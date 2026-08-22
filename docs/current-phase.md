@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 01 — Raw Collection**
+**Phase 01D — Collector v0.1**
 
 ## Objective
 
@@ -10,36 +10,25 @@ Collect the complete `mihoyo_obc` Chinese (`zh-cn`) Raw API corpus as a repeatab
 
 ## Current status
 
-Repository initialization is complete.
+Repository initialization is complete. Discovery and contract verification phases 01A–01C are complete.
 
-Formal collector implementation has **not** started yet.
-
-We are at **Phase 01A — Channel tree discovery**.
+Formal Collector v0.1 implementation has **not** started yet.
 
 ## Immediate next action
 
-Obtain a fresh browser capture for:
-
-```text
-getChannelTree?app_sn=ys_obc
-```
-
-Required evidence:
-
-1. the complete Response, unchanged;
-2. the request's full `Copy as cURL` capture, kept locally until secrets are reviewed/redacted.
-
-Use the real response to determine the current channel tree and choose representative channels for listing-API sampling.
+制定并审阅 Collector v0.1 implementation plan。
 
 ## Gate before collector implementation
 
-Do not build the general collector until we have verified from current evidence:
+The 01A–01C evidence gate is satisfied. Collector implementation may proceed against the promoted Phase 01 source contract. The `x-rpc-wiki_app: genshin` header remains an UNKNOWN requirement and may be checked by a minimal smoke test; it does not block 01D.
+
+Verified gates:
 
 - channel tree structure;
-- representative channel listing and pagination/termination behavior;
-- the current stable retrievable content key (historical `content_id` must be reverified);
+- representative channel listing endpoint behavior (pagination/termination remains UNKNOWN);
+- the current stable retrievable content key (`content_id` is verified for the current Phase contract);
 - representative detail endpoint behavior across multiple content types;
-- which request headers/parameters are genuinely required.
+- observed request parameters; required-header behavior remains UNKNOWN, including whether `x-rpc-wiki_app: genshin` is required.
 
 ## Explicitly paused
 

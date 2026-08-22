@@ -23,7 +23,7 @@ Phase 01 does not:
 2. Never overwrite old Raw evidence merely because a later crawl exists.
 3. `locale` is configurable; `zh-cn` is the current run target.
 4. Discovery is driven by official structures, never by brute-force enumeration of candidate content identifiers (including historically observed `content_id` values).
-5. The stable retrievable content key is not assumed in advance. Historical work suggests `content_id`, but the current API contract must be reverified in 01A–01C before implementation depends on it.
+5. The stable retrievable content key is evidence-driven. For the current reviewed capture, `content_id` is verified and promoted as the Phase 01 contract; future API versions must be reverified rather than assumed to preserve it.
 6. Within one crawl run/content inventory, fetch one detail payload per unique verified stable content key and preserve all observed channel memberships separately. This deduplication is scoped to that run; a later crawl run may fetch the same item again to detect source changes.
 7. Preserve channel-tree and listing responses, not only final entry details.
 8. Retries are bounded and failures remain visible.
@@ -33,14 +33,14 @@ Phase 01 does not:
 
 ## Workflow
 
-### 01A — Channel tree discovery
+### 01A — Channel tree discovery (complete)
 
-Current step.
+Completed against the reviewed current capture. The promoted source contract uses `GET /common/blackboard/ys_obc/v1/home/map?app_sn=ys_obc`. Observed structures include shortcut, hidden, and special-function nodes; depth is not limited to 2, and an embedded map `list` is not a complete inventory.
 
-Capture fresh evidence for:
+The reviewed capture used:
 
 ```text
-getChannelTree?app_sn=ys_obc
+GET /common/blackboard/ys_obc/v1/home/map?app_sn=ys_obc
 ```
 
 Collect:
@@ -56,11 +56,11 @@ Analyze and record at least:
 - which channels appear enumerable;
 - unknown fields/structures.
 
-Do not write the general collector yet.
+Do not treat the observed counts or node shapes as permanent API constants.
 
-### 01B — Representative channel listing samples
+### 01B — Representative channel listing samples (complete)
 
-After the current channel tree is understood, select roughly 5–10 structurally representative channels rather than copying every channel manually.
+Completed for representative channels 43, 25, 233, 129, 267, and 81. The promoted listing contract is `GET /common/blackboard/ys_obc/v1/home/content/list?app_sn=ys_obc&channel_id=<channel_id>`; detailed evidence remains in the research note.
 
 For each selected channel, verify the actual listing request/response and record:
 - request shape;
@@ -73,13 +73,13 @@ For each selected channel, verify the actual listing request/response and record
 
 Output: a verified Channel Inventory specification.
 
-Historical endpoint patterns may be used only as leads; they must be reverified against fresh captures.
+Detailed request/response evidence is maintained in `docs/research/phase-01/mihoyo-obc-api-discovery.md`.
 
-### 01C — Representative detail samples
+### 01C — Representative detail samples (complete)
 
-For representative content types/channels, inspect 1–3 IDs each.
+Completed with character 501157, quest 509653, and video 509109. The promoted detail contract is `GET /hoyowiki/genshin/wapi/entry_page?app_sn=ys_obc&entry_page_id=<content_id>&lang=zh-cn`. `content_id` is the currently verified directory/detail key; one key may have multiple channel memberships, which must all be preserved while deduplicating detail fetches within one run.
 
-Verify whether detail retrieval is shared across types or differs. Record:
+The reviewed samples confirm the endpoint across these content types. Keep schema differences evidence-driven. Record:
 - endpoint and method;
 - required query parameters;
 - required request headers;
@@ -92,7 +92,7 @@ Do not infer that quests, weapons, books, characters, etc. share one schema unti
 
 ### 01D — Implement Collector v0.1
 
-Only after 01A–01C provide enough current evidence.
+01A–01C satisfy the evidence gate. Implement only the Raw collector described below; the browser-observed `x-rpc-wiki_app: genshin` header remains UNKNOWN and is not an implementation prerequisite.
 
 Target flow:
 
@@ -121,17 +121,24 @@ Required engineering behavior:
 - safe handling of partial runs;
 - auditable timestamps and run metadata.
 
+## 01D implementation acceptance
+
+Collector fixtures/tests and manifest support belong to 01D implementation and acceptance.
+
 ### 01E — Staged validation before full crawl
 
-Scale progressively:
+Live staged validation runs in this order:
 
-1. channel tree only -> inspect;
-2. all channel listings only -> build/inspect inventory;
-3. stratified/random ~20 detail payloads -> inspect Raw storage;
-4. ~200 details -> inspect error rate, throttling, resume behavior;
-5. full site crawl.
+1. map + a small set of representative lists;
+2. at most ~20 details;
+3. inspect Raw, inventory, memberships, manifest, and failures;
+4. review;
+5. all relevant enumerable channel listings / full inventory;
+6. ~200 details;
+7. resume/rate-limit/failure validation;
+8. full crawl.
 
-Do not jump directly to a full crawl if an earlier gate fails.
+Do not treat the map's embedded `list` as the complete inventory. Do not proceed past a failed review gate.
 
 ### 01F — Profile Raw before designing Parsed
 

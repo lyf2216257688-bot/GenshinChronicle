@@ -1,6 +1,6 @@
 # Channel Tree Notes
 
-Status: waiting for fresh `getChannelTree?app_sn=ys_obc` Response.
+Status: 01A complete; facts below are observations from the reviewed current capture.
 
 This file records the human-readable analysis of the current channel tree. Do not paste secrets or unredacted cURL here.
 
@@ -18,8 +18,8 @@ Raw response hash (optional):
 ## Tree summary
 
 ```text
-Top-level channel count:
-Total channel/node count:
+Top-level channel count: 10 (observed in this capture)
+Total channel/node count: 96 (observed in this capture)
 Maximum depth:
 Leaf count:
 Non-leaf count:
@@ -40,12 +40,23 @@ Selection should maximize structural/content diversity, not simply pick the firs
 
 | channel | channel_id | why selected | listing sample status |
 |---|---:|---|---|
-| | | | pending |
+| representative channel | 43 | cross-channel listing sample | reviewed |
+| representative channel | 25 | cross-channel listing sample | reviewed |
+| representative channel | 233 | cross-channel listing sample | reviewed |
+| representative channel | 129 | cross-channel listing sample | reviewed |
+| representative channel | 267 | cross-channel listing sample | reviewed |
+| representative channel | 81 | cross-channel listing sample | reviewed |
+
+## Observed structural constraints
+
+- The reviewed capture includes `shortcut`, `hidden`, and special-function nodes.
+- The tree is not limited to `depth=2`.
+- A `list` embedded in the map response is not a complete content inventory.
 
 ## Unknowns / anomalies
 
-- None recorded yet.
+- Permanent counts and API-wide invariants are not inferred from this capture.
 
 ## Decision gate
 
-01A is complete only when the channel hierarchy is sufficiently understood to choose representative 01B listing samples without assuming all channels behave identically.
+01A is complete for the reviewed capture; representative 01B channels remain recorded here, while their API calls, schemas, and samples are maintained in `mihoyo-obc-api-discovery.md`.
