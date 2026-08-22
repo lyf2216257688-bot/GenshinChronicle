@@ -1,0 +1,37 @@
+# Local secrets / captures
+.local/
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated datasets
+/data/raw/*
+!/data/raw/.gitkeep
+/data/parsed/
+/data/canonical/
+/data/retrieval/
+
+# Logs / temporary outputs
+*.log
+/tmp/
