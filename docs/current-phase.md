@@ -10,13 +10,11 @@ Collect the complete `mihoyo_obc` Chinese (`zh-cn`) Raw API corpus as a repeatab
 
 ## Current status
 
-Repository initialization is complete. Discovery and contract verification phases 01A–01C are complete.
-
-Formal Collector v0.1 implementation has **not** started yet.
+Repository initialization and Collector v0.1 implementation are complete. Discovery and contract verification phases 01A–01C are complete. Phase 01D offline functional acceptance and the scoped Collector security gate are complete: `GC-COLLECTOR-001` and `GC-COLLECTOR-002` are closed, with 0 remaining findings.
 
 ## Immediate next action
 
-制定并审阅 Collector v0.1 implementation plan。
+进入 Phase 01E-1 小规模真实 smoke：从 map 与少量 representative lists 开始，逐步验证 Raw、inventory、manifest、失败记录、resume 与限流行为。01E 尚未开始。
 
 ## Gate before collector implementation
 

@@ -90,7 +90,7 @@ The reviewed samples confirm the endpoint across these content types. Keep schem
 
 Do not infer that quests, weapons, books, characters, etc. share one schema until observed.
 
-### 01D — Implement Collector v0.1
+### 01D — Implement Collector v0.1 (complete)
 
 01A–01C satisfy the evidence gate. Implement only the Raw collector described below; the browser-observed `x-rpc-wiki_app: genshin` header remains UNKNOWN and is not an implementation prerequisite.
 
