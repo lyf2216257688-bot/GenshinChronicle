@@ -1,0 +1,23 @@
+{
+  "retcode": 0,
+  "message": "OK",
+  "data": {
+    "list": [
+      {
+        "id": 194,
+        "parent_id": 0,
+        "depth": 1,
+        "children": [
+          {
+            "id": 43,
+            "parent_id": 194,
+            "depth": 2,
+            "children": [],
+            "list": []
+          }
+        ],
+        "list": []
+      }
+    ]
+  }
+}

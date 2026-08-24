@@ -2,8 +2,24 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+
+_ATOMIC_REPLACE_ATTEMPTS = 3
+_ATOMIC_REPLACE_BACKOFF = 0.01
+
+
+def _replace_with_retry(source: str, target: Path) -> None:
+    for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt + 1 >= _ATOMIC_REPLACE_ATTEMPTS:
+                raise
+            time.sleep(_ATOMIC_REPLACE_BACKOFF * (attempt + 1))
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -14,7 +30,7 @@ def atomic_write(path: Path, data: bytes) -> None:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, path)
+        _replace_with_retry(tmp, path)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)

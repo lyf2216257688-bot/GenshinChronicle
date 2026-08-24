@@ -6,7 +6,7 @@ Record **observed evidence** needed to implement the Raw collector. Keep verifie
 
 ## Current investigation
 
-Status: **01A–01C complete; 01D ready**
+Status: **01A–01C complete; P01-EA staged validation complete**
 
 Reviewed current contracts:
 
@@ -40,8 +40,12 @@ Use these labels:
 | Detail endpoint | VERIFIED | `/hoyowiki/genshin/wapi/entry_page` verified for character 501157, quest 509653, and video 509109. |
 | Stable directory/detail key | VERIFIED | `content_id` is the current verified listing identity and detail request key. |
 | Cross-channel membership | VERIFIED | One `content_id` may belong to multiple channels; deduplicate details within a run while preserving all memberships. |
+| Verified API origin | VERIFIED | Current live runs used `https://act-api-takumi-static.mihoyo.com`. |
 | `x-rpc-wiki_app: genshin` requirement | UNKNOWN | Observed in browser requests; server-side necessity is not proven. |
-| Listing/detail schemas, pagination termination, errors/limits | UNKNOWN | Keep unresolved until implementation smoke/staged validation. |
+| Listing pagination for browser-tested channels 25 and 130 | VERIFIED (scoped) | One `content/list` request per channel, no pagination parameters, and no request appended by scrolling to the bottom. This is current frontend evidence, not a permanent API guarantee. |
+| 200-detail staged run | VERIFIED | 200 detail responses succeeded with 0 failures. |
+| Same-run resume | VERIFIED (scoped) | Re-running the same run ID completed in about 1.7 seconds with zero retry attempts and reused saved listing/detail responses. |
+| Live 429/5xx behavior | UNKNOWN | No such responses were observed during staged live validation; bounded offline retry is tested. |
 
 ## Historical leads and unresolved contract details
 
@@ -50,7 +54,7 @@ Earlier work suggested patterns resembling:
 - detail requests using an `entry_page` endpoint and a content/page identifier;
 - additional wiki-specific request headers.
 
-The endpoint and key patterns above are now verified for the current reviewed capture; remaining schema, pagination, error, and header behavior stays unresolved until implementation validation.
+The endpoint and key patterns above are now verified for the current reviewed capture. Pagination is only verified for the two browser-tested channels; the collector must stop and report if a future listing envelope or listing container exposes a recognized pagination control field. Other schema, error, and header behavior stays evidence-bound.
 
 ## Sanitized request record template
 
@@ -70,7 +74,7 @@ Notes:
 ## Open questions
 
 1. Is there one listing schema or multiple listing schemas?
-2. How is pagination represented, and what observable condition proves a channel listing is exhausted?
+2. How is pagination represented for channels not covered by the browser validation, and what observable condition proves a channel listing is exhausted?
 3. Which headers are truly required versus browser noise?
 4. What throttling/error behavior is observed?
 5. Are there discovery structures that are not channel -> list -> detail?

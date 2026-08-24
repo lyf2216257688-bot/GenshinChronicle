@@ -3,9 +3,12 @@ from pathlib import Path
 from typing import Mapping
 
 
+DEFAULT_BASE_URL = "https://act-api-takumi-static.mihoyo.com"
+
+
 @dataclass(frozen=True)
 class CollectorConfig:
-    base_url: str = "https://wiki.hoyolab.com"
+    base_url: str = DEFAULT_BASE_URL
     app_sn: str = "ys_obc"
     locale: str = "zh-cn"
     output_root: Path = Path("data/raw")

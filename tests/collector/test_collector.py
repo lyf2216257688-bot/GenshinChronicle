@@ -8,14 +8,16 @@ from unittest import mock
 
 from genshin_corpus.collector.__main__ import main as collector_main
 from genshin_corpus.collector.collector import Collector
-from genshin_corpus.collector.config import CollectorConfig
+from genshin_corpus.collector.config import DEFAULT_BASE_URL, CollectorConfig
 from genshin_corpus.collector.storage import RunStore, atomic_write, write_json
 from genshin_corpus.collector.transport import HttpTransport, RequestError, Response
 
 
 class FakeTransport:
-    def __init__(self, fixture_dir):
+    def __init__(self, fixture_dir, *, map_name="map.json", listing_names=None):
         self.fixture_dir = Path(fixture_dir)
+        self.map_name = map_name
+        self.listing_names = listing_names or {}
         self.calls = []
 
     def get(self, url, *, params=(), headers=()):
@@ -23,9 +25,9 @@ class FakeTransport:
         headers = dict(headers)
         self.calls.append((url, params, headers))
         if url.endswith("/home/map"):
-            name = "map.json"
+            name = self.map_name
         elif url.endswith("/home/content/list"):
-            name = f"listing-{params['channel_id']}.json"
+            name = self.listing_names.get(params["channel_id"], f"listing-{params['channel_id']}.json")
         elif url.endswith("/entry_page"):
             name = f"detail-{params['entry_page_id']}.json"
         else:
@@ -177,6 +179,31 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), b"payload")
             self.assertEqual(Path(observed["dst"]), target)
 
+    def test_atomic_write_retries_transient_replace_permission_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "out.bin"
+            replace = mock.Mock(side_effect=[PermissionError(5, "sharing conflict"),
+                                              PermissionError(5, "sharing conflict"),
+                                              None])
+            with mock.patch("genshin_corpus.collector.storage.os.replace", replace), \
+                    mock.patch("genshin_corpus.collector.storage.time.sleep") as sleep:
+                atomic_write(target, b"payload")
+            self.assertEqual(replace.call_count, 3)
+            self.assertEqual([call.args[0] for call in sleep.call_args_list], [0.01, 0.02])
+            self.assertFalse(any(target.parent.glob(f".{target.name}.*")))
+
+    def test_atomic_write_raises_after_bounded_replace_retries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "out.bin"
+            replace = mock.Mock(side_effect=PermissionError(5, "persistent sharing conflict"))
+            with mock.patch("genshin_corpus.collector.storage.os.replace", replace), \
+                    mock.patch("genshin_corpus.collector.storage.time.sleep") as sleep:
+                with self.assertRaises(PermissionError):
+                    atomic_write(target, b"payload")
+            self.assertEqual(replace.call_count, 3)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertFalse(any(target.parent.glob(f".{target.name}.*")))
+
     def test_cli_defaults_do_not_fetch_details(self):
         with tempfile.TemporaryDirectory() as directory:
             with mock.patch("genshin_corpus.collector.__main__.Collector") as collector_cls:
@@ -185,7 +212,203 @@ class CollectorTests(unittest.TestCase):
                 collector_main(["--output-root", directory, "--run-id", "run-1"])
                 collector_cls.assert_called_once()
                 self.assertEqual(collector_cls.call_args.args[0].output_root, Path(directory))
+                self.assertEqual(collector_cls.call_args.args[0].base_url, DEFAULT_BASE_URL)
                 instance.run.assert_called_once_with(fetch_details=False)
+
+    def test_listing_pagination_signal_is_saved_and_blocks_followup_requests(self):
+        class PaginationTransport:
+            def __init__(self):
+                self.calls = []
+
+            def get(self, url, *, params=(), headers=()):
+                params = dict(params)
+                self.calls.append((url, params, dict(headers)))
+                if url.endswith("/home/map"):
+                    body = b'{"data":{"list":[{"channel_id":43},{"channel_id":25}]}}'
+                elif url.endswith("/home/content/list"):
+                    body = b'{"data":{"list":[{"id":43,"entry_limit":0,"next_cursor":"cursor-2","list":[{"content_id":501157}]}]}}'
+                else:
+                    raise AssertionError(url)
+                return Response(200, body, {}, url)
+
+        with tempfile.TemporaryDirectory() as directory:
+            transport = PaginationTransport()
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run()
+            listing_calls = [call for call in transport.calls if call[0].endswith("/home/content/list")]
+            detail_calls = [call for call in transport.calls if call[0].endswith("/entry_page")]
+            self.assertEqual([call[1]["channel_id"] for call in listing_calls], ["43"])
+            self.assertEqual(detail_calls, [])
+            self.assertEqual(manifest["status"], "partial")
+            failure = next(item for item in manifest["failures"] if item["kind"] == "listing_pagination_contract")
+            self.assertEqual(failure["context"]["signals"], ["root.data.list[0].next_cursor"])
+            self.assertEqual(manifest["channels"][0]["pagination"], "pagination_signal_detected")
+            self.assertEqual(manifest["listing_responses_saved"], 0)
+            store = RunStore(Path(directory), "mihoyo_obc", "zh-cn", "run-1")
+            raw, _ = store.response_paths("listings", "43")
+            self.assertTrue(raw.exists())
+
+    def test_listing_content_record_pagination_fields_do_not_trigger_guard(self):
+        class ContentFieldTransport:
+            def __init__(self):
+                self.calls = []
+
+            def get(self, url, *, params=(), headers=()):
+                params = dict(params)
+                self.calls.append((url, params, dict(headers)))
+                if url.endswith("/home/map"):
+                    body = b'{"data":{"list":[{"channel_id":43}]}}'
+                elif url.endswith("/home/content/list"):
+                    body = b'{"data":{"list":[{"content_id":501157,"page":1,"next":"business-value"}]}}'
+                else:
+                    raise AssertionError(url)
+                return Response(200, body, {}, url)
+
+        with tempfile.TemporaryDirectory() as directory:
+            transport = ContentFieldTransport()
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False
+            )
+            self.assertEqual(manifest["status"], "complete")
+            self.assertEqual(manifest["listing_responses_saved"], 1)
+            self.assertFalse(any(item["kind"] == "listing_pagination_contract" for item in manifest["failures"]))
+
+    def test_listing_channel_filter_selects_only_requested_channel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures)
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False, channel_ids=["43"]
+            )
+            listing_calls = [call for call in transport.calls if call[0].endswith("/home/content/list")]
+            self.assertEqual([call[1]["channel_id"] for call in listing_calls], ["43"])
+            self.assertEqual(manifest["listing_responses_saved"], 1)
+            self.assertEqual(manifest["inventory_count"], 2)
+
+    def test_live_map_id_nodes_and_children_feed_channel_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures, map_name="map-live-id.json")
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False, channel_ids=["43"]
+            )
+            listing_calls = [call for call in transport.calls if call[0].endswith("/home/content/list")]
+            self.assertEqual([call[1]["channel_id"] for call in listing_calls], ["43"])
+            self.assertEqual(manifest["recognized_channel_count"], 2)
+            self.assertEqual(manifest["listing_responses_saved"], 1)
+
+    def test_live_listing_wrapper_is_not_reported_as_missing_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(
+                self.fixtures,
+                listing_names={"43": "listing-live-wrapper-43.json"},
+            )
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False, channel_ids=["43"]
+            )
+            self.assertEqual(manifest["listing_records_discovered"], 2)
+            self.assertFalse(any(item["kind"] == "listing_item_anomaly" for item in manifest["failures"]))
+            self.assertEqual(manifest["channels"][0]["pagination"], "single_response_verified")
+
+    def test_map_without_recognizable_channels_is_partial(self):
+        class UnrecognizedMapTransport:
+            def __init__(self):
+                self.calls = []
+
+            def get(self, url, *, params=(), headers=()):
+                self.calls.append((url, dict(params), dict(headers)))
+                return Response(200, b'{"retcode":0,"message":"OK","data":{"list":[{"name":"unknown"}]}}', {}, url)
+
+        with tempfile.TemporaryDirectory() as directory:
+            transport = UnrecognizedMapTransport()
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False
+            )
+            self.assertEqual(manifest["recognized_channel_count"], 0)
+            self.assertEqual(manifest["status"], "partial")
+            self.assertEqual(manifest["failures"][0]["kind"], "map_schema")
+            failure_log = Path(directory) / "mihoyo_obc" / "zh-cn" / "run-1" / "failures.jsonl"
+            self.assertIn("map response contained no recognizable channel nodes", failure_log.read_text())
+
+    def test_listing_without_filter_keeps_all_channels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures)
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                fetch_details=False
+            )
+            listing_calls = [call for call in transport.calls if call[0].endswith("/home/content/list")]
+            self.assertEqual({call[1]["channel_id"] for call in listing_calls}, {"43", "25", "233", "81"})
+            self.assertEqual(manifest["listing_responses_saved"], 4)
+
+    def test_detail_limit_preserves_full_inventory_and_memberships(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures)
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                detail_limit=1
+            )
+            detail_calls = [call for call in transport.calls if call[0].endswith("/entry_page")]
+            self.assertEqual(len(detail_calls), 1)
+            self.assertEqual(manifest["unique_detail_responses_expected"], 2)
+            self.assertEqual(manifest["successful_detail_fetches"], 1)
+            inventory_path = Path(directory) / "mihoyo_obc" / "zh-cn" / "run-1" / "metadata" / "inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            self.assertEqual({item["content_id"] for item in inventory}, {"501157", "509653"})
+            self.assertEqual({item["content_id"]: item["channels"] for item in inventory}["501157"], ["43", "25"])
+
+    def test_detail_limit_none_keeps_all_detail_requests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures)
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run()
+            detail_calls = [call for call in transport.calls if call[0].endswith("/entry_page")]
+            self.assertEqual(len(detail_calls), 2)
+            self.assertEqual(manifest["successful_detail_fetches"], 2)
+
+    def test_detail_limit_twenty_caps_requests_without_truncating_inventory(self):
+        class LargeInventoryTransport:
+            def __init__(self):
+                self.calls = []
+
+            def get(self, url, *, params=(), headers=()):
+                params = dict(params)
+                self.calls.append((url, params, dict(headers)))
+                if url.endswith("/home/map"):
+                    body = b'{"data":{"list":[{"channel_id":43}]}}'
+                elif url.endswith("/home/content/list"):
+                    items = [{"content_id": f"content-{index:02d}"} for index in range(25)]
+                    body = json.dumps({"data": {"list": items}}).encode("utf-8")
+                elif url.endswith("/entry_page"):
+                    body = json.dumps({"content_id": params["entry_page_id"]}).encode("utf-8")
+                else:
+                    raise AssertionError(url)
+                return Response(200, body, {}, url)
+
+        with tempfile.TemporaryDirectory() as directory:
+            transport = LargeInventoryTransport()
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                detail_limit=20
+            )
+            detail_calls = [call for call in transport.calls if call[0].endswith("/entry_page")]
+            self.assertEqual(len(detail_calls), 20)
+            self.assertEqual(manifest["unique_detail_responses_expected"], 25)
+            self.assertEqual(manifest["successful_detail_fetches"], 20)
+            inventory_path = Path(directory) / "mihoyo_obc" / "zh-cn" / "run-1" / "metadata" / "inventory.json"
+            self.assertEqual(len(json.loads(inventory_path.read_text(encoding="utf-8"))), 25)
+
+    def test_detail_limit_round_robins_selected_channels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FakeTransport(self.fixtures)
+            manifest = Collector(CollectorConfig(output_root=Path(directory), run_id="run-1"), transport=transport).run(
+                detail_limit=1
+            )
+            self.assertEqual(manifest["detail_selection"]["strategy"], "channel_round_robin")
+            self.assertEqual(manifest["detail_selection"]["limit"], 1)
+            self.assertEqual(len(manifest["detail_selection"]["selected_content_ids"]), 1)
+
+    def test_cli_staged_options_are_forwarded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch("genshin_corpus.collector.__main__.Collector") as collector_cls:
+                instance = collector_cls.return_value
+                instance.run.return_value = {}
+                collector_main(["--output-root", directory, "--run-id", "run-1", "--details",
+                                "--channel-id", "43", "--channel-id", "25", "--detail-limit", "20"])
+                instance.run.assert_called_once_with(fetch_details=True, channel_ids=["43", "25"], detail_limit=20)
 
     def test_listing_anomaly_keeps_valid_items_and_unknown_fields(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,0 +1,17 @@
+{
+  "data": {
+    "list": [
+      {
+        "id": 43,
+        "parent_id": 194,
+        "depth": 2,
+        "children": [],
+        "list": [
+          {"content_id": 501157, "title": "Character"},
+          {"content_id": 509653, "title": "Quest"}
+        ],
+        "layout": "default"
+      }
+    ]
+  }
+}

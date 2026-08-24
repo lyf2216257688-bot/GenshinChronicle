@@ -140,6 +140,8 @@ Live staged validation runs in this order:
 
 Do not treat the map's embedded `list` as the complete inventory. Do not proceed past a failed review gate.
 
+P01-EA evidence (2026-08-24): browser inspection of channels 25 and 130 showed exactly one `content/list` request per channel, no pagination query parameters, and no appended request after scrolling to the bottom. A controlled run completed 200/200 detail fetches with 0 failures. Re-running the same run ID completed in about 1.7 seconds with zero retry attempts, demonstrating listing/detail resume skips for already valid saved responses. This is current frontend evidence, not a permanent API guarantee. The collector records `single_response_verified` for this observed contract and stops with an explicit partial manifest if a future response exposes a recognized pagination control field in the response envelope or listing container. Live 429/5xx behavior remains UNKNOWN; bounded offline retry behavior is covered by tests.
+
 ### 01F — Profile Raw before designing Parsed
 
 After the full crawl, **do not immediately implement parsing**.
