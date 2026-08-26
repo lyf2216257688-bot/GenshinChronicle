@@ -1,0 +1,34 @@
+{
+  "retcode": 0,
+  "data": {
+    "page": {
+      "id": "fixture-1",
+      "name": "示例页面",
+      "page_type": "Default",
+      "template_layout": {
+        "tab": [{
+          "tab_id": "t1",
+          "module_group": [{
+            "module_group_id": "g1",
+            "layout": "l1r1",
+            "module": [{"id": "m1", "pos": "left"}],
+            "name": "组"
+          }]
+        }]
+      },
+      "modules": [{
+        "id": "m1",
+        "name": "正文",
+        "repeated": false,
+        "is_submodule": false,
+        "origin_module_id": "0",
+        "components": [{
+          "component_id": "unknown_fixture",
+          "data": "{\"rich_text\":\"<p><strong>保留</strong>文本</p><p><a href=\\\"/entry/1\\\">链接</a></p>\"}",
+          "layout": "",
+          "style": ""
+        }]
+      }]
+    }
+  }
+}

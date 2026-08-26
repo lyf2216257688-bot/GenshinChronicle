@@ -1,6 +1,6 @@
 # Phase 02 - Parsed Schema Contract (Draft)
 
-Status: **draft; Batch 1 foundation**
+Status: **draft; Batch 2 structure and rich-text foundation**
 
 This document defines the first executable Parsed-layer contracts for the
 source-specific `mihoyo_obc` adapter. It is deliberately not a frozen schema.
@@ -74,3 +74,16 @@ The following remain UNKNOWN: complete `content_role` and `provenance`
 taxonomies, cross-snapshot module/component/block identity, HTML normalization
 rules, and the interactive-dialogue graph contract. They require targeted
 evidence before promotion.
+
+## Batch 2 promotion boundary
+
+The OBC adapter now decodes the verified `data.page` envelope, preserves
+module/component and template-layout observations, and emits a structure-
+preserving rich-text value for markup-bearing strings. Component IDs remain
+generic dispatch keys; no component family is promoted to a Canonical semantic
+type, so generic components are explicitly marked `preserved_unsupported` while
+their decoded payload remains available. The standard-library HTML parser is
+used only to preserve observed tags, attributes, text, links, media, entry
+references, and text-to-tree paths. Normalized text is a derived view and can
+be regenerated from `raw_markup` and the retained tree. Artifact SHA-256 and
+page/content identity mismatches are blocking integrity errors.

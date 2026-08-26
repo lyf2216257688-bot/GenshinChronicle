@@ -118,12 +118,14 @@ class ParsedModule:
     is_submodule: bool | None
     origin_module_id: str | None
     components: tuple[ParsedComponent, ...] = ()
+    unsupported: tuple[ParsedUnknown, ...] = ()
     layout_observations: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         if self.module_index < 0:
             raise ValueError("module_index must be non-negative")
         object.__setattr__(self, "components", tuple(self.components))
+        object.__setattr__(self, "unsupported", tuple(self.unsupported))
         object.__setattr__(self, "layout_observations", tuple(self.layout_observations))
 
     def to_dict(self) -> dict[str, Any]:
@@ -137,6 +139,7 @@ class ParsedModule:
             "is_submodule": self.is_submodule,
             "origin_module_id": self.origin_module_id,
             "components": [component.to_dict() for component in self.components],
+            "unsupported": [item.to_dict() for item in self.unsupported],
             "layout_observations": [_json_value(item) for item in self.layout_observations],
         }
 
@@ -155,10 +158,12 @@ class ParsedDetail:
     source_metadata: Mapping[str, Any] = field(default_factory=dict)
     source_template_layout: Any = None
     modules: tuple[ParsedModule, ...] = ()
+    unsupported_modules: tuple[ParsedUnknown, ...] = ()
     channel_memberships: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "modules", tuple(self.modules))
+        object.__setattr__(self, "unsupported_modules", tuple(self.unsupported_modules))
         object.__setattr__(self, "channel_memberships", tuple(self.channel_memberships))
 
     def to_dict(self) -> dict[str, Any]:
@@ -175,5 +180,6 @@ class ParsedDetail:
             "source_metadata": _json_value(self.source_metadata),
             "source_template_layout": _json_value(self.source_template_layout),
             "modules": [module.to_dict() for module in self.modules],
+            "unsupported_modules": [item.to_dict() for item in self.unsupported_modules],
             "channel_memberships": list(self.channel_memberships),
         }

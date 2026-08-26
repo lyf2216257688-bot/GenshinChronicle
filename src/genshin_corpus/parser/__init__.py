@@ -32,6 +32,8 @@ from .models import (
     ParsedUnknown,
 )
 from .storage import ParsedRunStore, blank_manifest
+from .rich_text import looks_like_markup, parse_rich_text
+from .obc import OBCDetailParser, parse_obc_detail
 
 __all__ = [
     "CONTENT_ROLE_UNKNOWN",
@@ -57,4 +59,8 @@ __all__ = [
     "ParsedUnknown",
     "ParsedRunStore",
     "blank_manifest",
+    "looks_like_markup",
+    "parse_rich_text",
+    "OBCDetailParser",
+    "parse_obc_detail",
 ]

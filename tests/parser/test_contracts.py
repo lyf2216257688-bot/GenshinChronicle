@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import tempfile
+import shutil
 import unittest
 
 from genshin_corpus.parser.contracts import (
@@ -82,12 +82,18 @@ class ContractTests(unittest.TestCase):
         self.assertNotEqual(provenance.to_dict(), role.to_dict())
 
     def test_parsed_store_rejects_conflicting_rewrite(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            store = ParsedRunStore(Path(directory), "mihoyo_obc", "zh-cn", "parsed-fixture")
+        root = Path("data/parsed/.parser-contract-test")
+        if root.exists():
+            shutil.rmtree(root)
+        try:
+            store = ParsedRunStore(root, "mihoyo_obc", "zh-cn", "parsed-fixture")
             first = store.write_record("detail:fixture-1", {"value": 1})
             self.assertTrue(Path(first["path"]).exists())
             with self.assertRaises(FileExistsError):
                 store.write_record("detail:fixture-1", {"value": 2})
+        finally:
+            if root.exists():
+                shutil.rmtree(root)
 
     def test_manifest_carries_raw_dependency_and_status_counts(self) -> None:
         manifest = blank_manifest(
