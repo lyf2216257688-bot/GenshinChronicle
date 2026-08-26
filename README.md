@@ -22,12 +22,12 @@ Those are different layers and must not be collapsed into one schema.
 
 ## Current status
 
-Active work is **Phase 02 — Parsing**.
+Phase 02 — Parsing is **CLOSED**. The immediate next action is **Phase 03 —
+Canonical Schema Design (planning only)**.
 
-Phase 01 Raw collection is closed. The current goal is to build a deterministic,
-source-specific Parsed layer over the completed Raw corpus while preserving
-structure, provenance, and Raw traceability. Canonical and Retrieval/RAG work
-remain outside the current phase.
+Phase 01 Raw collection and the Phase 02 deterministic, source-specific Parsed
+foundation are closed. Canonical implementation and Retrieval/RAG work remain
+outside the currently authorized planning scope.
 
 Start here:
 

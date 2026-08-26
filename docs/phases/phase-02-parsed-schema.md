@@ -1,9 +1,21 @@
 # Phase 02 - Parsed Schema Contract (Draft)
 
-Status: **draft; Batch 4 implementation complete; Phase 02 acceptance/review**
+Status: **CLOSED; draft Parsed contract remains evolutionary**
 
 This document defines the first executable Parsed-layer contracts for the
 source-specific `mihoyo_obc` adapter. It is deliberately not a frozen schema.
+
+## Closure
+
+Phase 02 closed at checkpoint `5c2d131` (`phase02: add incremental parsed
+acceptance pipeline`). Accepted local P01-EB validation accounted for
+16,437/16,437 input details with 0 `blocked_integrity` records. An independent
+same-run reuse validation reported 16,437 reused and 0 reparsed records; full
+local regression passed 53/53 tests.
+
+These results establish an auditable deterministic Parsed result for this
+local Raw snapshot. They do not claim upstream semantic completeness, complete
+semantic handling for every nested component, or a frozen Parsed schema.
 
 ## Boundary
 
@@ -78,6 +90,10 @@ taxonomies, cross-snapshot module/component/block identity, HTML normalization
 rules, and the full interactive-dialogue source contract (independent speaker
 field, option/dialogue semantics, group semantics, cross-group ordering and
 references). They require targeted evidence before promotion.
+
+Cross-snapshot stable identity and immutable semantic-projection reuse remain
+deferred until an explicit observation/projection contract is designed. Canonical,
+Retrieval, and RAG decisions are outside this closed Phase 02 contract.
 
 ## Batch 2 promotion boundary
 

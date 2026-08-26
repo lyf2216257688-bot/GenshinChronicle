@@ -34,17 +34,18 @@ API discovery
 
 ## Phase 02 — Parsing
 
-Status: **active**
+Status: **complete / CLOSED**
 
-Phase 02 begins with the reviewed contract foundation. Parsed outputs remain
-source-specific and provisional; detailed component handlers are added only
-when supported by representative Raw evidence.
+The source-specific Parsed foundation closed with auditable OBC Raw-to-Parsed
+acceptance. Parsed outputs remain source-specific, provisional, and
+evolutionary; closure does not freeze their draft schema or unknown handlers.
 
 ## Phase 03 — Canonical Corpus
 
-Status: **tentative / blocked by Phase 02 evidence**
+Status: **planning only**
 
-Create stable document/section/passage structures only after source schemas and mapping rules are validated.
+Design stable document/section/passage structures from accepted Phase 02
+evidence before authorizing any Canonical implementation.
 
 ## Phase 04 — Retrieval / RAG
 
