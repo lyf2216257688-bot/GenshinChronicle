@@ -5,7 +5,9 @@ import hashlib
 from dataclasses import replace
 from typing import Any, Iterable, Mapping
 
+from ..classification import classify_obc_component
 from ..contracts import ContractMetadata, Diagnostic, ParsedIdentity, RawRef, SourcePosition
+from ..dialogue import parse_dialogue_graph
 from ..fingerprints import parsed_fingerprint, source_fingerprint
 from ..identity import component_identity, content_unit_identity, detail_identity, module_identity
 from ..models import ParsedComponent, ParsedContentUnit, ParsedDetail, ParsedModule, ParsedUnknown
@@ -22,6 +24,18 @@ def _pointer_token(value: str | int) -> str:
 
 def _join_pointer(*parts: str | int) -> str:
     return "/" + "/".join(_pointer_token(part) for part in parts)
+
+
+def _projection_value(value: Any) -> Any:
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    if isinstance(value, tuple):
+        return [_projection_value(item) for item in value]
+    if isinstance(value, list):
+        return [_projection_value(item) for item in value]
+    if isinstance(value, Mapping):
+        return {str(key): _projection_value(item) for key, item in value.items()}
+    return value
 
 
 def _decode_component_data(value: Any) -> tuple[str, Any, Diagnostic | None]:
@@ -184,7 +198,7 @@ class OBCDetailParser:
             "source_layout": component.source_layout,
             "source_style": component.source_style,
             "units": [
-                {"identity": unit.identity.key, "value": unit.value}
+                {"identity": unit.identity.key, "value": _projection_value(unit.value)}
                 for unit in component.units
             ],
             "unsupported": [
@@ -316,9 +330,11 @@ class OBCDetailParser:
         component_ref: RawRef,
     ) -> ParsedComponent:
         encoding, decoded, decode_diagnostic = _decode_component_data(component.get("data"))
+        provenance, content_role = classify_obc_component(component_id)
+        generic_diagnostics = tuple(item for item in (decode_diagnostic,) if item is not None)
         diagnostics = tuple(item for item in (
-            Diagnostic("UNSUPPORTED_COMPONENT", "no source-specific component handler has been promoted", "info"),
-            decode_diagnostic,
+            None if component_id == "interactive_dialogue" else Diagnostic("UNSUPPORTED_COMPONENT", "no source-specific component handler has been promoted", "info"),
+            *generic_diagnostics,
         ) if item is not None)
         units: list[ParsedContentUnit] = []
         base_key = component_identity(content_id, component_id, same_type_ordinal).key
@@ -331,6 +347,8 @@ class OBCDetailParser:
                 source_fingerprint=source_fingerprint(component.get("data")),
                 parsed_fingerprint=parsed_fingerprint(generic_value),
                 parse_status="parsed_with_anomalies" if decode_diagnostic else "parsed",
+                provenance=provenance,
+                content_role=content_role,
                 diagnostics=diagnostics,
             ),
             value=generic_value,
@@ -344,10 +362,30 @@ class OBCDetailParser:
                     source_position=SourcePosition(component_ref.json_pointer, array_index=component_index, ordering=ordinal),
                     source_fingerprint=source_fingerprint(markup),
                     parsed_fingerprint=parsed_fingerprint(parse_rich_text(markup)),
+                    provenance=provenance,
+                    content_role=content_role,
                 ),
                 value={"kind": "rich_text", **parse_rich_text(markup)},
             ))
-        status = "preserved_unsupported"
+        graph = None
+        if component_id == "interactive_dialogue":
+            graph = parse_dialogue_graph(decoded, component_ref=component_ref)
+            units.append(ParsedContentUnit(
+                identity=content_unit_identity(base_key, "dialogue_graph", len(units)),
+                metadata=ContractMetadata(
+                    raw_refs=(component_ref,),
+                    source_position=SourcePosition(component_ref.json_pointer, ordering=len(units)),
+                    source_fingerprint=source_fingerprint(decoded),
+                    parsed_fingerprint=graph.parsed_fingerprint,
+                    parse_status="parsed_with_anomalies" if graph.diagnostics else "parsed",
+                    provenance=provenance,
+                    content_role=content_role,
+                    diagnostics=graph.diagnostics,
+                ),
+                value=graph,
+            ))
+        component_diagnostics = diagnostics if graph is None else diagnostics + graph.diagnostics
+        status = "preserved_unsupported" if graph is None else ("parsed_with_anomalies" if component_diagnostics else "parsed")
         unsupported: tuple[ParsedUnknown, ...] = ()
         return ParsedComponent(
             identity=component_identity(content_id, component_id, same_type_ordinal),
@@ -359,12 +397,14 @@ class OBCDetailParser:
                     "component_id": component_id,
                     "encoding": encoding,
                     "units": [
-                        {"identity": unit.identity.key, "value": unit.value}
+                        {"identity": unit.identity.key, "value": _projection_value(unit.value)}
                         for unit in units
                     ],
                 }),
                 parse_status=status,
-                diagnostics=diagnostics,
+                provenance=provenance,
+                content_role=content_role,
+                diagnostics=component_diagnostics,
             ),
             source_component_id=component_id,
             source_data_encoding=encoding,

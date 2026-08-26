@@ -1,6 +1,6 @@
 # Phase 02 - Parsed Schema Contract (Draft)
 
-Status: **draft; Batch 2 structure and rich-text foundation**
+Status: **draft; Batch 3 dialogue and classification foundation**
 
 This document defines the first executable Parsed-layer contracts for the
 source-specific `mihoyo_obc` adapter. It is deliberately not a frozen schema.
@@ -40,8 +40,11 @@ Every record carries:
 - `parse_status` and diagnostics;
 - separate, versioned `provenance` and `content_role` classifications.
 
-The Batch 1 implementation only provides the classification container and
-defaults it to `unknown`. It does not guess author or semantic role.
+The Batch 1 implementation provided the classification container. Batch 3 adds
+one source-structure rule: `interactive_dialogue` may receive the provisional
+`dialogue` content role. Provenance remains `unknown`; provenance and role are
+independent and versioned. Unknown and mixed states remain valid first-class
+results.
 
 ## Identity and fingerprints
 
@@ -72,8 +75,9 @@ the affected detail and must remain visible in the run manifest.
 
 The following remain UNKNOWN: complete `content_role` and `provenance`
 taxonomies, cross-snapshot module/component/block identity, HTML normalization
-rules, and the interactive-dialogue graph contract. They require targeted
-evidence before promotion.
+rules, and the full interactive-dialogue source contract (independent speaker
+field, option/dialogue semantics, group semantics, cross-group ordering and
+references). They require targeted evidence before promotion.
 
 ## Batch 2 promotion boundary
 
@@ -87,3 +91,19 @@ used only to preserve observed tags, attributes, text, links, media, entry
 references, and text-to-tree paths. Normalized text is a derived view and can
 be regenerated from `raw_markup` and the retained tree. Artifact SHA-256 and
 page/content identity mismatches are blocking integrity errors.
+
+## Batch 3 promotion boundary
+
+The OBC `interactive_dialogue` component now emits an additional
+`dialogue_graph` content unit. Groups, source node IDs, node insertion order,
+child edge order, options, dialogue values, icons, unknown node fields, and
+Raw pointers are retained. The representation is a graph: shared children,
+multiple parents, cycles, orphan nodes, dangling edges, and root anomalies are
+reported deterministically rather than coerced into a tree or a single
+storyline. Speaker is never inferred from HTML text. The original generic
+decoded component unit remains available.
+
+Classification is intentionally minimal and deterministic. The
+`interactive_dialogue` source component ID supplies only the provisional
+`dialogue` role label; provenance stays `unknown`, and no corpus-wide semantic
+classification or taxonomy freeze is performed.
