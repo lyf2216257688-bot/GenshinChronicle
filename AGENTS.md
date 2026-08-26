@@ -35,6 +35,7 @@ The collector must be source-oriented. Do not assume every entry is a quest or d
 - Do not bypass access controls, anti-bot protections, 403/429 responses, or other site protections.
 - API contracts must be evidence-driven. Never invent endpoints, required headers, or schemas from assumptions.
 - Never commit cookies, authorization material, or unredacted browser cURL containing secrets. Put sensitive local samples under `.local/`.
+- Evidence Packet convenience must not cause loss of structure, provenance, traceability, recall, ranking, context quality, or other information needed for final RAG quality.
 
 ## Explicit non-goals for Phase 01
 Do **not** implement or design in detail:

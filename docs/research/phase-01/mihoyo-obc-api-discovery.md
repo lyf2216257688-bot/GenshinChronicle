@@ -6,7 +6,7 @@ Record **observed evidence** needed to implement the Raw collector. Keep verifie
 
 ## Current investigation
 
-Status: **01A–01C complete; P01-EA staged validation complete**
+Status: **01A–01C complete; P01-EA and P01-EB complete; Phase 01 CLOSED**
 
 Reviewed current contracts:
 
@@ -46,6 +46,10 @@ Use these labels:
 | 200-detail staged run | VERIFIED | 200 detail responses succeeded with 0 failures. |
 | Same-run resume | VERIFIED (scoped) | Re-running the same run ID completed in about 1.7 seconds with zero retry attempts and reused saved listing/detail responses. |
 | Live 429/5xx behavior | UNKNOWN | No such responses were observed during staged live validation; bounded offline retry is tested. |
+
+## Full-crawl evidence (P01-EB)
+
+The local run `p01eb_full_20260824` is complete for the current production scope (`zh-cn` + OBC only): 96/96 listing responses, 32,916 listing records, 16,437 unique `content_id` values, 16,437/16,437 successful detail responses, and 0 final unresolved failures. Archive/hash/inventory audit, same-run recovery, and OBC full-corpus profiling passed. These are run-level, contract-bounded observations, not a claim of absolute semantic completeness of the upstream server.
 
 ## Historical leads and unresolved contract details
 

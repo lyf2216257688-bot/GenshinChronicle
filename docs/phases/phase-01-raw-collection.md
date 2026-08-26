@@ -142,7 +142,7 @@ Do not treat the map's embedded `list` as the complete inventory. Do not proceed
 
 P01-EA evidence (2026-08-24): browser inspection of channels 25 and 130 showed exactly one `content/list` request per channel, no pagination query parameters, and no appended request after scrolling to the bottom. A controlled run completed 200/200 detail fetches with 0 failures. Re-running the same run ID completed in about 1.7 seconds with zero retry attempts, demonstrating listing/detail resume skips for already valid saved responses. This is current frontend evidence, not a permanent API guarantee. The collector records `single_response_verified` for this observed contract and stops with an explicit partial manifest if a future response exposes a recognized pagination control field in the response envelope or listing container. Live 429/5xx behavior remains UNKNOWN; bounded offline retry behavior is covered by tests.
 
-### 01F — Profile Raw before designing Parsed
+### 01F — Profile Raw before designing Parsed (complete)
 
 After the full crawl, **do not immediately implement parsing**.
 
@@ -174,7 +174,11 @@ Choose samples deliberately:
 - smallest pages;
 - rare components.
 
-Only then begin Phase 02 design.
+P01-EB completed the full OBC detail-corpus profiling on the saved run. The profiling gate is satisfied; it does not itself define a Parsed schema.
+
+### Phase 01 closure (2026-08-26)
+
+P01-EB (`run_id=p01eb_full_20260824`) is complete for the current production scope (`zh-cn` + OBC only): 96/96 listing responses, 32,916 listing records, 16,437 unique `content_id` values, 16,437/16,437 successful detail fetches, and 0 final unresolved failures. Archive/hash/inventory audit and same-run recovery passed. P01-EA was checkpointed at `0c5617d` and is not rerun. Phase 01 is **CLOSED**. This records crawl and contract coverage for the run, not absolute semantic completeness of the upstream server. AGD, multilingual, OBC↔AGD alignment, client unpacking, and MiHoYoBinData branches remain retired from active production.
 
 ## Full-crawl acceptance report
 
