@@ -14,11 +14,11 @@ Repository initialization, Collector v0.1, discovery/contract verification (01A�
 
 P01-EB full crawl (`run_id=p01eb_full_20260824`) is complete and locally auditable: 96/96 listing responses, 32,916 listing records, 16,437 unique `content_id` values, and 16,437/16,437 successful detail responses, with 0 final unresolved failures. Archive/hash/inventory audit and same-run recovery passed. OBC full-corpus profiling is complete. Current production scope is `zh-cn` + OBC only. These results are run-level and contract-bounded; `manifest complete` is not a claim of absolute semantic completeness of the upstream server.
 
-Phase 02 Parsed Schema / Parser Architecture planning is complete and has been reviewed. The schema remains a design draft rather than a frozen contract. The next execution unit is Batch 1 — Phase 02 Contract Foundation.
+Phase 02 Parsed Schema / Parser Architecture planning is complete and has been reviewed. Batch 1 — Contract Foundation is complete: the draft schema specification, RawRef/identity/fingerprint contracts, evidence-preserving unknown model, Parsed run storage boundary, and deterministic foundation fixtures/tests are in place. The schema remains a design draft rather than a frozen contract.
 
 ## Immediate next action
 
-Execute Batch 1 — Phase 02 Contract Foundation from the reviewed Parsed Schema / Parser Architecture Plan.
+Execute Batch 2 — OBC Structure and Rich Text Foundation from the reviewed Parsed Schema / Parser Architecture Plan.
 
 ## Phase 02 boundary
 
@@ -44,4 +44,4 @@ Current stage and immediate next action: this file.
 
 Phase 01 workflow and closure evidence: `docs/phases/phase-01-raw-collection.md` and relevant `docs/research/phase-01/` notes.
 
-The Phase 02 specification will be created as part of Batch 1 — Phase 02 Contract Foundation. Until then, Phase 02 work must also follow `docs/architecture-overview.md`, `AGENTS.md`, and the verified OBC evidence already recorded in the repository.
+The Phase 02 draft specification is `docs/phases/phase-02-parsed-schema.md`. Phase 02 work must also follow `docs/architecture-overview.md`, `AGENTS.md`, and the verified OBC evidence already recorded in the repository.

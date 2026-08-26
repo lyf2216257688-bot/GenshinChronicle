@@ -15,7 +15,7 @@ Deliverables:
 
 ## Phase 01 — Raw Collection
 
-Status: **active**
+Status: **complete / CLOSED**
 
 Goal: obtain the complete, auditable `mihoyo_obc` `zh-cn` Raw corpus.
 
@@ -34,9 +34,11 @@ API discovery
 
 ## Phase 02 — Parsing
 
-Status: **tentative / blocked by Phase 01 evidence**
+Status: **active**
 
-Do not predefine detailed parsers before profiling the actual Raw corpus. Parsed outputs may be source-specific.
+Phase 02 begins with the reviewed contract foundation. Parsed outputs remain
+source-specific and provisional; detailed component handlers are added only
+when supported by representative Raw evidence.
 
 ## Phase 03 — Canonical Corpus
 

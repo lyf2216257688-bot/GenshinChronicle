@@ -22,9 +22,12 @@ Those are different layers and must not be collapsed into one schema.
 
 ## Current status
 
-Active work is **Phase 01 — Raw Collection**.
+Active work is **Phase 02 — Parsing**.
 
-The immediate goal is not to build the final database. It is to obtain a complete, reproducible, auditable `mihoyo_obc` `zh-cn` Raw dataset first, then use that real dataset to decide how later parsing should work.
+Phase 01 Raw collection is closed. The current goal is to build a deterministic,
+source-specific Parsed layer over the completed Raw corpus while preserving
+structure, provenance, and Raw traceability. Canonical and Retrieval/RAG work
+remain outside the current phase.
 
 Start here:
 
@@ -45,7 +48,8 @@ docs/
 ├── current-phase.md
 ├── roadmap.md
 ├── phases/
-│   └── phase-01-raw-collection.md
+│   ├── phase-01-raw-collection.md
+│   └── phase-02-parsed-schema.md
 ├── research/
 │   └── phase-01/
 │       ├── mihoyo-obc-api-discovery.md
@@ -67,7 +71,9 @@ tests/
     └── mihoyo_obc/
 ```
 
-`parser/`, `canonical/`, and `retrieval/` source packages are deliberately absent. They should be created only when their phases begin and are justified by evidence from the Raw corpus.
+`canonical/` and `retrieval/` source packages remain deliberately absent.
+The `parser/` package is introduced in Phase 02 and currently contains only
+the contract foundation; source-specific handlers are added incrementally.
 
 ## Data and secrets
 

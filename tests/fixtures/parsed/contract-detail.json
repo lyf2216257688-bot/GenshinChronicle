@@ -1,0 +1,12 @@
+{
+  "content_id": "fixture-1",
+  "module": {
+    "id": "module-7",
+    "component": {
+      "component_id": "unknown_fixture",
+      "data": {
+        "nested": ["retain", {"value": 1}]
+      }
+    }
+  }
+}

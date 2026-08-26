@@ -55,10 +55,16 @@ RAG answers are query results. They must not automatically become Canonical fact
 - Deterministic work belongs in code; semantic interpretation should not be disguised as deterministic parsing.
 - Long-term extensibility is preserved without implementing future layers prematurely.
 
+Phase 02 Parsed schema and parser contracts are source-specific, deterministic,
+and provisional until validated against representative OBC Raw evidence. Parsed
+records carry explicit Raw references, source positions, fingerprints, parser
+versions, and unsupported/anomaly status; they must not silently discard
+unknown structure or take on Canonical/Retrieval responsibilities.
+
 ## RAG-first product principle
 
 GenshinChronicle's final product goal is high-quality RAG. Evidence Packets provide a free/manual path and an auditable evidence-output layer, but must not drive lossy upstream choices. Parsed, Canonical, and retrieval design must preserve or improve retrieval quality, recall, ranking, context quality, structural information, provenance, and traceability back to Raw. Evidence Packet convenience is never a reason to discard information needed by future RAG.
 
 ## Current implementation boundary
 
-Phase 01 Raw collection is closed after the completed P01-EB corpus and profiling evidence. Detailed Parsed/Canonical/Retrieval schemas remain provisional until designed in Phase 02, governed by the RAG-first principle above.
+Phase 01 Raw collection is closed after the completed P01-EB corpus and profiling evidence. Phase 02 Parsed foundation is now being implemented incrementally; the draft contract is documented in `docs/phases/phase-02-parsed-schema.md`. Canonical/Retrieval schemas remain deferred and provisional, governed by the RAG-first principle above.
