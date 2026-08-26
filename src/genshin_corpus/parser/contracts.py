@@ -5,7 +5,7 @@ from typing import Any, Literal, Mapping
 
 
 PARSED_SCHEMA_VERSION = "phase02-draft-0.1"
-PARSER_VERSION = "obc-foundation-0.1"
+PARSER_VERSION = "obc-foundation-0.2"
 PROVENANCE_UNKNOWN = "unknown"
 CONTENT_ROLE_UNKNOWN = "unknown"
 

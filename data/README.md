@@ -2,9 +2,9 @@
 
 `data/` contains generated/local datasets, not source code.
 
-## Phase 01
+## Raw evidence
 
-`data/raw/` is the intended local home for collected Raw artifacts once the collector exists.
+`data/raw/` is the local home for collected Raw artifacts.
 
 Raw principles:
 - preserve received responses;
@@ -17,6 +17,15 @@ The full dataset is intentionally ignored by Git.
 
 Small sanitized samples needed for automated tests belong under `tests/fixtures/`, not here.
 
-## Future directories
+## Parsed outputs
 
-`data/parsed/`, `data/canonical/`, and retrieval artifacts should be introduced only when those phases begin. They are not part of the current implementation scope.
+`data/parsed/` contains generated, Git-ignored Parsed runs produced from local
+Raw runs. A Parsed run stores immutable record files plus an auditable manifest
+that records its input Raw run, dependencies, fingerprints, statuses, and
+diagnostics. Parsed output is derived data, not source code and not a
+replacement for Raw evidence.
+
+## Deferred directories
+
+`data/canonical/` and retrieval artifacts remain deferred. They should be
+introduced only with their respective future layer contracts.

@@ -8,6 +8,8 @@ import unittest
 from genshin_corpus.parser.contracts import (
     Classification,
     Diagnostic,
+    PARSED_SCHEMA_VERSION,
+    PARSER_VERSION,
     RawRef,
     SourcePosition,
 )
@@ -106,6 +108,40 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(manifest["raw_run_id"], "fixture-run")
         self.assertEqual(manifest["raw_manifest_sha256"], "c" * 64)
         self.assertIn("preserved_unsupported", manifest["counts"])
+
+    def test_blank_manifest_default_versions_follow_current_contract(self) -> None:
+        manifest = blank_manifest(
+            source="mihoyo_obc",
+            locale="zh-cn",
+            parsed_run_id="parsed-fixture",
+            raw_run_id="fixture-run",
+            raw_manifest_sha256="c" * 64,
+        )
+        self.assertEqual(manifest["schema_version"], PARSED_SCHEMA_VERSION)
+        self.assertEqual(manifest["parser_version"], PARSER_VERSION)
+
+    def test_completed_manifest_rejects_conflicting_rewrite(self) -> None:
+        root = Path("data/parsed/.parser-contract-test")
+        if root.exists():
+            shutil.rmtree(root)
+        try:
+            store = ParsedRunStore(root, "mihoyo_obc", "zh-cn", "parsed-fixture")
+            manifest = blank_manifest(
+                source="mihoyo_obc",
+                locale="zh-cn",
+                parsed_run_id="parsed-fixture",
+                raw_run_id="fixture-run",
+                raw_manifest_sha256="c" * 64,
+            )
+            manifest["status"] = "complete"
+            store.write_manifest(manifest)
+            changed = dict(manifest)
+            changed["counts"] = {**manifest["counts"], "parsed": 1}
+            with self.assertRaises(FileExistsError):
+                store.write_manifest(changed)
+        finally:
+            if root.exists():
+                shutil.rmtree(root)
 
 
 if __name__ == "__main__":

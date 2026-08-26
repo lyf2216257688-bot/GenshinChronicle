@@ -6,6 +6,16 @@ from .contracts import Classification
 CLASSIFICATION_TAXONOMY_VERSION = "phase02-draft-0.1"
 OBC_COMPONENT_ROLE_RULE = "obc-component-role"
 OBC_COMPONENT_ROLE_RULE_VERSION = "0.1"
+CLASSIFICATION_RULESET_VERSION = "phase02-classification-0.1"
+
+
+def classification_dependencies() -> dict[str, str]:
+    """Return versioned deterministic rules used by the current adapter."""
+
+    return {
+        "classification_ruleset": CLASSIFICATION_RULESET_VERSION,
+        OBC_COMPONENT_ROLE_RULE: OBC_COMPONENT_ROLE_RULE_VERSION,
+    }
 
 
 def classify_obc_component(component_id: str | None) -> tuple[Classification, Classification]:

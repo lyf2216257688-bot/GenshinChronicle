@@ -33,9 +33,9 @@ from .models import (
 )
 from .storage import ParsedRunStore, blank_manifest
 from .rich_text import looks_like_markup, parse_rich_text
-from .classification import classify_obc_component
+from .classification import classification_dependencies, classify_obc_component
 from .dialogue import DialogueEdge, DialogueGraph, DialogueGroup, DialogueNode, parse_dialogue_graph
-from .obc import OBCDetailParser, parse_obc_detail
+from .obc import OBCDetailParser, OBCParsedRunPipeline, ParseDependencies, parse_obc_detail
 
 __all__ = [
     "CONTENT_ROLE_UNKNOWN",
@@ -64,11 +64,14 @@ __all__ = [
     "looks_like_markup",
     "parse_rich_text",
     "classify_obc_component",
+    "classification_dependencies",
     "DialogueEdge",
     "DialogueGraph",
     "DialogueGroup",
     "DialogueNode",
     "parse_dialogue_graph",
     "OBCDetailParser",
+    "OBCParsedRunPipeline",
+    "ParseDependencies",
     "parse_obc_detail",
 ]

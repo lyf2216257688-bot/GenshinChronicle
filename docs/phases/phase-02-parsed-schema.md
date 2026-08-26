@@ -1,6 +1,6 @@
 # Phase 02 - Parsed Schema Contract (Draft)
 
-Status: **draft; Batch 3 dialogue and classification foundation**
+Status: **draft; Batch 4 implementation complete; Phase 02 acceptance/review**
 
 This document defines the first executable Parsed-layer contracts for the
 source-specific `mihoyo_obc` adapter. It is deliberately not a frozen schema.
@@ -107,3 +107,33 @@ Classification is intentionally minimal and deterministic. The
 `interactive_dialogue` source component ID supplies only the provisional
 `dialogue` role label; provenance stays `unknown`, and no corpus-wide semantic
 classification or taxonomy freeze is performed.
+
+## Batch 4 promotion boundary
+
+The OBC Parsed runner now reads one completed local Raw run, validates each
+detail artifact against both its Raw manifest path/hash and response metadata,
+and writes one immutable Parsed record per input detail. Its manifest carries
+the Raw run/manifest dependency, schema/parser/rule versions, per-observation
+dependency fingerprints, record hashes, detail-level status accounting, and
+deduplicated nested diagnostics. An observation dependency includes the Raw
+artifact fingerprint, effective ordered channel memberships passed to the
+adapter, and schema/parser/pipeline/rule dependencies. A change to one of
+those inputs invalidates only the corresponding observation in a new Parsed
+run.
+
+Reuse is intentionally limited to the same source, locale, and Raw run ID:
+reused records retain their original `RawRef`, so Phase 02 does not claim that
+a record from another Raw snapshot represents the current observation.
+Cross-snapshot immutable semantic-projection reuse remains deferred until an
+explicit observation/projection contract exists. Completed-run fast reuse also
+rechecks each Raw artifact/metadata and record hash, and recomputes the
+expected observation dependency before returning a complete manifest. A
+completed Parsed manifest is conflict-safe and is not silently replaced by
+different content.
+
+Corpus-wide local acceptance for `p01eb_full_20260824` accounted for all
+16,437 completed Raw detail artifacts. The resulting detail statuses were
+16,437 `parsed`, 0 `parsed_with_anomalies`, 0 `preserved_unsupported`, and 0
+`blocked_integrity`. This status accounting describes deterministic parsing of
+this local Raw snapshot. It does not establish upstream semantic completeness,
+freeze unknown component semantics, or change the identity evidence boundary.

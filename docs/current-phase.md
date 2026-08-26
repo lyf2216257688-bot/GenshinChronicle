@@ -14,11 +14,11 @@ Repository initialization, Collector v0.1, discovery/contract verification (01A�
 
 P01-EB full crawl (`run_id=p01eb_full_20260824`) is complete and locally auditable: 96/96 listing responses, 32,916 listing records, 16,437 unique `content_id` values, and 16,437/16,437 successful detail responses, with 0 final unresolved failures. Archive/hash/inventory audit and same-run recovery passed. OBC full-corpus profiling is complete. Current production scope is `zh-cn` + OBC only. These results are run-level and contract-bounded; `manifest complete` is not a claim of absolute semantic completeness of the upstream server.
 
-Phase 02 Parsed Schema / Parser Architecture planning is complete and has been reviewed. Batch 1 — Contract Foundation, Batch 2 — OBC Structure + Rich Text, and Batch 3 — Dialogue + Classification Foundation are complete: the draft schema specification, RawRef/identity/fingerprint contracts, evidence-preserving unknown model, Parsed run storage boundary, deterministic OBC page/module/component adapter, layout observations, structure-preserving rich-text handling, an evidence-preserving interactive-dialogue graph handler, and minimal versioned classification rules are in place. The schema remains a design draft rather than a frozen contract.
+Phase 02 Parsed Schema / Parser Architecture planning and all four implementation batches are complete. Batch 4 added the executable OBC Raw-to-Parsed run pipeline, immutable Parsed record storage, Raw dependency accounting, versioned reuse/reparse decisions, and deterministic corpus-wide acceptance. The local P01-EB acceptance run accounted for 16,437/16,437 completed Raw details with 0 `blocked_integrity` records. This is an auditable local parsing result, not a claim of absolute upstream semantic completeness. The schema remains a design draft rather than a frozen contract.
 
 ## Immediate next action
 
-Execute Batch 4 — Incremental Processing Foundation and Validation from the reviewed Parsed Schema / Parser Architecture Plan.
+Conduct Phase 02 acceptance/review of the completed Parsed foundation before any decision about a later phase.
 
 ## Phase 02 boundary
 
