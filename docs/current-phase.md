@@ -33,12 +33,18 @@ than a frozen contract.
 The Phase 03 Canonical architecture plan has passed review. The approved
 contract is recorded in `docs/phases/phase-03-canonical-schema.md`.
 
-Phase 03 Batch 1 — Canonical Contract Foundation is **CLOSED / PASS** at
-checkpoint `0f7cff4` (`phase03: establish canonical contract foundation`).
+Phase 01 Raw Collection is **CLOSED**. Phase 02 Parsed Schema / Parser
+Foundation is **CLOSED**. Phase 03 Canonical Corpus is **ACTIVE**; its
+architecture plan is **APPROVED**. Batch 1 — Canonical Contract Foundation is
+**CLOSED / PASS** at `0f7cff4` (`phase03: establish canonical contract
+foundation`), and its post-Batch 1 status synchronization is **CLOSED / PASS**
+at `d69903e` (`phase03: sync status after batch1`). Batch 2 — Structural OBC
+Projector is **CLOSED / PASS** at `e34468e` (`phase03: implement structural
+obc projector`).
 
 ## Immediate next action
 
-Phase 03 Batch 2 — Structural OBC Projector.
+Phase 03 Batch 3 — Dialogue + structured observations.
 
 ## Phase transition boundary
 
@@ -46,11 +52,12 @@ Phase 02 is closed. Its Parsed contracts remain source-specific and
 evolutionary; UNKNOWN or unsupported source structures must not be guessed or
 silently discarded.
 
-Phase 03 implementation is authorized. Batch 1 is closed / pass at `0f7cff4`.
-The current authorization is limited to Batch 2, Structural OBC Projector.
-Canonical corpus materialization, run storage/full-corpus projection, semantic
-normalization or merge, and cross-snapshot identity/reuse are not authorized
-in Batch 2.
+Phase 03 implementation is authorized. Batches 1 and 2 are closed / pass at
+`0f7cff4` and `e34468e`; the Batch 1 status synchronization is closed / pass
+at `d69903e`. The current authorization is limited to Batch 3, Dialogue +
+structured observations. Canonical corpus materialization, run
+storage/full-corpus projection, semantic normalization or merge, and
+cross-snapshot identity/reuse are not authorized in Batch 3.
 
 The following remain outside the authorized current batch. Later Phase 03
 batches require their own reviewed authorization:

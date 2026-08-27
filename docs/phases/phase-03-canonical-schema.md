@@ -1,15 +1,18 @@
 # Phase 03 - Canonical Schema Contract
 
-Status: **Batch 1 CLOSED / PASS @ `0f7cff4`; Batch 2 is the current authorized scope**
+Status: **Architecture Plan APPROVED; Batch 1 CLOSED / PASS @ `0f7cff4`; post-Batch 1 status synchronization CLOSED / PASS @ `d69903e`; Batch 2 CLOSED / PASS @ `e34468e`; Batch 3 is the current authorized scope**
 
 ## Authorization
 
-The Phase 03 architecture has passed review. Batch 1 — Canonical Contract
+The Phase 03 architecture plan is **APPROVED**. Batch 1 — Canonical Contract
 Foundation is **CLOSED / PASS** at `0f7cff4` (`phase03: establish canonical
-contract foundation`). Implementation continues in small, independently
-reviewed batches. The immediate authorized work is Batch 2, Structural OBC
-Projector. Later batches must not be pulled into Batch 2 merely because this
-specification defines their boundaries.
+contract foundation`), and its status synchronization is **CLOSED / PASS** at
+`d69903e` (`phase03: sync status after batch1`). Batch 2 — Structural OBC
+Projector is **CLOSED / PASS** at `e34468e` (`phase03: implement structural
+obc projector`). Implementation continues in small, independently reviewed
+batches. The immediate authorized work is Batch 3, Dialogue + structured
+observations. Later batches must not be pulled into Batch 3 merely because
+this specification defines their boundaries.
 
 The current production input scope remains `mihoyo_obc` + `zh-cn`. Locale must
 remain explicit in contracts so the current scope does not become a permanent
@@ -269,10 +272,10 @@ database, or serving infrastructure is required.
    `blocked_integrity` record with a RawRef, a `blocked_integrity` record
    without a RawRef, and the rule that `blocked_integrity` must not synthesize
    `source_identity` from manifest source, locale, or `content_id`.
-2. **Structural OBC Projector**: the versioned module-to-section rule,
+2. **Structural OBC Projector — CLOSED / PASS @ `e34468e`**: the versioned module-to-section rule,
    component contexts, ordered units, unsupported accounting, record metadata,
    and source-position preservation.
-3. **Dialogue and Structured Observations**: rich text, generic decoded values,
+3. **Dialogue and Structured Observations — current authorized scope**: rich text, generic decoded values,
    dialogue graph preservation, diagnostics, and derived relationships.
 4. **Storage and Incremental Processing**: immutable Canonical runs,
    manifests, integrity checks, same Parsed-run reuse, and dependency-driven
@@ -285,7 +288,7 @@ database, or serving infrastructure is required.
      snapshot. It requires its own reviewed authorization and is not
      implicitly authorized by Batch 1.
 
-Batch 2 must not include Canonical corpus materialization, run storage/full-
+Batch 3 must not include Canonical corpus materialization, run storage/full-
 corpus execution, semantic normalization or merge, Retrieval/RAG, or
 cross-snapshot identity/reuse.
 
