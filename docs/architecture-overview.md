@@ -79,12 +79,15 @@ GenshinChronicle's final product goal is high-quality RAG. Evidence Packets prov
 
 ## Current implementation boundary
 
-Phase 01 Raw collection and the Phase 02 Parsed foundation are closed after
-the completed P01-EB corpus, profiling evidence, and Parsed acceptance. The
-Phase 02 contract in `docs/phases/phase-02-parsed-schema.md` remains a draft,
-evolutionary source-specific contract. The Phase 03 architecture in
-`docs/phases/phase-03-canonical-schema.md` is approved and implementation is
-authorized in reviewable batches. The current scope is Batch 1, Canonical
-Contract Foundation; projector, persistence, and corpus materialization remain
-outside that batch. Retrieval schema design and implementation remain deferred
-until their later phase, governed by the RAG-first principle above.
+Phase 01 Raw collection, Phase 02 Parsed foundation, and Phase 03 Canonical
+Schema are closed after their accepted corpus gates. The Phase 02 contract in
+`docs/phases/phase-02-parsed-schema.md` remains a draft, evolutionary
+source-specific contract. Phase 03 completed its approved Canonical contract,
+structural OBC projection, deterministic storage, and the separately reviewed
+16,437-record OBC `zh-cn` production gate. It establishes structural,
+traceable Canonical evidence, not semantic completeness, final dialogue
+semantics, cross-snapshot semantic identity/reuse, or Retrieval/RAG quality.
+
+Retrieval / Evidence Assembly architecture and design is the next stage.
+Retrieval schema design, technology selection, and implementation remain
+deferred until separately approved under the RAG-first principle above.

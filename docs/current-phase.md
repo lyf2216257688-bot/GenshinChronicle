@@ -2,13 +2,13 @@
 
 ## Active phase
 
-**Phase 03 — Canonical Corpus (implementation authorized)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (planning)**
 
 ## Objective
 
-Implement the approved Canonical-layer contract from accepted Phase 02
-evidence in small, independently reviewed batches while preserving Parsed and
-Raw traceability and keeping Retrieval/RAG deferred.
+Define the next Retrieval / Evidence Assembly architecture from accepted Raw,
+Parsed, and Canonical evidence, while preserving traceability and keeping
+technology choices and implementation deferred until separately approved.
 
 ## Current status
 
@@ -30,45 +30,47 @@ of upstream semantic completeness or that every nested component has a
 complete semantic handler. The Parsed schema remains a design draft rather
 than a frozen contract.
 
-The Phase 03 Canonical architecture plan has passed review. The approved
-contract is recorded in `docs/phases/phase-03-canonical-schema.md`.
+Phase 03 Canonical Schema is **CLOSED / PASS**. Its approved architecture was
+completed through Batch 1 (`0f7cff4`), Batch 2 (`e34468e`), Batch 3
+(`0fc609b`), Batch 4 (`f287bef`), and Batch 5A (`4726d8a`). The separate
+Batch 5B production gate projected the accepted
+`phase02-batch4-p01eb-full-20260824-closure-v2` Parsed run to
+`phase03-batch5b-p01eb-full-20260824`: its manifest is `complete`, with
+16,437 input and accounted records, 0 input-integrity failures, 0 reuse, and
+16,437 reprojected Canonical records. Streaming audit verified all 16,437
+record paths, hashes, JSON objects, record IDs, and Parsed identity keys.
 
-Phase 01 Raw Collection is **CLOSED**. Phase 02 Parsed Schema / Parser
-Foundation is **CLOSED**. Phase 03 Canonical Corpus is **ACTIVE**; its
-architecture plan is **APPROVED**. Batch 1 — Canonical Contract Foundation is
-**CLOSED / PASS** at `0f7cff4` (`phase03: establish canonical contract
-foundation`), and its post-Batch 1 status synchronization is **CLOSED / PASS**
-at `d69903e` (`phase03: sync status after batch1`). Batch 2 — Structural OBC
-Projector is **CLOSED / PASS** at `e34468e` (`phase03: implement structural
-obc projector`).
+Phase 01 Raw Collection, Phase 02 Parsed Schema / Parser Foundation, and
+Phase 03 Canonical Schema are **CLOSED**. Phase 03 establishes a full OBC
+`zh-cn` structural Canonical production projection; it does not establish
+semantic completeness, complete unsupported-structure understanding, final
+dialogue/speaker semantics, cross-snapshot identity, or Retrieval/RAG quality.
 
 ## Immediate next action
 
-Phase 03 Batch 3 — Dialogue + structured observations.
+Phase 04 — Retrieval / Evidence Assembly architecture and design. Retrieval
+planning and experiment design are authorized; Retrieval/RAG implementation,
+infrastructure build-out, and freezing a technology choice are not.
 
 ## Phase transition boundary
 
-Phase 02 is closed. Its Parsed contracts remain source-specific and
-evolutionary; UNKNOWN or unsupported source structures must not be guessed or
-silently discarded.
+Phase 02 Parsed contracts remain source-specific and evolutionary; UNKNOWN or
+unsupported source structures must not be guessed or silently discarded.
+Phase 03 Canonical contracts preserve structural source evidence and lineage,
+not semantic equivalence.
 
-Phase 03 implementation is authorized. Batches 1 and 2 are closed / pass at
-`0f7cff4` and `e34468e`; the Batch 1 status synchronization is closed / pass
-at `d69903e`. The current authorization is limited to Batch 3, Dialogue +
-structured observations. Canonical corpus materialization, run
-storage/full-corpus projection, semantic normalization or merge, and
-cross-snapshot identity/reuse are not authorized in Batch 3.
+Phase 04 planning may evaluate, design, and compare retrieval-unit, passage,
+and chunk approaches; lexical/BM25, dense/vector, and Hybrid alternatives;
+embeddings and possible vector-store choices; reranking; deterministic and
+possible future LLM query expansion; and evidence assembly/context expansion.
+This permits planning and experimentation design only, not implementation,
+infrastructure build-out, or a frozen technology choice.
 
-The following remain outside the authorized current batch. Later Phase 03
-batches require their own reviewed authorization:
+The following remain outside the authorized current Retrieval planning scope
+and require their own reviewed authorization:
 
-- Canonical persistence, materialization, or corpus-wide projection
 - semantic identity, alias/entity merge, Fact/Claim/Event models
 - cross-Parsed-run or cross-snapshot semantic projection reuse
-- Retrieval-oriented passage/chunk design
-- BM25 / vector / Hybrid retrieval
-- Embeddings and vector databases
-- Reranking and query expansion
 - Retrieval/RAG implementation and prompt orchestration
 - AI semantic / claim extraction
 - Knowledge graph / semantic layer
@@ -81,7 +83,7 @@ Current stage and immediate next action: this file.
 Phase 01 workflow and closure evidence: `docs/phases/phase-01-raw-collection.md` and relevant `docs/research/phase-01/` notes.
 
 The closed Phase 02 draft specification is
-`docs/phases/phase-02-parsed-schema.md`. The approved Phase 03 contract is
-`docs/phases/phase-03-canonical-schema.md`. Implementation must also follow
-`docs/architecture-overview.md`, `AGENTS.md`, and the verified OBC evidence
-already recorded in the repository.
+`docs/phases/phase-02-parsed-schema.md`. The closed Phase 03 contract and
+acceptance boundary are `docs/phases/phase-03-canonical-schema.md`.
+Architecture/design work must also follow `docs/architecture-overview.md`,
+`AGENTS.md`, and the verified OBC evidence already recorded in the repository.

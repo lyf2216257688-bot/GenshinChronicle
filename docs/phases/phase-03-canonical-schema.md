@@ -1,18 +1,20 @@
 # Phase 03 - Canonical Schema Contract
 
-Status: **Architecture Plan APPROVED; Batch 1 CLOSED / PASS @ `0f7cff4`; post-Batch 1 status synchronization CLOSED / PASS @ `d69903e`; Batch 2 CLOSED / PASS @ `e34468e`; Batch 3 is the current authorized scope**
+Status: **CLOSED / PASS. Architecture Plan APPROVED; Batch 1 CLOSED / PASS @ `0f7cff4`; Batch 2 CLOSED / PASS @ `e34468e`; Batch 3 CLOSED / PASS @ `0fc609b`; Batch 4 CLOSED / PASS @ `f287bef`; Batch 5A CLOSED / PASS @ `4726d8a`; Batch 5B production gate PASS.**
 
 ## Authorization
 
-The Phase 03 architecture plan is **APPROVED**. Batch 1 — Canonical Contract
-Foundation is **CLOSED / PASS** at `0f7cff4` (`phase03: establish canonical
-contract foundation`), and its status synchronization is **CLOSED / PASS** at
-`d69903e` (`phase03: sync status after batch1`). Batch 2 — Structural OBC
-Projector is **CLOSED / PASS** at `e34468e` (`phase03: implement structural
-obc projector`). Implementation continues in small, independently reviewed
-batches. The immediate authorized work is Batch 3, Dialogue + structured
-observations. Later batches must not be pulled into Batch 3 merely because
-this specification defines their boundaries.
+The Phase 03 architecture plan is **APPROVED** and Phase 03 is **CLOSED /
+PASS**. The independently reviewed implementation checkpoints are Batch 1 —
+Canonical Contract Foundation (`0f7cff4`), Batch 2 — Structural OBC Projector
+(`e34468e`), Batch 3 — Dialogue and structured observations (`0fc609b`),
+Batch 4 — Storage and incremental processing (`f287bef`), and Batch 5A —
+fixture and representative acceptance (`4726d8a`). The separately authorized
+Batch 5B streaming production gate passed over the accepted 16,437-record
+Parsed snapshot. Its Canonical manifest is `complete`: 16,437 input and
+accounted records, 0 input-integrity failures, 0 reuse, and 16,437
+reprojected records; streaming audit verified every record path, SHA-256, JSON
+object, record ID, and Parsed identity key.
 
 The current production input scope remains `mihoyo_obc` + `zh-cn`. Locale must
 remain explicit in contracts so the current scope does not become a permanent
@@ -252,15 +254,11 @@ equivalence were proven.
 
 ## Deterministic serialization and storage boundary
 
-Batch 1 defines deterministic UTF-8 JSON serialization for the contracts and
-hand-built fixtures. It does not establish `data/canonical/`, write a Canonical
-corpus, or implement a run storage pipeline.
-
-A later authorized storage batch may use immutable or conflict-safe record
-artifacts, atomic writes, per-record SHA-256 values, and a manifest carrying
-input dependencies, versions, status/accounting totals, diagnostics, and
-reuse/reprojection decisions. No database, search index, vector store, graph
-database, or serving infrastructure is required.
+The completed Phase 03 implementation uses deterministic UTF-8 JSON,
+immutable/conflict-safe record artifacts, per-record SHA-256 values, and a
+manifest carrying input dependencies, versions, status/accounting totals,
+diagnostics, and reuse/reprojection decisions. No database, search index,
+vector store, graph database, or serving infrastructure is established.
 
 ## Implementation batches
 
@@ -275,50 +273,40 @@ database, or serving infrastructure is required.
 2. **Structural OBC Projector — CLOSED / PASS @ `e34468e`**: the versioned module-to-section rule,
    component contexts, ordered units, unsupported accounting, record metadata,
    and source-position preservation.
-3. **Dialogue and Structured Observations — current authorized scope**: rich text, generic decoded values,
+3. **Dialogue and Structured Observations — CLOSED / PASS @ `0fc609b`**: rich text, generic decoded values,
    dialogue graph preservation, diagnostics, and derived relationships.
-4. **Storage and Incremental Processing**: immutable Canonical runs,
+4. **Storage and Incremental Processing — CLOSED / PASS @ `f287bef`**: immutable Canonical runs,
    manifests, integrity checks, same Parsed-run reuse, and dependency-driven
    reprojection.
 5. **Acceptance and Documentation**:
-   - **5A - Fixture, Representative Acceptance, and Documentation**:
+   - **5A - Fixture, Representative Acceptance, and Documentation — CLOSED / PASS @ `4726d8a`**:
      fixtures, representative real Parsed records, and documentation closure.
-   - **5B - Production Corpus-Wide Canonical Gate**: the separate, high-cost
+   - **5B - Production Corpus-Wide Canonical Gate — PASS**: the separate, high-cost
      streaming Parsed-to-Canonical gate over the accepted 16,437-record
-     snapshot. It requires its own reviewed authorization and is not
-     implicitly authorized by Batch 1.
-
-Batch 3 must not include Canonical corpus materialization, run storage/full-
-corpus execution, semantic normalization or merge, Retrieval/RAG, or
-cross-snapshot identity/reuse.
+     snapshot. Its run ID is `phase03-batch5b-p01eb-full-20260824`; it used
+     Parsed manifest SHA-256
+     `b52483d76f92102a5cb8ece3340de8aa0630c0a0e1f6dbed04bd28f60922b29d`.
 
 ## Acceptance and closure gate
 
-Before final Phase 03 production closure, run a streaming Parsed-to-Canonical
-acceptance over the accepted 16,437-record Parsed snapshot. This is not a Raw
-crawl or Raw-to-Parsed reparse.
+Batch 5B completed the separately authorized streaming production acceptance
+over the accepted 16,437-record Parsed snapshot using the existing Canonical
+pipeline. This was not a Raw crawl or Raw-to-Parsed reparse. The completed
+Canonical manifest records 16,437 input and 16,437 accounted records, 0
+input-integrity failures, 0 reuse, and 16,437 reprojected records.
 
-The corpus-wide gate must establish only:
+The streaming audit verified all 16,437 Canonical record paths, SHA-256
+values, JSON objects, record IDs, and Parsed identity keys. Known unsupported
+and dialogue diagnostics remained non-blocking evidence under the defined
+projector contract. No second full 16,437-record reuse or materialization run
+was performed.
 
-- validated Parsed manifest records equal accounted Canonical records;
-- no silent module/component-context/unit/unsupported loss under the defined
-  projector contract;
-- unknown, unsupported, anomalous, and blocked records are explicitly
-  accounted;
-- lineage links, available Raw artifact hashes, record hashes, and manifest
-  dependencies pass integrity checks;
-- record serialization is deterministic;
-- repeated materialization of the same run context produces identical record
-  and manifest bytes;
-- comparisons across different run IDs use normalized semantic serialization
-  and Canonical content fingerprints rather than requiring full manifest byte
-  equality;
-- any implemented incremental reuse remains within the allowed same Parsed-run
-  boundary.
-
-This gate does not prove upstream semantic completeness, official-game-text
-coverage, semantic entity correctness, cross-snapshot identity, or
-Retrieval/RAG quality.
+This closure establishes bounded structural/accounting, lineage, deterministic
+serialization, and manifest/record-integrity properties only. It does not
+prove upstream semantic completeness, official-game-text coverage, semantic
+entity correctness, cross-snapshot identity, or Retrieval/RAG quality. It does
+not establish cross-run normalized semantic serialization or content-
+fingerprint comparison semantics.
 
 Phase 03 may close while complete provenance/content-role taxonomies,
 cross-snapshot identity/reuse, independent speaker fields, full dialogue

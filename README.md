@@ -22,14 +22,13 @@ Those are different layers and must not be collapsed into one schema.
 
 ## Current status
 
-Phase 02 — Parsing is **CLOSED**. Phase 03 — Canonical Corpus implementation is
-authorized, and the immediate next action is **Batch 1 — Canonical Contract
-Foundation**.
+Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
+**CLOSED**. Phase 03 produced and audited a full OBC `zh-cn` structural
+Canonical projection of the accepted 16,437-record Parsed snapshot.
 
-Phase 01 Raw collection and the Phase 02 deterministic, source-specific Parsed
-foundation are closed. The approved Phase 03 contract permits only the current
-reviewed implementation batch; the OBC projector, Canonical materialization,
-and Retrieval/RAG remain outside that batch.
+The next work is conservative Retrieval / Evidence Assembly architecture and
+design. Retrieval/RAG implementation and choices such as chunking, embeddings,
+BM25, vector, hybrid retrieval, or reranking are not yet authorized.
 
 Start here:
 
@@ -77,12 +76,12 @@ tests/
     └── mihoyo_obc/
 ```
 
-The `canonical/` source package is limited to the authorized Batch 1 contract
-foundation. `retrieval/` remains deliberately absent; Canonical projector,
-corpus storage, and `data/canonical/` remain deferred.
-Batch 1 authorization does not itself create future packages or data
-directories. The `parser/` package contains the closed Phase 02 contracts,
-source-specific OBC adapter, and Parsed run pipeline.
+The `canonical/` source package contains the completed Phase 03 contracts,
+OBC structural projector, and Canonical run pipeline. `data/canonical/` is the
+ignored local output root for immutable Canonical run records and manifests.
+`retrieval/` remains deliberately absent. The `parser/` package contains the
+closed Phase 02 contracts, source-specific OBC adapter, and Parsed run
+pipeline.
 
 ## Data and secrets
 

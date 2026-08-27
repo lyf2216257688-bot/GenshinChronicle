@@ -42,19 +42,22 @@ evolutionary; closure does not freeze their draft schema or unknown handlers.
 
 ## Phase 03 — Canonical Corpus
 
-Status: **implementation authorized / Batch 1 next**
+Status: **complete / CLOSED**
 
-Implement the approved `CanonicalRecord -> CanonicalSection -> CanonicalUnit`
-contract in reviewable batches. The immediate batch establishes contracts,
-identity/lineage boundaries, component context, metadata ownership,
-status/support rules, versions/fingerprints, deterministic serialization, and
-small fixtures before any OBC projector or corpus materialization.
+The approved `CanonicalRecord -> CanonicalSection -> CanonicalUnit` contract,
+structural OBC projector, dialogue/structured-observation preservation,
+immutable run storage, representative acceptance, and the separate 16,437
+record production gate are complete. This establishes an auditable OBC `zh-cn`
+structural Canonical corpus, not semantic completeness or cross-snapshot
+semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **tentative**
+Status: **architecture/design next; implementation tentative**
 
-Build lexical/vector retrieval over Canonical data and evaluate retrieval recall before adding semantic infrastructure.
+Design Retrieval / Evidence Assembly from the accepted Canonical evidence.
+BM25, vector, hybrid retrieval, chunking, embeddings, reranking, and other
+technology choices remain unselected; implementation requires later approval.
 
 ## Later semantic layers
 
