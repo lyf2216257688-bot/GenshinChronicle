@@ -21,9 +21,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   source-specific parser adapters.
 - `src/genshin_corpus/parser/obc/`: MiHoYo OBC detail adapter and the local
   Raw-to-Parsed run entry point.
-- `src/genshin_corpus/canonical/`: Phase 03 Batch 1 Canonical contracts,
-  fingerprints, deterministic in-memory serialization, and no corpus storage
-  or source-specific projector.
+- `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
+  deterministic serialization, and the authorized structural OBC projector;
+  corpus storage remains deferred.
 
 ## Tests and fixtures
 
@@ -40,6 +40,7 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `data/parsed/`: generated Parsed run records and manifests derived from Raw;
   ignored by Git.
 
-The Canonical source package is limited to its authorized Batch 1 contract
-foundation. `data/canonical/` is not established. Retrieval source and data
+The Canonical source package contains Canonical contracts, deterministic
+serialization, and the structural OBC projector. Canonical corpus storage
+under `data/canonical/` is not established. Retrieval source and data
 directories remain deferred to their own future phase contract.

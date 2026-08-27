@@ -235,9 +235,12 @@ Parsed record SHA-256 and semantic fingerprint, and all relevant Canonical
 versions. The Canonical content fingerprint covers the deterministic Canonical
 content projection and excludes Parsed observation/dependency fields such as
 run identifiers, dependency hashes, and version inputs, as well as run paths,
-timestamps, output paths, and other non-semantic runtime metadata. Whether
-fine-grained Parsed/Raw lineage locations affect that content projection remains
-unresolved in Phase 03; Batch 1 must not infer that boundary.
+timestamps, output paths, and other non-semantic runtime metadata. The current
+0.1 content projection serializes retained lineage and source-position evidence,
+so its current fingerprint may reflect that evidence. Whether a fine-grained
+Parsed/Raw lineage-location or source-position change has cross-snapshot
+semantic significance remains unresolved and deferred; this runtime behavior
+does not settle that policy.
 
 Same Parsed-run reuse may be implemented in a later Phase 03 batch after record
 and dependency hashes are revalidated. Cross-Parsed-run or cross-Raw-snapshot

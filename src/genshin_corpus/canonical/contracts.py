@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping
 
-from genshin_corpus.parser.contracts import Classification, Diagnostic, ParseStatus, ParsedIdentity, RawRef
+from genshin_corpus.parser.contracts import Classification, Diagnostic, ParseStatus, ParsedIdentity, RawRef, SourcePosition
 from genshin_corpus.parser.models import ParsedDetail
 
 from .fingerprints import (
@@ -267,6 +267,7 @@ class ComponentContext:
     content_role: Classification
     diagnostics: tuple[Diagnostic, ...]
     lineage: LineageLink
+    source_position: SourcePosition = field(default_factory=SourcePosition)
     child_unit_ordinals: tuple[int, ...] = ()
     unit_count: int = 0
 
@@ -278,6 +279,8 @@ class ComponentContext:
             raise ValueError("component ordinal and unit_count must be non-negative")
         if self.parsed_status not in _PARSED_STATUSES:
             raise ValueError("component parsed_status is not recognized")
+        if not isinstance(self.source_position, SourcePosition):
+            raise ValueError("component source_position must be a Parsed SourcePosition")
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
         ordinals = tuple(self.child_unit_ordinals)
         if any(ordinal < 0 for ordinal in ordinals) or len(set(ordinals)) != len(ordinals):
@@ -300,6 +303,7 @@ class ComponentContext:
             "content_role": self.content_role.to_dict(),
             "diagnostics": [diagnostic.to_dict() for diagnostic in self.diagnostics],
             "lineage": self.lineage.to_dict(),
+            "source_position": self.source_position.to_dict(),
             "child_unit_ordinals": list(self.child_unit_ordinals),
             "unit_count": self.unit_count,
         }

@@ -23,6 +23,7 @@ from .fingerprints import (
     canonical_record_id,
 )
 from .serialization import serialize_canonical_record
+from .projector import PROJECTOR_POLICY_VERSION, project_parsed_detail, project_parsed_input
 
 __all__ = [
     "CANONICAL_SCHEMA_VERSION",
@@ -44,4 +45,7 @@ __all__ = [
     "canonical_json_bytes",
     "canonical_record_id",
     "serialize_canonical_record",
+    "PROJECTOR_POLICY_VERSION",
+    "project_parsed_detail",
+    "project_parsed_input",
 ]
