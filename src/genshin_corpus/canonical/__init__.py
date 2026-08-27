@@ -1,4 +1,4 @@
-"""Phase 03 Batch 1 Canonical contract foundation."""
+"""Phase 03 Canonical contracts, projection, and local run processing."""
 
 from .contracts import (
     CANONICAL_SCHEMA_VERSION,
@@ -24,6 +24,8 @@ from .fingerprints import (
 )
 from .serialization import serialize_canonical_record
 from .projector import PROJECTOR_POLICY_VERSION, project_parsed_detail, project_parsed_input
+from .pipeline import CANONICAL_PIPELINE_VERSION, CanonicalRunPipeline
+from .storage import CanonicalRunStore
 
 __all__ = [
     "CANONICAL_SCHEMA_VERSION",
@@ -48,4 +50,7 @@ __all__ = [
     "PROJECTOR_POLICY_VERSION",
     "project_parsed_detail",
     "project_parsed_input",
+    "CANONICAL_PIPELINE_VERSION",
+    "CanonicalRunPipeline",
+    "CanonicalRunStore",
 ]
