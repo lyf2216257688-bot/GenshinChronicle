@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from genshin_corpus.parser.contracts import Classification, ContractMetadata, Diagnostic, ParsedIdentity, RawRef
+from genshin_corpus.parser.dialogue import DialogueGraph
 from genshin_corpus.parser.models import ParsedComponent, ParsedContentUnit, ParsedDetail, ParsedModule, ParsedUnknown
 
 from .contracts import (
@@ -124,10 +125,10 @@ def _parsed_metadata_projection(metadata: ContractMetadata) -> dict[str, Any]:
 
 
 def _unit_kind(value: Any) -> str:
-    if hasattr(value, "to_dict"):
-        serialized = value.to_dict()
-        if isinstance(serialized, Mapping) and isinstance(serialized.get("kind"), str):
-            return str(serialized["kind"])
+    """Name only the Phase 02 structures whose Canonical role is evidenced."""
+
+    if isinstance(value, DialogueGraph):
+        return "dialogue_graph"
     if isinstance(value, Mapping) and value.get("kind") == "rich_text":
         return "rich_text"
     return "structured_observation"

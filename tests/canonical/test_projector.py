@@ -52,6 +52,77 @@ class ProjectorTests(unittest.TestCase):
         self.fixture_ref = RawRef(**{**self.raw_ref.to_dict(), "artifact_sha256": hashlib.sha256(body).hexdigest()})
         return parse_obc_detail(body, raw_ref=self.fixture_ref, content_id="fixture-1", channel_memberships=("43", "99"))
 
+    def _dialogue_fixture(self) -> ParsedDetail:
+        dialogue = {
+            "root_id": "missing-root",
+            "child_ids": {
+                "root": ["left", "right"],
+                "left": ["shared"],
+                "right": ["shared"],
+                "missing-parent": ["root"],
+            },
+            "contents": {
+                "root": {"option": "<em>开始</em>", "dialogue": "<p>阿罗夏：你好</p>", "icon": "i", "extra": {"x": 1}},
+                "left": {"option": "左", "dialogue": "左文本", "icon": ""},
+                "right": {"option": "右", "dialogue": "右文本", "icon": ""},
+                "shared": {"option": "共同", "dialogue": "共同文本", "icon": ""},
+                "orphan": {"option": "孤立", "dialogue": "孤立文本", "icon": ""},
+            },
+        }
+        payload = {
+            "data": {
+                "page": {
+                    "id": "dialogue-fixture",
+                    "name": "对话样例",
+                    "modules": [{
+                        "id": "dialogue-module",
+                        "components": [{
+                            "component_id": "interactive_dialogue",
+                            "data": json.dumps(dialogue, ensure_ascii=False),
+                        }],
+                    }],
+                },
+            },
+        }
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        ref = RawRef(
+            source="mihoyo_obc",
+            locale="zh-cn",
+            run_id="dialogue-fixture-run",
+            artifact_kind="details",
+            artifact_path="responses/details/dialogue-fixture.json",
+            artifact_sha256=hashlib.sha256(body).hexdigest(),
+            content_id="dialogue-fixture",
+        )
+        return parse_obc_detail(body, raw_ref=ref, content_id="dialogue-fixture")
+
+    def _non_object_dialogue_fixture(self) -> ParsedDetail:
+        payload = {
+            "data": {
+                "page": {
+                    "id": "dialogue-non-object-fixture",
+                    "modules": [{
+                        "id": "dialogue-module",
+                        "components": [{
+                            "component_id": "interactive_dialogue",
+                            "data": json.dumps(["not", "an", "object"], ensure_ascii=False),
+                        }],
+                    }],
+                },
+            },
+        }
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        ref = RawRef(
+            source="mihoyo_obc",
+            locale="zh-cn",
+            run_id="dialogue-fixture-run",
+            artifact_kind="details",
+            artifact_path="responses/details/dialogue-non-object-fixture.json",
+            artifact_sha256=hashlib.sha256(body).hexdigest(),
+            content_id="dialogue-non-object-fixture",
+        )
+        return parse_obc_detail(body, raw_ref=ref, content_id="dialogue-non-object-fixture")
+
     def _blocked(self, *, with_raw_ref: bool) -> dict:
         raw_refs = [] if not with_raw_ref else [self.raw_ref.to_dict()]
         return {
@@ -146,6 +217,64 @@ class ProjectorTests(unittest.TestCase):
         self.assertEqual(serialize_canonical_record(first), serialize_canonical_record(second))
         self.assertEqual(first.parsed_identity, detail.identity)
         self.assertEqual(first.source_identity, detail.identity)
+
+    def test_batch3_preserves_generic_rich_text_and_dialogue_graph_relationships(self) -> None:
+        detail = self._dialogue_fixture()
+        record = project_parsed_detail(detail, observation=self._observation(detail.metadata.parse_status))
+        section = record.sections[0]
+        context = section.component_contexts[0]
+        units = section.units
+        generic = next(unit for unit in units if unit.kind == "structured_observation")
+        rich_text_units = tuple(unit for unit in units if unit.kind == "rich_text")
+        dialogue = next(unit for unit in units if unit.kind == "dialogue_graph")
+
+        self.assertEqual(record.status, "canonical")
+        self.assertEqual(generic.value, detail.modules[0].components[0].units[0].value)
+        self.assertEqual(generic.value["decoded"]["root_id"], "missing-root")
+        self.assertTrue(rich_text_units)
+        self.assertEqual(rich_text_units[0].value["raw_markup"], "<em>开始</em>")
+        self.assertEqual(rich_text_units[0].value["normalized_text"], "开始")
+        self.assertTrue(all(unit.parent_component_key == context.observation_key for unit in units))
+        self.assertEqual(tuple(unit.ordinal for unit in units), context.child_unit_ordinals)
+
+        graph = dialogue.value
+        self.assertEqual([node.source_id for node in graph.groups[0].nodes], ["root", "left", "right", "shared", "orphan"])
+        self.assertEqual(
+            [(edge.parent_id, edge.child_id) for edge in graph.groups[0].edges],
+            [("root", "left"), ("root", "right"), ("left", "shared"), ("right", "shared"), ("missing-parent", "root")],
+        )
+        self.assertIsNone(graph.groups[0].nodes[0].speaker)
+        self.assertEqual(graph.groups[0].nodes[0].raw_fields, {"extra": {"x": 1}})
+        self.assertEqual(graph.groups[0].nodes[0].raw_ref.embedded_json_pointer, "/contents/root")
+        self.assertEqual(graph.groups[0].edges[1].raw_ref.embedded_json_pointer, "/child_ids/root/1")
+        codes = {diagnostic.code for diagnostic in dialogue.diagnostics}
+        self.assertTrue({"DIALOGUE_MULTIPLE_PARENT", "DIALOGUE_ORPHAN_NODE", "DIALOGUE_PARENT_MISSING", "DIALOGUE_ROOT_NOT_FOUND"} <= codes)
+        self.assertEqual(
+            {diagnostic.code for diagnostic in context.diagnostics},
+            codes,
+        )
+        self.assertEqual(dialogue.lineage.raw_refs, detail.modules[0].components[0].units[-1].metadata.raw_refs)
+
+        serialized = dialogue.to_dict()["value"]
+        self.assertEqual(serialized["kind"], "dialogue_graph")
+        self.assertEqual(serialized["groups"][0]["nodes"][0]["dialogue_rich_text"]["raw_markup"], "<p>阿罗夏：你好</p>")
+        self.assertEqual(serialize_canonical_record(record), serialize_canonical_record(record))
+
+    def test_batch3_preserves_non_object_dialogue_anomaly_without_blocking_projection(self) -> None:
+        detail = self._non_object_dialogue_fixture()
+        record = project_parsed_detail(detail, observation=self._observation(detail.metadata.parse_status))
+        context = record.sections[0].component_contexts[0]
+        generic, graph_unit = record.sections[0].units
+
+        self.assertEqual(record.status, "canonical")
+        self.assertEqual(generic.kind, "structured_observation")
+        self.assertEqual(generic.value["decoded"], ["not", "an", "object"])
+        self.assertEqual(graph_unit.kind, "dialogue_graph")
+        self.assertEqual(graph_unit.value.groups, ())
+        self.assertEqual({diagnostic.code for diagnostic in graph_unit.diagnostics}, {"DIALOGUE_DATA_NOT_OBJECT"})
+        self.assertEqual(context.diagnostics, graph_unit.diagnostics)
+        self.assertEqual(graph_unit.lineage.raw_refs, detail.modules[0].components[0].units[1].metadata.raw_refs)
+        self.assertEqual(graph_unit.lineage.raw_refs[0].json_pointer, "/data/page/modules/0/components/0")
 
     def test_zero_unit_component_is_accounted_without_artificial_unit(self) -> None:
         detail = self._parsed_fixture()
