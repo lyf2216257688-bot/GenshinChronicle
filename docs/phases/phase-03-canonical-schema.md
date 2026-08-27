@@ -99,8 +99,11 @@ For a Parsed `blocked_integrity` record:
   `detail_observation` identity;
 - `source_identity` is null;
 - zero sections, component contexts, and units is valid;
-- the blocked reason, diagnostics, input `content_id`, channels, Parsed record
-  hash, and all available lineage are preserved;
+- the blocked reason and any available diagnostics are preserved;
+- input `content_id` and channel memberships are preserved in
+  `record_metadata`, with channel membership lineage using
+  `evidence_scope=parsed_dependency` and no fabricated detail RawRef;
+- the Parsed record hash and all available lineage are preserved;
 - a source identity must not be synthesized from manifest source, locale, or
   `content_id`.
 
@@ -121,9 +124,11 @@ permanent schema invariant.
 
 Module ID, module index, repeated/submodule flags, origin-module ID, and layout
 observations remain source context. They are not promoted to stable Canonical
-section identity. Unsupported module entries must remain ordered and
-accounted; the projector must not drop them because they lack normal module
-shape.
+section identity. Any `section_id` or `unit_id` used by the contract is only an
+observation-local addressing label; it is not a semantic or cross-snapshot
+identity and is not derived from Parsed child IDs as a stable key. Unsupported
+module entries must remain ordered and accounted; the projector must not drop
+them because they lack normal module shape.
 
 ## Component context
 
@@ -226,8 +231,11 @@ Canonical dependencies must separately version:
 The dependency fingerprint includes the Parsed run and manifest dependency,
 Parsed record SHA-256 and semantic fingerprint, and all relevant Canonical
 versions. The Canonical content fingerprint covers the deterministic Canonical
-content projection and excludes run paths, timestamps, output paths, and other
-non-semantic runtime metadata.
+content projection and excludes Parsed observation/dependency fields such as
+run identifiers, dependency hashes, and version inputs, as well as run paths,
+timestamps, output paths, and other non-semantic runtime metadata. Whether
+fine-grained Parsed/Raw lineage locations affect that content projection remains
+unresolved in Phase 03; Batch 1 must not infer that boundary.
 
 Same Parsed-run reuse may be implemented in a later Phase 03 batch after record
 and dependency hashes are revalidated. Cross-Parsed-run or cross-Raw-snapshot

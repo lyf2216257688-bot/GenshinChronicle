@@ -21,12 +21,16 @@ the immediate next action are owned by `docs/current-phase.md`.
   source-specific parser adapters.
 - `src/genshin_corpus/parser/obc/`: MiHoYo OBC detail adapter and the local
   Raw-to-Parsed run entry point.
+- `src/genshin_corpus/canonical/`: Phase 03 Batch 1 Canonical contracts,
+  fingerprints, deterministic in-memory serialization, and no corpus storage
+  or source-specific projector.
 
 ## Tests and fixtures
 
 - `tests/collector/`: collector tests.
 - `tests/parser/`: deterministic Parsed contract, OBC adapter, and run-pipeline
   tests.
+- `tests/canonical/`: hand-built Canonical contract fixtures and focused tests.
 - `tests/fixtures/`: small sanitized source samples used by automated tests.
 
 ## Data directories
@@ -36,8 +40,6 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `data/parsed/`: generated Parsed run records and manifests derived from Raw;
   ignored by Git.
 
-Canonical and retrieval directories are not currently established. Canonical
-source or data directories may be added only by the Phase 03 implementation
-batch that actually requires and owns them; Batch 1 authorization does not
-create `data/canonical/`. Retrieval directories remain deferred to their own
-future phase contract.
+The Canonical source package is limited to its authorized Batch 1 contract
+foundation. `data/canonical/` is not established. Retrieval source and data
+directories remain deferred to their own future phase contract.

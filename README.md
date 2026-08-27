@@ -77,7 +77,9 @@ tests/
     └── mihoyo_obc/
 ```
 
-`canonical/` and `retrieval/` source packages remain deliberately absent.
+The `canonical/` source package is limited to the authorized Batch 1 contract
+foundation. `retrieval/` remains deliberately absent; Canonical projector,
+corpus storage, and `data/canonical/` remain deferred.
 Batch 1 authorization does not itself create future packages or data
 directories. The `parser/` package contains the closed Phase 02 contracts,
 source-specific OBC adapter, and Parsed run pipeline.
