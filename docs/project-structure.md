@@ -36,5 +36,8 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `data/parsed/`: generated Parsed run records and manifests derived from Raw;
   ignored by Git.
 
-Canonical and retrieval directories are not established by this directory
-guide. They require their own future layer contracts.
+Canonical and retrieval directories are not currently established. Canonical
+source or data directories may be added only by the Phase 03 implementation
+batch that actually requires and owns them; Batch 1 authorization does not
+create `data/canonical/`. Retrieval directories remain deferred to their own
+future phase contract.

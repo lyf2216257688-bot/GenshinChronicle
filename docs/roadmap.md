@@ -42,10 +42,13 @@ evolutionary; closure does not freeze their draft schema or unknown handlers.
 
 ## Phase 03 — Canonical Corpus
 
-Status: **planning only**
+Status: **implementation authorized / Batch 1 next**
 
-Design stable document/section/passage structures from accepted Phase 02
-evidence before authorizing any Canonical implementation.
+Implement the approved `CanonicalRecord -> CanonicalSection -> CanonicalUnit`
+contract in reviewable batches. The immediate batch establishes contracts,
+identity/lineage boundaries, component context, metadata ownership,
+status/support rules, versions/fingerprints, deterministic serialization, and
+small fixtures before any OBC projector or corpus materialization.
 
 ## Phase 04 — Retrieval / RAG
 

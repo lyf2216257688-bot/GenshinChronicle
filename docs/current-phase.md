@@ -2,12 +2,13 @@
 
 ## Active phase
 
-**Phase 03 — Canonical Schema Design (planning only)**
+**Phase 03 — Canonical Corpus (implementation authorized)**
 
 ## Objective
 
-Design the Canonical-layer schema from accepted Phase 02 evidence. No Canonical
-implementation is authorized by this status transition.
+Implement the approved Canonical-layer contract from accepted Phase 02
+evidence in small, independently reviewed batches while preserving Parsed and
+Raw traceability and keeping Retrieval/RAG deferred.
 
 ## Current status
 
@@ -29,10 +30,15 @@ of upstream semantic completeness or that every nested component has a
 complete semantic handler. The Parsed schema remains a design draft rather
 than a frozen contract.
 
+The Phase 03 Canonical architecture plan has passed review. The approved
+contract is recorded in `docs/phases/phase-03-canonical-schema.md`.
+
 ## Immediate next action
 
-Phase 03 Canonical Schema Design / planning only. Do not begin Canonical
-implementation until its design is reviewed and separately authorized.
+Batch 1 — Canonical Contract Foundation: contracts/value objects, identity and
+blocked-record boundaries, lineage, `ComponentContext`, metadata ownership,
+support/status rules, version/fingerprint contracts, deterministic
+serialization, and hand-built fixtures/tests.
 
 ## Phase transition boundary
 
@@ -40,13 +46,18 @@ Phase 02 is closed. Its Parsed contracts remain source-specific and
 evolutionary; UNKNOWN or unsupported source structures must not be guessed or
 silently discarded.
 
-Canonical schema and normalization design are authorized for Phase 03 planning
-only and remain provisional. Canonical implementation, persistence, and
-materialization are not authorized.
+Phase 03 implementation is authorized. The current authorization is limited to
+Batch 1, Canonical Contract Foundation. The OBC projector, Canonical corpus
+materialization, run storage/full-corpus projection, semantic normalization or
+merge, and cross-snapshot identity/reuse are not authorized in Batch 1.
 
-The following remain outside the authorized Phase 03 planning scope:
+The following remain outside the authorized current batch. Later Phase 03
+batches require their own reviewed authorization:
 
-- Canonical implementation, persistence, or materialization
+- OBC Parsed-to-Canonical projector implementation
+- Canonical persistence, materialization, or corpus-wide projection
+- semantic identity, alias/entity merge, Fact/Claim/Event models
+- cross-Parsed-run or cross-snapshot semantic projection reuse
 - Retrieval-oriented passage/chunk design
 - BM25 / vector / Hybrid retrieval
 - Embeddings and vector databases
@@ -63,6 +74,7 @@ Current stage and immediate next action: this file.
 Phase 01 workflow and closure evidence: `docs/phases/phase-01-raw-collection.md` and relevant `docs/research/phase-01/` notes.
 
 The closed Phase 02 draft specification is
-`docs/phases/phase-02-parsed-schema.md`. Phase 03 planning must also follow
+`docs/phases/phase-02-parsed-schema.md`. The approved Phase 03 contract is
+`docs/phases/phase-03-canonical-schema.md`. Implementation must also follow
 `docs/architecture-overview.md`, `AGENTS.md`, and the verified OBC evidence
 already recorded in the repository.

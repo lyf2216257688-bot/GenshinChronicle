@@ -9,7 +9,11 @@ The long-term pipeline is:
 AI Semantic / Knowledge layers are explicitly deferred until real corpus data and RAG results justify them.
 
 ## Active scope
-The active phase is **Phase 02 — Parsing**.
+
+`docs/current-phase.md` is the source of truth for the active phase, current
+authorization, and immediate next action. This file owns durable repository-
+wide engineering and layer-boundary instructions rather than duplicating the
+current project status.
 
 Before changing code, read:
 
@@ -20,10 +24,17 @@ Before changing code, read:
 
 If a requested task conflicts with the active phase, stop and call out the conflict instead of silently expanding scope.
 
-## Phase 02 objective
-Build a source-specific, deterministic, auditable Parsed layer over the completed MiHoYo OBC (`mihoyo_obc`) Raw corpus.
+## Layer boundaries
 
-Parsed must preserve meaningful source structure, ordering, hierarchy, Raw traceability, and unsupported/unknown content. It may normalize or extract source structures only when supported by evidence. It must not silently invent source semantics or prematurely perform Canonical, Retrieval, or RAG responsibilities.
+Parsed remains source-specific, deterministic, and auditable. It preserves
+meaningful source structure, ordering, hierarchy, Raw traceability, and
+unsupported/unknown content.
+
+Canonical may establish a stable research document representation only within
+the approved current-phase contract. It must preserve traceability through
+Parsed to Raw, keep source evidence separate from semantic normalization, and
+must not silently invent identity, provenance, content role, dialogue
+semantics, or semantic equivalence.
 
 ## Hard constraints
 Raw/Collector constraints below remain binding whenever Raw acquisition or Collector behavior is touched, even though Phase 01 is closed.
@@ -41,9 +52,11 @@ Raw/Collector constraints below remain binding whenever Raw acquisition or Colle
 - Never commit cookies, authorization material, or unredacted browser cURL containing secrets. Put sensitive local samples under `.local/`.
 - Evidence Packet convenience must not cause loss of structure, provenance, traceability, recall, ranking, context quality, or other information needed for final RAG quality.
 
-## Explicit non-goals for Phase 02
-Do **not** prematurely implement or freeze:
-- Canonical database/entity/schema design
+## Deferred layers
+
+Unless a future phase explicitly authorizes them, do **not** prematurely
+implement or freeze:
+
 - Canonical entity or alias normalization
 - Retrieval-oriented passage/chunk design
 - embeddings or embedding text contracts
@@ -54,7 +67,8 @@ Do **not** prematurely implement or freeze:
 - knowledge graph / semantic layer
 - UI
 
-Phase 02 may implement source-specific parsers justified by real Raw evidence, but unknown or unsupported structures must be preserved rather than guessed or silently discarded.
+Unknown or unsupported structures must be preserved rather than guessed or
+silently discarded in every derived layer.
 
 Future directories or abstractions should not be created merely because they appear in the long-term architecture.
 

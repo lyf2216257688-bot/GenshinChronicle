@@ -35,14 +35,24 @@ Rules:
 ### 3. Canonical
 Answers: **What stable research document structure do we maintain independent of a source's page layout?**
 
-Tentative concepts include DomainObject, ContentCollection, Document, DocumentRevision, Section, Passage, and compact choice structures.
+The approved minimum hierarchy is `CanonicalRecord -> CanonicalSection ->
+CanonicalUnit`, supported by `CanonicalObservation`, `ComponentContext`, and
+`LineageLink` value objects. Source identity remains separate from the
+observation-scoped Canonical record ID; Canonical semantic identity is not yet
+established.
 
-Canonical text should preserve official wording. Representation may be normalized; meaning or wording must not be silently corrected.
+Canonical preserves source text and source values as represented by Parsed.
+Representation may be normalized through explicit deterministic rules;
+meaning, wording, provenance, and semantic equivalence must not be silently
+corrected or inferred.
 
 Current corpus policy: maintain one active Chinese Canonical corpus rather than duplicate Chinese passages for every source. The architecture must still allow future locales.
 
 ### 4. Derived Retrieval / RAG
-Full-text and vector representations are derived artifacts. Citation/evidence identity should remain tied to stable Canonical passages rather than to embedding chunks.
+Full-text and vector representations are derived artifacts. A later Retrieval
+contract must derive citation/evidence identity from Canonical lineage rather
+than from embedding chunk identity. Retrieval passage/chunk design remains
+deferred.
 
 RAG answers are query results. They must not automatically become Canonical facts.
 
@@ -55,11 +65,13 @@ RAG answers are query results. They must not automatically become Canonical fact
 - Deterministic work belongs in code; semantic interpretation should not be disguised as deterministic parsing.
 - Long-term extensibility is preserved without implementing future layers prematurely.
 
-Phase 02 Parsed schema and parser contracts are source-specific, deterministic,
-and provisional until validated against representative OBC Raw evidence. Parsed
-records carry explicit Raw references, source positions, fingerprints, parser
-versions, and unsupported/anomaly status; they must not silently discard
-unknown structure or take on Canonical/Retrieval responsibilities.
+Phase 02 Parsed schema and parser contracts remain source-specific,
+deterministic, and evolutionary. Parsed records carry explicit Raw references,
+source positions, fingerprints, parser versions, and unsupported/anomaly
+status; they must not silently discard unknown structure or take on
+Canonical/Retrieval responsibilities. Canonical lineage must identify the
+exact Parsed observation and must not fabricate RawRefs for values derived from
+Parsed-run dependencies.
 
 ## RAG-first product principle
 
@@ -70,8 +82,9 @@ GenshinChronicle's final product goal is high-quality RAG. Evidence Packets prov
 Phase 01 Raw collection and the Phase 02 Parsed foundation are closed after
 the completed P01-EB corpus, profiling evidence, and Parsed acceptance. The
 Phase 02 contract in `docs/phases/phase-02-parsed-schema.md` remains a draft,
-evolutionary source-specific contract. Phase 03 Canonical Schema Design is
-planning only: Canonical schema design is authorized and provisional, while
-Canonical implementation remains deferred. Retrieval schema design and
-implementation remain deferred until their later phase, governed by the
-RAG-first principle above.
+evolutionary source-specific contract. The Phase 03 architecture in
+`docs/phases/phase-03-canonical-schema.md` is approved and implementation is
+authorized in reviewable batches. The current scope is Batch 1, Canonical
+Contract Foundation; projector, persistence, and corpus materialization remain
+outside that batch. Retrieval schema design and implementation remain deferred
+until their later phase, governed by the RAG-first principle above.

@@ -22,18 +22,21 @@ Those are different layers and must not be collapsed into one schema.
 
 ## Current status
 
-Phase 02 — Parsing is **CLOSED**. The immediate next action is **Phase 03 —
-Canonical Schema Design (planning only)**.
+Phase 02 — Parsing is **CLOSED**. Phase 03 — Canonical Corpus implementation is
+authorized, and the immediate next action is **Batch 1 — Canonical Contract
+Foundation**.
 
 Phase 01 Raw collection and the Phase 02 deterministic, source-specific Parsed
-foundation are closed. Canonical implementation and Retrieval/RAG work remain
-outside the currently authorized planning scope.
+foundation are closed. The approved Phase 03 contract permits only the current
+reviewed implementation batch; the OBC projector, Canonical materialization,
+and Retrieval/RAG remain outside that batch.
 
 Start here:
 
 - `AGENTS.md` — repository-wide working rules for Codex
 - `docs/current-phase.md` — current status and immediate next action
 - `docs/phases/phase-01-raw-collection.md` — Phase 01 scope and acceptance criteria
+- `docs/phases/phase-03-canonical-schema.md` — approved Canonical contract and gates
 - `docs/architecture-overview.md` — long-term architecture, intentionally high-level
 - `docs/roadmap.md` — tentative future phases
 
@@ -49,7 +52,8 @@ docs/
 ├── roadmap.md
 ├── phases/
 │   ├── phase-01-raw-collection.md
-│   └── phase-02-parsed-schema.md
+│   ├── phase-02-parsed-schema.md
+│   └── phase-03-canonical-schema.md
 ├── research/
 │   └── phase-01/
 │       ├── mihoyo-obc-api-discovery.md
@@ -59,7 +63,8 @@ docs/
 
 src/
 └── genshin_corpus/
-    └── collector/
+    ├── collector/
+    └── parser/
 
 data/
 ├── README.md
@@ -67,13 +72,15 @@ data/
 
 tests/
 ├── collector/
+├── parser/
 └── fixtures/
     └── mihoyo_obc/
 ```
 
 `canonical/` and `retrieval/` source packages remain deliberately absent.
-The `parser/` package is introduced in Phase 02 and currently contains only
-the contract foundation; source-specific handlers are added incrementally.
+Batch 1 authorization does not itself create future packages or data
+directories. The `parser/` package contains the closed Phase 02 contracts,
+source-specific OBC adapter, and Parsed run pipeline.
 
 ## Data and secrets
 
