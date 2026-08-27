@@ -1,13 +1,15 @@
 # Phase 03 - Canonical Schema Contract
 
-Status: **IMPLEMENTATION AUTHORIZED; Batch 1 is the current authorized scope**
+Status: **Batch 1 CLOSED / PASS @ `0f7cff4`; Batch 2 is the current authorized scope**
 
 ## Authorization
 
-The Phase 03 architecture has passed review. Implementation is authorized in
-small, independently reviewed batches. The immediate authorized work is Batch
-1, Canonical Contract Foundation. Later batches must not be pulled into Batch
-1 merely because this specification defines their boundaries.
+The Phase 03 architecture has passed review. Batch 1 — Canonical Contract
+Foundation is **CLOSED / PASS** at `0f7cff4` (`phase03: establish canonical
+contract foundation`). Implementation continues in small, independently
+reviewed batches. The immediate authorized work is Batch 2, Structural OBC
+Projector. Later batches must not be pulled into Batch 2 merely because this
+specification defines their boundaries.
 
 The current production input scope remains `mihoyo_obc` + `zh-cn`. Locale must
 remain explicit in contracts so the current scope does not become a permanent
@@ -256,7 +258,7 @@ database, or serving infrastructure is required.
 
 ## Implementation batches
 
-1. **Canonical Contract Foundation**: contracts/value objects, identity and
+1. **Canonical Contract Foundation — CLOSED / PASS @ `0f7cff4`**: contracts/value objects, identity and
    blocked-record boundaries, lineage, component context, metadata ownership,
    support/status rules, version/fingerprint contract, deterministic
    serializer, and hand-built fixtures/tests. The hand-built identity fixtures
@@ -280,9 +282,9 @@ database, or serving infrastructure is required.
      snapshot. It requires its own reviewed authorization and is not
      implicitly authorized by Batch 1.
 
-Batch 1 must not include the OBC projector, Canonical corpus materialization,
-run storage/full-corpus execution, semantic normalization or merge,
-Retrieval/RAG, or cross-snapshot identity/reuse.
+Batch 2 must not include Canonical corpus materialization, run storage/full-
+corpus execution, semantic normalization or merge, Retrieval/RAG, or
+cross-snapshot identity/reuse.
 
 ## Acceptance and closure gate
 

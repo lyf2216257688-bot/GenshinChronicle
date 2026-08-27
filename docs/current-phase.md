@@ -33,12 +33,12 @@ than a frozen contract.
 The Phase 03 Canonical architecture plan has passed review. The approved
 contract is recorded in `docs/phases/phase-03-canonical-schema.md`.
 
+Phase 03 Batch 1 — Canonical Contract Foundation is **CLOSED / PASS** at
+checkpoint `0f7cff4` (`phase03: establish canonical contract foundation`).
+
 ## Immediate next action
 
-Batch 1 — Canonical Contract Foundation: contracts/value objects, identity and
-blocked-record boundaries, lineage, `ComponentContext`, metadata ownership,
-support/status rules, version/fingerprint contracts, deterministic
-serialization, and hand-built fixtures/tests.
+Phase 03 Batch 2 — Structural OBC Projector.
 
 ## Phase transition boundary
 
@@ -46,15 +46,15 @@ Phase 02 is closed. Its Parsed contracts remain source-specific and
 evolutionary; UNKNOWN or unsupported source structures must not be guessed or
 silently discarded.
 
-Phase 03 implementation is authorized. The current authorization is limited to
-Batch 1, Canonical Contract Foundation. The OBC projector, Canonical corpus
-materialization, run storage/full-corpus projection, semantic normalization or
-merge, and cross-snapshot identity/reuse are not authorized in Batch 1.
+Phase 03 implementation is authorized. Batch 1 is closed / pass at `0f7cff4`.
+The current authorization is limited to Batch 2, Structural OBC Projector.
+Canonical corpus materialization, run storage/full-corpus projection, semantic
+normalization or merge, and cross-snapshot identity/reuse are not authorized
+in Batch 2.
 
 The following remain outside the authorized current batch. Later Phase 03
 batches require their own reviewed authorization:
 
-- OBC Parsed-to-Canonical projector implementation
 - Canonical persistence, materialization, or corpus-wide projection
 - semantic identity, alias/entity merge, Fact/Claim/Event models
 - cross-Parsed-run or cross-snapshot semantic projection reuse
