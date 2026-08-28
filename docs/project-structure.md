@@ -24,8 +24,9 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
   deterministic serialization, structural OBC projection, and the local
   Canonical run-storage/pipeline boundary.
-- `src/genshin_corpus/retrieval/`: Phase 04 read-only corpus profiling and
-  benchmark-contract validation; it contains no retrieval engine or index.
+- `src/genshin_corpus/retrieval/`: Phase 04 corpus profiling, benchmark
+  contracts, rebuildable representation experiments, and an offline lexical
+  baseline; it contains no production retrieval engine or index.
 
 ## Tests and fixtures
 

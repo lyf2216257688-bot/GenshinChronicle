@@ -35,6 +35,7 @@ tools.
 ## Retrieval experiment artifacts
 
 `data/retrieval/` is an ignored local destination for explicitly authorized,
-rebuildable Retrieval experiment artifacts. P04-W1 adds only a read-only
-profiler and benchmark foundation; it does not create an index, vector store,
-or derived retrieval corpus.
+rebuildable Retrieval experiment artifacts. P04-W2 may store compact,
+manifested run-level derived-document artifacts and offline lexical experiment
+results; it does not create a production index, vector store, or serving
+infrastructure.
