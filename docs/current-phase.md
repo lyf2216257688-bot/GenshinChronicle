@@ -2,13 +2,14 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (planning)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W1 complete; review pending)**
 
 ## Objective
 
-Define the next Retrieval / Evidence Assembly architecture from accepted Raw,
-Parsed, and Canonical evidence, while preserving traceability and keeping
-technology choices and implementation deferred until separately approved.
+Establish the evidence and benchmark foundation for later Retrieval / Evidence
+Assembly experiments from accepted Raw, Parsed, and Canonical evidence, while
+preserving traceability and keeping technology choices and production retrieval
+implementation deferred until separately approved.
 
 ## Current status
 
@@ -46,11 +47,21 @@ Phase 03 Canonical Schema are **CLOSED**. Phase 03 establishes a full OBC
 semantic completeness, complete unsupported-structure understanding, final
 dialogue/speaker semantics, cross-snapshot identity, or Retrieval/RAG quality.
 
+## Active work unit
+
+**P04-W1 — Corpus Profiler + Retrieval Benchmark Foundation** is complete and
+awaits human review. It added a read-only full-Canonical-run profiler, a
+benchmark contract and small evidence-grounded seed set, focused tests, and
+minimal supporting documentation. It did not rerun Canonical projection or
+modify Raw, Parsed, or Canonical data.
+
+The approved Phase 04 boundary is documented in
+`docs/phases/phase-04-retrieval-evidence-assembly.md`.
+
 ## Immediate next action
 
-Phase 04 — Retrieval / Evidence Assembly architecture and design. Retrieval
-planning and experiment design are authorized; Retrieval/RAG implementation,
-infrastructure build-out, and freezing a technology choice are not.
+Review P04-W1. Subsequent retrieval representation, lexical baseline, engine,
+and Evidence Assembly experiments require separately reviewed authorization.
 
 ## Phase transition boundary
 
@@ -59,12 +70,12 @@ unsupported source structures must not be guessed or silently discarded.
 Phase 03 Canonical contracts preserve structural source evidence and lineage,
 not semantic equivalence.
 
-Phase 04 planning may evaluate, design, and compare retrieval-unit, passage,
-and chunk approaches; lexical/BM25, dense/vector, and Hybrid alternatives;
-embeddings and possible vector-store choices; reranking; deterministic and
-possible future LLM query expansion; and evidence assembly/context expansion.
-This permits planning and experimentation design only, not implementation,
-infrastructure build-out, or a frozen technology choice.
+P04-W1 is a foundation implementation, not a retrieval engine. The later
+Phase 04 work may evaluate retrieval-unit, passage, and chunk approaches;
+lexical/BM25, dense/vector, and Hybrid alternatives; embeddings and possible
+vector-store choices; reranking; deterministic and possible future LLM query
+expansion; and Evidence Assembly/context expansion. No winner, production
+infrastructure, or RAG behavior is authorized by P04-W1.
 
 The following remain outside the authorized current Retrieval planning scope
 and require their own reviewed authorization:

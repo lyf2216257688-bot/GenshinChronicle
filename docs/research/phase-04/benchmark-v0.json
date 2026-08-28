@@ -1,0 +1,284 @@
+{
+  "schema_version": "phase04-benchmark-0.1",
+  "benchmark_id": "p04-w1-obc-zh-cn-seed-v0",
+  "scope": {
+    "source": "mihoyo_obc",
+    "locale": "zh-cn",
+    "purpose": "Small evidence-grounded contract and resolver seed; not a representative quality benchmark.",
+    "product_weight_note": "Seed prioritization hints only; final scale, distribution, and scoring semantics remain UNKNOWN."
+  },
+  "tracks": {
+    "main": "Lore, narrative, character, and worldbuilding product questions.",
+    "diagnostic": "Targeted retrieval and evidence-assembly capability slices."
+  },
+  "queries": [
+    {
+      "query_id": "seed-exact-name-arlecchino",
+      "query": "阿蕾奇诺",
+      "benchmark_track": "both",
+      "product_weight": 2,
+      "slices": ["exact_name_entity"],
+      "evidence": [
+        {
+          "evidence_id": "record-title",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493"
+          },
+          "occurrence_context": "The Canonical record metadata carries the OBC page name 阿蕾奇诺."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["record-title"]]
+    },
+    {
+      "query_id": "seed-structured-arlecchino-birthday",
+      "query": "阿蕾奇诺的生日是哪一天？",
+      "benchmark_track": "both",
+      "product_weight": 1,
+      "slices": ["structured_attribute_value"],
+      "evidence": [
+        {
+          "evidence_id": "birthday-field",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 0,
+            "component_observation_key": "content:501157:component:role_base_info:ordinal:0",
+            "unit_ordinal": 0,
+            "parsed_json_pointer": "/modules/0/components/0/units/0",
+            "decoded_json_pointer": "/attr/0/value/0"
+          },
+          "occurrence_context": "The decoded attribute row identifies 生日 before its value; the numeric/text value is not golded by equality alone."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["birthday-field"]]
+    },
+    {
+      "query_id": "seed-quote-arlecchino-unknown",
+      "query": "“未知”是一切恐惧的来源，这句话描述的是谁的角色故事？",
+      "benchmark_track": "main",
+      "product_weight": 3,
+      "slices": ["exact_quote", "character_narrative"],
+      "evidence": [
+        {
+          "evidence_id": "story-quote",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 15,
+            "component_observation_key": "content:501157:component:collapse_panel:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/15/components/0/units/1"
+          },
+          "occurrence_context": "角色故事1 rich-text occurrence."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["story-quote"]]
+    },
+    {
+      "query_id": "seed-paraphrase-arlecchino-fear",
+      "query": "为什么与“仆人”打交道的人会感到难以应对？",
+      "benchmark_track": "main",
+      "product_weight": 3,
+      "slices": ["semantic_paraphrase", "character_narrative", "wrong_role_contamination"],
+      "evidence": [
+        {
+          "evidence_id": "story-explanation",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 15,
+            "component_observation_key": "content:501157:component:collapse_panel:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/15/components/0/units/1"
+          }
+        },
+        {
+          "evidence_id": "build-hard-negative",
+          "relevance": "hard_negative",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 2,
+            "component_observation_key": "content:501157:component:recommend:ordinal:0",
+            "unit_ordinal": 2,
+            "parsed_json_pointer": "/modules/2/components/0/units/2"
+          },
+          "occurrence_context": "Recommended equipment/build content is a wrong-role hard negative for this narrative question; this does not classify the Canonical record or component."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["story-explanation"]]
+    },
+    {
+      "query_id": "seed-dialogue-branch-very-handy",
+      "query": "旅行者选择“非常顺手！”后，剧情对话的下一节点如何回应？",
+      "benchmark_track": "both",
+      "product_weight": 3,
+      "slices": ["dialogue_branch", "narrative_context"],
+      "assembly_expectations": {
+        "requires_observed_dialogue_edge": true,
+        "preserve_group_and_node_context": true
+      },
+      "evidence": [
+        {
+          "evidence_id": "branch-response",
+          "relevance": "direct",
+          "location": {
+            "record_id": "39427935b5794079c6323c84c95d6cb6d11a874a6dcfb7a0e45b5fdaadea0386",
+            "section_ordinal": 7,
+            "component_observation_key": "content:509653:component:interactive_dialogue:ordinal:0",
+            "unit_ordinal": 4,
+            "parsed_json_pointer": "/modules/7/components/0/units/4",
+            "dialogue": {
+              "group_ordering": 0,
+              "node_source_id": "xw8gn2cly6oT1787134598748",
+              "edge": {
+                "parent_id": "6mttjd5ntbaT1787134589088",
+                "child_id": "xw8gn2cly6oT1787134598748"
+              }
+            }
+          },
+          "occurrence_context": "The annotated graph edge preserves the option-to-response relation; no speaker inference is required."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["branch-response"]]
+    },
+    {
+      "query_id": "seed-lore-moon-child-vault",
+      "query": "“月童的库藏”见证了什么样的古老文明经历？",
+      "benchmark_track": "main",
+      "product_weight": 3,
+      "slices": ["narrative_context", "worldbuilding"],
+      "evidence": [
+        {
+          "evidence_id": "vault-history",
+          "relevance": "direct",
+          "location": {
+            "record_id": "3cf3fcd3b709f4c23a001d295c38a2bd8ff4b7ebeb0ba80aa8973536dc85bd49",
+            "section_ordinal": 1,
+            "component_observation_key": "content:507740:component:multi_table:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/1/components/0/units/1"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["vault-history"]]
+    },
+    {
+      "query_id": "seed-readable-ottaba",
+      "query": "《变成骡子的人》中，须弥城的傻子叫什么名字？",
+      "benchmark_track": "main",
+      "product_weight": 2,
+      "slices": ["readable_book", "narrative_context"],
+      "evidence": [
+        {
+          "evidence_id": "readable-opening",
+          "relevance": "direct",
+          "location": {
+            "record_id": "322056d9a29169defa3b06cf4dc90bf66677efa5ed18b1855e9ddc3830b37252",
+            "section_ordinal": 1,
+            "component_observation_key": "content:507284:component:collapse_panel:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/1/components/0/units/1"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["readable-opening"]]
+    },
+    {
+      "query_id": "seed-weapon-story-snow-tombed-starsilver",
+      "query": "《雪葬的星银》的相关故事中，祭司之女将什么交给异乡勇士？",
+      "benchmark_track": "main",
+      "product_weight": 2,
+      "slices": ["weapon_artifact_item_lore", "exact_text"],
+      "evidence": [
+        {
+          "evidence_id": "weapon-story",
+          "relevance": "direct",
+          "location": {
+            "record_id": "f1eb5484cec447ecdbdd5a579fe61c783475724616292cb8f3fd07b4465cf771",
+            "section_ordinal": 3,
+            "component_observation_key": "content:1362:component:collapse_panel:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/3/components/0/units/1"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["weapon-story"]]
+    },
+    {
+      "query_id": "seed-npc-map-xiemiao",
+      "query": "合成“谢苗的笔记”前，谢苗位于哪里？",
+      "benchmark_track": "diagnostic",
+      "product_weight": 1,
+      "slices": ["map_npc", "exact_text"],
+      "evidence": [
+        {
+          "evidence_id": "npc-location",
+          "relevance": "direct",
+          "location": {
+            "record_id": "71f158d46adea0b3ce96652316d7a3da8e01e1339c8f0a9c3617047231af881d",
+            "section_ordinal": 0,
+            "component_observation_key": "content:506689:component:npc_base_info:ordinal:0",
+            "unit_ordinal": 3,
+            "parsed_json_pointer": "/modules/0/components/0/units/3"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["npc-location"]]
+    },
+    {
+      "query_id": "seed-relation-navias-view",
+      "query": "谁认为阿蕾奇诺是一位“威严却又慈爱的领导者”？",
+      "benchmark_track": "main",
+      "product_weight": 3,
+      "slices": ["relationship", "multi_evidence"],
+      "evidence": [
+        {
+          "evidence_id": "speaker-name",
+          "relevance": "supporting",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 27,
+            "component_observation_key": "content:501157:component:role_relation:ordinal:0",
+            "unit_ordinal": 9,
+            "parsed_json_pointer": "/modules/27/components/0/units/9"
+          }
+        },
+        {
+          "evidence_id": "relation-statement",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 27,
+            "component_observation_key": "content:501157:component:role_relation:ordinal:0",
+            "unit_ordinal": 10,
+            "parsed_json_pointer": "/modules/27/components/0/units/10"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["speaker-name", "relation-statement"]]
+    },
+    {
+      "query_id": "seed-character-voice-introduction",
+      "query": "阿蕾奇诺在汉语“初次见面”配音中如何介绍自己的职位？",
+      "benchmark_track": "main",
+      "product_weight": 2,
+      "slices": ["character_voice", "structured_attribute_value"],
+      "evidence": [
+        {
+          "evidence_id": "voice-table",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 14,
+            "component_observation_key": "content:501157:component:role_voice:ordinal:0",
+            "unit_ordinal": 0,
+            "parsed_json_pointer": "/modules/14/components/0/units/0"
+          },
+          "occurrence_context": "The decoded voice table retains language, audio-name, and content context; this seed intentionally does not invent a stable voice-row identity."
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["voice-table"]]
+    }
+  ]
+}

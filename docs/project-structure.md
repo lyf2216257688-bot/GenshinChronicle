@@ -24,6 +24,8 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
   deterministic serialization, structural OBC projection, and the local
   Canonical run-storage/pipeline boundary.
+- `src/genshin_corpus/retrieval/`: Phase 04 read-only corpus profiling and
+  benchmark-contract validation; it contains no retrieval engine or index.
 
 ## Tests and fixtures
 
@@ -31,6 +33,7 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `tests/parser/`: deterministic Parsed contract, OBC adapter, and run-pipeline
   tests.
 - `tests/canonical/`: hand-built Canonical contract fixtures and focused tests.
+- `tests/retrieval/`: Phase 04 profiler and benchmark-contract focused tests.
 - `tests/fixtures/`: small sanitized source samples used by automated tests.
 
 ## Data directories
@@ -41,5 +44,6 @@ the immediate next action are owned by `docs/current-phase.md`.
   ignored by Git.
 
 `data/canonical/` is the ignored local output root for immutable Canonical run
-records and manifests. Retrieval source and data directories remain deferred
-to their own future phase contract.
+records and manifests. `data/retrieval/` is ignored and reserved for explicitly
+authorized rebuildable Retrieval experiment artifacts; P04-W1 does not create
+a production index or derived corpus.

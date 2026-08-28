@@ -25,7 +25,16 @@ that records its input Raw run, dependencies, fingerprints, statuses, and
 diagnostics. Parsed output is derived data, not source code and not a
 replacement for Raw evidence.
 
-## Deferred directories
+## Canonical outputs
 
-`data/canonical/` and retrieval artifacts remain deferred. They should be
-introduced only with their respective future layer contracts.
+`data/canonical/` contains local, immutable Canonical run records and manifests
+derived from accepted Parsed observations. Canonical data remains the evidence
+source for later Retrieval derivatives and must not be rewritten by Phase 04
+tools.
+
+## Retrieval experiment artifacts
+
+`data/retrieval/` is an ignored local destination for explicitly authorized,
+rebuildable Retrieval experiment artifacts. P04-W1 adds only a read-only
+profiler and benchmark foundation; it does not create an index, vector store,
+or derived retrieval corpus.
