@@ -25,6 +25,7 @@ from .representations import (
     document_covers_location,
     load_retrieval_documents,
 )
+from .lexical import LEXICAL_BIGRAM_ANALYZER_VERSION, LEXICAL_SCORER_VERSION
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -40,6 +41,8 @@ __all__ = [
     "build_retrieval_documents",
     "document_covers_location",
     "load_retrieval_documents",
+    "LEXICAL_BIGRAM_ANALYZER_VERSION",
+    "LEXICAL_SCORER_VERSION",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]

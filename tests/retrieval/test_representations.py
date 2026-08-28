@@ -6,7 +6,8 @@ from pathlib import Path
 import shutil
 import unittest
 
-from genshin_corpus.retrieval.lexical import _build_index, _rank, evaluate_lexical_arm
+from genshin_corpus.retrieval.experiments import _slice_metrics
+from genshin_corpus.retrieval.lexical import _build_index, _rank, analyze, analyze_with_bigrams, evaluate_lexical_arm
 from genshin_corpus.retrieval.representations import (
     RetrievalRepresentationError,
     build_retrieval_documents,
@@ -206,6 +207,44 @@ class RetrievalRepresentationTests(unittest.TestCase):
         tokenized, lengths, _ = _build_index(documents)
         ranked, _ = _rank(documents, tokenized, lengths, "同分词")
         self.assertEqual([item["document_id"] for item in ranked], ["id-z", "id-a"])
+
+    def test_bigram_analyzer_is_deterministic_and_version_distinct(self) -> None:
+        self.assertEqual(analyze_with_bigrams("角色ABC"), ["角", "色", "角色", "abc"])
+        self.assertEqual(analyze_with_bigrams("角色ABC"), analyze_with_bigrams("角色ABC"))
+        self.assertNotEqual(analyze("角色ABC"), analyze_with_bigrams("角色ABC"))
+        self.assertNotIn("角A", analyze_with_bigrams("角A色"))
+        self.assertNotIn("角色", analyze_with_bigrams("角A色"))
+        self.assertNotIn("角色", analyze_with_bigrams("角·色"))
+
+    def test_diagnostic_slice_and_hard_negative_metrics_use_coverage(self) -> None:
+        documents = [
+            {
+                "document_id": "positive",
+                "text": "角色故事",
+                "source_coverage": [{"record_id": "record-1", "section_ordinal": 0, "component_observation_key": "c", "unit_ordinal": 0}],
+            },
+            {
+                "document_id": "negative",
+                "text": "角色攻略",
+                "source_coverage": [{"record_id": "record-1", "section_ordinal": 1, "component_observation_key": "c", "unit_ordinal": 0}],
+            },
+        ]
+        benchmark = {"queries": [{
+            "query_id": "q1",
+            "query": "角色",
+            "slices": ["wrong_role_contamination", "character_narrative"],
+            "evidence": [
+                {"evidence_id": "gold", "relevance": "direct", "location": {"record_id": "record-1", "section_ordinal": 0, "unit_ordinal": 0}},
+                {"evidence_id": "hn", "relevance": "hard_negative", "location": {"record_id": "record-1", "section_ordinal": 1, "unit_ordinal": 0}},
+            ],
+            "primary_sufficient_evidence_sets": [["gold"]],
+        }]}
+        result = evaluate_lexical_arm(documents, benchmark)
+        self.assertEqual(result["query_count"], 1)
+        self.assertEqual(result["metrics"]["hard_negative_top10_query_count"], 1)
+        self.assertEqual(result["queries"][0]["first_positive_rank"], 1)
+        self.assertEqual(result["queries"][0]["hard_negative_ranks"], {"hn": 2})
+        self.assertEqual(_slice_metrics(result, benchmark)["wrong_role_contamination"]["query_count"], 1)
 
 
 if __name__ == "__main__":

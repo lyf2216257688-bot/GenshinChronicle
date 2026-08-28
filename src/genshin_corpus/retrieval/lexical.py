@@ -13,6 +13,7 @@ from .representations import document_covers_location
 
 
 LEXICAL_ANALYZER_VERSION = "phase04-cjk-unigram-ascii-token-0.1"
+LEXICAL_BIGRAM_ANALYZER_VERSION = "phase04-cjk-unigram-bigram-ascii-token-0.1"
 LEXICAL_SCORER_VERSION = "phase04-bm25-source-address-tiebreak-0.2"
 _ASCII_TOKEN = re.compile(r"[a-z0-9]+")
 
@@ -26,9 +27,24 @@ def analyze(text: str) -> list[str]:
     return tokens
 
 
-def _build_index(documents: list[Mapping[str, Any]]) -> tuple[list[Counter[str]], list[int], float]:
+def analyze_with_bigrams(text: str) -> list[str]:
+    """Use CJK unigrams plus adjacent CJK bigrams and ASCII tokens."""
+
+    lowered = text.lower()
+    cjk = [character for character in lowered if "\u3400" <= character <= "\u9fff"]
+    tokens = list(cjk)
+    tokens.extend(
+        first + second
+        for first, second in zip(lowered, lowered[1:])
+        if "\u3400" <= first <= "\u9fff" and "\u3400" <= second <= "\u9fff"
+    )
+    tokens.extend(_ASCII_TOKEN.findall(lowered))
+    return tokens
+
+
+def _build_index(documents: list[Mapping[str, Any]], analyzer=analyze) -> tuple[list[Counter[str]], list[int], float]:
     started = time.perf_counter()
-    tokenized = [Counter(analyze(str(document.get("text", "")))) for document in documents]
+    tokenized = [Counter(analyzer(str(document.get("text", "")))) for document in documents]
     return tokenized, [sum(tokens.values()) for tokens in tokenized], (time.perf_counter() - started) * 1000
 
 
@@ -99,9 +115,10 @@ def _rank(
     tokenized: list[Counter[str]],
     lengths: list[int],
     query: str,
+    analyzer=analyze,
 ) -> tuple[list[Mapping[str, Any]], float]:
     started = time.perf_counter()
-    query_terms = Counter(analyze(query))
+    query_terms = Counter(analyzer(query))
     if not query_terms:
         return [], (time.perf_counter() - started) * 1000
     average_length = sum(lengths) / len(lengths) if lengths else 0.0
@@ -163,7 +180,13 @@ def _query_metrics(ranked: list[Mapping[str, Any]], query: Mapping[str, Any]) ->
     }
 
 
-def evaluate_lexical_arm(documents: list[Mapping[str, Any]], benchmark: Mapping[str, Any]) -> dict[str, Any]:
+def evaluate_lexical_arm(
+    documents: list[Mapping[str, Any]],
+    benchmark: Mapping[str, Any],
+    *,
+    analyzer=analyze,
+    analyzer_version: str = LEXICAL_ANALYZER_VERSION,
+) -> dict[str, Any]:
     """Evaluate one representation arm by explicit source coverage only."""
 
     queries = benchmark.get("queries")
@@ -171,11 +194,11 @@ def evaluate_lexical_arm(documents: list[Mapping[str, Any]], benchmark: Mapping[
         raise ValueError("benchmark queries must be a list")
     results: list[dict[str, Any]] = []
     latencies: list[float] = []
-    tokenized, lengths, index_build_latency = _build_index(documents)
+    tokenized, lengths, index_build_latency = _build_index(documents, analyzer)
     for query in queries:
         if not isinstance(query, Mapping):
             raise ValueError("benchmark query must be an object")
-        ranked, latency = _rank(documents, tokenized, lengths, str(query.get("query", "")))
+        ranked, latency = _rank(documents, tokenized, lengths, str(query.get("query", "")), analyzer)
         result = _query_metrics(ranked, query)
         result["latency_ms"] = round(latency, 3)
         results.append(result)
@@ -189,7 +212,7 @@ def evaluate_lexical_arm(documents: list[Mapping[str, Any]], benchmark: Mapping[
         return round(sum(result["primary_sufficient_rank"] is not None and result["primary_sufficient_rank"] <= limit for result in results) / total, 4) if total else 0.0
 
     return {
-        "analyzer_version": LEXICAL_ANALYZER_VERSION,
+        "analyzer_version": analyzer_version,
         "scorer_version": LEXICAL_SCORER_VERSION,
         "document_count": len(documents),
         "query_count": total,

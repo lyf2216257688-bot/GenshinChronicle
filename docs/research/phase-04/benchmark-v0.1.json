@@ -1,0 +1,111 @@
+{
+  "schema_version": "phase04-benchmark-0.1",
+  "benchmark_id": "p04-w3-obc-zh-cn-diagnostic-v0.1",
+  "scope": {
+    "source": "mihoyo_obc",
+    "locale": "zh-cn",
+    "purpose": "Small diagnostic expansion for analyzer/failure isolation; not benchmark-v1.",
+    "product_weight_note": "Provisional seed prioritization hint only; final weighting remains UNKNOWN."
+  },
+  "tracks": {
+    "diagnostic": "Targeted structured, dialogue, paraphrase, and wrong-role slices."
+  },
+  "queries": [
+    {
+      "query_id": "w3-structured-arlecchino-birthday",
+      "query": "阿蕾奇诺的资料表中，生日字段对应的日期是什么？",
+      "benchmark_track": "diagnostic",
+      "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table"],
+      "evidence": [{
+        "evidence_id": "birthday-field",
+        "relevance": "direct",
+        "location": {
+          "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+          "section_ordinal": 0,
+          "component_observation_key": "content:501157:component:role_base_info:ordinal:0",
+          "unit_ordinal": 0,
+          "parsed_json_pointer": "/modules/0/components/0/units/0",
+          "decoded_json_pointer": "/attr/0/value/0"
+        }
+      }],
+      "primary_sufficient_evidence_sets": [["birthday-field"]]
+    },
+    {
+      "query_id": "w3-dialogue-option-very-handy",
+      "query": "旅行者选择“非常顺手！”后，对应的对话节点如何回应？",
+      "benchmark_track": "diagnostic",
+      "product_weight": 2,
+      "slices": ["dialogue_option", "dialogue_branch"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{
+        "evidence_id": "branch-response",
+        "relevance": "direct",
+        "location": {
+          "record_id": "39427935b5794079c6323c84c95d6cb6d11a874a6dcfb7a0e45b5fdaadea0386",
+          "section_ordinal": 7,
+          "component_observation_key": "content:509653:component:interactive_dialogue:ordinal:0",
+          "unit_ordinal": 4,
+          "parsed_json_pointer": "/modules/7/components/0/units/4",
+          "dialogue": {
+            "group_ordering": 0,
+            "node_source_id": "xw8gn2cly6oT1787134598748",
+            "edge": {"parent_id": "6mttjd5ntbaT1787134589088", "child_id": "xw8gn2cly6oT1787134598748"}
+          }
+        }
+      }],
+      "primary_sufficient_evidence_sets": [["branch-response"]]
+    },
+    {
+      "query_id": "w3-paraphrase-hutao-boundary",
+      "query": "胡桃如何理解战斗与守护生死边界之间的关系？",
+      "benchmark_track": "diagnostic",
+      "product_weight": 2,
+      "slices": ["semantic_paraphrase", "character_narrative"],
+      "evidence": [{
+        "evidence_id": "hutao-narrative",
+        "relevance": "direct",
+        "location": {
+          "record_id": "f12cd65c647991927cb7e0810256ab7e09d9280b58dc1bdc7b1aee775a72f188",
+          "section_ordinal": 0,
+          "component_observation_key": "content:2268:component:collapse_panel:ordinal:0",
+          "unit_ordinal": 1,
+          "parsed_json_pointer": "/modules/0/components/0/units/1"
+        }
+      }],
+      "primary_sufficient_evidence_sets": [["hutao-narrative"]]
+    },
+    {
+      "query_id": "w3-wrong-role-arlecchino-build",
+      "query": "关于阿蕾奇诺角色故事中恐惧来源的叙述，哪些证据真正支持该解释？",
+      "benchmark_track": "diagnostic",
+      "product_weight": 2,
+      "slices": ["wrong_role_contamination", "character_narrative"],
+      "evidence": [
+        {
+          "evidence_id": "story-explanation",
+          "relevance": "direct",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 15,
+            "component_observation_key": "content:501157:component:collapse_panel:ordinal:0",
+            "unit_ordinal": 1,
+            "parsed_json_pointer": "/modules/15/components/0/units/1"
+          }
+        },
+        {
+          "evidence_id": "build-hard-negative",
+          "relevance": "hard_negative",
+          "location": {
+            "record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493",
+            "section_ordinal": 2,
+            "component_observation_key": "content:501157:component:recommend:ordinal:0",
+            "unit_ordinal": 2,
+            "parsed_json_pointer": "/modules/2/components/0/units/2"
+          }
+        }
+      ],
+      "primary_sufficient_evidence_sets": [["story-explanation"]]
+    }
+  ]
+}

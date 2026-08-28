@@ -11,11 +11,19 @@ from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.collector.storage import atomic_write
 
 from .benchmark import load_benchmark, validate_benchmark
-from .lexical import LEXICAL_ANALYZER_VERSION, LEXICAL_SCORER_VERSION, evaluate_lexical_arm
+from .lexical import (
+    LEXICAL_ANALYZER_VERSION,
+    LEXICAL_BIGRAM_ANALYZER_VERSION,
+    LEXICAL_SCORER_VERSION,
+    analyze,
+    analyze_with_bigrams,
+    evaluate_lexical_arm,
+)
 from .representations import REPRESENTATION_ARMS, load_retrieval_documents
 
 
 LEXICAL_EXPERIMENT_VERSION = "phase04-lexical-experiment-0.2"
+W3_LEXICAL_EXPERIMENT_VERSION = "phase04-w3-lexical-matrix-0.1"
 
 
 def _read_manifest(path: Path) -> Mapping[str, Any]:
@@ -81,6 +89,48 @@ def run_lexical_experiment(retrieval_manifest_path: Path, benchmark_path: Path, 
         "benchmark_sha256": hashlib.sha256(Path(benchmark_path).read_bytes()).hexdigest(),
         "results": results,
         "note": "This is a small lexical representation experiment, not a production retrieval system or technology-selection result.",
+    }
+    atomic_write(Path(output_path), canonical_json_bytes(output))
+    return output
+
+
+def run_lexical_matrix(retrieval_manifest_path: Path, benchmark_path: Path, output_path: Path) -> dict[str, Any]:
+    """Run the W3 A/B analyzer matrix over the unchanged r02 artifacts."""
+
+    retrieval_manifest_path = Path(retrieval_manifest_path)
+    retrieval_manifest = _read_manifest(retrieval_manifest_path)
+    if retrieval_manifest.get("status") != "complete":
+        raise ValueError("Retrieval manifest must be complete")
+    benchmark = load_benchmark(Path(benchmark_path))
+    validate_benchmark(benchmark)
+    analyzers = {
+        "A": (LEXICAL_ANALYZER_VERSION, analyze),
+        "B": (LEXICAL_BIGRAM_ANALYZER_VERSION, analyze_with_bigrams),
+    }
+    results: dict[str, Any] = {}
+    for arm in REPRESENTATION_ARMS:
+        documents = load_retrieval_documents(retrieval_manifest_path, arm)
+        results[arm] = {}
+        for label, (version, analyzer) in analyzers.items():
+            arm_result = evaluate_lexical_arm(documents, benchmark, analyzer=analyzer, analyzer_version=version)
+            arm_result["slice_metrics"] = _slice_metrics(arm_result, benchmark)
+            results[arm][label] = arm_result
+    output = {
+        "schema_version": W3_LEXICAL_EXPERIMENT_VERSION,
+        "analyzers": {
+            "A": LEXICAL_ANALYZER_VERSION,
+            "B": LEXICAL_BIGRAM_ANALYZER_VERSION,
+        },
+        "canonical_run_id": retrieval_manifest.get("canonical_run_id"),
+        "canonical_manifest_sha256": retrieval_manifest.get("canonical_manifest_sha256"),
+        "retrieval_manifest_path": str(retrieval_manifest_path),
+        "retrieval_manifest_sha256": hashlib.sha256(retrieval_manifest_path.read_bytes()).hexdigest(),
+        "representation_dependency": retrieval_manifest.get("representation_version"),
+        "benchmark_path": str(benchmark_path),
+        "benchmark_sha256": hashlib.sha256(Path(benchmark_path).read_bytes()).hexdigest(),
+        "scorer_version": LEXICAL_SCORER_VERSION,
+        "results": results,
+        "note": "Diagnostic A/B analyzer matrix only; no representation, routing, or production technology winner is selected.",
     }
     atomic_write(Path(output_path), canonical_json_bytes(output))
     return output
