@@ -71,15 +71,23 @@ mixed; natural HN did not form top-10 contamination. It does not authorize an
 analyzer follow-up, representation redesign, Dense pilot, routing/down-rank,
 or another Retrieval technology path.
 
+**P04-W6 — Dense family-isolation pilot** is **CLOSED / PASS**. The fixed
+`contextualized_leaf` pilot completed with 242,965 documents using the pinned
+`BAAI/bge-small-zh-v1.5` snapshot; embedding and frozen benchmark-v0.3
+evaluation artifacts passed provenance and integrity review. Dense showed
+credible complementary signal, but paraphrase-family repeated rescue was not
+established, Dense is not a standalone winner, and the Retrieval winner
+remains **UNKNOWN**. Hybrid, ANN/vector DB, reranking, routing/down-rank,
+larger models, query rewrite, and representation changes are not authorized.
+W7 has not started.
+
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-technical lead 基于 W1–W5 evidence 重新设计/授权下一 Phase 04
-retrieval-family experiment；不得自行指定技术路线。当前没有 Dense pilot、
-routing/down-rank、继续 analyzer、BM25 retune、representation redesign 或其他
-Retrieval technology follow-up 的授权。
+后续仅可由 technical lead 单独启动 W7 Plan / blind leaf-only
+evidence-expansion design；不得自行指定技术路线。W7 尚未开始。
 
 ## Phase transition boundary
 

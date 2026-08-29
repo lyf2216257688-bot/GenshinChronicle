@@ -15,6 +15,12 @@ selection, embeddings, vector stores, reranking, query expansion, RAG
 orchestration, Entity/Fact/Event models, a knowledge graph, or changes to Raw,
 Parsed, or Canonical contracts.
 
+W6 separately completed a bounded Dense family-isolation pilot on the fixed
+`contextualized_leaf` arm and frozen benchmark-v0.3. This is an accepted
+experiment result, not Dense adoption or production authorization; the
+Retrieval winner remains UNKNOWN and Hybrid/ANN/vector DB/reranking/routing
+follow-up remains unauthorized.
+
 ## Approved architectural boundaries
 
 - Canonical is immutable evidence; Retrieval artifacts are rebuildable,
@@ -34,6 +40,8 @@ Parsed, or Canonical contracts.
   provenance/content-role stays UNKNOWN; no fixed role/importance taxonomy or
   `component_id -> priority` contract is introduced.
 - No BM25/Dense/Hybrid/embedding/vector database/reranker winner is frozen.
+- W6 Dense evidence is closed for the approved pilot only; no Dense or Hybrid
+  technology is selected or authorized for follow-up.
 - No Phase 03 Retrieval integration blocker is currently known. Observation
   local IDs, heterogeneous values, incomplete roles, and dialogue uncertainty
   are Retrieval concerns to handle in rebuildable derivatives.
