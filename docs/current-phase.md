@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W3 complete; review pending)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W4 complete; review pending)**
 
 ## Objective
 
@@ -52,17 +52,18 @@ dialogue/speaker semantics, cross-snapshot identity, or Retrieval/RAG quality.
 **P04-W1 — Corpus Profiler + Retrieval Benchmark Foundation** is CLOSED / PASS
 at `3cf9694`. **P04-W2 — Derived Retrieval Representation + Lexical Baseline**
 is CLOSED at `7d8c510`. **P04-W3 — Diagnostic Benchmark Expansion + Lexical
-Failure Isolation** is complete and awaits human review. It added a small
-evidence-grounded diagnostic benchmark and a stdlib-only unigram+bigram analyzer
-matrix over unchanged r02 Retrieval artifacts. It did not rerun Canonical
-projection or modify Raw, Parsed, Canonical, or profiler data.
+Failure Isolation** is CLOSED at `34069c2`. **P04-W4 — Diagnostic Evidence
+Expansion + Retrieval-Family Decision Gate** is complete and awaits human
+review. It added a bounded evidence-grounded diagnostic benchmark and a fixed
+A/B analyzer matrix over unchanged r02 Retrieval artifacts. It did not rerun
+Canonical projection or modify Raw, Parsed, Canonical, or profiler data.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-Review P04-W3. Dense/Hybrid, routing/contamination, reranking, and Evidence
+Review P04-W4. Dense/Hybrid, routing/contamination, reranking, and Evidence
 Assembly experiments require separately reviewed authorization.
 
 ## Phase transition boundary
