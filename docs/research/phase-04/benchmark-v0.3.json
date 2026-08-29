@@ -1,0 +1,201 @@
+{
+  "schema_version": "phase04-benchmark-0.1",
+  "benchmark_id": "p04-w5-obc-zh-cn-benchmark-v0.3",
+  "unique_positive_locations_required": true,
+  "scope": {
+    "source": "mihoyo_obc",
+    "locale": "zh-cn",
+    "purpose": "W5 reliability and coverage expansion; v0.2 anchors are preserved unchanged before a single post-freeze diagnostic matrix.",
+    "product_weight_note": "Provisional diagnostic prioritization hint only; final weighting remains UNKNOWN.",
+    "eligibility_version": "phase04-benchmark-evidence-eligibility-0.1"
+  },
+  "tracks": {"diagnostic": "v0.2 anchors plus evidence-shape validated W5 additions; not benchmark-v1 or a retrieval technology selection benchmark."},
+  "v0_2_anchor_query_ids": ["w3-structured-arlecchino-birthday", "w3-dialogue-option-very-handy", "w3-paraphrase-hutao-boundary", "w3-wrong-role-arlecchino-build", "w4-structured-npc-xiemiao", "w4-structured-arlecchino-voice", "w4-dialogue-babara-nata-branch", "w4-dialogue-branch-followup", "w4-paraphrase-moon-child-history", "w4-paraphrase-readable-mule", "w4-wrong-role-arlecchino-relation", "w4-wrong-role-weapon-build"],
+  "queries": [
+    {
+      "query_id": "w3-structured-arlecchino-birthday",
+      "query": "阿蕾奇诺的资料表中，生日字段对应的日期是什么？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table"],
+      "evidence": [{"evidence_id": "birthday-field", "relevance": "direct", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 0, "component_observation_key": "content:501157:component:role_base_info:ordinal:0", "unit_ordinal": 0, "parsed_json_pointer": "/modules/0/components/0/units/0", "decoded_json_pointer": "/attr/0/value/0"}}],
+      "primary_sufficient_evidence_sets": [["birthday-field"]]
+    },
+    {
+      "query_id": "w3-dialogue-option-very-handy",
+      "query": "旅行者选择“非常顺手！”后，对应的对话节点如何回应？",
+      "benchmark_track": "diagnostic", "product_weight": 2,
+      "slices": ["dialogue_option", "dialogue_branch"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{"evidence_id": "branch-response", "relevance": "direct", "location": {"record_id": "39427935b5794079c6323c84c95d6cb6d11a874a6dcfb7a0e45b5fdaadea0386", "section_ordinal": 7, "component_observation_key": "content:509653:component:interactive_dialogue:ordinal:0", "unit_ordinal": 4, "parsed_json_pointer": "/modules/7/components/0/units/4", "dialogue": {"group_ordering": 0, "node_source_id": "xw8gn2cly6oT1787134598748", "edge": {"parent_id": "6mttjd5ntbaT1787134589088", "child_id": "xw8gn2cly6oT1787134598748"}}}}],
+      "primary_sufficient_evidence_sets": [["branch-response"]]
+    },
+    {
+      "query_id": "w3-paraphrase-hutao-boundary",
+      "query": "胡桃如何理解战斗与守护生死边界之间的关系？",
+      "benchmark_track": "diagnostic", "product_weight": 2,
+      "slices": ["semantic_paraphrase", "character_narrative"],
+      "evidence": [{"evidence_id": "hutao-narrative", "relevance": "direct", "location": {"record_id": "f12cd65c647991927cb7e0810256ab7e09d9280b58dc1bdc7b1aee775a72f188", "section_ordinal": 0, "component_observation_key": "content:2268:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/0/components/0/units/1"}}],
+      "primary_sufficient_evidence_sets": [["hutao-narrative"]]
+    },
+    {
+      "query_id": "w3-wrong-role-arlecchino-build",
+      "query": "关于阿蕾奇诺角色故事中恐惧来源的叙述，哪些证据真正支持该解释？",
+      "benchmark_track": "diagnostic", "product_weight": 2,
+      "slices": ["wrong_role_contamination", "character_narrative"],
+      "evidence": [
+        {"evidence_id": "story-explanation", "relevance": "direct", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 15, "component_observation_key": "content:501157:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/15/components/0/units/1"}},
+        {"evidence_id": "build-hard-negative", "relevance": "hard_negative", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 2, "component_observation_key": "content:501157:component:recommend:ordinal:0", "unit_ordinal": 2, "parsed_json_pointer": "/modules/2/components/0/units/2"}}
+      ],
+      "primary_sufficient_evidence_sets": [["story-explanation"]]
+    },
+    {
+      "query_id": "w4-structured-npc-xiemiao",
+      "query": "谢苗的资料表中，合成笔记前的位置字段是什么？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table", "map_npc"],
+      "evidence": [{"evidence_id": "npc-location", "relevance": "direct", "location": {"record_id": "71f158d46adea0b3ce96652316d7a3da8e01e1339c8f0a9c3617047231af881d", "section_ordinal": 0, "component_observation_key": "content:506689:component:npc_base_info:ordinal:0", "unit_ordinal": 0, "parsed_json_pointer": "/modules/0/components/0/units/0", "decoded_json_pointer": "/attr/1/value/0"}}],
+      "primary_sufficient_evidence_sets": [["npc-location"]]
+    },
+    {
+      "query_id": "w4-structured-arlecchino-voice",
+      "query": "阿蕾奇诺的初次见面语音记录属于哪类结构化资料？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table", "character_voice"],
+      "evidence": [{"evidence_id": "voice-table", "relevance": "direct", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 14, "component_observation_key": "content:501157:component:role_voice:ordinal:0", "unit_ordinal": 0, "parsed_json_pointer": "/modules/14/components/0/units/0", "decoded_json_pointer": "/list/0/table/0/content"}}],
+      "primary_sufficient_evidence_sets": [["voice-table"]]
+    },
+    {
+      "query_id": "w4-dialogue-babara-nata-branch",
+      "query": "旅行者询问纳塔客人后，芭芭拉的下一段回应是什么？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["dialogue_option", "dialogue_branch"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{"evidence_id": "babara-response", "relevance": "direct", "location": {"record_id": "fbc9752dd0977dab7f193a0e5101854fdebc926f3c84bacccf62047813d1228a", "section_ordinal": 4, "component_observation_key": "content:508390:component:interactive_dialogue:ordinal:0", "unit_ordinal": 8, "parsed_json_pointer": "/modules/4/components/0/units/8", "dialogue": {"group_ordering": 0, "node_source_id": "qzixc86g5cT1775842938967", "edge": {"parent_id": "1e92bmcviahT1775842105268", "child_id": "qzixc86g5cT1775842938967"}}}}],
+      "primary_sufficient_evidence_sets": [["babara-response"]]
+    },
+    {
+      "query_id": "w4-dialogue-branch-followup",
+      "query": "旅行者提到午睡后，下一对话节点如何回应？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["dialogue_option", "dialogue_branch"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{"evidence_id": "nap-followup", "relevance": "direct", "location": {"record_id": "fbc9752dd0977dab7f193a0e5101854fdebc926f3c84bacccf62047813d1228a", "section_ordinal": 4, "component_observation_key": "content:508390:component:interactive_dialogue:ordinal:0", "unit_ordinal": 8, "parsed_json_pointer": "/modules/4/components/0/units/8", "dialogue": {"group_ordering": 0, "node_source_id": "w3k9s705y6gT1775842940725", "edge": {"parent_id": "qzixc86g5cT1775842938967", "child_id": "w3k9s705y6gT1775842940725"}}}}],
+      "primary_sufficient_evidence_sets": [["nap-followup"]]
+    },
+    {
+      "query_id": "w4-paraphrase-moon-child-history",
+      "query": "哪段资料讲述了月童库藏所见证的古老文明兴衰？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["semantic_paraphrase", "worldbuilding", "narrative_context"],
+      "evidence": [{"evidence_id": "vault-history-text", "relevance": "direct", "location": {"record_id": "3cf3fcd3b709f4c23a001d295c38a2bd8ff4b7ebeb0ba80aa8973536dc85bd49", "section_ordinal": 1, "component_observation_key": "content:507740:component:multi_table:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/1/components/0/units/1"}}],
+      "primary_sufficient_evidence_sets": [["vault-history-text"]]
+    },
+    {
+      "query_id": "w4-paraphrase-readable-mule",
+      "query": "《变成骡子的人》里关于须弥城人物身份的描述指向谁？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["semantic_paraphrase", "readable_book", "narrative_context"],
+      "evidence": [{"evidence_id": "readable-opening", "relevance": "direct", "location": {"record_id": "322056d9a29169defa3b06cf4dc90bf66677efa5ed18b1855e9ddc3830b37252", "section_ordinal": 1, "component_observation_key": "content:507284:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/1/components/0/units/1"}}],
+      "primary_sufficient_evidence_sets": [["readable-opening"]]
+    },
+    {
+      "query_id": "w4-wrong-role-arlecchino-relation",
+      "query": "关于阿蕾奇诺的人物关系描述，哪些证据支持纳维亚的评价？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["wrong_role_contamination", "relationship"],
+      "evidence": [
+        {"evidence_id": "relation-statement", "relevance": "direct", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 27, "component_observation_key": "content:501157:component:role_relation:ordinal:0", "unit_ordinal": 10, "parsed_json_pointer": "/modules/27/components/0/units/10"}},
+        {"evidence_id": "build-hard-negative", "relevance": "hard_negative", "location": {"record_id": "51848b45ac4f093d72340d7042f021866fe9e7e4209f0e13976bc4ba7ee51493", "section_ordinal": 2, "component_observation_key": "content:501157:component:recommend:ordinal:0", "unit_ordinal": 2, "parsed_json_pointer": "/modules/2/components/0/units/2"}}
+      ],
+      "primary_sufficient_evidence_sets": [["relation-statement"]]
+    },
+    {
+      "query_id": "w4-wrong-role-weapon-build",
+      "query": "《雪葬的星银》的故事证据与武器养成信息应如何区分？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["wrong_role_contamination", "weapon_artifact_item_lore"],
+      "evidence": [
+        {"evidence_id": "weapon-story", "relevance": "direct", "location": {"record_id": "f1eb5484cec447ecdbdd5a579fe61c783475724616292cb8f3fd07b4465cf771", "section_ordinal": 3, "component_observation_key": "content:1362:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/3/components/0/units/1"}},
+        {"evidence_id": "weapon-build-hard-negative", "relevance": "hard_negative", "location": {"record_id": "f1eb5484cec447ecdbdd5a579fe61c783475724616292cb8f3fd07b4465cf771", "section_ordinal": 2, "component_observation_key": "content:1362:component:equipment_growth_info:ordinal:0", "unit_ordinal": 2, "parsed_json_pointer": "/modules/2/components/0/units/2"}}
+      ],
+      "primary_sufficient_evidence_sets": [["weapon-story"]]
+    },
+    {
+      "query_id": "w5-structured-odette-affiliation",
+      "query": "奥黛塔的基础资料中，所属字段写的是什么？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table", "character_profile"],
+      "evidence": [{"evidence_id": "affiliation-field", "relevance": "direct", "location": {"record_id": "eeea31ec880e8ae9c526a84dfb68cc0d821da26f431952ece6213631bda9ae8b", "section_ordinal": 0, "component_observation_key": "content:509103:component:role_base_info:ordinal:0", "unit_ordinal": 0, "parsed_json_pointer": "/modules/0/components/0/units/0", "decoded_json_pointer": "/attr/1/value/0"}}],
+      "primary_sufficient_evidence_sets": [["affiliation-field"]]
+    },
+    {
+      "query_id": "w5-structured-odette-voice",
+      "query": "奥黛塔初次见面语音中，她如何重新自我介绍？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["structured_attribute_value", "structured_table", "character_voice"],
+      "evidence": [{"evidence_id": "voice-content", "relevance": "direct", "location": {"record_id": "eeea31ec880e8ae9c526a84dfb68cc0d821da26f431952ece6213631bda9ae8b", "section_ordinal": 14, "component_observation_key": "content:509103:component:role_voice:ordinal:0", "unit_ordinal": 0, "parsed_json_pointer": "/modules/14/components/0/units/0", "decoded_json_pointer": "/list/0/table/0/content"}}],
+      "primary_sufficient_evidence_sets": [["voice-content"]]
+    },
+    {
+      "query_id": "w5-dialogue-nicole-witch-house",
+      "query": "旅行者说“魔女，好难懂啊”后，尼可为什么说要扩展领地？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["dialogue_option", "dialogue_branch", "quest_dialogue"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{"evidence_id": "witch-house-response", "relevance": "direct", "location": {"record_id": "75a653fb2a4b166f4020c4d5676bc3a7f73fe89653339e3925e1adfb9766550e", "section_ordinal": 7, "component_observation_key": "content:508131:component:interactive_dialogue:ordinal:0", "unit_ordinal": 3, "parsed_json_pointer": "/modules/7/components/0/units/3", "dialogue": {"group_ordering": 0, "node_source_id": "d14ou7lud0fT1782391913367", "edge": {"parent_id": "5or8hzr90suT1782391868256", "child_id": "d14ou7lud0fT1782391913367"}}}}],
+      "primary_sufficient_evidence_sets": [["witch-house-response"]]
+    },
+    {
+      "query_id": "w5-dialogue-varka-responsibility",
+      "query": "旅行者认为善意谎言可行时，法尔伽如何强调骑士应当面对选择？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["dialogue_option", "dialogue_branch", "quest_dialogue"],
+      "assembly_expectations": {"requires_observed_dialogue_edge": true, "preserve_group_and_node_context": true},
+      "evidence": [{"evidence_id": "responsibility-response", "relevance": "direct", "location": {"record_id": "30b0b0a4854e0ed8a4fd71a4077a238d87e5990f47df8818f9d06a35728827c2", "section_ordinal": 16, "component_observation_key": "content:508184:component:interactive_dialogue:ordinal:0", "unit_ordinal": 11, "parsed_json_pointer": "/modules/16/components/0/units/11", "dialogue": {"group_ordering": 0, "node_source_id": "nb4jepb10znT1773033896717", "edge": {"parent_id": "152yddg3op3T1773033894578", "child_id": "nb4jepb10znT1773033896717"}}}}],
+      "primary_sufficient_evidence_sets": [["responsibility-response"]]
+    },
+    {
+      "query_id": "w5-paraphrase-odette-double-life",
+      "query": "哪段人物资料描写奥黛塔白天在剧院、深夜另有职责的双重生活？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["semantic_paraphrase", "character_narrative"],
+      "evidence": [{"evidence_id": "double-life-text", "relevance": "direct", "location": {"record_id": "eeea31ec880e8ae9c526a84dfb68cc0d821da26f431952ece6213631bda9ae8b", "section_ordinal": 13, "component_observation_key": "content:509103:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/13/components/0/units/1"}}],
+      "primary_sufficient_evidence_sets": [["double-life-text"]]
+    },
+    {
+      "query_id": "w5-paraphrase-varka-rest",
+      "query": "法尔伽劝旅行者不要总是奔波、也要好好休息的那段话在哪里？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["semantic_paraphrase", "quest_dialogue"],
+      "evidence": [{"evidence_id": "rest-advice-text", "relevance": "direct", "location": {"record_id": "30b0b0a4854e0ed8a4fd71a4077a238d87e5990f47df8818f9d06a35728827c2", "section_ordinal": 26, "component_observation_key": "content:508184:component:interactive_dialogue:ordinal:0", "unit_ordinal": 2, "parsed_json_pointer": "/modules/26/components/0/units/2"}}],
+      "primary_sufficient_evidence_sets": [["rest-advice-text"]]
+    },
+    {
+      "query_id": "w5-wrong-role-odette-story-build",
+      "query": "关于奥黛塔的舞台形象及其背后职责，哪些叙述性证据相关，而装备配装说明不应作为答案？",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["wrong_role_contamination", "character_narrative"],
+      "evidence": [
+        {"evidence_id": "story-description", "relevance": "direct", "location": {"record_id": "eeea31ec880e8ae9c526a84dfb68cc0d821da26f431952ece6213631bda9ae8b", "section_ordinal": 15, "component_observation_key": "content:509103:component:collapse_panel:ordinal:0", "unit_ordinal": 1, "parsed_json_pointer": "/modules/15/components/0/units/1"}},
+        {"evidence_id": "build-hard-negative", "relevance": "hard_negative", "location": {"record_id": "eeea31ec880e8ae9c526a84dfb68cc0d821da26f431952ece6213631bda9ae8b", "section_ordinal": 2, "component_observation_key": "content:509103:component:recommend:ordinal:0", "unit_ordinal": 16, "parsed_json_pointer": "/modules/2/components/0/units/16"}}
+      ],
+      "primary_sufficient_evidence_sets": [["story-description"]]
+    },
+    {
+      "query_id": "w5-control-nicole-title",
+      "query": "尼可【逸闻】",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["control", "exact_name_entity"],
+      "evidence": [{"evidence_id": "nicole-record", "relevance": "direct", "location": {"record_id": "75a653fb2a4b166f4020c4d5676bc3a7f73fe89653339e3925e1adfb9766550e"}}],
+      "primary_sufficient_evidence_sets": [["nicole-record"]]
+    },
+    {
+      "query_id": "w5-control-varka-title",
+      "query": "法尔伽【逸闻】",
+      "benchmark_track": "diagnostic", "product_weight": 1,
+      "slices": ["control", "exact_name_entity"],
+      "evidence": [{"evidence_id": "varka-record", "relevance": "direct", "location": {"record_id": "30b0b0a4854e0ed8a4fd71a4077a238d87e5990f47df8818f9d06a35728827c2"}}],
+      "primary_sufficient_evidence_sets": [["varka-record"]]
+    }
+  ]
+}

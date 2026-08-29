@@ -6,8 +6,16 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from .representations import document_covers_location, load_retrieval_documents
+
 
 BENCHMARK_SCHEMA_VERSION = "phase04-benchmark-0.1"
+BENCHMARK_EVIDENCE_ELIGIBILITY_VERSION = "phase04-benchmark-evidence-eligibility-0.1"
+
+
+_STRUCTURED_SLICES = frozenset({"structured_attribute_value", "structured_table"})
+_DIALOGUE_SLICES = frozenset({"dialogue_option", "dialogue_branch"})
+_PARAPHRASE_SLICES = frozenset({"semantic_paraphrase"})
 
 
 class BenchmarkValidationError(ValueError):
@@ -103,10 +111,14 @@ def validate_benchmark(benchmark: Mapping[str, Any]) -> None:
     if benchmark.get("schema_version") != BENCHMARK_SCHEMA_VERSION:
         raise BenchmarkValidationError("unsupported benchmark schema_version")
     _require_text(benchmark.get("benchmark_id"), "benchmark_id")
+    unique_positive_locations_required = benchmark.get("unique_positive_locations_required", False)
+    if not isinstance(unique_positive_locations_required, bool):
+        raise BenchmarkValidationError("unique_positive_locations_required must be a boolean when present")
     queries = benchmark.get("queries")
     if not isinstance(queries, list) or not queries:
         raise BenchmarkValidationError("queries must be a non-empty list")
     identifiers: set[str] = set()
+    positive_locations: set[tuple[Any, ...]] = set()
     for query in queries:
         if not isinstance(query, Mapping):
             raise BenchmarkValidationError("query must be an object")
@@ -141,7 +153,14 @@ def validate_benchmark(benchmark: Mapping[str, Any]) -> None:
             if item.get("relevance") not in {"direct", "supporting", "hard_negative"}:
                 raise BenchmarkValidationError(f"{query_id}.{evidence_id}.relevance is invalid")
             relevance_by_evidence_id[evidence_id] = item["relevance"]
-            _location(item.get("location"), f"{query_id}.{evidence_id}")
+            location = _location(item.get("location"), f"{query_id}.{evidence_id}")
+            if unique_positive_locations_required and item["relevance"] != "hard_negative":
+                identity = _deepest_location_identity(location)
+                if identity in positive_locations:
+                    raise BenchmarkValidationError(
+                        f"{query_id}.{evidence_id} reuses an existing deepest positive evidence location"
+                    )
+                positive_locations.add(identity)
         primary_sets = query.get("primary_sufficient_evidence_sets")
         if not isinstance(primary_sets, list) or not primary_sets:
             raise BenchmarkValidationError(f"{query_id} needs a primary sufficient evidence set")
@@ -158,6 +177,38 @@ def validate_benchmark(benchmark: Mapping[str, Any]) -> None:
                 raise BenchmarkValidationError(f"{query_id} has an invalid alternative evidence set")
             if any(relevance_by_evidence_id[item] == "hard_negative" for item in group):
                 raise BenchmarkValidationError(f"{query_id} alternative sufficient evidence cannot contain hard_negative")
+        positive_scopes = {
+            _unit_scope_identity(item["location"])
+            for item in evidence
+            if item.get("relevance") != "hard_negative"
+        }
+        for item in evidence:
+            if item.get("relevance") == "hard_negative" and _unit_scope_identity(item["location"]) in positive_scopes:
+                raise BenchmarkValidationError(
+                    f"{query_id}.{item.get('evidence_id')} hard_negative must address a different Canonical scope from positive evidence"
+                )
+
+
+def _unit_scope_identity(location: Mapping[str, Any]) -> tuple[Any, ...]:
+    """Address the structural scope a wrong-role annotation is allowed to occupy."""
+
+    return tuple(location.get(field) for field in (
+        "record_id", "section_ordinal", "component_observation_key", "unit_ordinal",
+    ))
+
+
+def _deepest_location_identity(location: Mapping[str, Any]) -> tuple[Any, ...]:
+    """Occurrence address used to prohibit repeated positive gold in one benchmark."""
+
+    dialogue = location.get("dialogue")
+    raw_ref = location.get("raw_ref")
+    return (
+        *_unit_scope_identity(location),
+        location.get("decoded_json_pointer"),
+        json.dumps(dialogue, ensure_ascii=True, sort_keys=True, separators=(",", ":")) if dialogue is not None else None,
+        location.get("parsed_json_pointer"),
+        json.dumps(raw_ref, ensure_ascii=True, sort_keys=True, separators=(",", ":")) if raw_ref is not None else None,
+    )
 
 
 def _load_canonical_record(path: Path, expected_sha: str) -> Mapping[str, Any]:
@@ -178,7 +229,7 @@ def _load_canonical_record(path: Path, expected_sha: str) -> Mapping[str, Any]:
     return value
 
 
-def _resolve_location(record: Mapping[str, Any], location: Mapping[str, Any], label: str) -> None:
+def _resolve_location(record: Mapping[str, Any], location: Mapping[str, Any], label: str) -> Mapping[str, Any]:
     if record.get("record_id") != location["record_id"]:
         raise BenchmarkValidationError(f"{label} resolves to the wrong record")
     section_ordinal = location.get("section_ordinal")
@@ -244,6 +295,7 @@ def _resolve_location(record: Mapping[str, Any], location: Mapping[str, Any], la
                 if node_id is not None and node_id not in {matched_edge.get("parent_id"), matched_edge.get("child_id")}:
                     raise BenchmarkValidationError(f"{label} dialogue node does not participate in the selected edge")
     _resolve_lineage_selectors(target, location, label)
+    return target
 
 
 def _resolve_lineage_selectors(target: Mapping[str, Any], location: Mapping[str, Any], label: str) -> None:
@@ -282,10 +334,83 @@ def _resolve_json_pointer(value: Any, pointer: str, label: str) -> Any:
     return current
 
 
-def resolve_benchmark_locations(benchmark: Mapping[str, Any], canonical_manifest_path: Path) -> dict[str, int]:
+def _required_arms(query: Mapping[str, Any]) -> dict[str, str]:
+    slices = set(query.get("slices", []))
+    required: dict[str, str] = {}
+    if slices & _STRUCTURED_SLICES:
+        required["structured_path_value"] = "structured"
+    if slices & _DIALOGUE_SLICES:
+        required["dialogue_graph_local"] = "dialogue"
+    if slices & _PARAPHRASE_SLICES:
+        required["naked_leaf"] = "paraphrase"
+    return required
+
+
+def _validate_evidence_eligibility(
+    query: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    unit: Mapping[str, Any],
+    documents_by_arm: Mapping[str, list[Mapping[str, Any]]],
+) -> None:
+    """Fail closed when a typed benchmark slice lacks its observed source view.
+
+    This intentionally validates only the W5 evidence-shape slices.  It never
+    infers content role from component or template names and leaves semantic
+    paraphrase judgment to the human annotation review.
+    """
+
+    if evidence.get("relevance") == "hard_negative":
+        return
+    query_id = str(query.get("query_id"))
+    evidence_id = str(evidence.get("evidence_id"))
+    slices = set(query.get("slices", []))
+    location = evidence["location"]
+    kind = unit.get("kind")
+    expected: list[tuple[str, str]] = []
+    if slices & _STRUCTURED_SLICES:
+        if kind != "structured_observation" or location.get("decoded_json_pointer") is None:
+            raise BenchmarkValidationError(
+                f"{query_id}.{evidence_id} structured slice requires a structured_observation Unit and decoded_json_pointer"
+            )
+        expected.append(("structured_path_value", "structured"))
+    if slices & _DIALOGUE_SLICES:
+        dialogue = location.get("dialogue")
+        if kind != "dialogue_graph" or not isinstance(dialogue, Mapping) or dialogue.get("node_source_id") is None:
+            raise BenchmarkValidationError(
+                f"{query_id}.{evidence_id} dialogue slice requires a dialogue_graph Unit and dialogue node selector"
+            )
+        if "dialogue_branch" in slices and not isinstance(dialogue.get("edge"), Mapping):
+            raise BenchmarkValidationError(f"{query_id}.{evidence_id} dialogue_branch requires a dialogue edge selector")
+        expected.append(("dialogue_graph_local", "dialogue"))
+    if slices & _PARAPHRASE_SLICES:
+        if kind != "rich_text":
+            raise BenchmarkValidationError(f"{query_id}.{evidence_id} semantic_paraphrase requires a rich_text Unit")
+        expected.append(("naked_leaf", "paraphrase"))
+    for arm, label in expected:
+        documents = documents_by_arm.get(arm, [])
+        if not any(document_covers_location(document, location) for document in documents):
+            raise BenchmarkValidationError(
+                f"{query_id}.{evidence_id} {label} evidence is not explicitly covered by r02 arm {arm}"
+            )
+
+
+def resolve_benchmark_locations(
+    benchmark: Mapping[str, Any],
+    canonical_manifest_path: Path,
+    retrieval_manifest_path: Path | None = None,
+) -> dict[str, int]:
     """Resolve every annotated location against an immutable Canonical manifest."""
 
     validate_benchmark(benchmark)
+    scope = benchmark.get("scope")
+    eligibility_version = scope.get("eligibility_version") if isinstance(scope, Mapping) else None
+    if eligibility_version is not None and eligibility_version != BENCHMARK_EVIDENCE_ELIGIBILITY_VERSION:
+        raise BenchmarkValidationError(f"unsupported benchmark evidence eligibility_version: {eligibility_version!r}")
+    eligibility_enabled = eligibility_version == BENCHMARK_EVIDENCE_ELIGIBILITY_VERSION
+    if eligibility_enabled and retrieval_manifest_path is None:
+        raise BenchmarkValidationError(
+            "benchmark evidence eligibility requires a Retrieval manifest for required-arm source coverage resolution"
+        )
     manifest = load_benchmark(canonical_manifest_path)
     if manifest.get("status") != "complete" or not isinstance(manifest.get("records"), list):
         raise BenchmarkValidationError("Canonical manifest must be complete with records")
@@ -295,6 +420,11 @@ def resolve_benchmark_locations(benchmark: Mapping[str, Any], canonical_manifest
         if isinstance(entry, Mapping) and isinstance(entry.get("record_id"), str)
     }
     cache: dict[str, Mapping[str, Any]] = {}
+    required_arms = {arm for query in benchmark["queries"] for arm in _required_arms(query)} if eligibility_enabled else set()
+    documents_by_arm = {
+        arm: load_retrieval_documents(Path(retrieval_manifest_path), arm)
+        for arm in sorted(required_arms)
+    } if eligibility_enabled else {}
     resolved = 0
     for query in benchmark["queries"]:
         for evidence in query["evidence"]:
@@ -309,6 +439,8 @@ def resolve_benchmark_locations(benchmark: Mapping[str, Any], canonical_manifest
                 if not isinstance(path, str) or not isinstance(sha, str):
                     raise BenchmarkValidationError(f"Canonical manifest entry is incomplete for {record_id}")
                 cache[record_id] = _load_canonical_record(Path(path), sha)
-            _resolve_location(cache[record_id], location, f"{query['query_id']}.{evidence['evidence_id']}")
+            target = _resolve_location(cache[record_id], location, f"{query['query_id']}.{evidence['evidence_id']}")
+            if eligibility_enabled:
+                _validate_evidence_eligibility(query, evidence, target, documents_by_arm)
             resolved += 1
     return {"query_count": len(benchmark["queries"]), "evidence_location_count": resolved, "record_count": len(cache)}

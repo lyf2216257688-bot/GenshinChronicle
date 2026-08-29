@@ -1,6 +1,7 @@
 # Phase 04 — Retrieval / Evidence Assembly
 
-Status: **ACTIVE — P04-W1 Corpus Profiler + Retrieval Benchmark Foundation complete; human review pending**
+Status: **ACTIVE — approved Phase 04 architecture boundary; current work-unit
+status is owned by `docs/current-phase.md`**
 
 ## Authorization and boundary
 

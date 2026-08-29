@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import unittest
+import gzip
 
 from genshin_corpus.retrieval.benchmark import (
     BENCHMARK_SCHEMA_VERSION,
@@ -43,6 +44,7 @@ class BenchmarkContractTests(unittest.TestCase):
                 "units": [{
                     "ordinal": 0,
                     "parent_component_key": "component-1",
+                    "kind": "structured_observation",
                     "lineage": {
                         "parsed_json_pointer": "/modules/0/components/0/units/0",
                         "raw_refs": [{"artifact_path": "detail.json", "artifact_sha256": "a" * 64}],
@@ -53,6 +55,7 @@ class BenchmarkContractTests(unittest.TestCase):
                 }, {
                     "ordinal": 1,
                     "parent_component_key": "component-1",
+                    "kind": "dialogue_graph",
                     "lineage": {
                         "parsed_json_pointer": "/modules/0/components/0/units/1",
                         "raw_refs": [{"artifact_path": "dialogue.json"}],
@@ -66,6 +69,15 @@ class BenchmarkContractTests(unittest.TestCase):
                         ],
                         "edges": [{"parent_id": "a", "child_id": "b"}],
                     }]},
+                }, {
+                    "ordinal": 2,
+                    "parent_component_key": "component-1",
+                    "kind": "rich_text",
+                    "lineage": {
+                        "parsed_json_pointer": "/modules/0/components/0/units/2",
+                        "raw_refs": [{"artifact_path": "rich.json"}],
+                    },
+                    "value": {"normalized_text": "自然改写的来源文本"},
                 }],
             }],
         }
@@ -80,6 +92,20 @@ class BenchmarkContractTests(unittest.TestCase):
                 "canonical_record_sha256": hashlib.sha256(body).hexdigest(),
             }],
         }), encoding="utf-8")
+        self.retrieval_manifest_path = self.root / "retrieval-manifest.json"
+        artifacts = {}
+        locations = {
+            "structured_path_value": {"record_id": "record-1", "section_ordinal": 0, "component_observation_key": "component-1", "unit_ordinal": 0, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/0", "raw_refs": [{"artifact_path": "detail.json", "artifact_sha256": "a" * 64}]}, "decoded_json_pointers": ["/attr/0/value/0"]},
+            "dialogue_graph_local": {"record_id": "record-1", "section_ordinal": 0, "component_observation_key": "component-1", "unit_ordinal": 1, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/1", "raw_refs": [{"artifact_path": "dialogue.json"}]}, "dialogue": {"group_ordering": 0, "node_source_ids": ["a", "b"], "edges": [{"parent_id": "a", "child_id": "b"}]}},
+            "naked_leaf": {"record_id": "record-1", "section_ordinal": 0, "component_observation_key": "component-1", "unit_ordinal": 2, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/2", "raw_refs": [{"artifact_path": "rich.json"}]}},
+        }
+        for arm, coverage in locations.items():
+            path = self.root / f"{arm}.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps({"document_id": arm, "arm": arm, "source_coverage": [coverage]}, ensure_ascii=False) + "\n")
+            artifact_body = path.read_bytes()
+            artifacts[arm] = {"path": str(path), "sha256": hashlib.sha256(artifact_body).hexdigest(), "document_count": 1}
+        self.retrieval_manifest_path.write_text(json.dumps({"status": "complete", "artifacts": artifacts}), encoding="utf-8")
 
     def tearDown(self) -> None:
         if self.root.exists():
@@ -265,6 +291,78 @@ class BenchmarkContractTests(unittest.TestCase):
         })
         benchmark["queries"][0]["primary_sufficient_evidence_sets"] = [["field", "statement"]]
         validate_benchmark(benchmark)
+
+    def test_w5_typed_eligibility_rejects_mislabeled_or_uncovered_evidence(self) -> None:
+        cases = (
+            ("structured", "structured_attribute_value", 2, {}, "structured slice requires"),
+            ("dialogue-kind", "dialogue_branch", 0, {"dialogue": {"group_ordering": 0, "node_source_id": "b", "edge": {"parent_id": "a", "child_id": "b"}}}, "dialogue group does not exist"),
+            ("dialogue-edge", "dialogue_branch", 1, {"dialogue": {"group_ordering": 0, "node_source_id": "b"}}, "requires a dialogue edge"),
+            ("paraphrase", "semantic_paraphrase", 0, {}, "semantic_paraphrase requires"),
+        )
+        for name, slice_name, ordinal, extra, message in cases:
+            with self.subTest(name=name):
+                benchmark = self._benchmark()
+                benchmark["scope"] = {"eligibility_version": "phase04-benchmark-evidence-eligibility-0.1"}
+                location = benchmark["queries"][0]["evidence"][0]["location"]
+                location.update({"unit_ordinal": ordinal, "parsed_json_pointer": f"/modules/0/components/0/units/{ordinal}"})
+                location.update(extra)
+                location.pop("decoded_json_pointer", None)
+                location.pop("raw_ref", None)
+                benchmark["queries"][0]["slices"] = [slice_name]
+                if slice_name == "semantic_paraphrase":
+                    pass
+                elif ordinal == 1:
+                    location["raw_ref"] = {"artifact_path": "dialogue.json"}
+                with self.assertRaisesRegex(BenchmarkValidationError, message):
+                    resolve_benchmark_locations(benchmark, self.manifest_path, self.retrieval_manifest_path)
+
+    def test_w5_typed_eligibility_accepts_real_kind_and_r02_coverage(self) -> None:
+        cases = (
+            ("structured_attribute_value", 0, {"decoded_json_pointer": "/attr/0/value/0"}),
+            ("dialogue_branch", 1, {"dialogue": {"group_ordering": 0, "node_source_id": "b", "edge": {"parent_id": "a", "child_id": "b"}}}),
+            ("semantic_paraphrase", 2, {}),
+        )
+        for slice_name, ordinal, extra in cases:
+            with self.subTest(slice_name=slice_name):
+                benchmark = self._benchmark()
+                benchmark["scope"] = {"eligibility_version": "phase04-benchmark-evidence-eligibility-0.1"}
+                location = benchmark["queries"][0]["evidence"][0]["location"]
+                location.update({"unit_ordinal": ordinal, "parsed_json_pointer": f"/modules/0/components/0/units/{ordinal}"})
+                location.update(extra)
+                if slice_name != "structured_attribute_value":
+                    location.pop("decoded_json_pointer", None)
+                if slice_name == "semantic_paraphrase":
+                    location["raw_ref"] = {"artifact_path": "rich.json"}
+                elif slice_name == "dialogue_branch":
+                    location["raw_ref"] = {"artifact_path": "dialogue.json"}
+                benchmark["queries"][0]["slices"] = [slice_name]
+                self.assertEqual(resolve_benchmark_locations(benchmark, self.manifest_path, self.retrieval_manifest_path)["evidence_location_count"], 1)
+
+    def test_declared_eligibility_requires_known_version_and_retrieval_manifest(self) -> None:
+        benchmark = self._benchmark()
+        benchmark["scope"] = {"eligibility_version": "phase04-benchmark-evidence-eligibility-0.1"}
+        with self.assertRaisesRegex(BenchmarkValidationError, "requires a Retrieval manifest"):
+            resolve_benchmark_locations(benchmark, self.manifest_path)
+        benchmark["scope"]["eligibility_version"] = "unknown-eligibility-version"
+        with self.assertRaisesRegex(BenchmarkValidationError, "unsupported benchmark evidence eligibility_version"):
+            resolve_benchmark_locations(benchmark, self.manifest_path, self.retrieval_manifest_path)
+        benchmark.pop("scope")
+        self.assertEqual(resolve_benchmark_locations(benchmark, self.manifest_path)["evidence_location_count"], 1)
+
+    def test_w5_rejects_hard_negative_at_positive_unit_scope_and_duplicate_positives(self) -> None:
+        benchmark = self._benchmark()
+        benchmark["queries"][0]["evidence"].append({
+            "evidence_id": "negative", "relevance": "hard_negative", "location": dict(benchmark["queries"][0]["evidence"][0]["location"]),
+        })
+        with self.assertRaisesRegex(BenchmarkValidationError, "different Canonical scope"):
+            validate_benchmark(benchmark)
+        benchmark = self._benchmark()
+        benchmark["unique_positive_locations_required"] = True
+        copied = json.loads(json.dumps(benchmark["queries"][0]))
+        copied["query_id"] = "duplicate"
+        benchmark["queries"].append(copied)
+        with self.assertRaisesRegex(BenchmarkValidationError, "reuses an existing deepest"):
+            validate_benchmark(benchmark)
 
 
 if __name__ == "__main__":

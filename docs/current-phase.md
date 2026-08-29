@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W4 CLOSED / PASS)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W5 complete; review pending)**
 
 ## Objective
 
@@ -59,14 +59,24 @@ evidence-grounded diagnostic benchmark and a fixed A/B analyzer matrix over
 unchanged r02 Retrieval artifacts, without rerunning Canonical projection or
 modifying Raw, Parsed, Canonical, or profiler data.
 
+**P04-W5 — Benchmark Reliability & Coverage Expansion** is complete and
+awaiting review. It froze `benchmark-v0.3` before its single A/B matrix run,
+preserved all 12 v0.2 anchors, expanded the diagnostic evidence with explicit
+Canonical/r02 coverage eligibility, and kept all Retrieval representations,
+analyzers, scorer, and Canonical data unchanged. Its measurement evidence is
+`docs/research/phase-04/p04-w5-benchmark-reliability.md`; it does not authorize
+an analyzer follow-up, representation redesign, Dense pilot, routing/down-rank,
+or another Retrieval technology path.
+
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-Phase 04 下一工作单元等待 technical-lead 基于 W1–W4 evidence 重新设计/授权；
-不得自行指定 W5 技术路线。当前没有 Dense pilot、routing/down-rank、继续
-analyzer、BM25 retune 或其他 Retrieval technology follow-up 的授权。
+P04-W5 review pending。Phase 04 下一工作单元等待 technical-lead 基于 W1–W5
+evidence 重新设计/授权；不得自行指定后续技术路线。当前没有 Dense pilot、
+routing/down-rank、继续 analyzer、BM25 retune、representation redesign 或其他
+Retrieval technology follow-up 的授权。
 
 ## Phase transition boundary
 

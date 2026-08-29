@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import unittest
 
-from genshin_corpus.retrieval.experiments import _slice_metrics
+from genshin_corpus.retrieval.experiments import _cohort_metrics, _slice_metrics
 from genshin_corpus.retrieval.lexical import _build_index, _rank, analyze, analyze_with_bigrams, evaluate_lexical_arm
 from genshin_corpus.retrieval.representations import (
     RetrievalRepresentationError,
@@ -245,6 +245,17 @@ class RetrievalRepresentationTests(unittest.TestCase):
         self.assertEqual(result["queries"][0]["first_positive_rank"], 1)
         self.assertEqual(result["queries"][0]["hard_negative_ranks"], {"hn": 2})
         self.assertEqual(_slice_metrics(result, benchmark)["wrong_role_contamination"]["query_count"], 1)
+
+    def test_w5_cohort_metrics_keep_anchor_and_new_results_separate(self) -> None:
+        benchmark = {"v0_2_anchor_query_ids": ["anchor"], "queries": [{"query_id": "anchor"}, {"query_id": "new"}]}
+        result = {"queries": [
+            {"query_id": "anchor", "first_positive_rank": 1, "primary_sufficient_rank": 1, "hard_negative_ranks": {}},
+            {"query_id": "new", "first_positive_rank": 20, "primary_sufficient_rank": 20, "hard_negative_ranks": {"hn": 2}},
+        ]}
+        cohorts = _cohort_metrics(result, benchmark)
+        self.assertEqual(cohorts["all"]["query_count"], 2)
+        self.assertEqual(cohorts["v0_2_anchor"]["recall_at_10"], 1.0)
+        self.assertEqual(cohorts["w5_new"]["hard_negative_top10_query_count"], 1)
 
 
 if __name__ == "__main__":
