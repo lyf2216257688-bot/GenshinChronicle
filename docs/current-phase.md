@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W4 complete; review pending)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W4 CLOSED / PASS)**
 
 ## Objective
 
@@ -53,18 +53,20 @@ dialogue/speaker semantics, cross-snapshot identity, or Retrieval/RAG quality.
 at `3cf9694`. **P04-W2 — Derived Retrieval Representation + Lexical Baseline**
 is CLOSED at `7d8c510`. **P04-W3 — Diagnostic Benchmark Expansion + Lexical
 Failure Isolation** is CLOSED at `34069c2`. **P04-W4 — Diagnostic Evidence
-Expansion + Retrieval-Family Decision Gate** is complete and awaits human
-review. It added a bounded evidence-grounded diagnostic benchmark and a fixed
-A/B analyzer matrix over unchanged r02 Retrieval artifacts. It did not rerun
-Canonical projection or modify Raw, Parsed, Canonical, or profiler data.
+Expansion + Retrieval-Family Decision Gate** is CLOSED / PASS at `2f292f3`.
+Its final decision is **D — mixed / UNKNOWN**: it added a bounded
+evidence-grounded diagnostic benchmark and a fixed A/B analyzer matrix over
+unchanged r02 Retrieval artifacts, without rerunning Canonical projection or
+modifying Raw, Parsed, Canonical, or profiler data.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-Review P04-W4. Dense/Hybrid, routing/contamination, reranking, and Evidence
-Assembly experiments require separately reviewed authorization.
+Phase 04 下一工作单元等待 technical-lead 基于 W1–W4 evidence 重新设计/授权；
+不得自行指定 W5 技术路线。当前没有 Dense pilot、routing/down-rank、继续
+analyzer、BM25 retune 或其他 Retrieval technology follow-up 的授权。
 
 ## Phase transition boundary
 
