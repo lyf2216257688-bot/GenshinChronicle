@@ -1,2 +1,4 @@
 /src/genshin_corpus/retrieval/w7_sanitizer.py text eol=lf
 /tests/retrieval/test_w7_sanitizer.py text eol=lf
+/src/genshin_corpus/retrieval/w7_unit2.py text eol=lf
+/tests/retrieval/test_w7_unit2.py text eol=lf
