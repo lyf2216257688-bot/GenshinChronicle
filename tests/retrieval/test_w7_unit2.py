@@ -138,6 +138,25 @@ class W7Unit2FocusedTests(unittest.TestCase):
             actual = {record["occurrence_key"] for record in records if record["primary_disposition"] == "PENDING"}
             self.assertEqual(actual, expected, f"seed={seed}")
 
+    def test_shared_prefix_grams_emit_one_pair_and_input_order_is_irrelevant(self) -> None:
+        from genshin_corpus.retrieval.w7_unit2 import _exact_and_near
+
+        base = "abcdefghijklmnopqrstuvwx"
+        records = [
+            {"occurrence_key": "key-a", "text": base, "primary_disposition": "PENDING", "orthogonal_flags": []},
+            {"occurrence_key": "key-b", "text": base[:-1] + "!", "primary_disposition": "PENDING", "orthogonal_flags": []},
+        ]
+        reversed_records = [dict(record, orthogonal_flags=[]) for record in reversed(records)]
+        _exact_and_near(records)
+        _exact_and_near(reversed_records)
+        self.assertEqual(len([row for row in records if row.get("primary_disposition") == "NEAR_DUPLICATE_REJECTED"]), 1)
+        self.assertEqual(records[0].get("near_duplicate_rejecting_survivor"), None)
+        self.assertEqual(records[1].get("near_duplicate_rejecting_survivor"), "key-a")
+        self.assertEqual(
+            {(row["occurrence_key"], row.get("near_duplicate_rejecting_survivor")) for row in records},
+            {(row["occurrence_key"], row.get("near_duplicate_rejecting_survivor")) for row in reversed_records},
+        )
+
     def test_runner_interface_has_only_authorized_inputs(self) -> None:
         from genshin_corpus.retrieval.w7_unit2 import run_unit2
 

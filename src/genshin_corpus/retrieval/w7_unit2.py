@@ -259,18 +259,18 @@ def _exact_and_near(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_key = {record["occurrence_key"]: record for record in remaining}
     pair_audit: list[dict[str, Any]] = []
     qualifying: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
-    seen_pairs: set[tuple[str, str]] = set()
     for record in remaining:
         left_key = record["occurrence_key"]
         left_set = record["char_3grams"]
+        seen_right_keys: set[str] = set()
         for gram in ordered_grams[left_key][: max(0, len(left_set) - (4 * len(left_set) + 4) // 5 + 1)]:
             for right_key in postings[gram]:
-                if left_key == right_key:
+                if right_key <= left_key:
                     continue
-                pair = tuple(sorted((left_key, right_key)))
-                if pair in seen_pairs:
+                if right_key in seen_right_keys:
                     continue
-                seen_pairs.add(pair)
+                seen_right_keys.add(right_key)
+                pair = (left_key, right_key)
                 right = by_key[right_key]
                 if 100 * min(len(left_set), len(right["char_3grams"])) < 80 * max(len(left_set), len(right["char_3grams"])):
                     continue
@@ -280,15 +280,15 @@ def _exact_and_near(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 pair_audit.append({"left_occurrence_key": pair[0], "right_occurrence_key": pair[1], "intersection_size": intersection, "union_size": union, "threshold": ">=0.80", "result": "QUALIFYING_NEAR_DUPLICATE"})
                 qualifying[pair[0]].append((pair[1], intersection, union))
                 qualifying[pair[1]].append((pair[0], intersection, union))
-    survivors: list[str] = []
+    accepted_survivor_keys: set[str] = set()
     for record in sorted(remaining, key=lambda item: item["occurrence_key"]):
-        prior = sorted((key for key in qualifying.get(record["occurrence_key"], ()) if key[0] in survivors), key=lambda item: item[0])
+        prior = sorted((key for key in qualifying.get(record["occurrence_key"], ()) if key[0] in accepted_survivor_keys), key=lambda item: item[0])
         if prior:
             record["primary_disposition"] = "NEAR_DUPLICATE_REJECTED"
             record["near_duplicate_rejecting_survivor"] = prior[0][0]
             record["reason_code"] = "NEAR_DUPLICATE_JACCARD_080"
         else:
-            survivors.append(record["occurrence_key"])
+            accepted_survivor_keys.add(record["occurrence_key"])
     for record in records:
         record.pop("char_3grams", None)
         record.pop("normalized_text", None)
