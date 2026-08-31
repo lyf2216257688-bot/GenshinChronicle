@@ -1,0 +1,1097 @@
+"""Frozen W7 Unit 3 mechanical boundaries.
+
+This module deliberately separates pre-exposure review-pack extraction from
+human semantic judgment.  It never prints evidence text or legacy-query data.
+"""
+
+from __future__ import annotations
+
+import argparse
+import gzip
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import unicodedata
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from genshin_corpus.canonical.fingerprints import canonical_json_bytes
+
+
+UNIT3_SCHEMA_VERSION = "p04-w7-unit3-v1"
+REVIEW_PACK_SCHEMA_VERSION = "p04-w7-unit3-review-pack-v1"
+OVERLAP_SCHEMA_VERSION = "p04-w7-legacy-query-overlap-index-v1"
+NORMALIZATION_VERSION = "c1-nfkc-whitespace-collapse-trim-casefold-v1"
+EXPECTED_UNIT2_MANIFEST_SHA256 = "20baa9d92cdefc01731a234dc37fada6ca833456ec116a031fe557b4eb2796e8"
+EXPECTED_SANITIZER_MANIFEST_SHA256 = "237377715cc413cf87b1f6d1d77f54d7a380b09275f8e475bf73f239b93b33fe"
+EXPECTED_OVERLAP_INDEX_SHA256 = "171dc3a10420d880570201e0c62c7352154d7627dcd9564103c60d19b93354b7"
+EXPECTED_OVERLAP_ENTRY_COUNT = 21
+QUEUE_ORDER = ("semantic", "control", "WR", "HN")
+QUEUE_ALLOCATIONS = {"semantic": 16, "control": 8, "WR": 12, "HN": 12}
+FINAL_QUOTAS = {"semantic": 8, "WR": 6, "HN": 6, "control": 4}
+MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS = 2
+_PRE_PROPOSITION_REJECT_REASONS = frozenset(
+    {
+        "ANCHOR_NOT_VALID_POSITIVE",
+        "GOLD_SCOPE_INCOMPLETE",
+        "GOLD_NOT_COLLECTIVELY_SUFFICIENT",
+        "PRIMARY_GOLD_GAMEPLAY_BUILD",
+        "PROVENANCE_UNRESOLVED",
+        "REVIEWER_UNCERTAIN",
+    }
+)
+
+
+class Unit3Blocked(RuntimeError):
+    """Raised for a fail-closed Unit 3 mechanical contract violation."""
+
+
+def _sha256_bytes(body: bytes) -> str:
+    return hashlib.sha256(body).hexdigest()
+
+
+def _sha256_path(path: Path) -> str:
+    return _sha256_bytes(path.read_bytes())
+
+
+def _normalise(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value)
+    value = re.sub(r"\s+", " ", value, flags=re.UNICODE)
+    return value.strip().casefold()
+
+
+def _hash_text(value: str) -> str:
+    return _sha256_bytes(value.encode("utf-8"))
+
+
+def _windows(value: str, width: int) -> set[str]:
+    return {_hash_text(value[index : index + width]) for index in range(max(0, len(value) - width + 1))}
+
+
+def _grams(value: str) -> set[str]:
+    return _windows(value, 3)
+
+
+def _safe_json_load(path: Path) -> Mapping[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Unit3Blocked("JSON_READ_FAILED") from exc
+    if not isinstance(value, Mapping):
+        raise Unit3Blocked("JSON_OBJECT_REQUIRED")
+    return value
+
+
+def _read_jsonl_gzip(path: Path) -> list[Mapping[str, Any]]:
+    values: list[Mapping[str, Any]] = []
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                try:
+                    value = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise Unit3Blocked("JSONL_RECORD_INVALID") from exc
+                if not isinstance(value, Mapping):
+                    raise Unit3Blocked("JSONL_OBJECT_REQUIRED")
+                values.append(value)
+    except Unit3Blocked:
+        raise
+    except (OSError, UnicodeDecodeError, gzip.BadGzipFile) as exc:
+        raise Unit3Blocked("JSONL_GZIP_READ_FAILED") from exc
+    return values
+
+
+def _write_jsonl_gzip(path: Path, rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".w7-unit3-", dir=str(path.parent))
+    temporary = Path(temporary_name)
+    count = 0
+    try:
+        with os.fdopen(descriptor, "wb") as raw:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
+                for row in rows:
+                    compressed.write(canonical_json_bytes(row) + b"\n")
+                    count += 1
+        body = temporary.read_bytes()
+        temporary.replace(path)
+        return {"path": path.name, "sha256": _sha256_bytes(body), "byte_count": len(body), "row_count": count}
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _required_string(value: Mapping[str, Any], field: str) -> str:
+    candidate = value.get(field)
+    if not isinstance(candidate, str) or not candidate:
+        raise Unit3Blocked("REQUIRED_STRING_MISSING")
+    return candidate
+
+
+def _pack_occurrence(row: Mapping[str, Any]) -> dict[str, Any]:
+    required = ("occurrence_key", "candidate_key", "family_key", "entity_key", "topic_key", "occurrence_address", "text", "lineage", "raw_ref")
+    if any(field not in row for field in required):
+        raise Unit3Blocked("REVIEW_PACK_OCCURRENCE_INCOMPLETE")
+    if not isinstance(row["text"], str):
+        raise Unit3Blocked("REVIEW_PACK_TEXT_INVALID")
+    return {
+        "occurrence_key": _required_string(row, "occurrence_key"),
+        "candidate_key": _required_string(row, "candidate_key"),
+        "evidence_family_key": _required_string(row, "family_key"),
+        "entity_key": row["entity_key"],
+        "topic_key": row["topic_key"],
+        "occurrence_address": row["occurrence_address"],
+        "text": row["text"],
+        "lineage": row["lineage"],
+        "raw_ref": row["raw_ref"],
+    }
+
+
+def _index_unique(rows: Iterable[Mapping[str, Any]], key: str, code: str) -> dict[str, Mapping[str, Any]]:
+    indexed: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        value = _required_string(row, key)
+        if value in indexed:
+            raise Unit3Blocked(code)
+        indexed[value] = row
+    return indexed
+
+
+def _queue_rows(provisional_queues: Iterable[Mapping[str, Any]]) -> dict[str, list[Mapping[str, Any]]]:
+    values: dict[str, list[Mapping[str, Any]]] = {}
+    for entry in provisional_queues:
+        queue = _required_string(entry, "queue")
+        rows = entry.get("rows")
+        if queue not in QUEUE_ORDER or not isinstance(rows, list) or queue in values or not all(isinstance(row, Mapping) for row in rows):
+            raise Unit3Blocked("FROZEN_QUEUE_SCHEMA_INVALID")
+        values[queue] = rows
+    if tuple(values) != QUEUE_ORDER:
+        raise Unit3Blocked("FROZEN_QUEUE_ORDER_INVALID")
+    if {queue: len(values[queue]) for queue in QUEUE_ORDER} != QUEUE_ALLOCATIONS:
+        raise Unit3Blocked("FROZEN_QUEUE_COUNT_INVALID")
+    return values
+
+
+def build_review_pack(
+    provisional_queues: Iterable[Mapping[str, Any]],
+    input_rows: Iterable[Mapping[str, Any]],
+    gold_bundles: Iterable[Mapping[str, Any]],
+    pair_views: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Join frozen Unit 2 artifacts without assigning semantic labels."""
+    queue_rows = _queue_rows(provisional_queues)
+    occurrences = _index_unique(input_rows, "occurrence_key", "OCCURRENCE_IDENTITY_COLLISION")
+    bundles = _index_unique(gold_bundles, "anchor_occurrence_key", "GOLD_BUNDLE_COLLISION")
+    views = _index_unique(pair_views, "pair_key", "PAIR_VIEW_COLLISION")
+    packed: list[dict[str, Any]] = []
+    global_order = 0
+    used_anchors: set[str] = set()
+    for queue in QUEUE_ORDER:
+        for queue_order, candidate in enumerate(queue_rows[queue], 1):
+            global_order += 1
+            anchor_key = _required_string(candidate, "anchor_occurrence_key")
+            if anchor_key in used_anchors:
+                raise Unit3Blocked("FROZEN_QUEUE_CANDIDATE_DUPLICATED")
+            used_anchors.add(anchor_key)
+            anchor = occurrences.get(anchor_key)
+            bundle = bundles.get(anchor_key)
+            if anchor is None or bundle is None:
+                raise Unit3Blocked("REVIEW_PACK_REQUIRED_JOIN_MISSING")
+            occurrence_keys = bundle.get("occurrence_keys")
+            if not isinstance(occurrence_keys, list) or not occurrence_keys or not all(isinstance(key, str) for key in occurrence_keys):
+                raise Unit3Blocked("GOLD_BUNDLE_MEMBERSHIP_INVALID")
+            if anchor_key not in occurrence_keys or len(set(occurrence_keys)) != len(occurrence_keys):
+                raise Unit3Blocked("GOLD_BUNDLE_MEMBERSHIP_INVALID")
+            if bundle.get("status") != "VALID" or bundle.get("subreason") is not None or bundle.get("gold_review_occurrence_count") != len(occurrence_keys):
+                raise Unit3Blocked("GOLD_BUNDLE_STATUS_INVALID")
+            gold_rows: list[dict[str, Any]] = []
+            for occurrence_key in occurrence_keys:
+                row = occurrences.get(occurrence_key)
+                if row is None:
+                    raise Unit3Blocked("GOLD_OCCURRENCE_JOIN_MISSING")
+                gold_rows.append(_pack_occurrence(row))
+            expected_pair_keys = []
+            if queue in ("WR", "HN"):
+                candidate_views = candidate.get("wr_hn_relation_views")
+                if not isinstance(candidate_views, list) or not candidate_views:
+                    raise Unit3Blocked("WR_HN_PAIR_VIEW_MISSING")
+                expected_pair_keys = [_required_string(view, "pair_key") for view in candidate_views if isinstance(view, Mapping)]
+                if len(expected_pair_keys) != len(candidate_views) or len(set(expected_pair_keys)) != len(expected_pair_keys):
+                    raise Unit3Blocked("WR_HN_PAIR_VIEW_INVALID")
+            joined_views: list[Mapping[str, Any]] = []
+            for pair_key in expected_pair_keys:
+                view = views.get(pair_key)
+                if view is None or view.get("anchor_occurrence_key") != anchor_key or view.get("anchor_gold_bundle_key") != anchor_key:
+                    raise Unit3Blocked("PAIR_VIEW_JOIN_INVALID")
+                related_key = _required_string(view, "related_representative_occurrence_key")
+                if related_key not in occurrence_keys or related_key not in occurrences:
+                    raise Unit3Blocked("PAIR_VIEW_OUTSIDE_GOLD_SCOPE")
+                relevant_keys = view.get("pair_relevant_occurrence_keys")
+                if (
+                    not isinstance(relevant_keys, list)
+                    or not relevant_keys
+                    or not all(isinstance(key, str) for key in relevant_keys)
+                    or len(set(relevant_keys)) != len(relevant_keys)
+                    or not set(relevant_keys) <= set(occurrence_keys)
+                ):
+                    raise Unit3Blocked("PAIR_VIEW_OUTSIDE_GOLD_SCOPE")
+                joined_views.append({
+                    "pair_key": pair_key,
+                    "anchor_occurrence_key": anchor_key,
+                    "anchor_gold_bundle_key": anchor_key,
+                    "relation_type": _required_string(view, "relation_type"),
+                    "anchor_family_key": _required_string(view, "anchor_family_key"),
+                    "related_family_key": _required_string(view, "related_family_key"),
+                    "related_representative_occurrence_key": related_key,
+                    "pair_relevant_occurrence_keys": relevant_keys,
+                })
+            anchor_pack = _pack_occurrence(anchor)
+            packed.append({
+                "schema_version": REVIEW_PACK_SCHEMA_VERSION,
+                "queue": queue,
+                "queue_review_order": queue_order,
+                "global_review_order": global_order,
+                "candidate_key": anchor_pack["candidate_key"],
+                "anchor_occurrence_key": anchor_key,
+                "entity_key": anchor_pack["entity_key"],
+                "topic_key": anchor_pack["topic_key"],
+                "evidence_family_key": anchor_pack["evidence_family_key"],
+                "anchor": anchor_pack,
+                "gold_occurrences": gold_rows,
+                "pair_views": joined_views,
+            })
+    if global_order != 48:
+        raise Unit3Blocked("FROZEN_REVIEW_COUNT_INVALID")
+    validate_review_pack(packed)
+    return packed
+
+
+_PACK_FIELDS = frozenset({"schema_version", "queue", "queue_review_order", "global_review_order", "candidate_key", "anchor_occurrence_key", "entity_key", "topic_key", "evidence_family_key", "anchor", "gold_occurrences", "pair_views"})
+_OCCURRENCE_FIELDS = frozenset({"occurrence_key", "candidate_key", "evidence_family_key", "entity_key", "topic_key", "occurrence_address", "text", "lineage", "raw_ref"})
+_PAIR_FIELDS = frozenset({"pair_key", "anchor_occurrence_key", "anchor_gold_bundle_key", "relation_type", "anchor_family_key", "related_family_key", "related_representative_occurrence_key", "pair_relevant_occurrence_keys"})
+_ADDRESS_FIELDS = frozenset({"record_id", "section_ordinal", "component_observation_key", "unit_ordinal", "lineage"})
+_LINEAGE_FIELDS = frozenset({"evidence_scope", "parsed_json_pointer", "raw_refs", "dependency_locator"})
+_RAW_REF_FIELDS = frozenset({"source", "locale", "run_id", "content_id", "artifact_kind", "artifact_path", "artifact_sha256", "json_pointer", "embedded_json_pointer", "source_value_sha256"})
+_SENSITIVE_FIELD_TOKENS = ("legacy", "c1", "query", "overlap", "benchmark", "rank", "result", "outcome", "retrieval", "embedding", "vector")
+_PACK_DEPENDENCY_FIELDS = frozenset({"review_pack_manifest_sha256", "review_pack_artifact_sha256"})
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+
+
+def _validate_no_sensitive_fields(value: Any) -> int:
+    if isinstance(value, Mapping):
+        count = sum(any(token in key.casefold() for token in _SENSITIVE_FIELD_TOKENS) for key in value if isinstance(key, str))
+        return count + sum(_validate_no_sensitive_fields(item) for item in value.values())
+    if isinstance(value, list):
+        return sum(_validate_no_sensitive_fields(item) for item in value)
+    return 0
+
+
+def _review_pack_leak_counts(row: Mapping[str, Any]) -> dict[str, int]:
+    """Count pre-exposure violations from actual record contents, never text."""
+    forbidden = len(set(row) - _PACK_FIELDS)
+    outside_scope = 0
+    gold = row.get("gold_occurrences")
+    if isinstance(gold, list):
+        occurrence_keys = {item.get("occurrence_key") for item in gold if isinstance(item, Mapping)}
+        for occurrence in gold:
+            if isinstance(occurrence, Mapping):
+                forbidden += len(set(occurrence) - _OCCURRENCE_FIELDS)
+        views = row.get("pair_views")
+        if isinstance(views, list):
+            for view in views:
+                if not isinstance(view, Mapping):
+                    forbidden += 1
+                    continue
+                forbidden += len(set(view) - _PAIR_FIELDS)
+                pointers = view.get("pair_relevant_occurrence_keys")
+                if not isinstance(pointers, list) or not all(isinstance(key, str) for key in pointers):
+                    outside_scope += 1
+                elif not set(pointers) <= occurrence_keys:
+                    outside_scope += len(set(pointers) - occurrence_keys)
+                related = view.get("related_representative_occurrence_key")
+                if related not in occurrence_keys:
+                    outside_scope += 1
+    return {
+        "forbidden_field_count": forbidden,
+        "outside_scope_text_count": outside_scope,
+        "legacy_c1_sensitive_field_count": _validate_no_sensitive_fields(row),
+    }
+
+
+def _validate_lineage(value: Any) -> None:
+    if not isinstance(value, Mapping) or set(value) != _LINEAGE_FIELDS:
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if not isinstance(value["evidence_scope"], str) or not isinstance(value["parsed_json_pointer"], str):
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if value["dependency_locator"] is not None and not isinstance(value["dependency_locator"], str):
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    refs = value["raw_refs"]
+    if not isinstance(refs, list) or len(refs) != 1:
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    ref = refs[0]
+    if not isinstance(ref, Mapping) or set(ref) != _RAW_REF_FIELDS:
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    for field in _RAW_REF_FIELDS - {"source_value_sha256"}:
+        if not isinstance(ref[field], str) or not ref[field]:
+            raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if ref["source_value_sha256"] is not None and not isinstance(ref["source_value_sha256"], str):
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+
+
+def _validate_occurrence(occurrence: Any) -> str:
+    if not isinstance(occurrence, Mapping) or set(occurrence) != _OCCURRENCE_FIELDS:
+        raise Unit3Blocked("REVIEW_PACK_FIELD_ALLOWLIST_INVALID")
+    key = _required_string(occurrence, "occurrence_key")
+    address = occurrence["occurrence_address"]
+    if not isinstance(address, Mapping) or set(address) != _ADDRESS_FIELDS:
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if not isinstance(address["record_id"], str) or not isinstance(address["component_observation_key"], str):
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if any(not isinstance(address[field], int) or isinstance(address[field], bool) or address[field] < 0 for field in ("section_ordinal", "unit_ordinal")):
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    _validate_lineage(address["lineage"])
+    _validate_lineage(occurrence["lineage"])
+    raw_ref = occurrence["raw_ref"]
+    if not isinstance(raw_ref, Mapping) or set(raw_ref) != _RAW_REF_FIELDS:
+        raise Unit3Blocked("REVIEW_PACK_NESTED_SCHEMA_INVALID")
+    if raw_ref != occurrence["lineage"]["raw_refs"][0] or address["lineage"] != occurrence["lineage"]:
+        raise Unit3Blocked("REVIEW_PACK_PROVENANCE_INVALID")
+    _validate_lineage({"evidence_scope": occurrence["lineage"]["evidence_scope"], "parsed_json_pointer": occurrence["lineage"]["parsed_json_pointer"], "raw_refs": [raw_ref], "dependency_locator": occurrence["lineage"]["dependency_locator"]})
+    if not _required_string(occurrence, "candidate_key") or not _required_string(occurrence, "evidence_family_key"):
+        raise Unit3Blocked("REVIEW_PACK_IDENTITY_INVALID")
+    entity = occurrence["entity_key"]
+    topic = occurrence["topic_key"]
+    if not isinstance(entity, list) or len(entity) != 3 or not all(isinstance(value, str) and value for value in entity):
+        raise Unit3Blocked("REVIEW_PACK_IDENTITY_INVALID")
+    if not isinstance(topic, list) or len(topic) != 2 or not isinstance(topic[0], str) or not isinstance(topic[1], int) or isinstance(topic[1], bool) or topic[1] < 0:
+        raise Unit3Blocked("REVIEW_PACK_IDENTITY_INVALID")
+    return key
+
+
+def _validate_review_pack_record(row: Mapping[str, Any]) -> set[str]:
+    if set(row) != _PACK_FIELDS or row.get("schema_version") != REVIEW_PACK_SCHEMA_VERSION or row.get("queue") not in QUEUE_ORDER:
+        raise Unit3Blocked("REVIEW_PACK_FIELD_ALLOWLIST_INVALID")
+    if not isinstance(row.get("queue_review_order"), int) or not isinstance(row.get("global_review_order"), int):
+        raise Unit3Blocked("REVIEW_PACK_ORDER_INVALID")
+    anchor = row.get("anchor")
+    gold = row.get("gold_occurrences")
+    views = row.get("pair_views")
+    if not isinstance(anchor, Mapping) or not isinstance(gold, list) or not isinstance(views, list) or not gold:
+        raise Unit3Blocked("REVIEW_PACK_SCHEMA_INVALID")
+    occurrence_map = {_validate_occurrence(occurrence): occurrence for occurrence in gold}
+    occurrence_keys = set(occurrence_map)
+    if len(occurrence_keys) != len(gold):
+        raise Unit3Blocked("GOLD_BUNDLE_MEMBERSHIP_INVALID")
+    anchor_key = _required_string(row, "anchor_occurrence_key")
+    if _validate_occurrence(anchor) != anchor_key or anchor_key not in occurrence_keys:
+        raise Unit3Blocked("REVIEW_PACK_ANCHOR_INVALID")
+    for field in ("candidate_key", "entity_key", "topic_key", "evidence_family_key"):
+        if anchor[field] != row[field]:
+            raise Unit3Blocked("REVIEW_PACK_ANCHOR_INVALID")
+    if any(occurrence["entity_key"] != row["entity_key"] for occurrence in occurrence_map.values()):
+        raise Unit3Blocked("REVIEW_PACK_ENTITY_SCOPE_INVALID")
+    pair_keys: set[str] = set()
+    for view in views:
+        if not isinstance(view, Mapping) or set(view) != _PAIR_FIELDS:
+            raise Unit3Blocked("REVIEW_PACK_FIELD_ALLOWLIST_INVALID")
+        pair_key = _required_string(view, "pair_key")
+        if pair_key in pair_keys:
+            raise Unit3Blocked("PAIR_VIEW_COLLISION")
+        pair_keys.add(pair_key)
+        if view.get("anchor_occurrence_key") != anchor_key or view.get("anchor_gold_bundle_key") != anchor_key or view.get("anchor_family_key") != row["evidence_family_key"]:
+            raise Unit3Blocked("PAIR_VIEW_IDENTITY_INVALID")
+        pointers = view["pair_relevant_occurrence_keys"]
+        if (not isinstance(pointers, list) or not pointers or not all(isinstance(key, str) for key in pointers) or len(set(pointers)) != len(pointers) or not set(pointers) <= occurrence_keys):
+            raise Unit3Blocked("PAIR_VIEW_OUTSIDE_GOLD_SCOPE")
+        related_key = _required_string(view, "related_representative_occurrence_key")
+        related = occurrence_map.get(related_key)
+        if related is None:
+            raise Unit3Blocked("PAIR_VIEW_OUTSIDE_GOLD_SCOPE")
+        if view.get("related_family_key") != related["evidence_family_key"]:
+            raise Unit3Blocked("PAIR_VIEW_IDENTITY_INVALID")
+    if row["queue"] in ("WR", "HN") and not views:
+        raise Unit3Blocked("WR_HN_PAIR_VIEW_MISSING")
+    if row["queue"] in ("semantic", "control") and views:
+        raise Unit3Blocked("NON_WR_HN_PAIR_VIEW_PRESENT")
+    return occurrence_keys
+
+
+def review_pack_record_sha256(record: Mapping[str, Any]) -> str:
+    """Digest the record payload; the digest is external to avoid self-reference."""
+    _validate_review_pack_record(record)
+    return _sha256_bytes(canonical_json_bytes(record))
+
+
+def validate_review_pack(review_pack: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """Validate frozen order, nested allowlists and scope without exposing text."""
+    rows = list(review_pack)
+    if len(rows) != 48:
+        raise Unit3Blocked("FROZEN_REVIEW_COUNT_INVALID")
+    seen_anchors: set[str] = set()
+    queue_counts: dict[str, int] = defaultdict(int)
+    expected_queues = [queue for queue in QUEUE_ORDER for _ in range(QUEUE_ALLOCATIONS[queue])]
+    summary = {"candidate_count": len(rows), "forbidden_field_count": 0, "outside_scope_text_count": 0, "legacy_c1_sensitive_field_count": 0}
+    for expected_global_order, (row, expected_queue) in enumerate(zip(rows, expected_queues, strict=True), 1):
+        counts = _review_pack_leak_counts(row)
+        for key in ("forbidden_field_count", "outside_scope_text_count", "legacy_c1_sensitive_field_count"):
+            summary[key] += counts[key]
+        if summary["legacy_c1_sensitive_field_count"]:
+            raise Unit3Blocked("REVIEW_PACK_SENSITIVE_FIELD_PRESENT")
+        if summary["forbidden_field_count"]:
+            raise Unit3Blocked("REVIEW_PACK_FIELD_ALLOWLIST_INVALID")
+        if summary["outside_scope_text_count"]:
+            raise Unit3Blocked("PAIR_VIEW_OUTSIDE_GOLD_SCOPE")
+        _validate_review_pack_record(row)
+        if row["global_review_order"] != expected_global_order:
+            raise Unit3Blocked("REVIEW_PACK_ORDER_INVALID")
+        queue = row["queue"]
+        if queue != expected_queue:
+            raise Unit3Blocked("REVIEW_PACK_QUEUE_SEQUENCE_INVALID")
+        queue_counts[queue] += 1
+        if row["queue_review_order"] != queue_counts[queue]:
+            raise Unit3Blocked("REVIEW_PACK_ORDER_INVALID")
+        anchor_key = _required_string(row, "anchor_occurrence_key")
+        if anchor_key in seen_anchors:
+            raise Unit3Blocked("FROZEN_QUEUE_CANDIDATE_DUPLICATED")
+        seen_anchors.add(anchor_key)
+    if dict(queue_counts) != QUEUE_ALLOCATIONS:
+        raise Unit3Blocked("FROZEN_QUEUE_COUNT_INVALID")
+    return summary
+
+
+def _validate_pack_dependency(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping) or set(value) != _PACK_DEPENDENCY_FIELDS or not all(_is_sha256(value[field]) for field in _PACK_DEPENDENCY_FIELDS):
+        raise Unit3Blocked("REVIEW_PACK_DEPENDENCY_INVALID")
+    return {field: value[field] for field in sorted(_PACK_DEPENDENCY_FIELDS)}
+
+
+def _frozen_state_payload(state: Mapping[str, Any], record: Mapping[str, Any], dependency: Mapping[str, Any]) -> dict[str, Any]:
+    fields = ("frozen_gold_occurrence_keys", "accepted_gold_occurrence_keys", "reviewed_non_gold_occurrence_keys", "occurrence_reviews", "anchor_review_result", "gameplay_build_exclusion_status", "queue_semantic_validity", "semantic_status", "semantic_reason", "gold_review_complete", "accepted_gold_sufficient", "target_proposition_status", "target_proposition", "anchor_source_span", "sentence_or_clause_basis", "query_intent", "answer_proposition", "pair_judgments", "selected_pair_key")
+    if any(field not in state for field in fields):
+        raise Unit3Blocked("SEMANTIC_STATE_INCOMPLETE")
+    return {
+        **{field: state[field] for field in fields},
+        "pack_record_sha256": review_pack_record_sha256(record),
+        "review_pack_dependency": _validate_pack_dependency(dependency),
+        "candidate_key": record["candidate_key"],
+        "queue": record["queue"],
+        "global_review_order": record["global_review_order"],
+        "queue_review_order": record["queue_review_order"],
+        "anchor_occurrence_key": record["anchor_occurrence_key"],
+        "entity_key": record["entity_key"],
+        "topic_key": record["topic_key"],
+        "evidence_family_key": record["evidence_family_key"],
+    }
+
+
+def _validate_occurrence_reviews(payload: Mapping[str, Any], record: Mapping[str, Any]) -> None:
+    reviews = payload["occurrence_reviews"]
+    if not isinstance(reviews, list) or len(reviews) != len(record["gold_occurrences"]):
+        raise Unit3Blocked("OCCURRENCE_REVIEW_INVALID")
+    expected_keys = [_required_string(item, "occurrence_key") for item in record["gold_occurrences"]]
+    accepted = set(payload["accepted_gold_occurrence_keys"])
+    non_gold = set(payload["reviewed_non_gold_occurrence_keys"])
+    for expected_key, review in zip(expected_keys, reviews, strict=True):
+        if not isinstance(review, Mapping) or set(review) != {"occurrence_key", "judgment", "reason_code", "provenance_caveat"} or review.get("occurrence_key") != expected_key or review.get("judgment") not in ("ACCEPTED_GOLD", "REVIEWED_NON_GOLD") or not isinstance(review.get("reason_code"), str) or not review["reason_code"] or (review.get("provenance_caveat") is not None and not isinstance(review.get("provenance_caveat"), str)):
+            raise Unit3Blocked("OCCURRENCE_REVIEW_INVALID")
+        if (review["judgment"] == "ACCEPTED_GOLD") != (expected_key in accepted) or (review["judgment"] == "REVIEWED_NON_GOLD") != (expected_key in non_gold):
+            raise Unit3Blocked("OCCURRENCE_REVIEW_INVALID")
+    anchor_review = reviews[expected_keys.index(record["anchor_occurrence_key"])]
+    if payload["anchor_review_result"] != anchor_review["judgment"]:
+        raise Unit3Blocked("ANCHOR_REVIEW_INVALID")
+
+
+def _validate_semantic_outcome(payload: Mapping[str, Any]) -> None:
+    if not isinstance(payload["gameplay_build_exclusion_status"], str) or not payload["gameplay_build_exclusion_status"]:
+        raise Unit3Blocked("GAMEPLAY_BUILD_STATUS_INVALID")
+    if payload["queue_semantic_validity"] not in ("VALID", "INVALID") or payload["semantic_status"] not in ("ACCEPT", "REJECT"):
+        raise Unit3Blocked("SEMANTIC_OUTCOME_INVALID")
+    if payload["semantic_status"] == "ACCEPT":
+        if payload["queue_semantic_validity"] != "VALID" or payload["semantic_reason"] is not None:
+            raise Unit3Blocked("SEMANTIC_OUTCOME_INVALID")
+    elif payload["queue_semantic_validity"] != "INVALID" or not isinstance(payload["semantic_reason"], str) or not payload["semantic_reason"]:
+        raise Unit3Blocked("SEMANTIC_OUTCOME_INVALID")
+
+
+def _validate_pair_judgments(payload: Mapping[str, Any], record: Mapping[str, Any]) -> None:
+    judgments = payload["pair_judgments"]
+    views = record["pair_views"]
+    if not isinstance(judgments, list):
+        raise Unit3Blocked("PAIR_JUDGMENT_INVALID")
+    if payload["queue"] in ("semantic", "control"):
+        if judgments or payload["selected_pair_key"] is not None:
+            raise Unit3Blocked("SELECTED_PAIR_NOT_ALLOWED")
+        return
+    expected_keys = [_required_string(view, "pair_key") for view in views]
+    if len(judgments) != len(expected_keys):
+        raise Unit3Blocked("PAIR_JUDGMENT_INVALID")
+    valid_keys: list[str] = []
+    for pair_key, judgment in zip(expected_keys, judgments, strict=True):
+        if not isinstance(judgment, Mapping) or set(judgment) != {"pair_key", "decision", "reason_code"} or judgment.get("pair_key") != pair_key or judgment.get("decision") not in ("VALID", "REJECT"):
+            raise Unit3Blocked("PAIR_JUDGMENT_INVALID")
+        if judgment["decision"] == "VALID":
+            if judgment["reason_code"] is not None:
+                raise Unit3Blocked("PAIR_JUDGMENT_INVALID")
+            valid_keys.append(pair_key)
+        elif not isinstance(judgment["reason_code"], str) or not judgment["reason_code"]:
+            raise Unit3Blocked("PAIR_JUDGMENT_INVALID")
+    if payload["semantic_status"] == "ACCEPT" and (not valid_keys or payload["selected_pair_key"] != valid_keys[0]):
+        raise Unit3Blocked("SELECTED_PAIR_NOT_FIRST_VALID")
+    if payload["semantic_status"] == "REJECT" and payload["selected_pair_key"] != (valid_keys[0] if valid_keys else None):
+        raise Unit3Blocked("SELECTED_PAIR_NOT_FIRST_VALID")
+
+
+def freeze_semantic_state(state: Mapping[str, Any], *, record: Mapping[str, Any], review_pack_dependency: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _frozen_state_payload(state, record, review_pack_dependency)
+    gold = payload["frozen_gold_occurrence_keys"]
+    accepted = payload["accepted_gold_occurrence_keys"]
+    non_gold = payload["reviewed_non_gold_occurrence_keys"]
+    if not all(isinstance(values, list) and all(isinstance(value, str) for value in values) for values in (gold, accepted, non_gold)):
+        raise Unit3Blocked("GOLD_PARTITION_INVALID")
+    record_gold = [_required_string(item, "occurrence_key") for item in record["gold_occurrences"]]
+    if gold != record_gold or len(gold) != len(set(gold)) or len(accepted) != len(set(accepted)) or len(non_gold) != len(set(non_gold)) or set(accepted) & set(non_gold) or set(accepted) | set(non_gold) != set(gold):
+        raise Unit3Blocked("GOLD_PARTITION_INVALID")
+    _validate_occurrence_reviews(payload, record)
+    _validate_semantic_outcome(payload)
+    status = payload["target_proposition_status"]
+    if status not in ("FROZEN", "NOT_REACHED", "TARGET_PROPOSITION_AMBIGUOUS"):
+        raise Unit3Blocked("TARGET_PROPOSITION_STATUS_INVALID")
+    if not isinstance(payload["gold_review_complete"], bool) or not isinstance(payload["accepted_gold_sufficient"], bool):
+        raise Unit3Blocked("GOLD_COMPLETENESS_STATUS_INVALID")
+    if status == "FROZEN":
+        if record["anchor_occurrence_key"] not in accepted or not payload["gold_review_complete"] or not payload["accepted_gold_sufficient"]:
+            raise Unit3Blocked("FROZEN_GOLD_STATE_INVALID")
+        span = payload["anchor_source_span"]
+        anchor_text = record["anchor"].get("text")
+        if not isinstance(anchor_text, str) or not isinstance(span, Mapping) or set(span) != {"start", "end"} or not all(isinstance(span[key], int) and not isinstance(span[key], bool) for key in span) or not 0 <= span["start"] < span["end"] <= len(anchor_text):
+            raise Unit3Blocked("ANCHOR_SOURCE_SPAN_INVALID")
+        for field in ("target_proposition", "sentence_or_clause_basis", "query_intent", "answer_proposition"):
+            if not isinstance(payload[field], str) or not payload[field].strip():
+                raise Unit3Blocked("SEMANTIC_STATE_INCOMPLETE")
+        _validate_pair_judgments(payload, record)
+    else:
+        if (
+            payload["semantic_status"] != "REJECT"
+            or not payload["gold_review_complete"]
+            or any(payload[field] is not None for field in ("target_proposition", "anchor_source_span", "sentence_or_clause_basis", "query_intent", "answer_proposition", "selected_pair_key"))
+            or payload["pair_judgments"]
+        ):
+            raise Unit3Blocked("TARGET_PROPOSITION_PRE_FREEZE_INVALID")
+        if status == "TARGET_PROPOSITION_AMBIGUOUS" and payload["semantic_reason"] != "TARGET_PROPOSITION_AMBIGUOUS":
+            raise Unit3Blocked("TARGET_PROPOSITION_AMBIGUITY_INVALID")
+        if status == "NOT_REACHED" and payload["semantic_reason"] not in _PRE_PROPOSITION_REJECT_REASONS:
+            raise Unit3Blocked("TARGET_PROPOSITION_STAGE_INVALID")
+    frozen = dict(payload)
+    frozen["anchor_text_codepoint_count"] = len(record["anchor"]["text"])
+    frozen["semantic_state_sha256"] = _sha256_bytes(canonical_json_bytes(frozen))
+    return frozen
+
+
+def validate_frozen_semantic_state(state: Mapping[str, Any], *, record: Mapping[str, Any], review_pack_dependency: Mapping[str, Any]) -> None:
+    digest = state.get("semantic_state_sha256")
+    if not _is_sha256(digest):
+        raise Unit3Blocked("SEMANTIC_STATE_HASH_MISSING")
+    payload = dict(state)
+    payload.pop("semantic_state_sha256", None)
+    if _sha256_bytes(canonical_json_bytes(payload)) != digest:
+        raise Unit3Blocked("SEMANTIC_STATE_MUTATED")
+    expected = _frozen_state_payload(payload, record, review_pack_dependency)
+    expected["anchor_text_codepoint_count"] = len(record["anchor"]["text"])
+    if payload != expected:
+        raise Unit3Blocked("SEMANTIC_STATE_PACK_BINDING_INVALID")
+    # Revalidate mechanical state fields after binding to the authoritative record.
+    freeze_semantic_state(payload, record=record, review_pack_dependency=review_pack_dependency)
+
+
+def _validate_attempt(attempt: Mapping[str, Any], state: Mapping[str, Any], expected_number: int) -> None:
+    if attempt.get("attempt_number") != expected_number or attempt.get("candidate_key") != state["candidate_key"] or attempt.get("semantic_state_sha256") != state["semantic_state_sha256"]:
+        raise Unit3Blocked("QUERY_ATTEMPT_HISTORY_INVALID")
+    fields = {"attempt_id", "candidate_key", "semantic_state_sha256", "attempt_number", "query", "attempt_sha256"}
+    if set(attempt) != fields or not isinstance(attempt.get("attempt_id"), str) or not isinstance(attempt.get("query"), str) or not attempt["query"].strip():
+        raise Unit3Blocked("QUERY_ATTEMPT_INVALID")
+    copied = dict(attempt)
+    digest = copied.pop("attempt_sha256", None)
+    if not _is_sha256(digest) or _sha256_bytes(canonical_json_bytes(copied)) != digest:
+        raise Unit3Blocked("QUERY_ATTEMPT_MUTATED")
+
+
+def persist_query_attempt(state: Mapping[str, Any], attempt_number: int, query: str, *, record: Mapping[str, Any], review_pack_dependency: Mapping[str, Any]) -> dict[str, Any]:
+    validate_frozen_semantic_state(state, record=record, review_pack_dependency=review_pack_dependency)
+    if state.get("target_proposition_status") != "FROZEN" or state.get("semantic_status") != "ACCEPT" or attempt_number not in (1, 2) or not isinstance(query, str) or not query.strip():
+        raise Unit3Blocked("QUERY_ATTEMPT_INVALID")
+    attempt = {"attempt_id": f"{state['candidate_key']}:attempt:{attempt_number}", "candidate_key": state["candidate_key"], "semantic_state_sha256": state["semantic_state_sha256"], "attempt_number": attempt_number, "query": query}
+    attempt["attempt_sha256"] = _sha256_bytes(canonical_json_bytes(attempt))
+    return attempt
+
+
+_QUALITY_REJECT_REASONS = {
+    "QUERY_NOT_NATURAL",
+    "QUERY_INTENT_DRIFT",
+    "QUERY_REQUIRES_OUT_OF_SCOPE_EVIDENCE",
+    "QUERY_EVIDENCE_COPYING",
+    "PAIR_QUERY_INCONSISTENT",
+}
+
+
+def persist_query_quality_result(attempt: Mapping[str, Any], quality_status: str, quality_reason: str | None) -> dict[str, Any]:
+    """Persist the post-authoring quality decision without changing the attempt."""
+    _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
+    if quality_status not in ("PASS", "REJECT"):
+        raise Unit3Blocked("QUERY_QUALITY_STATUS_INVALID")
+    if quality_status == "PASS" and quality_reason is not None:
+        raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
+    if quality_status == "REJECT" and quality_reason not in _QUALITY_REJECT_REASONS:
+        raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
+    result = {"attempt_id": attempt["attempt_id"], "attempt_sha256": attempt["attempt_sha256"], "quality_status": quality_status, "quality_reason": quality_reason}
+    result["query_quality_result_sha256"] = _sha256_bytes(canonical_json_bytes(result))
+    return result
+
+
+def validate_query_quality_result(attempt: Mapping[str, Any], result: Mapping[str, Any]) -> None:
+    _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
+    fields = {"attempt_id", "attempt_sha256", "quality_status", "quality_reason", "query_quality_result_sha256"}
+    if set(result) != fields or result.get("attempt_id") != attempt["attempt_id"] or result.get("attempt_sha256") != attempt["attempt_sha256"] or result.get("quality_status") not in ("PASS", "REJECT"):
+        raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+    if (result["quality_status"] == "PASS" and result.get("quality_reason") is not None) or (result["quality_status"] == "REJECT" and result.get("quality_reason") not in _QUALITY_REJECT_REASONS):
+        raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
+    copied = dict(result)
+    digest = copied.pop("query_quality_result_sha256")
+    if not _is_sha256(digest) or _sha256_bytes(canonical_json_bytes(copied)) != digest:
+        raise Unit3Blocked("QUERY_QUALITY_RESULT_MUTATED")
+
+
+def validate_c1_result(attempt: Mapping[str, Any], quality_result: Mapping[str, Any], result: Mapping[str, Any]) -> None:
+    _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
+    validate_query_quality_result(attempt, quality_result)
+    if quality_result["quality_status"] != "PASS":
+        raise Unit3Blocked("C1_REQUIRES_QUERY_QUALITY_PASS")
+    fields = {"attempt_id", "attempt_sha256", "checker_schema_version", "overlap_index_sha256", "normalization_version", "exact_rule", "shared_8_rule", "char_3gram_threshold_rule", "overall", "c1_result_sha256"}
+    if set(result) != fields or result.get("attempt_id") != attempt.get("attempt_id") or result.get("attempt_sha256") != attempt.get("attempt_sha256") or result.get("checker_schema_version") != UNIT3_SCHEMA_VERSION or not _is_sha256(result.get("overlap_index_sha256")) or result.get("normalization_version") != NORMALIZATION_VERSION or result.get("overall") not in ("PASS", "REJECT") or not all(isinstance(result.get(field), bool) for field in ("exact_rule", "shared_8_rule", "char_3gram_threshold_rule")):
+        raise Unit3Blocked("C1_RESULT_INVALID")
+    copied = dict(result)
+    digest = copied.pop("c1_result_sha256")
+    if not _is_sha256(digest) or _sha256_bytes(canonical_json_bytes(copied)) != digest:
+        raise Unit3Blocked("C1_RESULT_MUTATED")
+
+
+def validate_attempt_history(state: Mapping[str, Any], attempts: Iterable[Mapping[str, Any]], quality_results: Iterable[Mapping[str, Any]], c1_results: Iterable[Mapping[str, Any]], *, record: Mapping[str, Any], review_pack_dependency: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    validate_frozen_semantic_state(state, record=record, review_pack_dependency=review_pack_dependency)
+    values = list(attempts)
+    qualities = list(quality_results)
+    results = list(c1_results)
+    if len(values) > MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS:
+        raise Unit3Blocked("QUERY_ATTEMPT_LIMIT_EXCEEDED")
+    quality_by_attempt: dict[str, Mapping[str, Any]] = {}
+    for quality in qualities:
+        attempt_id = _required_string(quality, "attempt_id")
+        if attempt_id in quality_by_attempt:
+            raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+        quality_by_attempt[attempt_id] = quality
+    result_by_attempt: dict[str, Mapping[str, Any]] = {}
+    for result in results:
+        attempt_id = _required_string(result, "attempt_id")
+        if attempt_id in result_by_attempt:
+            raise Unit3Blocked("C1_RESULT_INVALID")
+        result_by_attempt[attempt_id] = result
+    for expected_number, attempt in enumerate(values, 1):
+        _validate_attempt(attempt, state, expected_number)
+        quality = quality_by_attempt.get(attempt["attempt_id"])
+        if quality is not None:
+            validate_query_quality_result(attempt, quality)
+        result = result_by_attempt.get(attempt["attempt_id"])
+        if result is not None:
+            if quality is None or quality["quality_status"] != "PASS":
+                raise Unit3Blocked("C1_REQUIRES_QUERY_QUALITY_PASS")
+            validate_c1_result(attempt, quality, result)
+        if expected_number == 2:
+            first = values[0]
+            first_quality = quality_by_attempt.get(first["attempt_id"])
+            first_result = result_by_attempt.get(first["attempt_id"])
+            if (first_quality is None or first_quality.get("quality_status") != "REJECT") and (first_result is None or first_result.get("overall") != "REJECT"):
+                raise Unit3Blocked("UNJUSTIFIED_QUERY_RETRY")
+    attempt_ids = {attempt["attempt_id"] for attempt in values}
+    if set(quality_by_attempt) - attempt_ids:
+        raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+    if set(result_by_attempt) - attempt_ids:
+        raise Unit3Blocked("C1_RESULT_INVALID")
+    return values
+
+
+def _validate_overlap_index_payload(index: Mapping[str, Any]) -> None:
+    expected_metadata = {
+        "unicode_form": "NFKC",
+        "whitespace": "unicode_whitespace_collapse_to_ascii_space",
+        "trim": True,
+        "casefold": True,
+        "hash_encoding": "UTF-8",
+        "codepoint_basis": "Unicode_code_points",
+        "continuous_window_length": 8,
+        "unique_gram_length": 3,
+    }
+    expected_fields = {"schema_version", "FOR_UNIT3_ONLY", "FOR_UNIT2_CANDIDATE_SELECTION", "normalization_version", "normalization_metadata", "source_benchmark_sha256", "accounting", "entries"}
+    if set(index) != expected_fields or index.get("schema_version") != OVERLAP_SCHEMA_VERSION or index.get("FOR_UNIT3_ONLY") is not True or index.get("FOR_UNIT2_CANDIDATE_SELECTION") is not False:
+        raise Unit3Blocked("OVERLAP_INDEX_SCHEMA_INVALID")
+    if index.get("normalization_version") != NORMALIZATION_VERSION or index.get("normalization_metadata") != expected_metadata or not _is_sha256(index.get("source_benchmark_sha256")) or index.get("accounting", {}).get("legacy_query_count") != EXPECTED_OVERLAP_ENTRY_COUNT:
+        raise Unit3Blocked("OVERLAP_INDEX_CONTRACT_INVALID")
+    entries = index.get("entries")
+    if not isinstance(entries, list) or len(entries) != EXPECTED_OVERLAP_ENTRY_COUNT:
+        raise Unit3Blocked("OVERLAP_INDEX_ENTRY_COUNT_INVALID")
+    for entry in entries:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("opaque_legacy_id"), str):
+            raise Unit3Blocked("OVERLAP_INDEX_ENTRY_INVALID")
+        for field in ("normalized_query_sha256", "normalized_continuous_8char_window_sha256", "normalized_unique_char_3gram_sha256"):
+            value = entry.get(field)
+            if field == "normalized_query_sha256":
+                valid = _is_sha256(value)
+            else:
+                valid = isinstance(value, list) and value == sorted(set(value)) and all(_is_sha256(item) for item in value)
+            if not valid:
+                raise Unit3Blocked("OVERLAP_INDEX_ENTRY_INVALID")
+
+
+def parse_overlap_index_bytes(raw_bytes: bytes, *, expected_sha256: str = EXPECTED_OVERLAP_INDEX_SHA256) -> Mapping[str, Any]:
+    """Bind C1 parsing to raw bytes before any JSON object is trusted."""
+    if not isinstance(raw_bytes, bytes) or _sha256_bytes(raw_bytes) != expected_sha256:
+        raise Unit3Blocked("OVERLAP_INDEX_SHA_MISMATCH")
+    try:
+        parsed = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Unit3Blocked("OVERLAP_INDEX_JSON_INVALID") from exc
+    if not isinstance(parsed, Mapping):
+        raise Unit3Blocked("OVERLAP_INDEX_SCHEMA_INVALID")
+    _validate_overlap_index_payload(parsed)
+    return parsed
+
+
+def restricted_c1_check(attempts: Iterable[Mapping[str, Any]], quality_results: Iterable[Mapping[str, Any]], overlap_index_raw_bytes: bytes, *, expected_index_sha256: str = EXPECTED_OVERLAP_INDEX_SHA256) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return immutable restricted audit and author-safe PASS/REJECT projection."""
+    index = parse_overlap_index_bytes(overlap_index_raw_bytes, expected_sha256=expected_index_sha256)
+    attempt_values = list(attempts)
+    quality_by_attempt: dict[str, Mapping[str, Any]] = {}
+    for quality in quality_results:
+        attempt_id = _required_string(quality, "attempt_id")
+        if attempt_id in quality_by_attempt:
+            raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+        quality_by_attempt[attempt_id] = quality
+    audits: list[dict[str, Any]] = []
+    feedback: list[dict[str, Any]] = []
+    for attempt in attempt_values:
+        _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
+        quality = quality_by_attempt.get(attempt["attempt_id"])
+        if quality is None:
+            raise Unit3Blocked("C1_REQUIRES_QUERY_QUALITY_PASS")
+        validate_query_quality_result(attempt, quality)
+        if quality["quality_status"] != "PASS":
+            raise Unit3Blocked("C1_REQUIRES_QUERY_QUALITY_PASS")
+        query = attempt.get("query")
+        if not isinstance(query, str):
+            raise Unit3Blocked("QUERY_ATTEMPT_INVALID")
+        normalized = _normalise(query)
+        query_hash, windows, grams = _hash_text(normalized), _windows(normalized, 8), _grams(normalized)
+        exact = shared_8 = gram_threshold = False
+        for legacy in index["entries"]:
+            exact = exact or query_hash == legacy["normalized_query_sha256"]
+            shared_8 = shared_8 or bool(windows & set(legacy["normalized_continuous_8char_window_sha256"]))
+            legacy_grams = set(legacy["normalized_unique_char_3gram_sha256"])
+            intersection, union = len(grams & legacy_grams), len(grams | legacy_grams)
+            gram_threshold = gram_threshold or (union > 0 and 100 * intersection >= 50 * union)
+        result = "REJECT" if exact or shared_8 or gram_threshold else "PASS"
+        audit = {"attempt_id": _required_string(attempt, "attempt_id"), "attempt_sha256": _required_string(attempt, "attempt_sha256"), "checker_schema_version": UNIT3_SCHEMA_VERSION, "overlap_index_sha256": expected_index_sha256, "normalization_version": NORMALIZATION_VERSION, "exact_rule": exact, "shared_8_rule": shared_8, "char_3gram_threshold_rule": gram_threshold, "overall": result}
+        audit["c1_result_sha256"] = _sha256_bytes(canonical_json_bytes(audit))
+        validate_c1_result(attempt, quality, audit)
+        audits.append(audit)
+        feedback.append({"attempt_id": audit["attempt_id"], "overall": result})
+    if set(quality_by_attempt) - {attempt["attempt_id"] for attempt in attempt_values}:
+        raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+    return audits, feedback
+
+
+def _ledger_fully_valid(ledger: Mapping[str, Any], *, accepted_review_pack_dependency: Mapping[str, Any], expected_overlap_index_sha256: str) -> bool:
+    record, dependency, state = ledger.get("pack_record"), ledger.get("review_pack_dependency"), ledger.get("semantic_state")
+    accepted_dependency = _validate_pack_dependency(accepted_review_pack_dependency)
+    if not isinstance(record, Mapping) or not isinstance(dependency, Mapping) or not isinstance(state, Mapping):
+        return False
+    validate_frozen_semantic_state(state, record=record, review_pack_dependency=accepted_dependency)
+    attempts = list(ledger.get("attempts", []))
+    quality_results = list(ledger.get("query_quality_results", []))
+    results = list(ledger.get("c1_results", []))
+    validate_attempt_history(state, attempts, quality_results, results, record=record, review_pack_dependency=accepted_dependency)
+    if any(result.get("overlap_index_sha256") != expected_overlap_index_sha256 for result in results):
+        raise Unit3Blocked("FINALIZER_C1_DEPENDENCY_INVALID")
+    if state["semantic_status"] != "ACCEPT" or state["target_proposition_status"] != "FROZEN" or not state["gold_review_complete"] or not state["accepted_gold_sufficient"] or not attempts:
+        return False
+    final_attempt = attempts[-1]
+    matching_quality = [quality for quality in quality_results if quality.get("attempt_id") == final_attempt.get("attempt_id")]
+    if len(matching_quality) != 1 or matching_quality[0].get("quality_status") != "PASS":
+        return False
+    matching = [result for result in results if result.get("attempt_id") == final_attempt.get("attempt_id")]
+    return len(matching) == 1 and matching[0].get("overall") == "PASS" and matching[0].get("overlap_index_sha256") == expected_overlap_index_sha256
+
+
+def finalize_candidates(ledgers: Iterable[Mapping[str, Any]], *, accepted_review_pack_dependency: Mapping[str, Any], expected_overlap_index_sha256: str = EXPECTED_OVERLAP_INDEX_SHA256) -> dict[str, Any]:
+    """Apply frozen first-fully-valid quota truncation without semantic scoring."""
+    values = list(ledgers)
+    accepted_dependency = _validate_pack_dependency(accepted_review_pack_dependency)
+    if not _is_sha256(expected_overlap_index_sha256):
+        raise Unit3Blocked("FINALIZER_C1_DEPENDENCY_INVALID")
+    if len(values) != 48:
+        raise Unit3Blocked("FINALIZER_QUEUE_INVALID")
+    by_queue: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    seen: set[str] = set()
+    expected_queues = [queue for queue in QUEUE_ORDER for _ in range(QUEUE_ALLOCATIONS[queue])]
+    for expected_global_order, (ledger, expected_queue) in enumerate(zip(values, expected_queues, strict=True), 1):
+        record = ledger.get("pack_record")
+        if not isinstance(record, Mapping) or record.get("global_review_order") != expected_global_order or record.get("queue") != expected_queue:
+            raise Unit3Blocked("FINALIZER_ORDER_INVALID")
+        _validate_review_pack_record(record)
+        if _validate_pack_dependency(ledger.get("review_pack_dependency")) != accepted_dependency:
+            raise Unit3Blocked("FINALIZER_REVIEW_PACK_DEPENDENCY_INVALID")
+        queue, key = record["queue"], record["candidate_key"]
+        if key in seen:
+            raise Unit3Blocked("FINALIZER_IDENTITY_INVALID")
+        seen.add(key)
+        by_queue[queue].append(ledger)
+    if {queue: len(by_queue[queue]) for queue in QUEUE_ORDER} != QUEUE_ALLOCATIONS:
+        raise Unit3Blocked("FINALIZER_QUEUE_INVALID")
+    selected: list[Mapping[str, Any]] = []
+    accounting: dict[str, dict[str, Any]] = {}
+    for queue in QUEUE_ORDER:
+        queue_ledgers = by_queue[queue]
+        if [ledger["pack_record"]["queue_review_order"] for ledger in queue_ledgers] != list(range(1, QUEUE_ALLOCATIONS[queue] + 1)):
+            raise Unit3Blocked("FINALIZER_ORDER_INVALID")
+        valid = [ledger for ledger in queue_ledgers if _ledger_fully_valid(ledger, accepted_review_pack_dependency=accepted_review_pack_dependency, expected_overlap_index_sha256=expected_overlap_index_sha256)]
+        chosen = valid[:FINAL_QUOTAS[queue]]
+        selected.extend(chosen)
+        accounting[queue] = {"quota": FINAL_QUOTAS[queue], "reviewed": len(queue_ledgers), "fully_valid": len(valid), "selected": len(chosen), "valid_not_selected_quota": len(valid) - len(chosen), "rejected": len(queue_ledgers) - len(valid), "status": "COMPLETE" if len(chosen) == FINAL_QUOTAS[queue] else "SHORTFALL / EVIDENCE_INSUFFICIENT"}
+    diversity = {"distinct_entity_key_count": len({tuple(item["pack_record"]["entity_key"]) for item in selected}), "distinct_topic_key_count": len({tuple(item["pack_record"]["topic_key"]) for item in selected}), "distinct_evidence_family_key_count": len({item["pack_record"]["evidence_family_key"] for item in selected})}
+    return {"selected": selected, "queue_accounting": accounting, "diversity_accounting": diversity}
+
+
+def _verify_artifact(root: Path, relative_path: str, metadata: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    path = root / relative_path
+    if not path.is_file() or _sha256_path(path) != metadata.get("sha256") or path.stat().st_size != metadata.get("byte_count"):
+        raise Unit3Blocked("UNIT2_ARTIFACT_INTEGRITY_MISMATCH")
+    rows = _read_jsonl_gzip(path)
+    if len(rows) != metadata.get("row_count"):
+        raise Unit3Blocked("UNIT2_ARTIFACT_ROW_COUNT_MISMATCH")
+    return rows
+
+
+def verify_checkpoint_generator_binding(checkpoint_commit: str, *, module_path: Path | None = None) -> dict[str, str]:
+    """Prove the executed generator bytes are exactly those at the checkpoint."""
+    if not isinstance(checkpoint_commit, str) or not checkpoint_commit:
+        raise Unit3Blocked("CHECKPOINT_BINDING_INVALID")
+    generator_path = (module_path or Path(__file__)).resolve()
+    try:
+        repository_root = generator_path.parents[3]
+        resolved = subprocess.run(
+            ["git", "-C", str(repository_root), "rev-parse", "--verify", f"{checkpoint_commit}^{{commit}}"],
+            check=True,
+            capture_output=True,
+        ).stdout.decode("ascii").strip()
+        committed = subprocess.run(
+            ["git", "-C", str(repository_root), "show", f"{resolved}:src/genshin_corpus/retrieval/w7_unit3.py"],
+            check=True,
+            capture_output=True,
+        ).stdout
+    except (OSError, UnicodeDecodeError, subprocess.CalledProcessError) as exc:
+        raise Unit3Blocked("CHECKPOINT_BINDING_INVALID") from exc
+    current = generator_path.read_bytes()
+    if committed != current:
+        raise Unit3Blocked("CHECKPOINT_GENERATOR_MISMATCH")
+    return {"checkpoint_commit": resolved, "generator_sha256": _sha256_bytes(current), "checkpoint_generator_sha256": _sha256_bytes(committed)}
+
+
+def _attempt_log_path(output_root: Path) -> Path:
+    return output_root / "metadata" / "unit3_review_pack_extraction_attempts.json"
+
+
+def _load_extraction_attempts(output_root: Path) -> list[dict[str, Any]]:
+    path = _attempt_log_path(output_root)
+    if not path.exists():
+        return []
+    payload = _safe_json_load(path)
+    if set(payload) != {"schema_version", "attempts"} or payload.get("schema_version") != UNIT3_SCHEMA_VERSION:
+        raise Unit3Blocked("EXTRACTION_ATTEMPT_ACCOUNTING_INVALID")
+    values = payload.get("attempts")
+    if not isinstance(values, list) or not all(isinstance(value, Mapping) for value in values):
+        raise Unit3Blocked("EXTRACTION_ATTEMPT_ACCOUNTING_INVALID")
+    records: list[dict[str, Any]] = []
+    for number, value in enumerate(values, 1):
+        if set(value) != {"attempt_number", "status", "failure_reason", "checkpoint_commit", "generator_sha256"} or value.get("attempt_number") != number or value.get("status") not in ("MECHANICAL_FAILURE", "COMPLETE") or not isinstance(value.get("failure_reason"), (str, type(None))) or not isinstance(value.get("checkpoint_commit"), str) or not _is_sha256(value.get("generator_sha256")):
+            raise Unit3Blocked("EXTRACTION_ATTEMPT_ACCOUNTING_INVALID")
+        records.append(dict(value))
+    if records and records[-1]["status"] == "COMPLETE":
+        raise Unit3Blocked("OUTPUT_COLLISION")
+    return records
+
+
+def _write_extraction_attempts(output_root: Path, attempts: list[Mapping[str, Any]]) -> None:
+    path = _attempt_log_path(output_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    try:
+        temporary.write_bytes(canonical_json_bytes({"schema_version": UNIT3_SCHEMA_VERSION, "attempts": attempts}))
+        temporary.replace(path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _attempt_record(number: int, status: str, failure_reason: str | None, binding: Mapping[str, str]) -> dict[str, Any]:
+    if status not in ("MECHANICAL_FAILURE", "COMPLETE") or (status == "COMPLETE") != (failure_reason is None):
+        raise Unit3Blocked("EXTRACTION_ATTEMPT_ACCOUNTING_INVALID")
+    return {"attempt_number": number, "status": status, "failure_reason": failure_reason, "checkpoint_commit": binding["checkpoint_commit"], "generator_sha256": binding["generator_sha256"]}
+
+
+def _accepted_review_pack_root(output_root: Path) -> Path:
+    return output_root / "unit3_review_pack_accepted"
+
+
+def _staging_review_pack_root(output_root: Path, attempt_number: int) -> Path:
+    return output_root / f".unit3-review-pack-staging-{attempt_number:04d}"
+
+
+def _stage_and_accept_review_pack(
+    output_root: Path,
+    *,
+    attempt_number: int,
+    pack: Iterable[Mapping[str, Any]],
+    manifest: Mapping[str, Any],
+    fault_injector: Any = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Write both accepted files under one staging directory, then rename once."""
+    accepted_root = _accepted_review_pack_root(output_root)
+    if accepted_root.exists():
+        raise Unit3Blocked("OUTPUT_COLLISION")
+    staging_root = _staging_review_pack_root(output_root, attempt_number)
+    if staging_root.exists():
+        try:
+            shutil.rmtree(staging_root)
+        except OSError as exc:
+            raise Unit3Blocked("STAGING_CLEANUP_FAILED") from exc
+    try:
+        artifact = _write_jsonl_gzip(staging_root / "review_pack" / "frozen_48_review_pack.jsonl.gz", pack)
+        artifact["path"] = "review_pack/frozen_48_review_pack.jsonl.gz"
+        if fault_injector is not None:
+            fault_injector("after_pack_write")
+        accepted_manifest = {**manifest, "review_pack": artifact}
+        manifest_path = staging_root / "metadata" / "review_pack_manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_bytes(canonical_json_bytes(accepted_manifest))
+        if fault_injector is not None:
+            fault_injector("after_manifest_write")
+        # Validate the staged bytes before the sole acceptance rename.
+        staged_rows = _read_jsonl_gzip(staging_root / artifact["path"])
+        if len(staged_rows) != artifact["row_count"] or _sha256_path(staging_root / artifact["path"]) != artifact["sha256"]:
+            raise Unit3Blocked("STAGED_REVIEW_PACK_INTEGRITY_MISMATCH")
+        staged_integrity = validate_review_pack(staged_rows)
+        if manifest.get("integrity") is not None and staged_integrity != manifest["integrity"]:
+            raise Unit3Blocked("STAGED_REVIEW_PACK_INTEGRITY_MISMATCH")
+        if fault_injector is not None:
+            fault_injector("before_accept_replace")
+        staging_root.replace(accepted_root)
+        return artifact, accepted_manifest
+    except Exception as exc:
+        try:
+            if staging_root.exists():
+                shutil.rmtree(staging_root)
+        except OSError as cleanup_exc:
+            raise Unit3Blocked("STAGING_CLEANUP_FAILED") from cleanup_exc
+        if isinstance(exc, Unit3Blocked):
+            raise
+        raise Unit3Blocked("REVIEW_PACK_STAGING_WRITE_FAILED") from exc
+
+
+def _extract_production_review_pack(unit2_manifest_path: Path, sanitizer_manifest_path: Path, output_root: Path, binding: Mapping[str, str], attempts: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Unit3A-2 entry point.  It never opens the real overlap-index bytes."""
+    if _sha256_path(unit2_manifest_path) != EXPECTED_UNIT2_MANIFEST_SHA256 or _sha256_path(sanitizer_manifest_path) != EXPECTED_SANITIZER_MANIFEST_SHA256:
+        raise Unit3Blocked("FROZEN_DEPENDENCY_MISMATCH")
+    unit2 = _safe_json_load(unit2_manifest_path)
+    sanitizer = _safe_json_load(sanitizer_manifest_path)
+    if unit2.get("schema_version") != "p04-w7-unit2-runner-v1" or unit2.get("status") != "complete":
+        raise Unit3Blocked("UNIT2_MANIFEST_INVALID")
+    if sanitizer.get("schema_version") != "p04-w7-sanitizer-manifest-v1" or sanitizer.get("overlap_index", {}).get("sha256") != EXPECTED_OVERLAP_INDEX_SHA256:
+        raise Unit3Blocked("SANITIZER_MANIFEST_INVALID")
+    artifacts = unit2.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise Unit3Blocked("EXTRACTION_INPUT_INVALID")
+    source_root = unit2_manifest_path.parent.parent
+    paths = {
+        "input_rows": "unit2/input_rows.jsonl.gz",
+        "gold_bundles": "gold/anchor_gold_bundles.jsonl.gz",
+        "pair_views": "relations/pair_views.jsonl.gz",
+        "queues": "queues/provisional_queues.jsonl.gz",
+    }
+    rows: dict[str, list[Mapping[str, Any]]] = {}
+    for name, relative_path in paths.items():
+        metadata = artifacts.get(name)
+        if not isinstance(metadata, Mapping):
+            raise Unit3Blocked("UNIT2_ARTIFACT_METADATA_MISSING")
+        rows[name] = _verify_artifact(source_root, relative_path, metadata)
+    if _accepted_review_pack_root(output_root).exists():
+        raise Unit3Blocked("OUTPUT_COLLISION")
+    pack = build_review_pack(rows["queues"], rows["input_rows"], rows["gold_bundles"], rows["pair_views"])
+    integrity = validate_review_pack(pack)
+    attempt_count = len(attempts) + 1
+    manifest = {
+        "schema_version": UNIT3_SCHEMA_VERSION,
+        "status": "complete",
+        "checkpoint_commit": binding["checkpoint_commit"],
+        "generator": {"file_path": "src/genshin_corpus/retrieval/w7_unit3.py", "sha256": binding["generator_sha256"], "checkpoint_generator_sha256": binding["checkpoint_generator_sha256"]},
+        "dependencies": {
+            "unit2_manifest_sha256": EXPECTED_UNIT2_MANIFEST_SHA256,
+            "sanitizer_manifest_sha256": EXPECTED_SANITIZER_MANIFEST_SHA256,
+            "overlap_index_sha256": EXPECTED_OVERLAP_INDEX_SHA256,
+        },
+        "input_artifacts": {name: artifacts[name] for name in paths},
+        "integrity": integrity,
+        "production_extraction_attempt_count": attempt_count,
+        "pre_freeze_mechanical_failures": [attempt for attempt in attempts if attempt["status"] == "MECHANICAL_FAILURE"],
+        "extraction_attempt": _attempt_record(attempt_count, "COMPLETE", None, binding),
+    }
+    artifact, accepted_manifest = _stage_and_accept_review_pack(output_root, attempt_number=attempt_count, pack=pack, manifest=manifest)
+    return {"manifest": accepted_manifest, "pre_exposure_summary": {**integrity, "review_pack_rows": artifact["row_count"], "review_pack_bytes": artifact["byte_count"]}}
+
+
+def extract_production_review_pack(unit2_manifest_path: Path, sanitizer_manifest_path: Path, output_root: Path, checkpoint_commit: str) -> dict[str, Any]:
+    """Unit3A-2 entry point. It records only pre-freeze mechanical attempts."""
+    if _accepted_review_pack_root(output_root).exists():
+        raise Unit3Blocked("OUTPUT_COLLISION")
+    attempts = _load_extraction_attempts(output_root)
+    binding = verify_checkpoint_generator_binding(checkpoint_commit)
+    if any(attempt["checkpoint_commit"] != binding["checkpoint_commit"] or attempt["generator_sha256"] != binding["generator_sha256"] for attempt in attempts):
+        raise Unit3Blocked("EXTRACTION_ATTEMPT_BINDING_MISMATCH")
+    attempt_count = len(attempts) + 1
+    try:
+        return _extract_production_review_pack(unit2_manifest_path, sanitizer_manifest_path, output_root, binding, attempts)
+    except Unit3Blocked as exc:
+        _write_extraction_attempts(output_root, [*attempts, _attempt_record(attempt_count, "MECHANICAL_FAILURE", str(exc), binding)])
+        raise
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Extract the frozen W7 Unit 3 review pack")
+    parser.add_argument("--unit2-manifest", type=Path, required=True)
+    parser.add_argument("--sanitizer-manifest", type=Path, required=True)
+    parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--checkpoint-commit", required=True)
+    args = parser.parse_args()
+    try:
+        result = extract_production_review_pack(args.unit2_manifest, args.sanitizer_manifest, args.output_root, args.checkpoint_commit)
+    except Unit3Blocked as exc:
+        print(f"UNIT3A2 = BLOCKED: {exc}")
+        return 2
+    print(f"UNIT3A2 = PASS: {result['pre_exposure_summary']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
