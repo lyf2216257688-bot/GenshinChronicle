@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B-0 pre-exposure production persistence tooling gate)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B production semantic-exposure authorization gate)**
 
 ## Objective
 
@@ -84,19 +84,21 @@ and Unit 2 structural runner, performance repair, and one production Unit 2
 run are CLOSED / PASS. The Unit 3 execution contract is APPROVED / FROZEN.
 Unit 3A-1 pre-exposure implementation and its technical-lead actual code gate
 are ACCEPTED / PASS. Unit 3A-2 committed production mechanical extraction is
-ACCEPTED / FROZEN. The active gate is Unit 3B-0 pre-exposure production
-persistence tooling. `UNIT3_REVIEW = NOT EXECUTED`; `QUERY_AUTHORING = NOT EXECUTED`;
-`REAL_C1_CHECK = NOT EXECUTED`; `BENCHMARK_V0_4 = NOT CREATED`; and
-`RETRIEVAL_EVALUATION = NOT EXECUTED`.
+ACCEPTED / FROZEN. Unit 3B-0 pre-exposure production persistence tooling and
+its technical-lead actual source/test/docs gate are PASS at checkpoint
+`1126a8d`; post-checkpoint generator binding is PASS. Production Unit 3B
+semantic exposure is NOT AUTHORIZED / NOT EXECUTED. `UNIT3_REVIEW = NOT EXECUTED`;
+`QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT EXECUTED`;
+`BENCHMARK_V0_4 = NOT CREATED`; and `RETRIEVAL_EVALUATION = NOT EXECUTED`.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-下一步仅可完成 P04-W7 Unit 3B-0 pre-exposure production persistence tooling
-并接受 technical-lead actual review；不得进入 semantic review、query authoring、
-C1、benchmark-v0.4或 retrieval evaluation。
+下一步等待 technical lead 单独决定是否授权首次 production Unit 3B semantic
+exposure；在新授权前不得进入 semantic review、query authoring、C1、benchmark-v0.4
+或 retrieval evaluation。
 
 ## Phase transition boundary
 
