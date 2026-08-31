@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B production semantic-exposure authorization gate)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B semantic execution authorized subject to mandatory zero-exposure runtime preflight)**
 
 ## Objective
 
@@ -87,7 +87,10 @@ are ACCEPTED / PASS. Unit 3A-2 committed production mechanical extraction is
 ACCEPTED / FROZEN. Unit 3B-0 pre-exposure production persistence tooling and
 its technical-lead actual source/test/docs gate are PASS at checkpoint
 `1126a8d`; post-checkpoint generator binding is PASS. Production Unit 3B
-semantic exposure is NOT AUTHORIZED / NOT EXECUTED. `UNIT3_REVIEW = NOT EXECUTED`;
+semantic execution is AUTHORIZED SUBJECT TO mandatory ZERO-EXPOSURE runtime
+preflight; runtime ZERO-EXPOSURE preflight has NOT been executed, no production
+semantic exposure has occurred, and the frozen-48 body remains NOT EXPOSED / NOT
+READ. `UNIT3_REVIEW = NOT EXECUTED`;
 `QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT EXECUTED`;
 `BENCHMARK_V0_4 = NOT CREATED`; and `RETRIEVAL_EVALUATION = NOT EXECUTED`.
 
@@ -96,9 +99,13 @@ The approved Phase 04 boundary is documented in
 
 ## Immediate next action
 
-下一步等待 technical lead 单独决定是否授权首次 production Unit 3B semantic
-exposure；在新授权前不得进入 semantic review、query authoring、C1、benchmark-v0.4
-或 retrieval evaluation。
+下一步继续现有 `P04-W7 Blind Unit 2 Execution Contract` clean blind lineage，先运行
+mandatory ZERO-EXPOSURE production runtime preflight；仅当该 preflight exact
+PASS 后，同一 production work unit 才可继续 Unit 3B semantic execution。runtime
+preflight 仍未执行；在其 PASS 前不得发生 production semantic exposure、semantic
+review、query authoring、C1、benchmark-v0.4 或 retrieval evaluation。若在 semantic
+exposure 前发现新的 contamination evidence，必须 STOP，不得在该 lineage 继续，
+并等待 technical lead 重新做 execution-window 决策。
 
 ## Phase transition boundary
 
