@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import hashlib
+import os
 import subprocess
+import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +19,7 @@ from genshin_corpus.retrieval.w7_unit3 import (
     QUEUE_ALLOCATIONS,
     QUEUE_ORDER,
     Unit3Blocked,
+    Unit3BPersistenceStore,
     _attempt_record,
     _stage_and_accept_review_pack,
     build_review_pack,
@@ -29,6 +34,7 @@ from genshin_corpus.retrieval.w7_unit3 import (
     validate_query_quality_result,
     validate_review_pack,
     verify_checkpoint_generator_binding,
+    open_production_unit3b_store,
 )
 
 
@@ -36,6 +42,16 @@ PACK_DEPENDENCY = {
     "review_pack_manifest_sha256": "a" * 64,
     "review_pack_artifact_sha256": "b" * 64,
 }
+
+SYNTHETIC_A2_DEPENDENCY = {
+    "review_pack_manifest_sha256": "a" * 64,
+    "review_pack_artifact_sha256": "b" * 64,
+    "review_pack_byte_count": 123,
+    "review_pack_row_count": 48,
+    "source_checkpoint": "9a90ef46f43f1719be1d3e77b14e97bbedc62e9f",
+    "source_generator_sha256": "c" * 64,
+}
+SYNTHETIC_TOOLING_BINDING = {"checkpoint_commit": "synthetic-unit3b-checkpoint", "generator_sha256": "d" * 64}
 
 
 def _raw_ref(index: int) -> dict[str, object]:
@@ -164,6 +180,56 @@ def _overlap_entry(opaque_id: str, query: str) -> dict[str, object]:
 def _overlap_bytes(query: str = "zzzzzz") -> bytes:
     index = {"schema_version": "p04-w7-legacy-query-overlap-index-v1", "FOR_UNIT3_ONLY": True, "FOR_UNIT2_CANDIDATE_SELECTION": False, "normalization_version": "c1-nfkc-whitespace-collapse-trim-casefold-v1", "normalization_metadata": {"unicode_form": "NFKC", "whitespace": "unicode_whitespace_collapse_to_ascii_space", "trim": True, "casefold": True, "hash_encoding": "UTF-8", "codepoint_basis": "Unicode_code_points", "continuous_window_length": 8, "unique_gram_length": 3}, "source_benchmark_sha256": "d" * 64, "accounting": {"legacy_query_count": EXPECTED_OVERLAP_ENTRY_COUNT}, "entries": [_overlap_entry(f"legacy-{index:02d}", query if index == 0 else f"other-{index}-zzzz") for index in range(EXPECTED_OVERLAP_ENTRY_COUNT)]}
     return canonical_json_bytes(index)
+
+
+def _store(root: Path, *, index_sha256: str | None = None) -> Unit3BPersistenceStore:
+    return Unit3BPersistenceStore(
+        root,
+        _pack(),
+        a2_dependency=SYNTHETIC_A2_DEPENDENCY,
+        tooling_binding=SYNTHETIC_TOOLING_BINDING,
+        expected_overlap_index_sha256=index_sha256 or "e" * 64,
+    )
+
+
+def _early_reject(record: dict[str, object]) -> dict[str, object]:
+    state = _state_input(record)
+    gold = list(state["frozen_gold_occurrence_keys"])
+    state.update({
+        "accepted_gold_occurrence_keys": [],
+        "reviewed_non_gold_occurrence_keys": gold,
+        "occurrence_reviews": [{"occurrence_key": key, "judgment": "REVIEWED_NON_GOLD", "reason_code": "W7_LOCAL_SYNTHETIC_REVIEW", "provenance_caveat": None} for key in gold],
+        "anchor_review_result": "REVIEWED_NON_GOLD",
+        "queue_semantic_validity": "INVALID",
+        "semantic_status": "REJECT",
+        "semantic_reason": "ANCHOR_NOT_VALID_POSITIVE",
+        "gold_review_complete": True,
+        "accepted_gold_sufficient": False,
+        "target_proposition_status": "NOT_REACHED",
+        "target_proposition": None,
+        "anchor_source_span": None,
+        "sentence_or_clause_basis": None,
+        "query_intent": None,
+        "answer_proposition": None,
+        "pair_judgments": [],
+        "selected_pair_key": None,
+    })
+    return freeze_semantic_state(state, record=record, review_pack_dependency=PACK_DEPENDENCY)
+
+
+@contextlib.contextmanager
+def _synthetic_root(slot: int) -> Iterable[Path]:
+    configured = os.environ.get("UNIT3B_TEST_ROOTS")
+    if configured:
+        roots = configured.split(";")
+        if slot >= len(roots):
+            raise RuntimeError("UNIT3B_TEST_ROOTS_INCOMPLETE")
+        isolated = Path(roots[slot]) / uuid.uuid4().hex
+        isolated.mkdir(parents=True, exist_ok=True)
+        yield isolated
+        return
+    with tempfile.TemporaryDirectory() as temporary:
+        yield Path(temporary)
 
 
 class W7Unit3FocusedTests(unittest.TestCase):
@@ -580,8 +646,313 @@ class W7Unit3FocusedTests(unittest.TestCase):
             with self.assertRaises(Unit3Blocked):
                 _stage_and_accept_review_pack(FakePath("root"), attempt_number=5, pack=[{}], manifest=manifest)
 
+    def test_unit3b_store_enforces_immutable_dag_resume_and_restricted_c1_boundary(self) -> None:
+        raw = _overlap_bytes("first question")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(0) as root:
+            store = _store(root, index_sha256=raw_sha)
+            first_record = _pack()[0]
+            self.assertEqual(store.next_action()["action"], "REVIEW_SEMANTIC")
+            with self.assertRaises(Unit3Blocked):
+                store.append_query_quality_result({})
+            state = _freeze(first_record)
+            store.append_semantic_state(state)
+            self.assertEqual(store.next_action(), {"action": "AUTHOR_ATTEMPT", "attempt_number": 1, "global_review_order": 1})
+            attempt = persist_query_attempt(state, 1, "first question", record=first_record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            with self.assertRaises(Unit3Blocked):
+                store.run_restricted_c1(raw)
+            quality = persist_query_quality_result(attempt, "PASS", None)
+            store.append_query_quality_result(quality)
+            safe_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(set(safe_feedback), {"attempt_id", "overall"})
+            self.assertEqual(store._read_rows("author_feedback"), [])
+
+            resumed = _store(root, index_sha256=raw_sha)
+            self.assertEqual(resumed.next_action()["action"], "PERSIST_AUTHOR_FEEDBACK")
+            resumed.append_author_feedback(safe_feedback)
+            self.assertEqual(resumed.next_action(), {"action": "AUTHOR_ATTEMPT", "attempt_number": 2, "global_review_order": 1})
+            with self.assertRaises(Unit3Blocked):
+                resumed.append_authored_attempt(attempt)
+            second = persist_query_attempt(state, 2, "second question", record=first_record, review_pack_dependency=PACK_DEPENDENCY)
+            resumed.append_authored_attempt(second)
+            second_quality = persist_query_quality_result(second, "REJECT", "QUERY_NOT_NATURAL")
+            resumed.append_query_quality_result(second_quality)
+            self.assertEqual(resumed.next_action()["global_review_order"], 2)
+            with self.assertRaises(Unit3Blocked):
+                persist_query_attempt(state, 3, "third", record=first_record, review_pack_dependency=PACK_DEPENDENCY)
+
+            rejected = _early_reject(_pack()[1])
+            resumed.append_semantic_state(rejected)
+            self.assertEqual(resumed.next_action()["global_review_order"], 3)
+
+    def test_unit3b_store_rejects_reordered_query_prefix_and_incomplete_finalization(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root, index_sha256="e" * 64)
+            state = _freeze(_pack()[0])
+            store.append_semantic_state(state)
+            semantic_path = store._path("semantic_ledger")
+            semantic_original = semantic_path.read_bytes()
+            semantic_rows = store._read_rows("semantic_ledger")
+            semantic_path.write_bytes(w7_unit3._deterministic_jsonl_bytes([
+                *semantic_rows,
+                {"schema_version": w7_unit3.UNIT3B_PERSISTENCE_SCHEMA_VERSION, "semantic_state": _freeze(_pack()[1])},
+            ]))
+            with self.assertRaises(Unit3Blocked):
+                _store(root)
+            semantic_path.write_bytes(semantic_original)
+            attempt = persist_query_attempt(state, 1, "first question", record=_pack()[0], review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "PASS", None)
+            store.append_query_quality_result(quality)
+            path = store._path("query_attempts")
+            rows = store._read_rows("query_attempts")
+            path.write_bytes(w7_unit3._deterministic_jsonl_bytes(list(reversed(rows))))
+            with self.assertRaises(Unit3Blocked):
+                _store(root)
+            with self.assertRaises(Unit3Blocked):
+                store.finalize()
+
+    def test_unit3b_store_finalizes_exact_48_deterministically_and_blocks_replacement(self) -> None:
+        raw = _overlap_bytes("legacy-only")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(2) as root:
+            store = _store(root, index_sha256=raw_sha)
+            for record in _pack():
+                state = _freeze(record)
+                store.append_semantic_state(state)
+                attempt = persist_query_attempt(state, 1, f"question-{record['global_review_order']}", record=record, review_pack_dependency=PACK_DEPENDENCY)
+                store.append_authored_attempt(attempt)
+                store.append_query_quality_result(persist_query_quality_result(attempt, "PASS", None))
+                feedback = store.run_restricted_c1(raw)
+                store.append_author_feedback(feedback)
+            self.assertEqual(store.next_action(), {"action": "FINALIZE"})
+            finalized = store.finalize()
+            self.assertEqual(finalized["manifest"]["accounting"]["reviewed"], 48)
+            self.assertEqual(finalized["manifest"]["artifacts"]["final_ledger"]["row_count"], 48)
+            self.assertEqual(finalized["manifest"]["artifacts"]["freeze_candidates"]["row_count"], 24)
+            self.assertTrue(finalized["manifest_descriptor"]["sha256"])
+            self.assertEqual(store.finalize()["manifest"]["status"], "complete")
+            reopened = _store(root, index_sha256=raw_sha)
+            self.assertEqual(reopened.finalize()["manifest"]["status"], "complete")
+
     def test_mechanical_serialization_is_deterministic(self) -> None:
         self.assertEqual(canonical_json_bytes({"schema": "x", "queue_order": list(QUEUE_ORDER)}), canonical_json_bytes({"queue_order": list(QUEUE_ORDER), "schema": "x"}))
+
+    def test_zero_row_children_are_real_empty_plain_jsonl(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root, index_sha256="e" * 64)
+            for record in _pack():
+                store.append_semantic_state(_early_reject(record))
+            result = store.finalize()
+            for name in ("query_attempts", "restricted_c1_audit", "author_feedback", "freeze_candidates"):
+                path = store._path(name)
+                self.assertTrue(path.is_file())
+                self.assertEqual(path.read_bytes(), b"")
+                self.assertEqual(result["manifest"]["artifacts"][name]["row_count"], 0)
+                self.assertEqual(result["manifest"]["artifacts"][name]["byte_count"], 0)
+            reopened = _store(root, index_sha256="e" * 64)
+            self.assertEqual(reopened.finalize()["manifest"], result["manifest"])
+            bad_path = reopened._path("freeze_candidates")
+            bad_path.write_bytes(b"\n")
+            bad_manifest = copy.deepcopy(result["manifest"])
+            bad_manifest["artifacts"]["freeze_candidates"].update({"sha256": hashlib.sha256(b"\n").hexdigest(), "byte_count": 1, "row_count": 0})
+            reopened._path("manifest").write_bytes(canonical_json_bytes(bad_manifest))
+            with self.assertRaises(Unit3Blocked):
+                _store(root, index_sha256="e" * 64)
+
+    def test_noncanonical_persisted_jsonl_prefix_is_rejected(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root, index_sha256="e" * 64)
+            store.append_semantic_state(_early_reject(_pack()[0]))
+            path = store._path("semantic_ledger")
+            canonical = path.read_bytes()
+            path.write_bytes(canonical.replace(b"\n", b"\r\n", 1))
+            with self.assertRaises(Unit3Blocked):
+                _store(root, index_sha256="e" * 64)
+            path.write_bytes(b"\n")
+            with self.assertRaises(Unit3Blocked):
+                _store(root, index_sha256="e" * 64)
+
+    def test_log_order_checks_candidate_and_attempt_progression(self) -> None:
+        states = [_freeze(_pack()[0]), _freeze(_pack()[1])]
+        attempt_ids = [f"{states[0]['candidate_key']}:attempt:1", f"{states[0]['candidate_key']}:attempt:2", f"{states[1]['candidate_key']}:attempt:1"]
+        events = [{"event_type": "AUTHORED_ATTEMPT", "attempt": {"attempt_id": value, "attempt_number": int(value.rsplit(":", 1)[1])}} for value in attempt_ids]
+        audits = [{"c1_result": {"attempt_id": value}} for value in attempt_ids]
+        feedback = [{"attempt_id": value} for value in attempt_ids]
+        store = _store(Path("D:/Batch4_review") / ("u3b-order-" + uuid.uuid4().hex), index_sha256="e" * 64)
+        store._validate_global_log_order(events, audits, feedback, states)
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, list(reversed(audits)), feedback, states)
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, audits, list(reversed(feedback)), states)
+
+    def test_direct_production_opener_uses_real_synthetic_bytes(self) -> None:
+        pack = _pack()
+        artifact_body = w7_unit3._deterministic_jsonl_gzip_bytes(pack)
+        artifact_sha = hashlib.sha256(artifact_body).hexdigest()
+        manifest_payload = {
+            "checkpoint_commit": "synthetic-checkpoint",
+            "generator": {"sha256": "c" * 64},
+            "review_pack": {"sha256": artifact_sha, "byte_count": len(artifact_body), "row_count": 48},
+        }
+        manifest_body = canonical_json_bytes(manifest_payload)
+        manifest_sha = hashlib.sha256(manifest_body).hexdigest()
+        with _synthetic_root(1) as root:
+            accepted = root / "unit3_review_pack_accepted"
+            (accepted / "metadata").mkdir(parents=True)
+            (accepted / "review_pack").mkdir(parents=True)
+            (accepted / "metadata" / "review_pack_manifest.json").write_bytes(manifest_body)
+            (accepted / "review_pack" / "frozen_48_review_pack.jsonl.gz").write_bytes(artifact_body)
+            module_bytes = Path(w7_unit3.__file__).read_bytes()
+            with patch.multiple(
+                w7_unit3,
+                FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256=manifest_sha,
+                FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256=artifact_sha,
+                FROZEN_A2_SOURCE_CHECKPOINT="synthetic-checkpoint",
+                FROZEN_A2_REVIEW_PACK_BYTES=len(artifact_body),
+                FROZEN_A2_REVIEW_PACK_ROWS=48,
+            ), patch("genshin_corpus.retrieval.w7_unit3.subprocess.run", side_effect=[subprocess.CompletedProcess([], 0, stdout=b"synthetic-checkpoint\n", stderr=b""), subprocess.CompletedProcess([], 0, stdout=module_bytes, stderr=b"")]):
+                opened = open_production_unit3b_store(root, tooling_checkpoint="synthetic-checkpoint")
+            self.assertEqual(len(opened.records), 48)
+
+    def test_direct_production_opener_rejects_real_binding_failures(self) -> None:
+        pack = _pack()
+        artifact_body = w7_unit3._deterministic_jsonl_gzip_bytes(pack)
+        artifact_sha = hashlib.sha256(artifact_body).hexdigest()
+        payload = {"checkpoint_commit": "synthetic-checkpoint", "generator": {"sha256": "c" * 64}, "review_pack": {"sha256": artifact_sha, "byte_count": len(artifact_body), "row_count": 48}}
+        manifest_body = canonical_json_bytes(payload)
+        with _synthetic_root(1) as root:
+            accepted = root / "unit3_review_pack_accepted"
+            (accepted / "metadata").mkdir(parents=True); (accepted / "review_pack").mkdir(parents=True)
+            (accepted / "metadata" / "review_pack_manifest.json").write_bytes(manifest_body)
+            (accepted / "review_pack" / "frozen_48_review_pack.jsonl.gz").write_bytes(artifact_body)
+            manifest_sha = hashlib.sha256(manifest_body).hexdigest()
+            with patch.multiple(w7_unit3, FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256=manifest_sha, FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256=artifact_sha, FROZEN_A2_SOURCE_CHECKPOINT="synthetic-checkpoint", FROZEN_A2_REVIEW_PACK_BYTES=len(artifact_body), FROZEN_A2_REVIEW_PACK_ROWS=48):
+                with patch("genshin_corpus.retrieval.w7_unit3.subprocess.run", side_effect=subprocess.CalledProcessError(1, "git")):
+                    with self.assertRaises(Unit3Blocked):
+                        open_production_unit3b_store(root, tooling_checkpoint="synthetic-checkpoint")
+                module_bytes = Path(w7_unit3.__file__).read_bytes()
+                with patch("genshin_corpus.retrieval.w7_unit3.subprocess.run", side_effect=[subprocess.CompletedProcess([], 0, stdout=b"synthetic-checkpoint\n", stderr=b""), subprocess.CompletedProcess([], 0, stdout=b"tampered", stderr=b"")]):
+                    with self.assertRaises(Unit3Blocked):
+                        open_production_unit3b_store(root, tooling_checkpoint="synthetic-checkpoint")
+
+    def _populate_terminal_store(self, root: Path) -> tuple[Unit3BPersistenceStore, bytes, str]:
+        raw = _overlap_bytes("legacy-only")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        store = _store(root, index_sha256=raw_sha)
+        for record in _pack():
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, f"question-{record['global_review_order']}", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            store.append_query_quality_result(persist_query_quality_result(attempt, "PASS", None))
+            store.append_author_feedback(store.run_restricted_c1(raw))
+        return store, raw, raw_sha
+
+    def test_finalization_exact_partial_outputs_resume_and_completed_state_is_immutable(self) -> None:
+        with _synthetic_root(0) as root:
+            store, raw, raw_sha = self._populate_terminal_store(root)
+            first = store.finalize()
+            manifest_path = store._path("manifest")
+            final_path = store._path("final_ledger")
+            freeze_path = store._path("freeze_candidates")
+            manifest_path.unlink()
+            reopened = _store(root, index_sha256=raw_sha)
+            resumed = reopened.finalize()
+            self.assertEqual(resumed["manifest"], first["manifest"])
+            manifest_path.unlink()
+            freeze_path.unlink()
+            reopened = _store(root, index_sha256=raw_sha)
+            self.assertEqual(reopened.finalize()["manifest"], first["manifest"])
+            manifest_path.unlink()
+            final_path.write_bytes(final_path.read_bytes() + b"x")
+            with self.assertRaises(Unit3Blocked):
+                _store(root, index_sha256=raw_sha)
+
+    def test_completed_manifest_and_child_tamper_fail_closed(self) -> None:
+        for tamper in ("accounting", "descriptor", "child"):
+            with self.subTest(tamper=tamper), _synthetic_root(1) as root:
+                store, raw, raw_sha = self._populate_terminal_store(root)
+                result = store.finalize()
+                manifest_path = store._path("manifest")
+                if tamper == "child":
+                    path = store._path("final_ledger")
+                    path.write_bytes(path.read_bytes() + b"x")
+                else:
+                    manifest = copy.deepcopy(result["manifest"])
+                    if tamper == "accounting":
+                        manifest["accounting"]["reviewed"] = 47
+                    else:
+                        manifest["artifacts"]["final_ledger"]["byte_count"] += 1
+                    manifest_path.write_bytes(canonical_json_bytes(manifest))
+                with self.assertRaises(Unit3Blocked):
+                    _store(root, index_sha256=raw_sha)
+
+    def test_completed_reopen_result_and_all_append_paths_are_blocked(self) -> None:
+        with _synthetic_root(2) as root:
+            store, raw, raw_sha = self._populate_terminal_store(root)
+            expected = store.finalize()
+            reopened = _store(root, index_sha256=raw_sha)
+            self.assertEqual(reopened.finalize(), expected)
+            state = _freeze(_pack()[0])
+            attempt = persist_query_attempt(state, 1, "query", record=_pack()[0], review_pack_dependency=PACK_DEPENDENCY)
+            quality = persist_query_quality_result(attempt, "PASS", None)
+            for action in (
+                lambda: reopened.append_semantic_state(state),
+                lambda: reopened.append_authored_attempt(attempt),
+                lambda: reopened.append_query_quality_result(quality),
+                lambda: reopened.run_restricted_c1(raw),
+                lambda: reopened.append_author_feedback({"attempt_id": attempt["attempt_id"], "overall": "PASS"}),
+            ):
+                with self.assertRaises(Unit3Blocked):
+                    action()
+
+    def test_log_order_negative_cases_are_isolated(self) -> None:
+        states = [_freeze(_pack()[0]), _freeze(_pack()[1])]
+        def authored(state: dict[str, object], number: int) -> dict[str, object]:
+            record = _pack()[0] if state["candidate_key"] == _pack()[0]["candidate_key"] else _pack()[1]
+            return persist_query_attempt(state, number, f"q-{state['candidate_key']}-{number}", record=record, review_pack_dependency=PACK_DEPENDENCY)
+        first = authored(states[0], 1)
+        second = authored(states[0], 2)
+        other = authored(states[1], 1)
+        events = [{"event_type": "AUTHORED_ATTEMPT", "attempt": value} for value in (first, second, other)]
+        store = _store(Path("D:/Batch4_review") / ("u3b-order-reg-" + uuid.uuid4().hex), index_sha256="e" * 64)
+        audits_same = [{"c1_result": {"attempt_id": first["attempt_id"]}}, {"c1_result": {"attempt_id": second["attempt_id"]}}]
+        feedback_same = [{"attempt_id": first["attempt_id"]}, {"attempt_id": second["attempt_id"]}]
+        store._validate_global_log_order(events, audits_same, feedback_same, states)
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, list(reversed(audits_same)), feedback_same, states)
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, audits_same, list(reversed(feedback_same)), states)
+        audits_cross = [{"c1_result": {"attempt_id": first["attempt_id"]}}, {"c1_result": {"attempt_id": other["attempt_id"]}}]
+        feedback_cross = [{"attempt_id": first["attempt_id"]}, {"attempt_id": other["attempt_id"]}]
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, list(reversed(audits_cross)), feedback_cross, states)
+        with self.assertRaises(Unit3Blocked):
+            store._validate_global_log_order(events, audits_cross, list(reversed(feedback_cross)), states)
+
+    def test_direct_production_opener_rejects_binding_and_descriptor_mismatch(self) -> None:
+        pack = _pack()
+        artifact_body = w7_unit3._deterministic_jsonl_gzip_bytes(pack)
+        artifact_sha = hashlib.sha256(artifact_body).hexdigest()
+        base = {"checkpoint_commit": "synthetic-checkpoint", "generator": {"sha256": "c" * 64}, "review_pack": {"sha256": artifact_sha, "byte_count": len(artifact_body), "row_count": 48}}
+        for mutate in ("manifest_sha", "artifact_sha", "byte_count", "row_count", "checkpoint"):
+            with self.subTest(mutate=mutate), _synthetic_root(2) as root:
+                payload = copy.deepcopy(base)
+                if mutate == "artifact_sha": payload["review_pack"]["sha256"] = "f" * 64
+                if mutate == "byte_count": payload["review_pack"]["byte_count"] += 1
+                if mutate == "row_count": payload["review_pack"]["row_count"] = 47
+                if mutate == "checkpoint": payload["checkpoint_commit"] = "wrong-checkpoint"
+                body = canonical_json_bytes(payload)
+                accepted = root / "unit3_review_pack_accepted"
+                (accepted / "metadata").mkdir(parents=True); (accepted / "review_pack").mkdir(parents=True)
+                (accepted / "metadata" / "review_pack_manifest.json").write_bytes(body)
+                (accepted / "review_pack" / "frozen_48_review_pack.jsonl.gz").write_bytes(artifact_body)
+                manifest_sha = hashlib.sha256(body).hexdigest() if mutate != "manifest_sha" else "0" * 64
+                with patch.multiple(w7_unit3, FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256=manifest_sha, FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256=artifact_sha, FROZEN_A2_SOURCE_CHECKPOINT="synthetic-checkpoint", FROZEN_A2_REVIEW_PACK_BYTES=len(artifact_body), FROZEN_A2_REVIEW_PACK_ROWS=48), patch("genshin_corpus.retrieval.w7_unit3.verify_checkpoint_generator_binding", return_value={"checkpoint_commit": "synthetic-checkpoint", "generator_sha256": "d" * 64}):
+                    with self.assertRaises(Unit3Blocked):
+                        open_production_unit3b_store(root, tooling_checkpoint="synthetic-checkpoint")
 
 
 if __name__ == "__main__":

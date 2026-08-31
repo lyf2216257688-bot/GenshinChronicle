@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3A-2 production mechanical extraction gate)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B-0 pre-exposure production persistence tooling gate)**
 
 ## Objective
 
@@ -83,9 +83,9 @@ larger models, query rewrite, and representation changes are not authorized.
 and Unit 2 structural runner, performance repair, and one production Unit 2
 run are CLOSED / PASS. The Unit 3 execution contract is APPROVED / FROZEN.
 Unit 3A-1 pre-exposure implementation and its technical-lead actual code gate
-are ACCEPTED / PASS. The next gate is Unit 3A-2 committed production
-mechanical extraction. `PRODUCTION_REVIEW_PACK_EXTRACTION = NOT EXECUTED`;
-`UNIT3_REVIEW = NOT EXECUTED`; `QUERY_AUTHORING = NOT EXECUTED`;
+are ACCEPTED / PASS. Unit 3A-2 committed production mechanical extraction is
+ACCEPTED / FROZEN. The active gate is Unit 3B-0 pre-exposure production
+persistence tooling. `UNIT3_REVIEW = NOT EXECUTED`; `QUERY_AUTHORING = NOT EXECUTED`;
 `REAL_C1_CHECK = NOT EXECUTED`; `BENCHMARK_V0_4 = NOT CREATED`; and
 `RETRIEVAL_EVALUATION = NOT EXECUTED`.
 
@@ -94,10 +94,9 @@ The approved Phase 04 boundary is documented in
 
 ## Immediate next action
 
-下一步仅可在用户完成 checkpoint commit 后执行已冻结的 P04-W7 Unit 3A-2
-committed production mechanical extraction，并接受 technical-lead pre-exposure
-artifact gate；不得进入 semantic review、query authoring、C1、benchmark-v0.4
-或 retrieval evaluation。
+下一步仅可完成 P04-W7 Unit 3B-0 pre-exposure production persistence tooling
+并接受 technical-lead actual review；不得进入 semantic review、query authoring、
+C1、benchmark-v0.4或 retrieval evaluation。
 
 ## Phase transition boundary
 

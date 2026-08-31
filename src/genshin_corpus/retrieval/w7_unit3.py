@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import io
 import json
 import os
 import re
@@ -35,6 +36,12 @@ QUEUE_ORDER = ("semantic", "control", "WR", "HN")
 QUEUE_ALLOCATIONS = {"semantic": 16, "control": 8, "WR": 12, "HN": 12}
 FINAL_QUOTAS = {"semantic": 8, "WR": 6, "HN": 6, "control": 4}
 MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS = 2
+UNIT3B_PERSISTENCE_SCHEMA_VERSION = "p04-w7-unit3b-persistence-v1"
+FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256 = "704c8ea3aeb77f984b68c83d8e7ce5e936ce04dec3e82439a59d893d4a24e95d"
+FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256 = "fb797a4bd224ae75e0cc2ff36253726413dfe6822786e9a8dc61f60f18380a05"
+FROZEN_A2_SOURCE_CHECKPOINT = "9a90ef46f43f1719be1d3e77b14e97bbedc62e9f"
+FROZEN_A2_REVIEW_PACK_BYTES = 103456
+FROZEN_A2_REVIEW_PACK_ROWS = 48
 _PRE_PROPOSITION_REJECT_REASONS = frozenset(
     {
         "ANCHOR_NOT_VALID_POSITIVE",
@@ -123,6 +130,41 @@ def _write_jsonl_gzip(path: Path, rows: Iterable[Mapping[str, Any]]) -> dict[str
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def _deterministic_jsonl_gzip_bytes(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    output = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as compressed:
+        for row in rows:
+            compressed.write(canonical_json_bytes(row) + b"\n")
+    return output.getvalue()
+
+
+def _deterministic_jsonl_bytes(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    """Canonical plain UTF-8/LF JSONL used by Unit3B artifacts."""
+    return b"".join(canonical_json_bytes(row) + b"\n" for row in rows)
+
+
+def _read_jsonl(path: Path) -> list[Mapping[str, Any]]:
+    values: list[Mapping[str, Any]] = []
+    try:
+        body = path.read_bytes()
+        if body.startswith(b"\x1f\x8b"):
+            raise Unit3Blocked("JSONL_PLAIN_REQUIRED")
+        for line in body.split(b"\n"):
+            if not line:
+                continue
+            value = json.loads(line.decode("utf-8"))
+            if not isinstance(value, Mapping):
+                raise Unit3Blocked("JSONL_OBJECT_REQUIRED")
+            values.append(value)
+        if body != _deterministic_jsonl_bytes(values):
+            raise Unit3Blocked("JSONL_NONCANONICAL")
+    except Unit3Blocked:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Unit3Blocked("JSONL_READ_FAILED") from exc
+    return values
 
 
 def _required_string(value: Mapping[str, Any], field: str) -> str:
@@ -872,6 +914,661 @@ def finalize_candidates(ledgers: Iterable[Mapping[str, Any]], *, accepted_review
         accounting[queue] = {"quota": FINAL_QUOTAS[queue], "reviewed": len(queue_ledgers), "fully_valid": len(valid), "selected": len(chosen), "valid_not_selected_quota": len(valid) - len(chosen), "rejected": len(queue_ledgers) - len(valid), "status": "COMPLETE" if len(chosen) == FINAL_QUOTAS[queue] else "SHORTFALL / EVIDENCE_INSUFFICIENT"}
     diversity = {"distinct_entity_key_count": len({tuple(item["pack_record"]["entity_key"]) for item in selected}), "distinct_topic_key_count": len({tuple(item["pack_record"]["topic_key"]) for item in selected}), "distinct_evidence_family_key_count": len({item["pack_record"]["evidence_family_key"] for item in selected})}
     return {"selected": selected, "queue_accounting": accounting, "diversity_accounting": diversity}
+
+
+_UNIT3B_PATHS = {
+    "semantic_ledger": "review/semantic_ledger.jsonl",
+    "query_attempts": "review/query_attempts.jsonl",
+    "restricted_c1_audit": "c1/restricted_c1_audit.jsonl",
+    "author_feedback": "c1/author_feedback.jsonl",
+    "final_ledger": "review/final_ledger.jsonl",
+    "freeze_candidates": "final/w7_new_freeze_candidates.jsonl",
+    "manifest": "metadata/unit3_manifest.json",
+}
+_A2_DEPENDENCY_FIELDS = {
+    "review_pack_manifest_sha256",
+    "review_pack_artifact_sha256",
+    "review_pack_byte_count",
+    "review_pack_row_count",
+    "source_checkpoint",
+    "source_generator_sha256",
+}
+_UNIT3B_TOOLING_FIELDS = {"checkpoint_commit", "generator_sha256"}
+
+
+def _validate_a2_dependency(value: Any) -> dict[str, Any]:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _A2_DEPENDENCY_FIELDS
+        or not _is_sha256(value.get("review_pack_manifest_sha256"))
+        or not _is_sha256(value.get("review_pack_artifact_sha256"))
+        or not _is_sha256(value.get("source_generator_sha256"))
+        or not isinstance(value.get("source_checkpoint"), str)
+        or not isinstance(value.get("review_pack_byte_count"), int)
+        or not isinstance(value.get("review_pack_row_count"), int)
+    ):
+        raise Unit3Blocked("UNIT3B_A2_DEPENDENCY_INVALID")
+    return {field: value[field] for field in sorted(_A2_DEPENDENCY_FIELDS)}
+
+
+def _validate_unit3b_tooling_binding(value: Any) -> dict[str, str]:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _UNIT3B_TOOLING_FIELDS
+        or not isinstance(value.get("checkpoint_commit"), str)
+        or not value["checkpoint_commit"]
+        or not _is_sha256(value.get("generator_sha256"))
+    ):
+        raise Unit3Blocked("UNIT3B_TOOLING_BINDING_INVALID")
+    return {field: value[field] for field in sorted(_UNIT3B_TOOLING_FIELDS)}
+
+
+def _unit3b_pack_dependency(a2_dependency: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        "review_pack_manifest_sha256": a2_dependency["review_pack_manifest_sha256"],
+        "review_pack_artifact_sha256": a2_dependency["review_pack_artifact_sha256"],
+    }
+
+
+def _atomic_write_bytes(path: Path, body: bytes, *, replace: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".w7-unit3-", dir=str(path.parent))
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(body)
+        if replace:
+            temporary.replace(path)
+        else:
+            temporary.rename(path)
+    except OSError as exc:
+        raise Unit3Blocked("PERSISTENCE_WRITE_FAILED") from exc
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _artifact_descriptor(path: Path, relative_path: str, rows: int) -> dict[str, Any]:
+    if not path.exists():
+        body = b""
+    else:
+        body = path.read_bytes()
+    return {"path": relative_path, "sha256": _sha256_bytes(body), "byte_count": len(body), "row_count": rows}
+
+
+def _artifact_descriptor_from_bytes(relative_path: str, body: bytes, rows: int) -> dict[str, Any]:
+    return {"path": relative_path, "sha256": _sha256_bytes(body), "byte_count": len(body), "row_count": rows}
+
+
+def _ensure_artifact_bytes(path: Path, relative_path: str, body: bytes, rows: int) -> dict[str, Any]:
+    expected = _artifact_descriptor_from_bytes(relative_path, body, rows)
+    if path.exists():
+        if path.read_bytes() != body:
+            raise Unit3Blocked("FINAL_ARTIFACT_COLLISION")
+    else:
+        _atomic_write_bytes(path, body, replace=False)
+    return expected
+
+
+def _append_immutable_jsonl(path: Path, expected_rows: list[Mapping[str, Any]], entry: Mapping[str, Any]) -> None:
+    """Atomically extend one canonical JSONL prefix, never replacing its content."""
+    if path.exists():
+        current = _read_jsonl(path)
+        if current != expected_rows:
+            raise Unit3Blocked("IMMUTABLE_PREFIX_MISMATCH")
+    elif expected_rows:
+        raise Unit3Blocked("IMMUTABLE_PREFIX_MISSING")
+    body = _deterministic_jsonl_bytes([*expected_rows, entry])
+    _atomic_write_bytes(path, body, replace=True)
+
+
+def _write_once_or_verify_jsonl(path: Path, relative_path: str, rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    expected = _deterministic_jsonl_bytes(rows)
+    if path.exists():
+        if path.read_bytes() != expected:
+            raise Unit3Blocked("FINAL_ARTIFACT_COLLISION")
+    else:
+        _atomic_write_bytes(path, expected, replace=False)
+    return _artifact_descriptor(path, relative_path, len(rows))
+
+
+class Unit3BPersistenceStore:
+    """Immutable, resumable persistence boundary for future Unit 3B review work."""
+
+    def __init__(
+        self,
+        output_root: Path,
+        review_pack: Iterable[Mapping[str, Any]],
+        *,
+        a2_dependency: Mapping[str, Any],
+        tooling_binding: Mapping[str, Any],
+        expected_overlap_index_sha256: str = EXPECTED_OVERLAP_INDEX_SHA256,
+    ) -> None:
+        self.output_root = Path(output_root)
+        self.records = list(review_pack)
+        validate_review_pack(self.records)
+        self.a2_dependency = _validate_a2_dependency(a2_dependency)
+        self.tooling_binding = _validate_unit3b_tooling_binding(tooling_binding)
+        if not _is_sha256(expected_overlap_index_sha256):
+            raise Unit3Blocked("FINALIZER_C1_DEPENDENCY_INVALID")
+        self.expected_overlap_index_sha256 = expected_overlap_index_sha256
+        self.pack_dependency = _unit3b_pack_dependency(self.a2_dependency)
+        self._c1_authority_nonce = object()
+        self._finalized = False
+        if self._path("manifest").exists():
+            self._load_existing_manifest()
+            self._finalized = True
+        self._validate_persisted()
+        if not self._finalized:
+            final_paths = (self._path("final_ledger"), self._path("freeze_candidates"))
+            if any(path.exists() for path in final_paths):
+                states = self._semantic_states()
+                if len(states) != len(self.records) or self.next_action().get("action") != "FINALIZE":
+                    raise Unit3Blocked("PREMATURE_FINAL_OUTPUT")
+                ledgers = self._terminal_ledgers()
+                expected = self._expected_finalization(ledgers)
+                expected_bodies = {
+                    "final_ledger": _deterministic_jsonl_bytes(expected["final_rows"]),
+                    "freeze_candidates": _deterministic_jsonl_bytes(expected["freeze_rows"]),
+                }
+                for name, body in expected_bodies.items():
+                    path = self._path(name)
+                    if path.exists() and path.read_bytes() != body:
+                        raise Unit3Blocked("FINAL_ARTIFACT_INTEGRITY_MISMATCH")
+        if self._finalized:
+            self._validate_existing_manifest()
+
+    def _load_existing_manifest(self) -> None:
+        """Treat a complete, exactly matching manifest as an immutable terminal marker."""
+        manifest = _safe_json_load(self._path("manifest"))
+        if manifest.get("status") != "complete" or manifest.get("a2_dependency") != self.a2_dependency or manifest.get("unit3b_tooling") != self.tooling_binding or manifest.get("overlap_index_sha256") != self.expected_overlap_index_sha256:
+            raise Unit3Blocked("OUTPUT_COLLISION")
+        if not isinstance(manifest.get("artifacts"), Mapping):
+            raise Unit3Blocked("OUTPUT_COLLISION")
+
+    def _validate_existing_manifest(self) -> None:
+        manifest = _safe_json_load(self._path("manifest"))
+        if manifest.get("a2_dependency") != self.a2_dependency or manifest.get("unit3b_tooling") != self.tooling_binding or manifest.get("overlap_index_sha256") != self.expected_overlap_index_sha256:
+            raise Unit3Blocked("OUTPUT_COLLISION")
+        ledgers = self._terminal_ledgers()
+        expected = self._expected_finalization(ledgers)
+        if manifest != expected["manifest"]:
+            raise Unit3Blocked("OUTPUT_COLLISION")
+        for name, descriptor in expected["artifacts"].items():
+            path = self._path(name)
+            if not path.is_file():
+                raise Unit3Blocked("OUTPUT_COLLISION")
+            if name in _UNIT3B_PATHS and name != "manifest":
+                rows = _read_jsonl(path)
+                if path.read_bytes() != _deterministic_jsonl_bytes(rows):
+                    raise Unit3Blocked("OUTPUT_COLLISION")
+            actual = _artifact_descriptor_from_bytes(descriptor["path"], path.read_bytes(), descriptor["row_count"])
+            if actual != descriptor:
+                raise Unit3Blocked("OUTPUT_COLLISION")
+
+    def _expected_finalization(self, ledgers: list[dict[str, Any]]) -> dict[str, Any]:
+        result = finalize_candidates(ledgers, accepted_review_pack_dependency=self.pack_dependency, expected_overlap_index_sha256=self.expected_overlap_index_sha256)
+        selected_hashes = {ledger["semantic_state"]["semantic_state_sha256"] for ledger in result["selected"]}
+        final_rows: list[dict[str, Any]] = []
+        freeze_rows: list[dict[str, Any]] = []
+        for ledger in ledgers:
+            state = ledger["semantic_state"]
+            selected = state["semantic_state_sha256"] in selected_hashes
+            final_rows.append({"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "candidate_key": state["candidate_key"], "queue": state["queue"], "global_review_order": state["global_review_order"], "queue_review_order": state["queue_review_order"], "semantic_state_sha256": state["semantic_state_sha256"], "semantic_status": state["semantic_status"], "semantic_reason": state["semantic_reason"], "selected": selected, "selection_disposition": "SELECTED" if selected else "NOT_SELECTED"})
+            if selected:
+                final_attempt = ledger["attempts"][-1]
+                freeze_rows.append({"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "candidate_key": state["candidate_key"], "queue": state["queue"], "global_review_order": state["global_review_order"], "anchor_occurrence_key": state["anchor_occurrence_key"], "entity_key": state["entity_key"], "topic_key": state["topic_key"], "evidence_family_key": state["evidence_family_key"], "accepted_gold_occurrence_keys": state["accepted_gold_occurrence_keys"], "selected_pair_key": state["selected_pair_key"], "query": final_attempt["query"], "answer_proposition": state["answer_proposition"], "semantic_state_sha256": state["semantic_state_sha256"], "attempt_sha256": final_attempt["attempt_sha256"]})
+        semantic_rows = self._read_rows("semantic_ledger")
+        query_rows = self._read_rows("query_attempts")
+        c1_rows = self._read_rows("restricted_c1_audit")
+        feedback_rows = self._read_rows("author_feedback")
+        descriptors = {
+            "semantic_ledger": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["semantic_ledger"], _deterministic_jsonl_bytes(semantic_rows), len(semantic_rows)),
+            "query_attempts": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["query_attempts"], _deterministic_jsonl_bytes(query_rows), len(query_rows)),
+            "restricted_c1_audit": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["restricted_c1_audit"], _deterministic_jsonl_bytes(c1_rows), len(c1_rows)),
+            "author_feedback": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["author_feedback"], _deterministic_jsonl_bytes(feedback_rows), len(feedback_rows)),
+            "final_ledger": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["final_ledger"], _deterministic_jsonl_bytes(final_rows), len(final_rows)),
+            "freeze_candidates": _artifact_descriptor_from_bytes(_UNIT3B_PATHS["freeze_candidates"], _deterministic_jsonl_bytes(freeze_rows), len(freeze_rows)),
+        }
+        semantic_by_queue = {queue: {"ACCEPT": 0, "REJECT": 0} for queue in QUEUE_ORDER}
+        reasons: dict[str, int] = defaultdict(int)
+        for ledger in ledgers:
+            state = ledger["semantic_state"]
+            semantic_by_queue[state["queue"]][state["semantic_status"]] += 1
+            if state["semantic_reason"] is not None:
+                reasons[state["semantic_reason"]] += 1
+        events = self._attempt_events(); audits = self._read_rows("restricted_c1_audit"); feedback = self._read_rows("author_feedback")
+        accounting = {"reviewed": len(ledgers), "semantic_by_queue": semantic_by_queue, "reject_reason_counts": dict(sorted(reasons.items())), "attempt_events": len(events), "authored_attempts": sum(1 for row in events if row.get("event_type") == "AUTHORED_ATTEMPT"), "query_quality_total": sum(1 for row in events if row.get("event_type") == "QUERY_QUALITY_RESULT"), "query_quality_pass": sum(1 for row in events if row.get("event_type") == "QUERY_QUALITY_RESULT" and row.get("quality_result", {}).get("quality_status") == "PASS"), "query_quality_reject": sum(1 for row in events if row.get("event_type") == "QUERY_QUALITY_RESULT" and row.get("quality_result", {}).get("quality_status") == "REJECT"), "restricted_c1_audits": len(audits), "restricted_c1_total": len(audits), "restricted_c1_pass": sum(1 for row in audits if row.get("c1_result", {}).get("overall") == "PASS"), "restricted_c1_reject": sum(1 for row in audits if row.get("c1_result", {}).get("overall") == "REJECT"), "author_feedback": len(feedback), "final": result["queue_accounting"], "diversity": result["diversity_accounting"], "benchmark_v0_4": "NOT_CREATED", "retrieval_evaluation": "NOT_EXECUTED"}
+        manifest = {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "status": "complete", "a2_dependency": self.a2_dependency, "unit3b_tooling": self.tooling_binding, "overlap_index_sha256": self.expected_overlap_index_sha256, "artifacts": descriptors, "accounting": accounting}
+        return {"manifest": manifest, "artifacts": descriptors, "final_rows": final_rows, "freeze_rows": freeze_rows}
+
+    def _path(self, name: str) -> Path:
+        return self.output_root / _UNIT3B_PATHS[name]
+
+    def _ensure_open(self) -> None:
+        if self._finalized:
+            raise Unit3Blocked("OUTPUT_COLLISION")
+
+    def _read_rows(self, name: str) -> list[Mapping[str, Any]]:
+        path = self._path(name)
+        return _read_jsonl(path) if path.exists() else []
+
+    def _ensure_empty_children(self) -> None:
+        for name in ("query_attempts", "restricted_c1_audit", "author_feedback"):
+            path = self._path(name)
+            if not path.exists():
+                _atomic_write_bytes(path, b"", replace=False)
+
+    def _semantic_states(self) -> list[Mapping[str, Any]]:
+        rows = self._read_rows("semantic_ledger")
+        states: list[Mapping[str, Any]] = []
+        if len(rows) > len(self.records):
+            raise Unit3Blocked("SEMANTIC_LEDGER_ORDER_INVALID")
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping) or set(row) != {"schema_version", "semantic_state"} or row.get("schema_version") != UNIT3B_PERSISTENCE_SCHEMA_VERSION or not isinstance(row.get("semantic_state"), Mapping):
+                raise Unit3Blocked("SEMANTIC_LEDGER_SCHEMA_INVALID")
+            state = row["semantic_state"]
+            validate_frozen_semantic_state(state, record=self.records[index], review_pack_dependency=self.pack_dependency)
+            states.append(state)
+        return states
+
+    def _attempt_events(self) -> list[Mapping[str, Any]]:
+        rows = self._read_rows("query_attempts")
+        for row in rows:
+            if not isinstance(row, Mapping) or row.get("schema_version") != UNIT3B_PERSISTENCE_SCHEMA_VERSION or row.get("event_type") not in ("AUTHORED_ATTEMPT", "QUERY_QUALITY_RESULT"):
+                raise Unit3Blocked("QUERY_EVENT_SCHEMA_INVALID")
+            if set(row) != ({"schema_version", "event_type", "attempt"} if row["event_type"] == "AUTHORED_ATTEMPT" else {"schema_version", "event_type", "quality_result"}):
+                raise Unit3Blocked("QUERY_EVENT_SCHEMA_INVALID")
+        return rows
+
+    def _c1_rows(self) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+        audits, feedback = self._read_rows("restricted_c1_audit"), self._read_rows("author_feedback")
+        for audit in audits:
+            if not isinstance(audit, Mapping) or set(audit) != {"schema_version", "c1_result"} or audit.get("schema_version") != UNIT3B_PERSISTENCE_SCHEMA_VERSION or not isinstance(audit.get("c1_result"), Mapping):
+                raise Unit3Blocked("RESTRICTED_C1_AUDIT_SCHEMA_INVALID")
+        for row in feedback:
+            if not isinstance(row, Mapping) or set(row) != {"schema_version", "attempt_id", "overall"} or row.get("schema_version") != UNIT3B_PERSISTENCE_SCHEMA_VERSION or not isinstance(row.get("attempt_id"), str) or row.get("overall") not in ("PASS", "REJECT"):
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+        return audits, feedback
+
+    def _validate_global_log_order(self, events: list[Mapping[str, Any]], audits: list[Mapping[str, Any]], feedback: list[Mapping[str, Any]], states: list[Mapping[str, Any]]) -> None:
+        order = {state["candidate_key"]: index for index, state in enumerate(states)}
+        attempt_numbers: dict[str, int] = {}
+        for event in events:
+            payload = event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result")
+            if not isinstance(payload, Mapping):
+                raise Unit3Blocked("PERSISTED_LOG_ORDER_INVALID")
+            attempt_id = _required_string(payload, "attempt_id")
+            if event["event_type"] == "AUTHORED_ATTEMPT":
+                number = payload.get("attempt_number")
+                if not isinstance(number, int) or isinstance(number, bool):
+                    raise Unit3Blocked("PERSISTED_LOG_ORDER_INVALID")
+                attempt_numbers[attempt_id] = number
+        def event_key(attempt_id: Any) -> tuple[int, int]:
+            if not isinstance(attempt_id, str) or ":attempt:" not in attempt_id:
+                raise Unit3Blocked("PERSISTED_LOG_ORDER_INVALID")
+            candidate = attempt_id.rsplit(":attempt:", 1)[0]
+            if candidate not in order:
+                raise Unit3Blocked("PERSISTED_LOG_ORDER_INVALID")
+            number = attempt_numbers.get(attempt_id)
+            if number is None:
+                raise Unit3Blocked("PERSISTED_LOG_ORDER_INVALID")
+            return order[candidate], number
+        for rows, getter, code in (
+            (events, lambda row: (row.get("attempt") or row.get("quality_result", {})).get("attempt_id"), "QUERY_EVENT_ORDER_INVALID"),
+            (audits, lambda row: row.get("c1_result", {}).get("attempt_id"), "C1_LOG_ORDER_INVALID"),
+            (feedback, lambda row: row.get("attempt_id"), "AUTHOR_FEEDBACK_ORDER_INVALID"),
+        ):
+            previous = (-1, -1)
+            for row in rows:
+                index = event_key(getter(row))
+                if index < previous:
+                    raise Unit3Blocked(code)
+                previous = index
+
+    def _candidate_events(self, state: Mapping[str, Any], events: Iterable[Mapping[str, Any]]) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+        attempts: list[Mapping[str, Any]] = []
+        qualities: list[Mapping[str, Any]] = []
+        for event in events:
+            payload = event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result")
+            if isinstance(payload, Mapping) and payload.get("attempt_id", "").startswith(f"{state['candidate_key']}:attempt:"):
+                (attempts if event["event_type"] == "AUTHORED_ATTEMPT" else qualities).append(payload)
+        return attempts, qualities
+
+    def _candidate_c1(self, state: Mapping[str, Any], audits: Iterable[Mapping[str, Any]], feedback: Iterable[Mapping[str, Any]]) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+        prefix = f"{state['candidate_key']}:attempt:"
+        candidate_audits = [row["c1_result"] for row in audits if row["c1_result"].get("attempt_id", "").startswith(prefix)]
+        candidate_feedback = [row for row in feedback if row.get("attempt_id", "").startswith(prefix)]
+        return candidate_audits, candidate_feedback
+
+    def _validate_persisted(self) -> None:
+        states = self._semantic_states()
+        events = self._attempt_events()
+        audits, feedback = self._c1_rows()
+        all_attempts: dict[str, Mapping[str, Any]] = {}
+        all_qualities: dict[str, Mapping[str, Any]] = {}
+        all_audits: dict[str, Mapping[str, Any]] = {}
+        all_feedback: dict[str, Mapping[str, Any]] = {}
+        for event in events:
+            payload = event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result")
+            if not isinstance(payload, Mapping):
+                raise Unit3Blocked("QUERY_EVENT_SCHEMA_INVALID")
+            attempt_id = _required_string(payload, "attempt_id")
+            target = all_attempts if event["event_type"] == "AUTHORED_ATTEMPT" else all_qualities
+            if attempt_id in target:
+                raise Unit3Blocked("QUERY_EVENT_ID_DUPLICATED")
+            target[attempt_id] = payload
+        for audit_row in audits:
+            audit = audit_row["c1_result"]
+            attempt_id = _required_string(audit, "attempt_id")
+            if attempt_id in all_audits:
+                raise Unit3Blocked("C1_RESULT_INVALID")
+            all_audits[attempt_id] = audit
+        for feedback_row in feedback:
+            attempt_id = _required_string(feedback_row, "attempt_id")
+            if attempt_id in all_feedback:
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+            all_feedback[attempt_id] = feedback_row
+        seen_attempt_ids: set[str] = set()
+        seen_quality_ids: set[str] = set()
+        audit_by_attempt: dict[str, Mapping[str, Any]] = {}
+        for audit_row in audits:
+            audit = audit_row["c1_result"]
+            attempt_id = _required_string(audit, "attempt_id")
+            if attempt_id in audit_by_attempt:
+                raise Unit3Blocked("C1_RESULT_INVALID")
+            audit_by_attempt[attempt_id] = audit
+        feedback_by_attempt_global: dict[str, Mapping[str, Any]] = {}
+        for feedback_row in feedback:
+            attempt_id = _required_string(feedback_row, "attempt_id")
+            if attempt_id in feedback_by_attempt_global:
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+            feedback_by_attempt_global[attempt_id] = feedback_row
+        for index, (state, record) in enumerate(zip(states, self.records)):
+            attempts, qualities = self._candidate_events(state, events)
+            c1_results, candidate_feedback = self._candidate_c1(state, audits, feedback)
+            if state["semantic_status"] == "REJECT" and (attempts or qualities or c1_results or candidate_feedback):
+                raise Unit3Blocked("QUERY_EVENT_AFTER_SEMANTIC_REJECT")
+            candidate_events = [
+                event
+                for event in events
+                if isinstance(
+                    (event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result")),
+                    Mapping,
+                )
+                and (event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result"))["attempt_id"].startswith(f"{state['candidate_key']}:attempt:")
+            ]
+            expected_types: list[str] = []
+            for position, attempt in enumerate(attempts):
+                expected_types.append("AUTHORED_ATTEMPT")
+                if position < len(qualities):
+                    if qualities[position].get("attempt_id") != attempt.get("attempt_id"):
+                        raise Unit3Blocked("QUERY_EVENT_ORDER_INVALID")
+                    expected_types.append("QUERY_QUALITY_RESULT")
+            if len(qualities) > len(attempts):
+                raise Unit3Blocked("QUERY_EVENT_ORDER_INVALID")
+            if [event["event_type"] for event in candidate_events] != expected_types:
+                raise Unit3Blocked("QUERY_EVENT_ORDER_INVALID")
+            for attempt in attempts:
+                if attempt["attempt_id"] in seen_attempt_ids:
+                    raise Unit3Blocked("QUERY_ATTEMPT_ID_DUPLICATED")
+                seen_attempt_ids.add(attempt["attempt_id"])
+            for quality in qualities:
+                if quality["attempt_id"] in seen_quality_ids:
+                    raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
+                seen_quality_ids.add(quality["attempt_id"])
+            validate_attempt_history(state, attempts, qualities, c1_results, record=record, review_pack_dependency=self.pack_dependency)
+            feedback_by_attempt = {row["attempt_id"]: row for row in candidate_feedback}
+            for result in c1_results:
+                if result["overlap_index_sha256"] != self.expected_overlap_index_sha256:
+                    raise Unit3Blocked("FINALIZER_C1_DEPENDENCY_INVALID")
+                item = feedback_by_attempt.get(result["attempt_id"])
+                if item is not None and item["overall"] != result["overall"]:
+                    raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+                if item is not None:
+                    attempt = next((a for a in attempts if a["attempt_id"] == result["attempt_id"]), None)
+                    quality = next((q for q in qualities if q["attempt_id"] == result["attempt_id"]), None)
+                    if attempt is None or quality is None:
+                        raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+                    validate_c1_result(attempt, quality, result)
+            if set(feedback_by_attempt) - {result["attempt_id"] for result in c1_results}:
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+            if index < len(states) - 1 and not self._candidate_terminal(state, record, events, audits, feedback):
+                raise Unit3Blocked("SEMANTIC_LEDGER_PREFIX_NOT_TERMINAL")
+        known_prefixes = {f"{state['candidate_key']}:attempt:" for state in states}
+        for event in events:
+            payload = event.get("attempt") if event["event_type"] == "AUTHORED_ATTEMPT" else event.get("quality_result")
+            if not isinstance(payload, Mapping) or not any(payload.get("attempt_id", "").startswith(prefix) for prefix in known_prefixes):
+                raise Unit3Blocked("QUERY_EVENT_OUTSIDE_SEMANTIC_PREFIX")
+        for audit in audits:
+            if not any(audit["c1_result"].get("attempt_id", "").startswith(prefix) for prefix in known_prefixes):
+                raise Unit3Blocked("RESTRICTED_C1_AUDIT_OUTSIDE_SEMANTIC_PREFIX")
+        for row in feedback:
+            if not any(row.get("attempt_id", "").startswith(prefix) for prefix in known_prefixes):
+                raise Unit3Blocked("AUTHOR_FEEDBACK_OUTSIDE_SEMANTIC_PREFIX")
+            attempt_id = row["attempt_id"]
+            attempt = all_attempts.get(attempt_id)
+            quality = all_qualities.get(attempt_id)
+            audit = all_audits.get(attempt_id)
+            if attempt is None or quality is None or audit is None or quality.get("quality_status") != "PASS":
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+            if row.get("overall") != audit.get("overall"):
+                raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+            validate_query_quality_result(attempt, quality)
+            validate_c1_result(attempt, quality, audit)
+        self._validate_global_log_order(events, audits, feedback, states)
+
+    def _candidate_terminal(self, state: Mapping[str, Any], record: Mapping[str, Any], events: list[Mapping[str, Any]], audits: list[Mapping[str, Any]], feedback: list[Mapping[str, Any]]) -> bool:
+        if state["semantic_status"] == "REJECT":
+            return True
+        attempts, qualities = self._candidate_events(state, events)
+        c1_results, candidate_feedback = self._candidate_c1(state, audits, feedback)
+        if any(result["attempt_id"] not in {row["attempt_id"] for row in candidate_feedback} for result in c1_results):
+            return False
+        if not attempts:
+            return False
+        final = attempts[-1]
+        quality_by_attempt = {item["attempt_id"]: item for item in qualities}
+        result_by_attempt = {item["attempt_id"]: item for item in c1_results}
+        quality = quality_by_attempt.get(final["attempt_id"])
+        if quality is None:
+            return False
+        if quality["quality_status"] == "REJECT":
+            return final["attempt_number"] == MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS
+        result = result_by_attempt.get(final["attempt_id"])
+        if result is None:
+            return False
+        return result["overall"] == "PASS" or final["attempt_number"] == MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS
+
+    def next_action(self) -> dict[str, Any]:
+        self._validate_persisted()
+        states, events = self._semantic_states(), self._attempt_events()
+        audits, feedback = self._c1_rows()
+        for index, record in enumerate(self.records):
+            if index >= len(states):
+                return {"action": "REVIEW_SEMANTIC", "global_review_order": record["global_review_order"], "queue": record["queue"]}
+            state = states[index]
+            if state["semantic_status"] == "REJECT":
+                continue
+            attempts, qualities = self._candidate_events(state, events)
+            c1_results, candidate_feedback = self._candidate_c1(state, audits, feedback)
+            feedback_ids = {row["attempt_id"] for row in candidate_feedback}
+            for result in c1_results:
+                if result["attempt_id"] not in feedback_ids:
+                    return {"action": "PERSIST_AUTHOR_FEEDBACK", "global_review_order": record["global_review_order"], "attempt_id": result["attempt_id"]}
+            if not attempts:
+                return {"action": "AUTHOR_ATTEMPT", "attempt_number": 1, "global_review_order": record["global_review_order"]}
+            final = attempts[-1]
+            quality_by_attempt = {item["attempt_id"]: item for item in qualities}
+            result_by_attempt = {item["attempt_id"]: item for item in c1_results}
+            quality = quality_by_attempt.get(final["attempt_id"])
+            if quality is None:
+                return {"action": "PERSIST_QUERY_QUALITY", "global_review_order": record["global_review_order"], "attempt_id": final["attempt_id"]}
+            if quality["quality_status"] == "PASS" and final["attempt_id"] not in result_by_attempt:
+                return {"action": "RUN_RESTRICTED_C1", "global_review_order": record["global_review_order"], "attempt_id": final["attempt_id"]}
+            if result_by_attempt.get(final["attempt_id"], {}).get("overall") == "PASS":
+                continue
+            if final["attempt_number"] == 1:
+                return {"action": "AUTHOR_ATTEMPT", "attempt_number": 2, "global_review_order": record["global_review_order"]}
+        return {"action": "FINALIZE"}
+
+    def append_semantic_state(self, state: Mapping[str, Any]) -> None:
+        self._ensure_open()
+        action = self.next_action()
+        if action["action"] != "REVIEW_SEMANTIC":
+            raise Unit3Blocked("SEMANTIC_APPEND_OUT_OF_ORDER")
+        record = self.records[action["global_review_order"] - 1]
+        validate_frozen_semantic_state(state, record=record, review_pack_dependency=self.pack_dependency)
+        rows = self._read_rows("semantic_ledger")
+        _append_immutable_jsonl(self._path("semantic_ledger"), rows, {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "semantic_state": state})
+
+    def append_authored_attempt(self, attempt: Mapping[str, Any]) -> None:
+        self._ensure_open()
+        action = self.next_action()
+        if action["action"] != "AUTHOR_ATTEMPT" or attempt.get("attempt_number") != action["attempt_number"]:
+            raise Unit3Blocked("QUERY_ATTEMPT_APPEND_OUT_OF_ORDER")
+        state = self._semantic_states()[action["global_review_order"] - 1]
+        _validate_attempt(attempt, state, action["attempt_number"])
+        rows = self._attempt_events()
+        _append_immutable_jsonl(self._path("query_attempts"), rows, {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "event_type": "AUTHORED_ATTEMPT", "attempt": attempt})
+
+    def append_query_quality_result(self, quality_result: Mapping[str, Any]) -> None:
+        self._ensure_open()
+        action = self.next_action()
+        if action["action"] != "PERSIST_QUERY_QUALITY" or quality_result.get("attempt_id") != action["attempt_id"]:
+            raise Unit3Blocked("QUERY_QUALITY_APPEND_OUT_OF_ORDER")
+        state = self._semantic_states()[action["global_review_order"] - 1]
+        attempts, _ = self._candidate_events(state, self._attempt_events())
+        validate_query_quality_result(attempts[-1], quality_result)
+        rows = self._attempt_events()
+        _append_immutable_jsonl(self._path("query_attempts"), rows, {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "event_type": "QUERY_QUALITY_RESULT", "quality_result": quality_result})
+
+    def _persist_restricted_c1_result(self, c1_result: Mapping[str, Any], *, _authority: object | None = None) -> dict[str, str]:
+        self._ensure_open()
+        if _authority is not self._c1_authority_nonce:
+            raise Unit3Blocked("C1_AUTHORITY_BOUNDARY")
+        action = self.next_action()
+        if action["action"] != "RUN_RESTRICTED_C1" or c1_result.get("attempt_id") != action["attempt_id"]:
+            raise Unit3Blocked("C1_APPEND_OUT_OF_ORDER")
+        state = self._semantic_states()[action["global_review_order"] - 1]
+        attempts, qualities = self._candidate_events(state, self._attempt_events())
+        validate_c1_result(attempts[-1], qualities[-1], c1_result)
+        if c1_result["overlap_index_sha256"] != self.expected_overlap_index_sha256:
+            raise Unit3Blocked("FINALIZER_C1_DEPENDENCY_INVALID")
+        rows = self._read_rows("restricted_c1_audit")
+        _append_immutable_jsonl(self._path("restricted_c1_audit"), rows, {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, "c1_result": c1_result})
+        return {"attempt_id": c1_result["attempt_id"], "overall": c1_result["overall"]}
+
+    def append_restricted_c1_result(self, c1_result: Mapping[str, Any]) -> dict[str, str]:
+        """C1 audits are authoritative only when produced by run_restricted_c1."""
+        raise Unit3Blocked("C1_AUTHORITY_BOUNDARY")
+
+    def append_author_feedback(self, feedback: Mapping[str, Any]) -> None:
+        self._ensure_open()
+        action = self.next_action()
+        if action["action"] != "PERSIST_AUTHOR_FEEDBACK" or set(feedback) != {"attempt_id", "overall"} or feedback.get("attempt_id") != action["attempt_id"] or feedback.get("overall") not in ("PASS", "REJECT"):
+            raise Unit3Blocked("AUTHOR_FEEDBACK_APPEND_OUT_OF_ORDER")
+        audits, _ = self._c1_rows()
+        result = next((row["c1_result"] for row in audits if row["c1_result"]["attempt_id"] == feedback["attempt_id"]), None)
+        if result is None or result["overall"] != feedback["overall"]:
+            raise Unit3Blocked("AUTHOR_FEEDBACK_SCHEMA_INVALID")
+        rows = self._read_rows("author_feedback")
+        _append_immutable_jsonl(self._path("author_feedback"), rows, {"schema_version": UNIT3B_PERSISTENCE_SCHEMA_VERSION, **dict(feedback)})
+
+    def run_restricted_c1(self, overlap_index_raw_bytes: bytes) -> dict[str, str]:
+        """Restricted boundary: persist audit internally and return author-safe feedback only."""
+        self._ensure_open()
+        action = self.next_action()
+        if action["action"] != "RUN_RESTRICTED_C1":
+            raise Unit3Blocked("C1_APPEND_OUT_OF_ORDER")
+        state = self._semantic_states()[action["global_review_order"] - 1]
+        attempts, qualities = self._candidate_events(state, self._attempt_events())
+        audits, feedback = restricted_c1_check([attempts[-1]], [qualities[-1]], overlap_index_raw_bytes, expected_index_sha256=self.expected_overlap_index_sha256)
+        safe_feedback = self._persist_restricted_c1_result(audits[0], _authority=self._c1_authority_nonce)
+        if feedback != [safe_feedback]:
+            raise Unit3Blocked("RESTRICTED_C1_FEEDBACK_INVALID")
+        return safe_feedback
+
+    def _terminal_ledgers(self) -> list[dict[str, Any]]:
+        states, events = self._semantic_states(), self._attempt_events()
+        audits, feedback = self._c1_rows()
+        if len(states) != len(self.records) or self.next_action().get("action") != "FINALIZE":
+            raise Unit3Blocked("FINALIZATION_INCOMPLETE")
+        ledgers: list[dict[str, Any]] = []
+        for state, record in zip(states, self.records, strict=True):
+            attempts, qualities = self._candidate_events(state, events)
+            c1_results, _ = self._candidate_c1(state, audits, feedback)
+            ledgers.append({"pack_record": record, "review_pack_dependency": self.pack_dependency, "semantic_state": state, "attempts": attempts, "query_quality_results": qualities, "c1_results": c1_results})
+        return ledgers
+
+    def finalize(self) -> dict[str, Any]:
+        manifest_path = self._path("manifest")
+        if manifest_path.exists():
+            if not self._finalized:
+                raise Unit3Blocked("OUTPUT_COLLISION")
+            manifest = _safe_json_load(manifest_path)
+            return {"manifest": manifest, "manifest_descriptor": _artifact_descriptor(manifest_path, _UNIT3B_PATHS["manifest"], 1)}
+        ledgers = self._terminal_ledgers()
+        self._ensure_empty_children()
+        expected = self._expected_finalization(ledgers)
+        artifacts = expected["artifacts"]
+        _ensure_artifact_bytes(self._path("final_ledger"), _UNIT3B_PATHS["final_ledger"], _deterministic_jsonl_bytes(expected["final_rows"]), len(expected["final_rows"]))
+        _ensure_artifact_bytes(self._path("freeze_candidates"), _UNIT3B_PATHS["freeze_candidates"], _deterministic_jsonl_bytes(expected["freeze_rows"]), len(expected["freeze_rows"]))
+        self._validate_persisted()
+        for name, descriptor in artifacts.items():
+            path = self._path(name)
+            if _artifact_descriptor(path, descriptor["path"], descriptor["row_count"]) != descriptor:
+                raise Unit3Blocked("FINAL_ARTIFACT_INTEGRITY_MISMATCH")
+        manifest = expected["manifest"]
+        _atomic_write_bytes(manifest_path, canonical_json_bytes(manifest), replace=False)
+        self._finalized = True
+        return {"manifest": manifest, "manifest_descriptor": _artifact_descriptor(manifest_path, _UNIT3B_PATHS["manifest"], 1)}
+
+
+def open_production_unit3b_store(output_root: Path, *, tooling_checkpoint: str) -> Unit3BPersistenceStore:
+    """Open the sole frozen A-2 pack for Unit 3B after its review gate allows exposure."""
+    root = Path(output_root)
+    accepted_root = _accepted_review_pack_root(root)
+    manifest_path = accepted_root / "metadata" / "review_pack_manifest.json"
+    artifact_path = accepted_root / "review_pack" / "frozen_48_review_pack.jsonl.gz"
+    if (
+        not manifest_path.is_file()
+        or not artifact_path.is_file()
+        or _sha256_path(manifest_path) != FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256
+        or _sha256_path(artifact_path) != FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256
+        or artifact_path.stat().st_size != FROZEN_A2_REVIEW_PACK_BYTES
+    ):
+        raise Unit3Blocked("FROZEN_REVIEW_PACK_DEPENDENCY_MISMATCH")
+    manifest = _safe_json_load(manifest_path)
+    review_pack = manifest.get("review_pack")
+    generator = manifest.get("generator")
+    if (
+        manifest.get("checkpoint_commit") != FROZEN_A2_SOURCE_CHECKPOINT
+        or not isinstance(review_pack, Mapping)
+        or review_pack.get("sha256") != FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256
+        or review_pack.get("byte_count") != FROZEN_A2_REVIEW_PACK_BYTES
+        or review_pack.get("row_count") != FROZEN_A2_REVIEW_PACK_ROWS
+        or not isinstance(generator, Mapping)
+        or not _is_sha256(generator.get("sha256"))
+    ):
+        raise Unit3Blocked("FROZEN_REVIEW_PACK_MANIFEST_INVALID")
+    tooling = verify_checkpoint_generator_binding(tooling_checkpoint)
+    rows = _read_jsonl_gzip(artifact_path)
+    if len(rows) != FROZEN_A2_REVIEW_PACK_ROWS:
+        raise Unit3Blocked("FROZEN_REVIEW_PACK_DEPENDENCY_MISMATCH")
+    return Unit3BPersistenceStore(
+        root,
+        rows,
+        a2_dependency={
+            "review_pack_manifest_sha256": FROZEN_A2_REVIEW_PACK_MANIFEST_SHA256,
+            "review_pack_artifact_sha256": FROZEN_A2_REVIEW_PACK_ARTIFACT_SHA256,
+            "review_pack_byte_count": FROZEN_A2_REVIEW_PACK_BYTES,
+            "review_pack_row_count": FROZEN_A2_REVIEW_PACK_ROWS,
+            "source_checkpoint": FROZEN_A2_SOURCE_CHECKPOINT,
+            "source_generator_sha256": generator["sha256"],
+        },
+        tooling_binding={"checkpoint_commit": tooling["checkpoint_commit"], "generator_sha256": tooling["generator_sha256"]},
+    )
 
 
 def _verify_artifact(root: Path, relative_path: str, metadata: Mapping[str, Any]) -> list[Mapping[str, Any]]:
