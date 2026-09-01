@@ -120,21 +120,27 @@ accepted/frozen manifest and pack. The independent source/test audit was
 PARTIAL at audit time because authoritative N→N+1 exposure-readiness semantics
 were then absent; its source findings remain valid. The exposure amendment is
 repository-effective / FROZEN; the previously missing
-N→N+1 exposure-readiness semantics are now authoritative. The repaired-state ZERO-EXPOSURE
-preflight has NOT YET been run, and frozen-48 semantic review has not
-restarted.
+N→N+1 exposure-readiness semantics are now authoritative. The repaired-state
+ZERO-EXPOSURE preflight is PASS / CLOSED, with ZERO candidate-body,
+future-candidate-body, and real-overlap exposure and ZERO production runtime
+state created or modified by the preflight. Production frozen-48 semantic
+execution is AUTHORIZED only in a NEW clean semantic executor/window; the old
+contaminated first-production semantic executor remains RETIRED / MUST NOT
+REUSE. The current engineering/preflight conversation is not reused for the
+blind production semantic role.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-The immediate next action is the repaired-state ZERO-EXPOSURE preflight. Fresh
-semantic retry remains BLOCKED / NOT AUTHORIZED. The repaired-state
-ZERO-EXPOSURE preflight is NOT YET RUN. Frozen-48 semantic review,
-query authoring, quality judgment, restricted C1, and finalization are not
-authorized; `BENCHMARK_V0_4 = NOT AUTHORIZED`; and
-`RETRIEVAL_EVALUATION = NOT AUTHORIZED`.
+The immediate next action is a NEW clean semantic executor/window -> execute
+the already-frozen Unit3B 48 exactly under existing frozen authority. Fresh
+semantic retry is AUTHORIZED only through that clean executor/window. The
+repaired-state ZERO-EXPOSURE preflight is PASS / CLOSED. Query authoring,
+quality judgment, restricted C1, and finalization are authorized only as part
+of that already-frozen Unit3B semantic execution; `BENCHMARK_V0_4 = NOT YET
+AUTHORIZED`; and `RETRIEVAL_EVALUATION = NOT YET AUTHORIZED`.
 
 ## Phase transition boundary
 
