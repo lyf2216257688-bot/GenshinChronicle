@@ -7,6 +7,7 @@ human semantic judgment.  It never prints evidence text or legacy-query data.
 from __future__ import annotations
 
 import argparse
+import copy
 import gzip
 import hashlib
 import io
@@ -682,7 +683,15 @@ _QUALITY_REJECT_REASONS = {
 }
 
 
-def persist_query_quality_result(attempt: Mapping[str, Any], quality_status: str, quality_reason: str | None) -> dict[str, Any]:
+_QUALITY_RETRY_DISPOSITIONS = {"ATTEMPT_2_AUTHORIZED", "TERMINAL"}
+
+
+def persist_query_quality_result(
+    attempt: Mapping[str, Any],
+    quality_status: str,
+    quality_reason: str | None,
+    retry_disposition: str | None = None,
+) -> dict[str, Any]:
     """Persist the post-authoring quality decision without changing the attempt."""
     _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
     if quality_status not in ("PASS", "REJECT"):
@@ -691,7 +700,16 @@ def persist_query_quality_result(attempt: Mapping[str, Any], quality_status: str
         raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
     if quality_status == "REJECT" and quality_reason not in _QUALITY_REJECT_REASONS:
         raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
+    if quality_status == "PASS" and retry_disposition is not None:
+        raise Unit3Blocked("QUERY_QUALITY_RETRY_DISPOSITION_INVALID")
+    attempt_number = attempt.get("attempt_number")
+    if quality_status == "REJECT" and attempt_number == 1 and retry_disposition not in _QUALITY_RETRY_DISPOSITIONS:
+        raise Unit3Blocked("MATERIAL_QUALITY_RETRY_DISPOSITION_MISSING")
+    if quality_status == "REJECT" and attempt_number == 2 and retry_disposition is not None:
+        raise Unit3Blocked("QUERY_QUALITY_RETRY_DISPOSITION_INVALID")
     result = {"attempt_id": attempt["attempt_id"], "attempt_sha256": attempt["attempt_sha256"], "quality_status": quality_status, "quality_reason": quality_reason}
+    if quality_status == "REJECT" and attempt_number == 1:
+        result["retry_disposition"] = retry_disposition
     result["query_quality_result_sha256"] = _sha256_bytes(canonical_json_bytes(result))
     return result
 
@@ -699,10 +717,18 @@ def persist_query_quality_result(attempt: Mapping[str, Any], quality_status: str
 def validate_query_quality_result(attempt: Mapping[str, Any], result: Mapping[str, Any]) -> None:
     _validate_attempt(attempt, {"candidate_key": attempt.get("candidate_key"), "semantic_state_sha256": attempt.get("semantic_state_sha256")}, attempt.get("attempt_number"))
     fields = {"attempt_id", "attempt_sha256", "quality_status", "quality_reason", "query_quality_result_sha256"}
+    if result.get("quality_status") == "REJECT" and attempt.get("attempt_number") == 1:
+        fields.add("retry_disposition")
     if set(result) != fields or result.get("attempt_id") != attempt["attempt_id"] or result.get("attempt_sha256") != attempt["attempt_sha256"] or result.get("quality_status") not in ("PASS", "REJECT"):
         raise Unit3Blocked("QUERY_QUALITY_RESULT_INVALID")
     if (result["quality_status"] == "PASS" and result.get("quality_reason") is not None) or (result["quality_status"] == "REJECT" and result.get("quality_reason") not in _QUALITY_REJECT_REASONS):
         raise Unit3Blocked("QUERY_QUALITY_REASON_INVALID")
+    if result["quality_status"] == "PASS" and result.get("retry_disposition") is not None:
+        raise Unit3Blocked("QUERY_QUALITY_RETRY_DISPOSITION_INVALID")
+    if result["quality_status"] == "REJECT" and attempt.get("attempt_number") == 1 and result.get("retry_disposition") not in _QUALITY_RETRY_DISPOSITIONS:
+        raise Unit3Blocked("MATERIAL_QUALITY_RETRY_DISPOSITION_INVALID")
+    if result["quality_status"] == "REJECT" and attempt.get("attempt_number") == 2 and "retry_disposition" in result:
+        raise Unit3Blocked("QUERY_QUALITY_RETRY_DISPOSITION_INVALID")
     copied = dict(result)
     digest = copied.pop("query_quality_result_sha256")
     if not _is_sha256(digest) or _sha256_bytes(canonical_json_bytes(copied)) != digest:
@@ -756,7 +782,7 @@ def validate_attempt_history(state: Mapping[str, Any], attempts: Iterable[Mappin
             first = values[0]
             first_quality = quality_by_attempt.get(first["attempt_id"])
             first_result = result_by_attempt.get(first["attempt_id"])
-            if (first_quality is None or first_quality.get("quality_status") != "REJECT") and (first_result is None or first_result.get("overall") != "REJECT"):
+            if (first_quality is None or first_quality.get("quality_status") != "REJECT" or first_quality.get("retry_disposition") != "ATTEMPT_2_AUTHORIZED") and (first_result is None or first_result.get("overall") != "REJECT"):
                 raise Unit3Blocked("UNJUSTIFIED_QUERY_RETRY")
     attempt_ids = {attempt["attempt_id"] for attempt in values}
     if set(quality_by_attempt) - attempt_ids:
@@ -1374,6 +1400,8 @@ class Unit3BPersistenceStore:
         if quality is None:
             return False
         if quality["quality_status"] == "REJECT":
+            if final["attempt_number"] == 1:
+                return quality.get("retry_disposition") == "TERMINAL"
             return final["attempt_number"] == MAX_PERSISTED_AUTHORED_QUERY_ATTEMPTS
         result = result_by_attempt.get(final["attempt_id"])
         if result is None:
@@ -1408,8 +1436,14 @@ class Unit3BPersistenceStore:
                 return {"action": "RUN_RESTRICTED_C1", "global_review_order": record["global_review_order"], "attempt_id": final["attempt_id"]}
             if result_by_attempt.get(final["attempt_id"], {}).get("overall") == "PASS":
                 continue
-            if final["attempt_number"] == 1:
+            if final["attempt_number"] == 1 and result_by_attempt.get(final["attempt_id"], {}).get("overall") == "REJECT":
                 return {"action": "AUTHOR_ATTEMPT", "attempt_number": 2, "global_review_order": record["global_review_order"]}
+            if final["attempt_number"] == 1 and quality.get("retry_disposition") == "ATTEMPT_2_AUTHORIZED":
+                return {"action": "AUTHOR_ATTEMPT", "attempt_number": 2, "global_review_order": record["global_review_order"]}
+            if final["attempt_number"] == 1 and quality.get("retry_disposition") == "TERMINAL":
+                continue
+            if final["attempt_number"] == 1:
+                raise Unit3Blocked("MATERIAL_QUALITY_RETRY_MAPPING_UNRESOLVED")
         return {"action": "FINALIZE"}
 
     def append_semantic_state(self, state: Mapping[str, Any]) -> None:
@@ -1525,6 +1559,216 @@ class Unit3BPersistenceStore:
         return {"manifest": manifest, "manifest_descriptor": _artifact_descriptor(manifest_path, _UNIT3B_PATHS["manifest"], 1)}
 
 
+class Unit3BSemanticExposureController:
+    """Sanctioned one-candidate body boundary for semantic-facing code."""
+
+    __slots__ = ("_output_root", "_tooling_checkpoint")
+
+    def __init__(self, output_root: Path, *, tooling_checkpoint: str) -> None:
+        self._output_root = Path(output_root)
+        self._tooling_checkpoint = tooling_checkpoint
+
+    def current_candidate_body(self) -> dict[str, Any]:
+        """Return one detached current body, or fail closed before exposure."""
+        return _run_semantic_controller_operation(self, _semantic_current_body)
+
+    def current_action(self) -> dict[str, Any]:
+        """Return only the amendment-authorized current workflow action."""
+        return _run_semantic_controller_operation(self, _semantic_current_action)
+
+    def persist_semantic_state(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        """Persist a state only for the mechanically current candidate/action."""
+        return _run_semantic_controller_operation(self, lambda store: _semantic_persist_state(store, state))
+
+    def author_query(self, query: str) -> dict[str, Any]:
+        """Create the mechanically authorized current attempt without caller numbering."""
+        return _run_semantic_controller_operation(self, lambda store: _semantic_author_query(store, query))
+
+    def persist_query_quality(
+        self,
+        quality_status: str,
+        quality_reason: str | None,
+    ) -> dict[str, Any]:
+        """Persist quality only for the mechanically current authored attempt."""
+        if quality_status == "REJECT":
+            raise Unit3Blocked("MATERIAL_QUALITY_RETRY_MAPPING_UNRESOLVED")
+        return _run_semantic_controller_operation(
+            self,
+            lambda store: _semantic_persist_quality(store, quality_status, quality_reason),
+        )
+
+    def persist_author_feedback(self, overall: str) -> dict[str, str]:
+        """Persist only the current restricted-checker safe feedback projection."""
+        return _run_semantic_controller_operation(self, lambda store: _semantic_persist_feedback(store, overall))
+
+
+def _run_semantic_controller_operation(
+    controller: Unit3BSemanticExposureController,
+    operation: Any,
+) -> Any:
+    """Module-private trusted operation: open, validate, operate once, return safe data."""
+    store = open_production_unit3b_store(
+        controller._output_root, tooling_checkpoint=controller._tooling_checkpoint
+    )
+    return operation(store)
+
+
+class Unit3BQualityAuthority:
+    """Sanctioned quality/pair-consistency persistence boundary."""
+
+    __slots__ = ("_output_root", "_tooling_checkpoint")
+
+    def __init__(self, output_root: Path, *, tooling_checkpoint: str) -> None:
+        self._output_root = Path(output_root)
+        self._tooling_checkpoint = tooling_checkpoint
+
+    def persist_quality_judgment(self, quality_result: Mapping[str, Any]) -> dict[str, Any]:
+        """Persist the exact current authorized quality judgment, without classifying it."""
+        return _run_quality_authority_operation(
+            self, lambda store: _persist_quality_authority_judgment(store, quality_result)
+        )
+
+
+def _run_quality_authority_operation(
+    authority: Unit3BQualityAuthority,
+    operation: Any,
+) -> Any:
+    """Module-private trusted quality operation returning only role-safe data."""
+    store = open_production_unit3b_store(
+        authority._output_root, tooling_checkpoint=authority._tooling_checkpoint
+    )
+    return operation(store)
+
+
+def _candidate_exposure_terminal(
+    store: Unit3BPersistenceStore,
+    state: Mapping[str, Any],
+    events: list[Mapping[str, Any]],
+    audits: list[Mapping[str, Any]],
+    feedback: list[Mapping[str, Any]],
+) -> bool:
+    if state["semantic_status"] == "REJECT":
+        return True
+    attempts, qualities = store._candidate_events(state, events)
+    c1_results, candidate_feedback = store._candidate_c1(state, audits, feedback)
+    if not attempts or len(qualities) != len(attempts):
+        return False
+    first_attempt = attempts[0]
+    first_quality = next((item for item in qualities if item.get("attempt_id") == first_attempt.get("attempt_id")), None)
+    if first_quality is not None and first_quality["quality_status"] == "REJECT":
+        disposition = first_quality.get("retry_disposition")
+        if disposition not in _QUALITY_RETRY_DISPOSITIONS:
+            raise Unit3Blocked("MATERIAL_QUALITY_RETRY_MAPPING_UNRESOLVED")
+        if disposition == "ATTEMPT_2_AUTHORIZED" and len(attempts) < 2:
+            return False
+        if disposition == "TERMINAL":
+            return True
+    final = attempts[-1]
+    quality = next((item for item in qualities if item.get("attempt_id") == final.get("attempt_id")), None)
+    if quality is None:
+        return False
+    if quality["quality_status"] == "REJECT":
+        return final["attempt_number"] == 2
+    result = next((item for item in c1_results if item.get("attempt_id") == final.get("attempt_id")), None)
+    matching_feedback = [item for item in candidate_feedback if item.get("attempt_id") == final.get("attempt_id")]
+    if result is None or len(matching_feedback) != 1:
+        return False
+    return final["attempt_number"] == 2 or result["overall"] == "PASS"
+
+
+def _semantic_current_record(store: Unit3BPersistenceStore) -> tuple[Mapping[str, Any] | None, int | None]:
+    store._validate_persisted()
+    states, events = store._semantic_states(), store._attempt_events()
+    audits, feedback = store._c1_rows()
+    for index, record in enumerate(store.records):
+        if index >= len(states) or not _candidate_exposure_terminal(store, states[index], events, audits, feedback):
+            return record, index
+    return None, None
+
+
+def _semantic_current_action(store: Unit3BPersistenceStore) -> dict[str, Any]:
+    record, _ = _semantic_current_record(store)
+    action = store.next_action()
+    if record is None:
+        if action.get("action") != "FINALIZE":
+            raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+        return {"action": "FINALIZE"}
+    if action.get("global_review_order") != record["global_review_order"]:
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    safe = {key: action[key] for key in ("action", "attempt_number", "attempt_id") if key in action}
+    return safe
+
+
+def _semantic_current_body(store: Unit3BPersistenceStore) -> dict[str, Any]:
+    record, _ = _semantic_current_record(store)
+    if record is None:
+        raise Unit3Blocked("UNIT3B_EXPOSURE_COMPLETE")
+    return copy.deepcopy(dict(record))
+
+
+def _semantic_persist_state(store: Unit3BPersistenceStore, state: Mapping[str, Any]) -> dict[str, Any]:
+    record, _ = _semantic_current_record(store)
+    action = _semantic_current_action(store)
+    if record is None or action["action"] != "REVIEW_SEMANTIC" or state.get("candidate_key") != record["candidate_key"]:
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_CANDIDATE_MISMATCH")
+    store.append_semantic_state(state)
+    return {"global_review_order": record["global_review_order"], "semantic_status": state.get("semantic_status")}
+
+
+def _semantic_author_query(store: Unit3BPersistenceStore, query: str) -> dict[str, Any]:
+    record, index = _semantic_current_record(store)
+    action = _semantic_current_action(store)
+    if record is None or index is None or action["action"] != "AUTHOR_ATTEMPT":
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    state = store._semantic_states()[index]
+    attempt = persist_query_attempt(
+        state, action["attempt_number"], query, record=record, review_pack_dependency=store.pack_dependency
+    )
+    store.append_authored_attempt(attempt)
+    return {"attempt_id": attempt["attempt_id"], "attempt_number": attempt["attempt_number"]}
+
+
+def _semantic_persist_quality(
+    store: Unit3BPersistenceStore, quality_status: str, quality_reason: str | None
+) -> dict[str, Any]:
+    record, index = _semantic_current_record(store)
+    action = _semantic_current_action(store)
+    if record is None or index is None or action["action"] != "PERSIST_QUERY_QUALITY":
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    state = store._semantic_states()[index]
+    attempts, _ = store._candidate_events(state, store._attempt_events())
+    quality = persist_query_quality_result(attempts[-1], quality_status, quality_reason)
+    if quality["attempt_id"] != action["attempt_id"]:
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    store.append_query_quality_result(quality)
+    return {"attempt_id": quality["attempt_id"], "quality_status": quality["quality_status"]}
+
+
+def _persist_quality_authority_judgment(
+    store: Unit3BPersistenceStore, quality_result: Mapping[str, Any]
+) -> dict[str, Any]:
+    record, index = _semantic_current_record(store)
+    action = _semantic_current_action(store)
+    if record is None or index is None or action["action"] != "PERSIST_QUERY_QUALITY":
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    state = store._semantic_states()[index]
+    attempts, _ = store._candidate_events(state, store._attempt_events())
+    if not attempts or quality_result.get("attempt_id") != action.get("attempt_id"):
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    validate_query_quality_result(attempts[-1], quality_result)
+    store.append_query_quality_result(quality_result)
+    return {"attempt_id": quality_result["attempt_id"], "quality_status": quality_result["quality_status"]}
+
+
+def _semantic_persist_feedback(store: Unit3BPersistenceStore, overall: str) -> dict[str, str]:
+    action = _semantic_current_action(store)
+    if action["action"] != "PERSIST_AUTHOR_FEEDBACK" or overall not in ("PASS", "REJECT"):
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    feedback = {"attempt_id": action["attempt_id"], "overall": overall}
+    store.append_author_feedback(feedback)
+    return dict(feedback)
+
+
 def open_production_unit3b_store(output_root: Path, *, tooling_checkpoint: str) -> Unit3BPersistenceStore:
     """Open the sole frozen A-2 pack for Unit 3B after its review gate allows exposure."""
     root = Path(output_root)
@@ -1569,6 +1813,16 @@ def open_production_unit3b_store(output_root: Path, *, tooling_checkpoint: str) 
         },
         tooling_binding={"checkpoint_commit": tooling["checkpoint_commit"], "generator_sha256": tooling["generator_sha256"]},
     )
+
+
+def open_production_unit3b_semantic_exposure(output_root: Path, *, tooling_checkpoint: str) -> Unit3BSemanticExposureController:
+    """Open the sanctioned semantic-facing single-candidate exposure boundary."""
+    return Unit3BSemanticExposureController(output_root, tooling_checkpoint=tooling_checkpoint)
+
+
+def open_production_unit3b_quality_authority(output_root: Path, *, tooling_checkpoint: str) -> Unit3BQualityAuthority:
+    """Open the sanctioned quality/pair-consistency persistence boundary."""
+    return Unit3BQualityAuthority(output_root, tooling_checkpoint=tooling_checkpoint)
 
 
 def _verify_artifact(root: Path, relative_path: str, metadata: Mapping[str, Any]) -> list[Mapping[str, Any]]:

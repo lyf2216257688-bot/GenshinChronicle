@@ -97,10 +97,13 @@ finalization is NOT EXECUTED;
 A-2 remains VALID / FROZEN. The contaminated semantic executor is RETIRED from
 further Unit 3 semantic-review and query-author roles. Incident classification
 is FINAL C — `SAFE_HELPER_EXISTS_BUT_NOT_EXCLUSIVE_OR_STATE_BOUND`.
-The exposure-workflow actual source/test gate is PASS, with the authorized
-source/test delta still uncommitted. The current application-level
-exclusive/state-bound candidate-body exposure implementation is present in that
-delta and remains pending the accepted implementation checkpoint. The approved
+The combined Unit3B exposure-repair plus material-quality source/test actual
+gate is PASS, with the authorized source/test delta still UNCOMMITTED / NOT
+YET CHECKPOINTED. The minimum persisted material-quality retry
+representation/wiring and mechanically separate production-shaped
+quality-authority wiring are implemented in that delta. The current
+application-level exclusive/state-bound candidate-body exposure implementation
+is present there as well. The approved
 post-incident requirement is a trusted blind executor plus an application-level
 mechanical fail-closed gate; OS/filesystem/shell isolation is not required or
 claimed for W7. Post-incident exposure authority is owned by
@@ -108,9 +111,8 @@ claimed for W7. Post-incident exposure authority is owned by
 authority is owned by
 `docs/phases/phase-04-w7-unit3b-material-quality-retry-addendum-v1.md`. The
 exposure amendment is effective/frozen at its accepted authority checkpoint;
-the material-quality addendum content is TECHNICAL-LEAD APPROVED, but its
-repository-effective authority is PENDING the accepted authority checkpoint;
-the classification gap closes only once it becomes repository-effective. The
+the material-quality addendum is effective/frozen at checkpoint `46fb3aa`; the
+classification gap is closed by that repository-effective authority. The
 readiness rule is: candidate N full lifecycle terminal -> candidate N+1 body
 may be exposed. No surviving state attributable to the failed semantic
 execution was found within the committed source-observable Unit3B runtime
@@ -118,24 +120,24 @@ footprint; this does not include or invalidate the pre-existing A-2
 accepted/frozen manifest and pack. The independent source/test audit was
 PARTIAL at audit time because authoritative N→N+1 exposure-readiness semantics
 were then absent; its source findings remain valid. The exposure amendment
-closes that gap once repository-effective. The material-quality authority gap
-is approved but not yet repository-effective; its persisted mechanical
-representation and wiring are NOT IMPLEMENTED / BLOCKED PENDING
-IMPLEMENTATION GATE.
+closes that gap once repository-effective. The minimum persisted
+material-quality retry representation/wiring and mechanically separate
+production-shaped quality-authority wiring are implemented in the uncommitted
+delta. The repaired-state ZERO-EXPOSURE preflight has NOT YET been re-run, and
+frozen-48 semantic review has not restarted.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-The authority checkpoint order is: actual technical-lead authority/docs review
--> accepted authority checkpoint commit. After that checkpoint, the immediate
-next action is implementation of the minimum persisted material-quality retry
-disposition representation and wiring, followed by the combined accepted
-Unit3B exposure-repair source/test checkpoint. Exposure-controller
-implementation remains NOT YET
-CHECKPOINTED; fresh semantic retry is BLOCKED. No semantic review, query
-authoring, C1, benchmark-v0.4, or retrieval evaluation is authorized.
+The immediate next action is the combined Unit3B implementation checkpoint.
+The combined implementation remains UNCOMMITTED / NOT YET CHECKPOINTED; fresh
+semantic retry remains BLOCKED / NOT AUTHORIZED. The repaired-state
+ZERO-EXPOSURE preflight has NOT YET been re-run. Frozen-48 semantic review,
+query authoring, quality judgment, restricted C1, and finalization are not
+authorized; `BENCHMARK_V0_4 = NOT AUTHORIZED`; and
+`RETRIEVAL_EVALUATION = NOT AUTHORIZED`.
 
 ## Phase transition boundary
 

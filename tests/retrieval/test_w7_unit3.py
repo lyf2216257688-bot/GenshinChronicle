@@ -35,6 +35,10 @@ from genshin_corpus.retrieval.w7_unit3 import (
     validate_review_pack,
     verify_checkpoint_generator_binding,
     open_production_unit3b_store,
+    open_production_unit3b_semantic_exposure,
+    open_production_unit3b_quality_authority,
+    Unit3BSemanticExposureController,
+    Unit3BQualityAuthority,
 )
 
 
@@ -159,6 +163,7 @@ def _persist_with_quality(
     query: str,
     quality_status: str = "PASS",
     quality_reason: str | None = None,
+    retry_disposition: str | None = None,
     *,
     record: dict[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -169,7 +174,7 @@ def _persist_with_quality(
         record=record,
         review_pack_dependency=PACK_DEPENDENCY,
     )
-    return attempt, persist_query_quality_result(attempt, quality_status, quality_reason)
+    return attempt, persist_query_quality_result(attempt, quality_status, quality_reason, retry_disposition)
 
 
 def _overlap_entry(opaque_id: str, query: str) -> dict[str, object]:
@@ -233,6 +238,315 @@ def _synthetic_root(slot: int) -> Iterable[Path]:
 
 
 class W7Unit3FocusedTests(unittest.TestCase):
+
+    def _controller(self, store: Unit3BPersistenceStore) -> Unit3BSemanticExposureController:
+        patcher = patch(
+            "genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store",
+            return_value=store,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return Unit3BSemanticExposureController(
+            store.output_root, tooling_checkpoint=store.tooling_binding["checkpoint_commit"]
+        )
+
+    def _quality_authority(self, store: Unit3BPersistenceStore) -> Unit3BQualityAuthority:
+        patcher = patch(
+            "genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store",
+            return_value=store,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return open_production_unit3b_quality_authority(
+            store.output_root, tooling_checkpoint=store.tooling_binding["checkpoint_commit"]
+        )
+
+    def test_sanctioned_exposure_is_single_current_body_and_hides_pack_capability(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            body = controller.current_candidate_body()
+            self.assertEqual(body["global_review_order"], 1)
+            self.assertEqual(body["candidate_key"], _pack()[0]["candidate_key"])
+            self.assertFalse(hasattr(controller, "records"))
+            self.assertFalse(hasattr(controller, "__iter__"))
+            self.assertFalse(hasattr(controller, "_validated_store"))
+            with self.assertRaises(TypeError):
+                controller.current_candidate_body(2)  # type: ignore[call-arg]
+
+    def test_sanctioned_exposure_refuses_future_and_arbitrary_batch_access(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            store.append_semantic_state(_early_reject(_pack()[0]))
+            body = controller.current_candidate_body()
+            self.assertEqual(body["global_review_order"], 2)
+            self.assertNotEqual(body["candidate_key"], _pack()[0]["candidate_key"])
+            with self.assertRaises(TypeError):
+                controller.current_candidate_body(candidate_index=2)  # type: ignore[call-arg]
+            self.assertNotIn("records", body)
+
+    def test_accept_alone_and_attempt1_c1_reject_do_not_advance_or_surface_attempt2(self) -> None:
+        raw = _overlap_bytes("first question")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(2) as root:
+            store = _store(root, index_sha256=raw_sha)
+            controller = self._controller(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "PASS", None)
+            store.append_query_quality_result(quality)
+            store.run_restricted_c1(raw)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+
+    def test_attempt1_material_quality_reject_authorizes_attempt2(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            authority = self._quality_authority(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED")
+            self.assertEqual(authority.persist_quality_judgment(quality), {"attempt_id": attempt["attempt_id"], "quality_status": "REJECT"})
+            self.assertEqual(controller.current_action()["action"], "AUTHOR_ATTEMPT")
+            self.assertEqual(controller.current_action()["attempt_number"], 2)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+
+    def test_attempt1_nonmaterial_quality_reject_is_terminal(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            authority = self._quality_authority(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            first = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(first)
+            authority.persist_quality_judgment(persist_query_quality_result(first, "REJECT", "QUERY_NOT_NATURAL", "TERMINAL"))
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 2)
+
+    def test_query_author_has_no_quality_authority_capability(self) -> None:
+        with _synthetic_root(2) as root:
+            controller = self._controller(_store(root))
+            self.assertFalse(hasattr(controller, "persist_quality_judgment"))
+            self.assertFalse(hasattr(controller, "persist_authorized_query_quality"))
+            self.assertFalse(hasattr(controller, "_quality_authority_nonce"))
+
+    def test_quality_authority_rejects_valid_stale_attempt_without_persisting(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            authority = self._quality_authority(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            current = persist_query_attempt(state, 1, "current question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(current)
+            stale = persist_query_attempt(state, 1, "stale question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            judgment = persist_query_quality_result(stale, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED")
+            with self.assertRaises(Unit3Blocked):
+                authority.persist_quality_judgment(judgment)
+            self.assertEqual(store._read_rows("query_attempts"), [{"schema_version": w7_unit3.UNIT3B_PERSISTENCE_SCHEMA_VERSION, "event_type": "AUTHORED_ATTEMPT", "attempt": current}])
+            self.assertEqual(controller.current_action(), {"action": "PERSIST_QUERY_QUALITY", "attempt_id": current["attempt_id"]})
+
+    def test_attempt1_quality_disposition_is_bound_and_tamper_blocks(self) -> None:
+        with _synthetic_root(2) as root:
+            store = _store(root)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "REJECT", "QUERY_NOT_NATURAL", "TERMINAL")
+            tampered = dict(quality)
+            tampered["retry_disposition"] = "ATTEMPT_2_AUTHORIZED"
+            with self.assertRaises(Unit3Blocked):
+                validate_query_quality_result(attempt, tampered)
+            store.append_query_quality_result(quality)
+            with self.assertRaises(Unit3Blocked):
+                store.append_query_quality_result(quality)
+
+    def test_quality_reason_cannot_self_authorize_retry_through_sanctioned_api(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            record = _pack()[0]
+            store.append_semantic_state(_freeze(record))
+            controller.author_query("first question")
+            with self.assertRaisesRegex(Unit3Blocked, "MATERIAL_QUALITY_RETRY_MAPPING_UNRESOLVED"):
+                controller.persist_query_quality("REJECT", "QUERY_NOT_NATURAL")
+            with self.assertRaisesRegex(Unit3Blocked, "MATERIAL_QUALITY_RETRY_MAPPING_UNRESOLVED"):
+                controller.persist_query_quality("REJECT", "QUERY_INTENT_DRIFT")
+
+    def test_quality_commit_interruption_reopens_without_retry_or_next_body(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED")
+            original = w7_unit3._atomic_write_bytes
+            with patch.object(w7_unit3, "_atomic_write_bytes", side_effect=Unit3Blocked("PERSISTENCE_WRITE_FAILED")):
+                with self.assertRaises(Unit3Blocked):
+                    store.append_query_quality_result(quality)
+            reopened = _store(root)
+            self.assertEqual(reopened.next_action()["action"], "PERSIST_QUERY_QUALITY")
+            self.assertEqual(reopened.next_action()["attempt_id"], attempt["attempt_id"])
+            self.assertEqual(original.__name__, "_atomic_write_bytes")
+
+    def test_committed_quality_disposition_resumes_attempt2_deterministically(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            store.append_query_quality_result(persist_query_quality_result(attempt, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED"))
+            reopened = _store(root)
+            self.assertEqual(reopened.next_action(), {"action": "AUTHOR_ATTEMPT", "attempt_number": 2, "global_review_order": 1})
+
+    def test_missing_retry_disposition_after_quality_commit_blocks(self) -> None:
+        with _synthetic_root(2) as root:
+            store = _store(root)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED")
+            quality.pop("retry_disposition")
+            quality["query_quality_result_sha256"] = w7_unit3._sha256_bytes(canonical_json_bytes(quality))
+            path = store._path("query_attempts")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(w7_unit3._deterministic_jsonl_bytes([
+                {"schema_version": w7_unit3.UNIT3B_PERSISTENCE_SCHEMA_VERSION, "event_type": "AUTHORED_ATTEMPT", "attempt": attempt},
+                {"schema_version": w7_unit3.UNIT3B_PERSISTENCE_SCHEMA_VERSION, "event_type": "QUERY_QUALITY_RESULT", "quality_result": quality},
+            ]))
+            with self.assertRaises(Unit3Blocked):
+                _store(root)
+
+    def test_semantic_reject_and_attempt2_quality_reject_advance_exactly_one_candidate(self) -> None:
+        raw = _overlap_bytes("first question")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(1) as root:
+            store = _store(root, index_sha256=raw_sha)
+            controller = self._controller(store)
+            store.append_semantic_state(_early_reject(_pack()[0]))
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 2)
+            record = _pack()[1]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            first = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(first)
+            first_quality = persist_query_quality_result(first, "PASS", None)
+            store.append_query_quality_result(first_quality)
+            first_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(first_feedback["overall"], "REJECT")
+            store.append_author_feedback(first_feedback)
+            second = persist_query_attempt(state, 2, "second question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(second)
+            store.append_query_quality_result(persist_query_quality_result(second, "REJECT", "PAIR_QUERY_INCONSISTENT"))
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 3)
+
+    def test_attempt2_c1_pass_or_reject_advances_only_after_matching_feedback(self) -> None:
+        raw = _overlap_bytes("first question")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(2) as root:
+            store = _store(root, index_sha256=raw_sha)
+            controller = self._controller(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            first = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(first)
+            first_quality = persist_query_quality_result(first, "PASS", None)
+            store.append_query_quality_result(first_quality)
+            first_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(first_feedback["overall"], "REJECT")
+            store.append_author_feedback(first_feedback)
+            second = persist_query_attempt(state, 2, "different question", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(second)
+            second_quality = persist_query_quality_result(second, "PASS", None)
+            store.append_query_quality_result(second_quality)
+            audit_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+            store.append_author_feedback(audit_feedback)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 2)
+
+    def test_attempt1_c1_pass_advances_only_after_matching_feedback(self) -> None:
+        raw = _overlap_bytes("zzzzzz")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(0) as root:
+            store = _store(root, index_sha256=raw_sha)
+            controller = self._controller(store)
+            record = _pack()[0]
+            state = _freeze(record)
+            store.append_semantic_state(state)
+            attempt = persist_query_attempt(state, 1, "unique", record=record, review_pack_dependency=PACK_DEPENDENCY)
+            store.append_authored_attempt(attempt)
+            quality = persist_query_quality_result(attempt, "PASS", None)
+            store.append_query_quality_result(quality)
+            safe_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(safe_feedback["overall"], "PASS")
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+            store.append_author_feedback(safe_feedback)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 2)
+
+    def test_tampered_persisted_state_fails_closed_at_exposure_boundary(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root)
+            controller = self._controller(store)
+            store.append_semantic_state(_early_reject(_pack()[0]))
+            semantic_path = store._path("semantic_ledger")
+            semantic_path.write_bytes(semantic_path.read_bytes() + b"tampered")
+            with self.assertRaises(Unit3Blocked):
+                controller.current_candidate_body()
+
+    def test_sanctioned_workflow_derives_current_candidate_and_action_without_store(self) -> None:
+        raw = _overlap_bytes("zzzzzz")
+        raw_sha = hashlib.sha256(raw).hexdigest()
+        with _synthetic_root(2) as root:
+            store = _store(root, index_sha256=raw_sha)
+            controller = self._controller(store)
+            first, future = _pack()[:2]
+            self.assertEqual(controller.current_action(), {"action": "REVIEW_SEMANTIC"})
+            with self.assertRaisesRegex(Unit3Blocked, "SEMANTIC_EXPOSURE_CANDIDATE_MISMATCH"):
+                controller.persist_semantic_state(_freeze(future))
+            controller.persist_semantic_state(_freeze(first))
+            self.assertEqual(controller.current_action(), {"action": "AUTHOR_ATTEMPT", "attempt_number": 1})
+            created = controller.author_query("unique")
+            self.assertEqual(created["attempt_number"], 1)
+            self.assertEqual(controller.current_action()["action"], "PERSIST_QUERY_QUALITY")
+            quality = controller.persist_query_quality("PASS", None)
+            self.assertEqual(quality["quality_status"], "PASS")
+            safe_feedback = store.run_restricted_c1(raw)
+            self.assertEqual(safe_feedback["overall"], "PASS")
+            self.assertEqual(controller.current_action()["action"], "PERSIST_AUTHOR_FEEDBACK")
+            self.assertEqual(controller.persist_author_feedback("PASS"), safe_feedback)
+            self.assertEqual(controller.current_candidate_body()["global_review_order"], 2)
+
+    def test_production_semantic_opener_is_role_safe_and_state_bound(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            with patch("genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store", return_value=store) as opener:
+                controller = open_production_unit3b_semantic_exposure(root, tooling_checkpoint="synthetic-unit3b-checkpoint")
+                self.assertIsInstance(controller, Unit3BSemanticExposureController)
+                self.assertNotIsInstance(controller, Unit3BPersistenceStore)
+                self.assertFalse(hasattr(controller, "_validated_store"))
+                self.assertFalse(hasattr(controller, "records"))
+                self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
+                self.assertEqual(controller.current_action(), {"action": "REVIEW_SEMANTIC"})
+                self.assertGreaterEqual(opener.call_count, 2)
     def test_review_pack_is_frozen_48_ordered_nested_allowlisted_and_silent(self) -> None:
         pack = _pack()
         self.assertEqual(validate_review_pack(pack), {"candidate_count": 48, "forbidden_field_count": 0, "outside_scope_text_count": 0, "legacy_c1_sensitive_field_count": 0})
@@ -446,7 +760,7 @@ class W7Unit3FocusedTests(unittest.TestCase):
         first = persist_query_attempt(state, 1, "first question", record=record, review_pack_dependency=PACK_DEPENDENCY)
         with self.assertRaises(Unit3Blocked):
             restricted_c1_check([first], [], raw, expected_index_sha256=sha)
-        first_quality = persist_query_quality_result(first, "REJECT", "QUERY_NOT_NATURAL")
+        first_quality = persist_query_quality_result(first, "REJECT", "QUERY_NOT_NATURAL", "ATTEMPT_2_AUTHORIZED")
         with self.assertRaises(Unit3Blocked):
             restricted_c1_check([first], [first_quality], raw, expected_index_sha256=sha)
         mutated_attempt = dict(first)
