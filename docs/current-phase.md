@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B semantic execution authorized subject to mandatory zero-exposure runtime preflight)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B incident / exposure-readiness gate)**
 
 ## Objective
 
@@ -86,26 +86,39 @@ Unit 3A-1 pre-exposure implementation and its technical-lead actual code gate
 are ACCEPTED / PASS. Unit 3A-2 committed production mechanical extraction is
 ACCEPTED / FROZEN. Unit 3B-0 pre-exposure production persistence tooling and
 its technical-lead actual source/test/docs gate are PASS at checkpoint
-`1126a8d`; post-checkpoint generator binding is PASS. Production Unit 3B
-semantic execution is AUTHORIZED SUBJECT TO mandatory ZERO-EXPOSURE runtime
-preflight; runtime ZERO-EXPOSURE preflight has NOT been executed, no production
-semantic exposure has occurred, and the frozen-48 body remains NOT EXPOSED / NOT
-READ. `UNIT3_REVIEW = NOT EXECUTED`;
-`QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT EXECUTED`;
-`BENCHMARK_V0_4 = NOT CREATED`; and `RETRIEVAL_EVALUATION = NOT EXECUTED`.
+`1126a8d`; post-checkpoint generator binding is PASS. Its proven scope is
+persistence and write/action ordering only: **write-order correctness !=
+read/exposure-order correctness**. The first ZERO-EXPOSURE runtime preflight is
+PASS, but semantic exposure OCCURRED and the first production semantic
+execution is BLOCKED. Scientific judgments are 0/48; query quality checking is
+NOT EXECUTED; `QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT EXECUTED`;
+finalization is NOT EXECUTED;
+`BENCHMARK_V0_4 = NOT AUTHORIZED`; and `RETRIEVAL_EVALUATION = NOT AUTHORIZED`.
+A-2 remains VALID / FROZEN. The contaminated semantic executor is RETIRED from
+further Unit 3 semantic-review and query-author roles. Incident classification
+is FINAL C — `SAFE_HELPER_EXISTS_BUT_NOT_EXCLUSIVE_OR_STATE_BOUND`.
+Application-level exclusive/state-bound candidate-body exposure gate: NO.
+Executor-level capability isolation: UNKNOWN / NOT ESTABLISHED. No surviving
+state attributable to the failed semantic execution was found within the
+committed source-observable Unit3B runtime footprint; this does not include or
+invalidate the pre-existing A-2 accepted/frozen manifest and pack. Independent
+source/test audit status is PARTIAL because authoritative frozen candidate
+N→N+1 exposure-readiness semantics are not sufficiently represented in
+committed docs.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-下一步继续现有 `P04-W7 Blind Unit 2 Execution Contract` clean blind lineage，先运行
-mandatory ZERO-EXPOSURE production runtime preflight；仅当该 preflight exact
-PASS 后，同一 production work unit 才可继续 Unit 3B semantic execution。runtime
-preflight 仍未执行；在其 PASS 前不得发生 production semantic exposure、semantic
-review、query authoring、C1、benchmark-v0.4 或 retrieval evaluation。若在 semantic
-exposure 前发现新的 contamination evidence，必须 STOP，不得在该 lineage 继续，
-并等待 technical lead 重新做 execution-window 决策。
+Resolve and establish authoritative Unit3B exposure-readiness semantics and the
+production trust/capability boundary, including whether and what must be
+formally added to the frozen execution contract, before designing or
+implementing the exposure-order repair. Keep the candidate N→N+1 readiness
+rule explicitly UNKNOWN until the next architecture/contract gate resolves it.
+Fresh semantic retry is BLOCKED; exposure-order tooling repair implementation
+is NOT YET AUTHORIZED. No semantic review, query authoring, C1, benchmark-v0.4,
+or retrieval evaluation is authorized.
 
 ## Phase transition boundary
 
