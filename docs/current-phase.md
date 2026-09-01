@@ -97,28 +97,33 @@ finalization is NOT EXECUTED;
 A-2 remains VALID / FROZEN. The contaminated semantic executor is RETIRED from
 further Unit 3 semantic-review and query-author roles. Incident classification
 is FINAL C — `SAFE_HELPER_EXISTS_BUT_NOT_EXCLUSIVE_OR_STATE_BOUND`.
-Application-level exclusive/state-bound candidate-body exposure gate: NO.
-Executor-level capability isolation: UNKNOWN / NOT ESTABLISHED. No surviving
-state attributable to the failed semantic execution was found within the
-committed source-observable Unit3B runtime footprint; this does not include or
-invalidate the pre-existing A-2 accepted/frozen manifest and pack. Independent
-source/test audit status is PARTIAL because authoritative frozen candidate
-N→N+1 exposure-readiness semantics are not sufficiently represented in
-committed docs.
+The current application-level exclusive/state-bound candidate-body exposure-gate
+implementation remains absent / NOT YET REPAIRED. The approved post-incident
+requirement is a trusted blind executor plus an application-level mechanical
+fail-closed gate; OS/filesystem/shell isolation is not required or claimed for
+W7. The post-incident authority is owned by
+`docs/phases/phase-04-w7-unit3b-exposure-amendment-v1.md` and is
+effective/frozen only at the first accepted authority checkpoint that commits
+it. Its readiness rule is: candidate N full lifecycle terminal -> candidate N+1
+body may be exposed. No surviving state attributable to the failed semantic
+execution was found within the committed source-observable Unit3B runtime
+footprint; this does not include or invalidate the pre-existing A-2
+accepted/frozen manifest and pack. The independent source/test audit was PARTIAL
+at audit time because authoritative N→N+1 exposure-readiness semantics were
+then absent; its source findings remain valid. This amendment closes that
+authority gap once repository-effective.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-Resolve and establish authoritative Unit3B exposure-readiness semantics and the
-production trust/capability boundary, including whether and what must be
-formally added to the frozen execution contract, before designing or
-implementing the exposure-order repair. Keep the candidate N→N+1 readiness
-rule explicitly UNKNOWN until the next architecture/contract gate resolves it.
-Fresh semantic retry is BLOCKED; exposure-order tooling repair implementation
-is NOT YET AUTHORIZED. No semantic review, query authoring, C1, benchmark-v0.4,
-or retrieval evaluation is authorized.
+The authority checkpoint order is: actual technical-lead authority/docs review
+-> accepted authority checkpoint commit. After that checkpoint, the immediate
+next action is the minimal exposure-order repair under its exact terminality and
+application boundary. Exposure-controller implementation is NOT YET REPAIRED;
+fresh semantic retry is BLOCKED. No semantic review, query authoring, C1,
+benchmark-v0.4, or retrieval evaluation is authorized.
 
 ## Phase transition boundary
 
