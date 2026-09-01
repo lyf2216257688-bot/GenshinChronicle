@@ -97,11 +97,10 @@ finalization is NOT EXECUTED;
 A-2 remains VALID / FROZEN. The contaminated semantic executor is RETIRED from
 further Unit 3 semantic-review and query-author roles. Incident classification
 is FINAL C — `SAFE_HELPER_EXISTS_BUT_NOT_EXCLUSIVE_OR_STATE_BOUND`.
-The combined Unit3B exposure-repair plus material-quality source/test actual
-gate is PASS, with the authorized source/test delta still UNCOMMITTED / NOT
-YET CHECKPOINTED. The minimum persisted material-quality retry
-representation/wiring and mechanically separate production-shaped
-quality-authority wiring are implemented in that delta. The current
+The combined Unit3B exposure-repair plus material-quality implementation is
+CHECKPOINTED / CLOSED / PASS at `225baa7`. The minimum persisted
+material-quality retry representation/wiring and mechanically separate
+production-shaped quality-authority wiring are checkpointed there. The current
 application-level exclusive/state-bound candidate-body exposure implementation
 is present there as well. The approved
 post-incident requirement is a trusted blind executor plus an application-level
@@ -119,22 +118,20 @@ execution was found within the committed source-observable Unit3B runtime
 footprint; this does not include or invalidate the pre-existing A-2
 accepted/frozen manifest and pack. The independent source/test audit was
 PARTIAL at audit time because authoritative N→N+1 exposure-readiness semantics
-were then absent; its source findings remain valid. The exposure amendment
-closes that gap once repository-effective. The minimum persisted
-material-quality retry representation/wiring and mechanically separate
-production-shaped quality-authority wiring are implemented in the uncommitted
-delta. The repaired-state ZERO-EXPOSURE preflight has NOT YET been re-run, and
-frozen-48 semantic review has not restarted.
+were then absent; its source findings remain valid. The exposure amendment is
+repository-effective / FROZEN; the previously missing
+N→N+1 exposure-readiness semantics are now authoritative. The repaired-state ZERO-EXPOSURE
+preflight has NOT YET been run, and frozen-48 semantic review has not
+restarted.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-The immediate next action is the combined Unit3B implementation checkpoint.
-The combined implementation remains UNCOMMITTED / NOT YET CHECKPOINTED; fresh
+The immediate next action is the repaired-state ZERO-EXPOSURE preflight. Fresh
 semantic retry remains BLOCKED / NOT AUTHORIZED. The repaired-state
-ZERO-EXPOSURE preflight has NOT YET been re-run. Frozen-48 semantic review,
+ZERO-EXPOSURE preflight is NOT YET RUN. Frozen-48 semantic review,
 query authoring, quality judgment, restricted C1, and finalization are not
 authorized; `BENCHMARK_V0_4 = NOT AUTHORIZED`; and
 `RETRIEVAL_EVALUATION = NOT AUTHORIZED`.
