@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit 3B incident / exposure-readiness gate)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit3B Frozen48 persisted production FINALIZE resume / resume-authority state)**
 
 ## Objective
 
@@ -88,21 +88,23 @@ ACCEPTED / FROZEN. Unit 3B-0 pre-exposure production persistence tooling and
 its technical-lead actual source/test/docs gate are PASS at checkpoint
 `1126a8d`; post-checkpoint generator binding is PASS. Its proven scope is
 persistence and write/action ordering only: **write-order correctness !=
-read/exposure-order correctness**. The first ZERO-EXPOSURE runtime preflight is
-PASS, but semantic exposure OCCURRED and the first production semantic
-execution is BLOCKED. Scientific judgments are 0/48; query quality checking is
-NOT EXECUTED; `QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT EXECUTED`;
-finalization is NOT EXECUTED;
+read/exposure-order correctness**. Historically, the first ZERO-EXPOSURE
+runtime preflight was PASS, semantic exposure OCCURRED, and the contaminated
+first production semantic execution WAS BLOCKED at that incident point;
+scientific judgments were 0/48 at that incident point. Query quality checking
+was NOT EXECUTED; `QUERY_AUTHORING = NOT EXECUTED`; `REAL_C1_CHECK = NOT
+EXECUTED`; finalization was NOT EXECUTED;
 `BENCHMARK_V0_4 = NOT AUTHORIZED`; and `RETRIEVAL_EVALUATION = NOT AUTHORIZED`.
 A-2 remains VALID / FROZEN. The contaminated semantic executor is RETIRED from
 further Unit 3 semantic-review and query-author roles. Incident classification
 is FINAL C — `SAFE_HELPER_EXISTS_BUT_NOT_EXCLUSIVE_OR_STATE_BOUND`.
-The combined Unit3B exposure-repair plus material-quality implementation is
-CHECKPOINTED / CLOSED / PASS at `225baa7`. The minimum persisted
+The previous accepted exposure/materiality implementation checkpoint is
+`225baa7` (pre-finalization-repair source identity); it is not the current
+working-source implementation or binding. The minimum persisted
 material-quality retry representation/wiring and mechanically separate
-production-shaped quality-authority wiring are checkpointed there. The current
-application-level exclusive/state-bound candidate-body exposure implementation
-is present there as well. The approved
+production-shaped quality-authority wiring were checkpointed there. The
+pre-finalization-repair application-level exclusive/state-bound candidate-body
+exposure implementation was checkpointed there as well. The approved
 post-incident requirement is a trusted blind executor plus an application-level
 mechanical fail-closed gate; OS/filesystem/shell isolation is not required or
 claimed for W7. Post-incident exposure authority is owned by
@@ -123,8 +125,20 @@ repository-effective / FROZEN; the previously missing
 N→N+1 exposure-readiness semantics are now authoritative. The repaired-state
 ZERO-EXPOSURE preflight is PASS / CLOSED, with ZERO candidate-body,
 future-candidate-body, and real-overlap exposure and ZERO production runtime
-state created or modified by the preflight. Production frozen-48 semantic
-execution is AUTHORIZED only in a NEW clean semantic executor/window; the old
+state created or modified by the preflight. Frozen48 semantic execution is
+MECHANICALLY COMPLETE / PERSISTED: 48/48 terminal, observed 0 ACCEPT / 48
+REJECT (`ANCHOR_NOT_VALID_POSITIVE` ×48). Independent semantic re-adjudication
+was NOT PERFORMED; interpretation remains deferred. No authored query
+attempts, quality judgments, restricted C1, or author feedback occurred. The
+authoritative semantic prefix remains `review/semantic_ledger.jsonl`
+(201316 bytes; SHA-256
+`a88ec19bbbd5d92d76099505987ee4c32f6f1025880051a73fda8fb727e0b6d1`).
+Production finalization has NOT executed; `final_ledger`, freeze candidates,
+and Unit3 manifest remain NOT CREATED; `final24` persisted result is NONE.
+The sanctioned semantic-facing FINALIZE integration repair is actual-gated and
+checkpointed at `50a7afaafa2a7dd79fbdf8505d917f52800d4478`, the current
+`w7_unit3.py` tooling/source-binding checkpoint. `225baa756d5870a4c5dc5144c717aec75fdf1b72`
+remains the previous/pre-finalization-repair implementation identity. The old
 contaminated first-production semantic executor remains RETIRED / MUST NOT
 REUSE. The current engineering/preflight conversation is not reused for the
 blind production semantic role.
@@ -134,13 +148,17 @@ The approved Phase 04 boundary is documented in
 
 ## Immediate next action
 
-The immediate next action is a NEW clean semantic executor/window -> execute
-the already-frozen Unit3B 48 exactly under existing frozen authority. Fresh
-semantic retry is AUTHORIZED only through that clean executor/window. The
-repaired-state ZERO-EXPOSURE preflight is PASS / CLOSED. Query authoring,
-quality judgment, restricted C1, and finalization are authorized only as part
-of that already-frozen Unit3B semantic execution; `BENCHMARK_V0_4 = NOT YET
-AUTHORIZED`; and `RETRIEVAL_EVALUATION = NOT YET AUTHORIZED`.
+The immediate next action is Production FINALIZE resume, NOT YET EXECUTED. It
+is authorized only after this repository status synchronization is committed,
+current `w7_unit3.py` verifies against tooling checkpoint
+`50a7afaafa2a7dd79fbdf8505d917f52800d4478`, and the authoritative persisted
+Unit3B prefix remains valid. The only authorized continuation is: validated
+resume -> sanctioned `current_action == FINALIZE` -> `controller.finalize()`
+-> STOP/report. Semantic rerun = NO; A-2 rerun/replacement = NO. The
+deterministic expectation is selected semantic/control/WR/HN = `0/0/0/0`,
+shortfall = `8/4/6/6`, no refill. `BENCHMARK_V0_4 = NOT YET AUTHORIZED`;
+`RETRIEVAL_EVALUATION = NOT YET AUTHORIZED`; Dense-rescue-HN, Hybrid, RRF,
+reranker, ANN, vector DB, embedding, and r02 remain NOT AUTHORIZED.
 
 ## Phase transition boundary
 
