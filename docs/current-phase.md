@@ -2,14 +2,30 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 post-Frozen48 scientific interpretation / downstream authorization decision gate)**
+**Phase 04 - First End-to-End RAG design / planning (post-W7 direction reset; implementation not yet authorized)**
 
 ## Objective
 
-Establish the evidence and benchmark foundation for later Retrieval / Evidence
-Assembly experiments from accepted Raw, Parsed, and Canonical evidence, while
-preserving traceability and keeping technology choices and production retrieval
-implementation deferred until separately approved.
+Build the first real, runnable end-to-end RAG baseline on top of the accepted
+Raw -> Parsed -> Canonical foundation, then use real human-authored questions
+to measure the whole system and optimize the actual bottleneck.
+
+The current baseline direction is:
+
+```text
+Canonical
+-> Retrieval Units
+-> BM25 + local Dense + simple Hybrid
+-> deterministic Evidence Assembly
+-> provider-neutral Evidence Packet
+-> GenerationProvider
+-> Answer + Citations
+```
+
+This is a **first runnable baseline**, not a final architecture freeze. Models,
+retrieval parameters, context-expansion settings, fusion details, storage,
+GenerationProviders, and later optimization layers may change when actual
+evaluation evidence justifies the change.
 
 ## Current status
 
@@ -156,47 +172,110 @@ REUSE.
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
+## Post-W7 direction update
+
+P04-W7 Frozen48 production / finalization / outcome closure remains **PASS /
+CLOSED**. Its observed result was 0 ACCEPT / 48 REJECT; it remains a valid
+negative result for the frozen W7 candidate-construction design and does not
+establish a Retrieval-family winner.
+
+The user subsequently stopped the Frozen48 D1/body-failure-taxonomy path and
+also stopped the separately sent Semantic-First Benchmark Design Plan.
+Neither is a pending task and neither should be resumed or resent.
+
+Current project priority is now **First End-to-End RAG**. The governing design
+direction is:
+
+`docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md`
+
+Historical authorization statements inside the W1-W7 status paragraphs above
+remain valid as historical snapshots of those work units, but they do **not**
+override this later current-state direction. In particular, old statements
+that Hybrid, RRF, embedding, or downstream RAG work were "NOT AUTHORIZED" are
+not current permanent technology bans.
+
+That amendment records the agreed first runnable baseline direction. It does
+not authorize implementation by itself and it must not be interpreted as a
+permanent rejection of later reranking, ANN/vector DB, different embeddings,
+different Hybrid methods, additional GenerationProviders, or other
+evidence-justified improvements.
+
+Current pending Codex task: **NONE**.
+
 ## Immediate next action
 
-The immediate next action is a separate scientific/stage decision on what the
-0/48 outcome means and whether any downstream work should be authorized.
-Semantic rerun = NO; A-2 rerun/replacement = NO. `BENCHMARK_V0_4` remains
-NOT_CREATED / not automatically authorized; `RETRIEVAL_EVALUATION` remains
-NOT_EXECUTED / not automatically authorized. Dense-rescue-HN, Hybrid, RRF,
-reranker, ANN, vector DB, embedding, and r02 remain NOT AUTHORIZED.
+Create a docs-only checkpoint containing
+`docs/current-phase.md` and
+`docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md`.
+
+After that checkpoint, the next engineering task is a **new Plan-only Codex
+task**. Codex must inspect the live Canonical contracts, fixtures, and reusable
+Retrieval assets and answer:
+
+> How should the current real Canonical data be transformed into Retrieval
+> Units, and how should context be restored with the simplest deterministic
+> Evidence Assembly design?
+
+The Plan must distinguish deterministic invariants from tunable configuration.
+Context window / neighbor expansion / Top-K / evidence-budget choices should
+have bounded, reproducible defaults but must not be hard-coded as permanent
+architecture constants. The Plan should end with **exactly one first
+implementation work unit**.
+
+No First End-to-End RAG implementation is authorized before that Plan is
+reviewed and explicitly approved.
 
 ## Phase transition boundary
+
+Phase 01 Raw Collection, Phase 02 Parsed Schema / Parser Foundation, and Phase
+03 Canonical Schema remain **CLOSED**. P04-W1-W7 accepted/closed work remains
+historical evidence and reusable tooling where applicable.
 
 Phase 02 Parsed contracts remain source-specific and evolutionary; UNKNOWN or
 unsupported source structures must not be guessed or silently discarded.
 Phase 03 Canonical contracts preserve structural source evidence and lineage,
 not semantic equivalence.
 
-P04-W1 is a foundation implementation, not a retrieval engine. The later
-Phase 04 work may evaluate retrieval-unit, passage, and chunk approaches;
-lexical/BM25, dense/vector, and Hybrid alternatives; embeddings and possible
-vector-store choices; reranking; deterministic and possible future LLM query
-expansion; and Evidence Assembly/context expansion. No winner, production
-infrastructure, or RAG behavior is authorized by P04-W1.
+The new First End-to-End RAG direction builds on the current real Canonical
+contract; it must not redesign Canonical merely for Retrieval convenience.
 
-The following remain outside the authorized current Retrieval planning scope
-and require their own reviewed authorization:
+The current amendment authorizes **design / planning direction only**.
+Implementation requires a separately reviewed Plan and explicit execution
+authorization.
 
-- semantic identity, alias/entity merge, Fact/Claim/Event models
-- cross-Parsed-run or cross-snapshot semantic projection reuse
-- Retrieval/RAG implementation and prompt orchestration
-- AI semantic / claim extraction
-- Knowledge graph / semantic layer
-- UI
+First-version exclusions in the amendment are temporary scope controls, not
+permanent technology bans. In particular, Vector DB / ANN, reranking, more
+complex Hybrid methods, query routing/decomposition, agentic retrieval,
+knowledge graphs, different embeddings, and additional GenerationProviders
+may be reconsidered later if end-to-end evidence shows they address a real
+bottleneck.
+
+The planned first GenerationProvider is OpenAI. The long-term provider list is
+intentionally not frozen; later providers may be added or removed according
+to actual product needs.
+
+Knowledge-graph / semantic-identity layers and production UI remain outside
+the first runnable RAG baseline unless separately authorized.
 
 ## Source of truth
 
 Current stage and immediate next action: this file.
 
-Phase 01 workflow and closure evidence: `docs/phases/phase-01-raw-collection.md` and relevant `docs/research/phase-01/` notes.
+Current First End-to-End RAG design direction:
+`docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md`.
 
-The closed Phase 02 draft specification is
-`docs/phases/phase-02-parsed-schema.md`. The closed Phase 03 contract and
-acceptance boundary are `docs/phases/phase-03-canonical-schema.md`.
+The general Phase 04 boundary remains documented in
+`docs/phases/phase-04-retrieval-evidence-assembly.md`; W7-specific amendments
+and addenda remain authoritative for the historical W7 work they governed,
+unless a later document explicitly supersedes a current-state decision.
+
+Phase 01 workflow and closure evidence:
+`docs/phases/phase-01-raw-collection.md` and relevant
+`docs/research/phase-01/` notes.
+
+Closed Phase 02 and Phase 03 authority:
+`docs/phases/phase-02-parsed-schema.md` and
+`docs/phases/phase-03-canonical-schema.md`.
+
 Architecture/design work must also follow `docs/architecture-overview.md`,
-`AGENTS.md`, and the verified OBC evidence already recorded in the repository.
+`AGENTS.md`, actual repository code/tests, and verified OBC evidence.
