@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 Unit3B Frozen48 persisted production FINALIZE resume / resume-authority state)**
+**Phase 04 — Retrieval / Evidence Assembly architecture and design (P04-W7 post-Frozen48 scientific interpretation / downstream authorization decision gate)**
 
 ## Objective
 
@@ -125,39 +125,44 @@ repository-effective / FROZEN; the previously missing
 N→N+1 exposure-readiness semantics are now authoritative. The repaired-state
 ZERO-EXPOSURE preflight is PASS / CLOSED, with ZERO candidate-body,
 future-candidate-body, and real-overlap exposure and ZERO production runtime
-state created or modified by the preflight. Frozen48 semantic execution is
-MECHANICALLY COMPLETE / PERSISTED: 48/48 terminal, observed 0 ACCEPT / 48
-REJECT (`ANCHOR_NOT_VALID_POSITIVE` ×48). Independent semantic re-adjudication
-was NOT PERFORMED; interpretation remains deferred. No authored query
-attempts, quality judgments, restricted C1, or author feedback occurred. The
-authoritative semantic prefix remains `review/semantic_ledger.jsonl`
-(201316 bytes; SHA-256
-`a88ec19bbbd5d92d76099505987ee4c32f6f1025880051a73fda8fb727e0b6d1`).
-Production finalization has NOT executed; `final_ledger`, freeze candidates,
-and Unit3 manifest remain NOT CREATED; `final24` persisted result is NONE.
-The sanctioned semantic-facing FINALIZE integration repair is actual-gated and
+state created or modified by the preflight. P04-W7 Unit3B Frozen48 production
+execution is PASS / CLOSED: 48/48 semantic states are mechanically complete /
+persisted; observed result is 0 ACCEPT / 48 REJECT
+(`ANCHOR_NOT_VALID_POSITIVE` ×48). Independent semantic re-adjudication was
+NOT PERFORMED and scientific interpretation is DEFERRED. No authored query
+attempts, quality judgments, restricted C1, or author feedback occurred.
+Production finalization is COMPLETE / PERSISTED / ACTUAL-GATED. Its terminal
+manifest is
+`data/retrieval/p04-w7-unit3-contextualized-leaf-r01/metadata/unit3_manifest.json`
+(3018 bytes; SHA-256
+`512eb2fafa44c05c8b7d1d218fc163d051177b2208f89e355e83bf25bb3dcf73`).
+Filesystem existence, byte-count, and SHA identities were independently
+actual-matched; row-count and accounting values are terminal-manifest /
+authoritative-finalizer derived and consistent with the actual-gated
+deterministic finalization contract. The terminal manifest is the primary
+owner of detailed child artifact identities and accounting. Selected
+semantic/control/WR/HN = `0/0/0/0`; quota shortfall = `8/4/6/6`; all queues
+are `SHORTFALL / EVIDENCE_INSUFFICIENT`; no refill. Terminal-manifest row
+counts are final ledger 48 and freeze candidates 0. `benchmark_v0_4 =
+NOT_CREATED` and `retrieval_evaluation = NOT_EXECUTED`; neither is
+automatically authorized by this closure. Engineering blocker = NONE. The
+sanctioned semantic-facing FINALIZE integration repair is actual-gated and
 checkpointed at `50a7afaafa2a7dd79fbdf8505d917f52800d4478`, the current
 `w7_unit3.py` tooling/source-binding checkpoint. `225baa756d5870a4c5dc5144c717aec75fdf1b72`
 remains the previous/pre-finalization-repair implementation identity. The old
 contaminated first-production semantic executor remains RETIRED / MUST NOT
-REUSE. The current engineering/preflight conversation is not reused for the
-blind production semantic role.
+REUSE.
 
 The approved Phase 04 boundary is documented in
 `docs/phases/phase-04-retrieval-evidence-assembly.md`.
 
 ## Immediate next action
 
-The immediate next action is Production FINALIZE resume, NOT YET EXECUTED. It
-is authorized only after this repository status synchronization is committed,
-current `w7_unit3.py` verifies against tooling checkpoint
-`50a7afaafa2a7dd79fbdf8505d917f52800d4478`, and the authoritative persisted
-Unit3B prefix remains valid. The only authorized continuation is: validated
-resume -> sanctioned `current_action == FINALIZE` -> `controller.finalize()`
--> STOP/report. Semantic rerun = NO; A-2 rerun/replacement = NO. The
-deterministic expectation is selected semantic/control/WR/HN = `0/0/0/0`,
-shortfall = `8/4/6/6`, no refill. `BENCHMARK_V0_4 = NOT YET AUTHORIZED`;
-`RETRIEVAL_EVALUATION = NOT YET AUTHORIZED`; Dense-rescue-HN, Hybrid, RRF,
+The immediate next action is a separate scientific/stage decision on what the
+0/48 outcome means and whether any downstream work should be authorized.
+Semantic rerun = NO; A-2 rerun/replacement = NO. `BENCHMARK_V0_4` remains
+NOT_CREATED / not automatically authorized; `RETRIEVAL_EVALUATION` remains
+NOT_EXECUTED / not automatically authorized. Dense-rescue-HN, Hybrid, RRF,
 reranker, ANN, vector DB, embedding, and r02 remain NOT AUTHORIZED.
 
 ## Phase transition boundary
