@@ -1,7 +1,8 @@
-"""Phase 04 Retrieval experiment foundations.
+"""Phase 04 deterministic Retrieval derivatives and Evidence Assembly.
 
-This package contains deterministic, offline representation and lexical
-experiments only; it has no production retrieval service, embeddings, or RAG.
+The package contains rebuildable experiment artifacts plus the P04-RAG-W1
+Retrieval Unit and candidate-neutral Evidence Assembly core.  It contains no
+BM25/Dense production integration, embeddings, or GenerationProvider.
 """
 
 from .benchmark import (
@@ -26,6 +27,26 @@ from .representations import (
     load_retrieval_documents,
 )
 from .lexical import LEXICAL_BIGRAM_ANALYZER_VERSION, LEXICAL_SCORER_VERSION
+from .retrieval_units import (
+    IDENTITY_ADDRESS_POLICY_VERSION,
+    RETRIEVAL_UNIT_BUILD_SCHEMA_VERSION,
+    RETRIEVAL_UNIT_GENERATOR_VERSION,
+    RETRIEVAL_UNIT_SCHEMA_VERSION,
+    RetrievalUnitBuildConfig,
+    RetrievalUnitError,
+    build_retrieval_units,
+    load_retrieval_units,
+)
+from .evidence_assembly import (
+    EVIDENCE_ASSEMBLY_VERSION,
+    EVIDENCE_PACKET_SCHEMA_VERSION,
+    EvidenceAssemblyConfig,
+    EvidenceAssemblyError,
+    assemble_evidence_packet,
+    evidence_packet_json_bytes,
+    evidence_packet_markdown,
+    write_evidence_packet,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -43,6 +64,22 @@ __all__ = [
     "load_retrieval_documents",
     "LEXICAL_BIGRAM_ANALYZER_VERSION",
     "LEXICAL_SCORER_VERSION",
+    "IDENTITY_ADDRESS_POLICY_VERSION",
+    "RETRIEVAL_UNIT_BUILD_SCHEMA_VERSION",
+    "RETRIEVAL_UNIT_GENERATOR_VERSION",
+    "RETRIEVAL_UNIT_SCHEMA_VERSION",
+    "RetrievalUnitBuildConfig",
+    "RetrievalUnitError",
+    "build_retrieval_units",
+    "load_retrieval_units",
+    "EVIDENCE_ASSEMBLY_VERSION",
+    "EVIDENCE_PACKET_SCHEMA_VERSION",
+    "EvidenceAssemblyConfig",
+    "EvidenceAssemblyError",
+    "assemble_evidence_packet",
+    "evidence_packet_json_bytes",
+    "evidence_packet_markdown",
+    "write_evidence_packet",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]

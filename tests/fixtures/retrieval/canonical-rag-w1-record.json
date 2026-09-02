@@ -1,0 +1,180 @@
+{
+  "record_id": "canonical-fixture-record-1",
+  "status": "canonical",
+  "source_identity": {
+    "kind": "detail",
+    "key": "mihoyo_obc:zh-cn:fixture-rag-1",
+    "stability": "logical",
+    "components": {
+      "source": "mihoyo_obc",
+      "locale": "zh-cn",
+      "content_id": "fixture-rag-1"
+    }
+  },
+  "record_metadata": {
+    "name": "RAG fixture record"
+  },
+  "observation": {
+    "parsed_run_id": "parsed-fixture-run",
+    "parsed_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "parsed_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "parsed_schema_version": "phase02-draft-0.1",
+    "parsed_parser_version": "obc-foundation-0.2",
+    "parsed_pipeline_version": "obc-parsed-run-0.2"
+  },
+  "versions": {
+    "schema_version": "phase03-draft-0.1",
+    "transform_version": "obc-modules-as-sections-0.1",
+    "structural_normalization_version": "none-0.1",
+    "classification_rule_versions": {}
+  },
+  "lineage": {
+    "parsed_json_pointer": "",
+    "evidence_scope": "direct_raw",
+    "raw_refs": [
+      {
+        "source": "mihoyo_obc",
+        "locale": "zh-cn",
+        "run_id": "raw-fixture-run",
+        "artifact_kind": "details",
+        "artifact_path": "responses/details/rag-fixture.json",
+        "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "content_id": "fixture-rag-1",
+        "json_pointer": "/data/page",
+        "embedded_json_pointer": null,
+        "source_value_sha256": null
+      }
+    ],
+    "dependency_locator": null
+  },
+  "sections": [
+    {
+      "ordinal": 0,
+      "lineage": {
+        "parsed_json_pointer": "/modules/0",
+        "evidence_scope": "direct_raw",
+        "raw_refs": [
+          {
+            "source": "mihoyo_obc",
+            "locale": "zh-cn",
+            "run_id": "raw-fixture-run",
+            "artifact_kind": "details",
+            "artifact_path": "responses/details/rag-fixture.json",
+            "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "content_id": "fixture-rag-1",
+            "json_pointer": "/data/page/modules/0",
+            "embedded_json_pointer": null,
+            "source_value_sha256": null
+          }
+        ],
+        "dependency_locator": null
+      },
+      "source_metadata": {
+        "name": "Fixture section"
+      },
+      "component_contexts": [
+        {
+          "observation_key": "content:fixture-rag-1:component:fixture:ordinal:0",
+          "ordinal": 0,
+          "source_component_id": "fixture_component",
+          "source_position": {
+            "json_pointer": "/data/page/modules/0/components/0",
+            "array_index": 0,
+            "layout_path": [],
+            "ordering": 0
+          },
+          "lineage": {
+            "parsed_json_pointer": "/modules/0/components/0",
+            "evidence_scope": "direct_raw",
+            "raw_refs": [
+              {
+                "source": "mihoyo_obc",
+                "locale": "zh-cn",
+                "run_id": "raw-fixture-run",
+                "artifact_kind": "details",
+                "artifact_path": "responses/details/rag-fixture.json",
+                "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "content_id": "fixture-rag-1",
+                "json_pointer": "/data/page/modules/0/components/0",
+                "embedded_json_pointer": null,
+                "source_value_sha256": null
+              }
+            ],
+            "dependency_locator": null
+          },
+          "child_unit_ordinals": [0, 1, 2, 3, 4, 5, 6, 7],
+          "unit_count": 8
+        }
+      ],
+      "units": [
+        {
+          "unit_id": "unit:0",
+          "kind": "rich_text",
+          "ordinal": 0,
+          "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0",
+          "value": {"kind": "rich_text", "normalized_text": "ABCDEFGHIJK"},
+          "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/0", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/text/0", "source_value_sha256": null}], "dependency_locator": null},
+          "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:1",
+          "kind": "rich_text",
+          "ordinal": 1,
+          "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0",
+          "value": {"kind": "rich_text", "normalized_text": "next leaf"},
+          "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/1", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/text/1", "source_value_sha256": null}], "dependency_locator": null},
+          "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:2",
+          "kind": "structured_observation",
+          "ordinal": 2,
+          "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0",
+          "value": {"raw": "fixture", "decoded": {"a": "one", "b": "value-that-is-long"}},
+          "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/2", "evidence_scope": "inherited_parent_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": null, "source_value_sha256": null}], "dependency_locator": null},
+          "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:3",
+          "kind": "dialogue_graph",
+          "ordinal": 3,
+          "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0",
+          "value": {
+            "kind": "dialogue_graph",
+            "groups": [
+              {
+                "ordering": 0,
+                "source_path": "",
+                "root_id": "a",
+                "nodes": [
+                  {"source_id": "a", "ordering": 0, "option": "Start", "dialogue": "Alpha", "icon": "", "raw_ref": {"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/contents/a", "source_value_sha256": null}, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/contents/a"], "ordering": 0}},
+                  {"source_id": "b", "ordering": 1, "option": "Other", "dialogue": "Beta", "icon": "", "raw_ref": {"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/contents/b", "source_value_sha256": null}, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/contents/b"], "ordering": 1}},
+                  {"source_id": "shared", "ordering": 2, "option": "Shared", "dialogue": "Gamma", "icon": "", "raw_ref": {"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/contents/shared", "source_value_sha256": null}, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/contents/shared"], "ordering": 2}},
+                  {"source_id": "empty", "ordering": 3, "option": "", "dialogue": "", "icon": "", "raw_ref": null, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/contents/empty"], "ordering": 3}}
+                ],
+                "edges": [
+                  {"parent_id": "a", "child_id": "shared", "ordering": 0, "raw_ref": {"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/child_ids/a/0", "source_value_sha256": null}, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/child_ids/a/0"], "ordering": 0}},
+                  {"parent_id": "b", "child_id": "shared", "ordering": 0, "raw_ref": {"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": "/child_ids/b/0", "source_value_sha256": null}, "source_position": {"json_pointer": "/data/page/modules/0/components/0", "array_index": null, "layout_path": ["/child_ids/b/0"], "ordering": 0}}
+                ]
+              }
+            ]
+          },
+          "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/3", "evidence_scope": "inherited_parent_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "raw-fixture-run", "artifact_kind": "details", "artifact_path": "responses/details/rag-fixture.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "content_id": "fixture-rag-1", "json_pointer": "/data/page/modules/0/components/0", "embedded_json_pointer": null, "source_value_sha256": null}], "dependency_locator": null},
+          "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:4", "kind": "rich_text", "ordinal": 4, "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0", "value": {"kind": "rich_text", "normalized_text": ""}, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/4", "evidence_scope": "parsed_dependency", "raw_refs": [], "dependency_locator": "parsed-record:/modules/0/components/0/units/4"}, "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:5", "kind": "structured_observation", "ordinal": 5, "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0", "value": {"raw": "fixture", "decoded": {"empty": []}}, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/5", "evidence_scope": "parsed_dependency", "raw_refs": [], "dependency_locator": "parsed-record:/modules/0/components/0/units/5"}, "metadata": {}, "provenance": {}, "content_role": {}
+        },
+        {
+          "unit_id": "unit:6", "kind": "dialogue_graph", "ordinal": 6, "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0", "value": {"kind": "dialogue_graph", "groups": []}, "lineage": {"parsed_json_pointer": "/modules/0/components/0/units/6", "evidence_scope": "parsed_dependency", "raw_refs": [], "dependency_locator": "parsed-record:/modules/0/components/0/units/6"}, "metadata": {}, "provenance": {}, "content_role": {}, "diagnostics": [{"code": "DIALOGUE_DATA_NOT_OBJECT", "message": "retained anomaly", "severity": "error", "path": ""}]
+        },
+        {
+          "unit_id": "unit:7", "kind": "unsupported", "ordinal": 7, "parent_component_key": "content:fixture-rag-1:component:fixture:ordinal:0", "value": {"reason": "fixture unsupported"}, "lineage": {"parsed_json_pointer": "/modules/0/components/0/unsupported/0", "evidence_scope": "parsed_dependency", "raw_refs": [], "dependency_locator": "parsed-record:/modules/0/components/0/unsupported/0"}, "metadata": {}, "provenance": {}, "content_role": {}
+        }
+      ]
+    }
+  ]
+}

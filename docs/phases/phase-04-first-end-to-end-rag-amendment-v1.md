@@ -1,6 +1,6 @@
 # Phase 04 Amendment — First End-to-End RAG v1
 
-> Status: **design direction agreed; implementation not yet authorized**
+> Status: **P04-RAG-W1 Retrieval Unit / deterministic Evidence Assembly core completed; subsequent retrieval and generation work remains separately authorized**
 >
 > This document records the current engineering direction for the first runnable end-to-end RAG baseline.
 > It is **not** a final architecture freeze. The first version exists to make the complete system runnable,
@@ -490,9 +490,25 @@ Principle:
 
 ---
 
-## 16. What the next Plan must answer
+## 16. Completed first implementation boundary
 
-The next Codex task should be **Plan only** and must inspect the live repository before answering.
+The reviewed Plan was approved and **P04-RAG-W1** implemented the first
+bounded layer below candidate retrieval:
+
+```text
+Canonical
+→ versioned Retrieval Units
+→ candidate-neutral deterministic Evidence Assembly
+→ provider-neutral Evidence Packet JSON / Markdown
+```
+
+It adds no BM25/Dense/Hybrid retrieval implementation, embedding, benchmark
+production, GenerationProvider, or Canonical change. Retrieval Unit identity
+is source-occurrence based; build identity is recorded separately. Known
+non-indexable Canonical structures are audited skips, while unknown schema,
+kind, or malformed supported shape fails closed.
+
+The completed Plan answered the following from the live repository:
 
 Its central question is:
 
@@ -513,7 +529,8 @@ The Plan must explicitly answer:
 11. What existing W2–W7 code/assets can be reused without importing obsolete governance.
 12. **Exactly one first implementation work unit** after the Plan is approved.
 
-The Plan must not modify files.
+Later work must retain the same Canonical provenance and deterministic
+assembly invariants, and requires its own scoped authorization.
 
 ---
 

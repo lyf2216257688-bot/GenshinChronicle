@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 - First End-to-End RAG design / planning (post-W7 direction reset; implementation not yet authorized)**
+**Phase 04 - First End-to-End RAG implementation (post-W7 direction reset; P04-RAG-W1 ACCEPTED)**
 
 ## Objective
 
@@ -194,36 +194,27 @@ override this later current-state direction. In particular, old statements
 that Hybrid, RRF, embedding, or downstream RAG work were "NOT AUTHORIZED" are
 not current permanent technology bans.
 
-That amendment records the agreed first runnable baseline direction. It does
-not authorize implementation by itself and it must not be interpreted as a
-permanent rejection of later reranking, ANN/vector DB, different embeddings,
-different Hybrid methods, additional GenerationProviders, or other
-evidence-justified improvements.
+That amendment records the agreed first runnable baseline direction.
+**P04-RAG-W1 — Versioned Retrieval Unit Builder + Deterministic Evidence
+Assembly Core** is implemented, has passed technical-lead actual review, and
+is **ACCEPTED**. It added only rebuildable Retrieval Units, audited
+skip/failure ledgers, candidate-neutral structural Assembly, and
+provider-neutral Evidence Packet JSON/Markdown. It did not run a production
+corpus build or add BM25, Dense, Hybrid, embeddings, GenerationProvider,
+benchmark production, or a Canonical change. Later work remains separately
+scoped and authorized; this does not constitute a permanent rejection of
+reranking, ANN/vector DB, different embeddings, different Hybrid methods, or
+additional GenerationProviders when end-to-end evidence justifies them.
 
 Current pending Codex task: **NONE**.
 
 ## Immediate next action
 
-Create a docs-only checkpoint containing
-`docs/current-phase.md` and
-`docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md`.
-
-After that checkpoint, the next engineering task is a **new Plan-only Codex
-task**. Codex must inspect the live Canonical contracts, fixtures, and reusable
-Retrieval assets and answer:
-
-> How should the current real Canonical data be transformed into Retrieval
-> Units, and how should context be restored with the simplest deterministic
-> Evidence Assembly design?
-
-The Plan must distinguish deterministic invariants from tunable configuration.
-Context window / neighbor expansion / Top-K / evidence-budget choices should
-have bounded, reproducible defaults but must not be hard-coded as permanent
-architecture constants. The Plan should end with **exactly one first
-implementation work unit**.
-
-No First End-to-End RAG implementation is authorized before that Plan is
-reviewed and explicitly approved.
+Define and review exactly one candidate-retrieval work unit over the accepted
+versioned Retrieval Unit artifact. That work unit is not yet formally defined
+or authorized; its scope must preserve the build/identity boundary and must
+not silently pull BM25, Dense, Hybrid, embedding, GenerationProvider,
+benchmark production, or Canonical changes into the same work unit.
 
 ## Phase transition boundary
 
@@ -239,9 +230,9 @@ not semantic equivalence.
 The new First End-to-End RAG direction builds on the current real Canonical
 contract; it must not redesign Canonical merely for Retrieval convenience.
 
-The current amendment authorizes **design / planning direction only**.
-Implementation requires a separately reviewed Plan and explicit execution
-authorization.
+The reviewed P04-RAG-W1 Plan received explicit execution authorization and is
+complete. All later First End-to-End RAG implementation work still requires a
+separate reviewed scope and explicit execution authorization.
 
 First-version exclusions in the amendment are temporary scope controls, not
 permanent technology bans. In particular, Vector DB / ANN, reranking, more

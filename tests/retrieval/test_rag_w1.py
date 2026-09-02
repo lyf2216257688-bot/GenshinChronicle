@@ -1,0 +1,342 @@
+from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import unittest
+from unittest.mock import patch
+
+from genshin_corpus.canonical.fingerprints import canonical_json_bytes
+from genshin_corpus.retrieval.evidence_assembly import (
+    EvidenceAssemblyConfig,
+    EvidenceAssemblyError,
+    assemble_evidence_packet,
+    evidence_packet_json_bytes,
+    evidence_packet_markdown,
+    write_evidence_packet,
+)
+from genshin_corpus.retrieval.retrieval_units import (
+    RetrievalUnitBuildConfig,
+    RetrievalUnitError,
+    build_retrieval_units,
+    load_retrieval_units,
+)
+
+
+class RagW1Tests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.root = Path("data/retrieval/.rag-w1-test")
+        if self.root.exists():
+            shutil.rmtree(self.root)
+        self.root.mkdir(parents=True)
+        fixture = Path(__file__).parents[1] / "fixtures" / "retrieval" / "canonical-rag-w1-record.json"
+        self.record = json.loads(fixture.read_text(encoding="utf-8"))
+        self.record_path = self.root / "canonical-record.json"
+        self._write_record()
+        self.manifest_path = self.root / "canonical-manifest.json"
+        self._write_manifest()
+        self.config = RetrievalUnitBuildConfig(text_fragment_chars=4, structured_fragment_chars=10)
+
+    def tearDown(self) -> None:
+        if self.root.exists():
+            shutil.rmtree(self.root)
+
+    def _write_record(self) -> None:
+        self.record_body = canonical_json_bytes(self.record)
+        self.record_path.write_bytes(self.record_body)
+
+    def _write_manifest(self) -> None:
+        self.manifest = {
+            "status": "complete",
+            "canonical_run_id": "canonical-rag-w1-fixture",
+            "source": "mihoyo_obc",
+            "locale": "zh-cn",
+            "input_record_count": 1,
+            "accounted_record_count": 1,
+            "input_integrity_failure_count": 0,
+            "dependencies": {
+                "canonical_versions": {
+                    "schema_version": "phase03-draft-0.1",
+                    "transform_version": "obc-modules-as-sections-0.1",
+                    "structural_normalization_version": "none-0.1",
+                    "classification_rule_versions": {},
+                }
+            },
+            "records": [{
+                "record_id": self.record["record_id"],
+                "canonical_record_path": str(self.record_path),
+                "canonical_record_sha256": hashlib.sha256(self.record_body).hexdigest(),
+                "canonical_status": "canonical",
+            }],
+        }
+        self.manifest_path.write_bytes(canonical_json_bytes(self.manifest))
+
+    def _build(self, name: str = "build") -> tuple[dict, list[dict], Path]:
+        output = self.root / name
+        result = build_retrieval_units(self.manifest_path, output, config=self.config)
+        _, units = load_retrieval_units(output / "metadata" / "manifest.json")
+        return result, list(units), output
+
+    def _unit(self, units: list[dict], content_type: str, **selector: object) -> dict:
+        for unit in units:
+            if unit["content_type"] != content_type:
+                continue
+            structure = unit.get("structure", {})
+            dialogue = structure.get("dialogue", {}) if isinstance(structure, dict) else {}
+            if all(dialogue.get(key) == value for key, value in selector.items()):
+                return unit
+        self.fail(f"No {content_type} unit with selector {selector}")
+
+    def test_build_is_deterministic_and_unit_identity_is_occurrence_stable(self) -> None:
+        first, first_units, first_root = self._build("build-a")
+        second, second_units, second_root = self._build("build-b")
+        self.assertEqual(first["build_identity"], second["build_identity"])
+        self.assertEqual(first_units, second_units)
+        self.assertEqual(
+            (first_root / "artifacts" / "retrieval_units.jsonl.gz").read_bytes(),
+            (second_root / "artifacts" / "retrieval_units.jsonl.gz").read_bytes(),
+        )
+        changed_manifest = dict(self.manifest, canonical_run_id="changed-global-run")
+        changed_path = self.root / "canonical-manifest-changed-run.json"
+        changed_path.write_bytes(canonical_json_bytes(changed_manifest))
+        changed_output = self.root / "build-changed-run"
+        build_retrieval_units(changed_path, changed_output, config=self.config)
+        _, changed_units = load_retrieval_units(changed_output / "metadata" / "manifest.json")
+        self.assertNotEqual(first["build_identity"], json.loads((changed_output / "metadata" / "manifest.json").read_text(encoding="utf-8"))["build_identity"])
+        self.assertEqual([item["unit_id"] for item in first_units], [item["unit_id"] for item in changed_units])
+        self.assertNotIn(str(self.record_path), canonical_json_bytes(first).decode("utf-8"))
+
+    def test_build_identity_is_not_polluted_by_manifest_record_path(self) -> None:
+        first, _, _ = self._build("path-a")
+        other_record_path = self.root / "relocated" / "same-record.json"
+        other_record_path.parent.mkdir()
+        other_record_path.write_bytes(self.record_body)
+        relocated = json.loads(canonical_json_bytes(self.manifest).decode("utf-8"))
+        relocated["records"][0]["canonical_record_path"] = str(other_record_path)
+        relocated_path = self.root / "canonical-manifest-relocated.json"
+        relocated_path.write_bytes(canonical_json_bytes(relocated))
+        second = build_retrieval_units(relocated_path, self.root / "path-b", config=self.config)
+        self.assertEqual(first["build_identity"], second["build_identity"])
+
+    def test_generator_implementation_version_does_not_change_unit_identity(self) -> None:
+        _, first_units, _ = self._build("generator-a")
+        with patch(
+            "genshin_corpus.retrieval.retrieval_units.RETRIEVAL_UNIT_GENERATOR_VERSION",
+            "phase04-rag-w1-builder-test-change",
+        ):
+            _, changed_units, _ = self._build("generator-b")
+        self.assertEqual(
+            [item["unit_id"] for item in first_units],
+            [item["unit_id"] for item in changed_units],
+        )
+
+    def test_rich_and_structured_fragmentation_are_deterministic(self) -> None:
+        _, units, _ = self._build()
+        rich = [item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] in {"ABCD", "EFGH", "IJK"}]
+        self.assertEqual([item["retrieval_visible_text"] for item in rich], ["ABCD", "EFGH", "IJK"])
+        self.assertEqual([item["fragment_selector"]["fragment_index"] for item in rich], [0, 1, 2])
+        structured = [item for item in units if item["content_type"] == "structured"]
+        self.assertEqual([item["retrieval_visible_text"] for item in structured], ["/a\tone", "/b\tvalue-t", "hat-is-lon", "g"])
+        oversized = structured[1:]
+        self.assertTrue(all(item["fragment_selector"]["kind"] == "oversized_scalar_line_range" for item in oversized))
+        self.assertEqual("".join(item["retrieval_visible_text"] for item in oversized), "/b\tvalue-that-is-long")
+
+    def test_assembly_restores_fragment_text_without_inserted_separator(self) -> None:
+        _, units, output = self._build()
+        rich = [
+            item for item in units
+            if item["content_type"] == "rich_text" and item["retrieval_visible_text"] in {"ABCD", "EFGH", "IJK"}
+        ]
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": item["unit_id"], "rank": index + 1} for index, item in enumerate(rich)],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000),
+        )
+        self.assertEqual(len(packet["evidence"]), 1)
+        self.assertEqual(packet["evidence"][0]["text"], "ABCDEFGHIJK")
+
+    def test_structured_neighbor_uses_scalar_line_order_only_within_one_unit(self) -> None:
+        _, units, output = self._build()
+        structured = [item for item in units if item["content_type"] == "structured"]
+        first = structured[0]
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": first["unit_id"], "rank": 1}],
+            config=EvidenceAssemblyConfig(
+                neighbor_before=0,
+                neighbor_after=0,
+                structured_neighbor_before=0,
+                structured_neighbor_after=1,
+                per_block_chars=100,
+                total_context_chars=1000,
+            ),
+        )
+        members = [member for block in packet["evidence"] for member in block["members"]]
+        self.assertEqual([item["unit_id"] for item in members], [first["unit_id"], structured[1]["unit_id"]])
+        self.assertTrue(any(reason["kind"] == "structured_neighbor" for reason in members[1]["assembly_reasons"]))
+
+    def test_structured_assembly_merges_packed_and_next_oversized_scalar_line(self) -> None:
+        _, units, output = self._build()
+        structured = [item for item in units if item["content_type"] == "structured"]
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": item["unit_id"], "rank": index + 1} for index, item in enumerate(structured)],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000),
+        )
+        self.assertEqual(len(packet["evidence"]), 1)
+        self.assertEqual(packet["evidence"][0]["text"], "/a\tone\n/b\tvalue-that-is-long")
+
+    def test_node_first_dialogue_preserves_edges_but_never_infers_speaker(self) -> None:
+        _, units, _ = self._build()
+        dialogue = [item for item in units if item["content_type"] == "dialogue_node"]
+        self.assertEqual({item["nested_selector"]["node_source_id"] for item in dialogue}, {"a", "b", "shared"})
+        self.assertEqual(len({item["nested_selector"]["node_source_id"] for item in dialogue}), 3)
+        self.assertEqual(len({(item["nested_selector"]["node_source_id"], item["fragment_selector"].get("fragment_index", 0)) for item in dialogue}), len(dialogue))
+        shared = self._unit(units, "dialogue_node", node_source_id="shared")
+        self.assertIsNone(shared["structure"]["dialogue"]["speaker"])
+        self.assertEqual(
+            [(edge["parent_id"], edge["child_id"]) for edge in shared["structure"]["dialogue"]["observed_edges"]],
+            [("a", "shared"), ("b", "shared")],
+        )
+
+    def test_known_nonindexable_shapes_are_audited_skip_even_with_diagnostic(self) -> None:
+        result, _, output = self._build()
+        self.assertEqual(result["accounting"]["skip_reason_counts"], {
+            "known_dialogue_without_text": 1,
+            "known_empty_rich_text": 1,
+            "known_structured_without_scalar": 1,
+            "known_unsupported_canonical_unit": 1,
+        })
+        with gzip.open(output / "artifacts" / "skip_ledger.jsonl.gz", "rt", encoding="utf-8") as handle:
+            skips = [json.loads(line) for line in handle]
+        self.assertEqual({item["reason"] for item in skips}, set(result["accounting"]["skip_reason_counts"]))
+
+    def test_unknown_kind_and_malformed_supported_shape_fail_closed(self) -> None:
+        self.record["sections"][0]["units"][0]["kind"] = "future_kind"
+        self._write_record()
+        self._write_manifest()
+        output = self.root / "unknown-kind"
+        with self.assertRaisesRegex(RetrievalUnitError, "unknown Canonical unit kind"):
+            build_retrieval_units(self.manifest_path, output, config=self.config)
+        failure = json.loads((output / "metadata" / "failure_ledger.json").read_text(encoding="utf-8"))
+        self.assertEqual(failure["status"], "failed")
+        self.assertFalse((output / "metadata" / "manifest.json").exists())
+
+        self.record = json.loads((Path(__file__).parents[1] / "fixtures" / "retrieval" / "canonical-rag-w1-record.json").read_text(encoding="utf-8"))
+        del self.record["sections"][0]["units"][0]["value"]["normalized_text"]
+        self._write_record()
+        self._write_manifest()
+        with self.assertRaisesRegex(RetrievalUnitError, "lacks normalized_text"):
+            build_retrieval_units(self.manifest_path, self.root / "malformed-rich", config=self.config)
+
+    def test_unsupported_schema_fails_closed(self) -> None:
+        self.manifest["dependencies"]["canonical_versions"]["schema_version"] = "future-canonical-schema"
+        self.manifest_path.write_bytes(canonical_json_bytes(self.manifest))
+        with self.assertRaisesRegex(RetrievalUnitError, "unsupported Canonical schema"):
+            build_retrieval_units(self.manifest_path, self.root / "unsupported-schema", config=self.config)
+
+    def test_assembly_is_deterministic_merges_only_real_adjacency_and_audits_budget(self) -> None:
+        _, units, output = self._build()
+        first_rich = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "ABCD")
+        next_leaf = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "next")
+        other_fragment = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "EFGH")
+        structured = self._unit(units, "structured")
+        config = EvidenceAssemblyConfig(neighbor_before=1, neighbor_after=1, per_block_chars=7, total_context_chars=50, max_evidence_blocks=8)
+        candidates = [
+            {"unit_id": first_rich["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic"}},
+            {"unit_id": first_rich["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic-duplicate"}},
+            {"unit_id": structured["unit_id"], "rank": 3, "retrieval": {"mode": "synthetic"}},
+        ]
+        packet_one = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, retrieval_audit={"mode": "synthetic"})
+        packet_two = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, retrieval_audit={"mode": "synthetic"})
+        self.assertEqual(evidence_packet_json_bytes(packet_one), evidence_packet_json_bytes(packet_two))
+        self.assertEqual(packet_one["retrieval_audit"]["deduplicated_candidates"][0]["unit_id"], first_rich["unit_id"])
+        self.assertTrue(any(item["reason"] == "per_block_char_limit" for item in packet_one["budget"]["omitted_blocks"]))
+        ids = [member["unit_id"] for block in packet_one["evidence"] for member in block["members"]]
+        self.assertNotIn(other_fragment["unit_id"], ids)
+        self.assertNotIn(next_leaf["unit_id"], ids)
+        markdown = evidence_packet_markdown(packet_one)
+        self.assertIn("# Evidence Packet", markdown)
+        output_packet = self.root / "packet"
+        first_write = write_evidence_packet(output_packet, packet_one)
+        second_write = write_evidence_packet(output_packet, packet_two)
+        self.assertEqual(first_write, second_write)
+
+    def test_fragment_gap_never_merges(self) -> None:
+        _, units, output = self._build()
+        fragments = [
+            item for item in units
+            if item["content_type"] == "rich_text" and item["nested_selector"].get("kind") == "rich_text"
+            and item["fragment_selector"].get("kind") == "unicode_codepoint_range"
+        ]
+        first = next(item for item in fragments if item["fragment_selector"]["fragment_index"] == 0)
+        third = next(item for item in fragments if item["fragment_selector"]["fragment_index"] == 2)
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": first["unit_id"], "rank": 1}, {"unit_id": third["unit_id"], "rank": 2}],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000),
+        )
+        self.assertEqual(len(packet["evidence"]), 2)
+        self.assertEqual([item["text"] for item in packet["evidence"]], ["ABCD", "IJK"])
+
+    def test_assembly_expands_dialogue_only_through_observed_edges_and_preserves_provenance(self) -> None:
+        _, units, output = self._build()
+        node_a = self._unit(units, "dialogue_node", node_source_id="a")
+        node_b = self._unit(units, "dialogue_node", node_source_id="b")
+        shared = self._unit(units, "dialogue_node", node_source_id="shared")
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": node_a["unit_id"], "rank": 1, "retrieval": {}}],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, dialogue_hops=1, per_block_chars=100, total_context_chars=1000),
+        )
+        members = [member for block in packet["evidence"] for member in block["members"]]
+        ids = {item["unit_id"] for item in members}
+        self.assertIn(node_a["unit_id"], ids)
+        self.assertIn(shared["unit_id"], ids)
+        self.assertNotIn(node_b["unit_id"], ids)
+        shared_member = next(item for item in members if item["unit_id"] == shared["unit_id"])
+        self.assertTrue(any(reason["kind"] == "observed_dialogue_edge" for reason in shared_member["assembly_reasons"]))
+        self.assertIn("raw_refs", shared_member["lineage"])
+        self.assertEqual(shared_member["canonical_address"]["parsed_json_pointer"], "/modules/0/components/0/units/3")
+
+    def test_identical_text_different_occurrences_remains_distinct_and_no_cross_context_merge(self) -> None:
+        self.record["sections"].append(json.loads(json.dumps(self.record["sections"][0])))
+        second = self.record["sections"][1]
+        second["ordinal"] = 1
+        second["component_contexts"][0]["ordinal"] = 0
+        second["component_contexts"][0]["observation_key"] = "content:fixture-rag-1:component:fixture:ordinal:other"
+        for unit in second["units"]:
+            unit["parent_component_key"] = second["component_contexts"][0]["observation_key"]
+        second["units"] = [second["units"][0]]
+        second["component_contexts"][0]["child_unit_ordinals"] = [0]
+        second["component_contexts"][0]["unit_count"] = 1
+        self._write_record()
+        self._write_manifest()
+        _, units, output = self._build()
+        same_text = [item for item in units if item["retrieval_visible_text"] == "ABCD"]
+        self.assertEqual(len(same_text), 2)
+        self.assertNotEqual(same_text[0]["unit_id"], same_text[1]["unit_id"])
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": item["unit_id"], "rank": index + 1, "retrieval": {}} for index, item in enumerate(same_text)],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000),
+        )
+        self.assertEqual(len(packet["evidence"]), 2)
+
+    def test_rejects_unknown_candidate(self) -> None:
+        _, _, output = self._build()
+        with self.assertRaises(EvidenceAssemblyError):
+            assemble_evidence_packet(output / "metadata" / "manifest.json", [{"unit_id": "not-real", "rank": 1}])
+
+    def test_loader_rejects_tampered_skip_ledger(self) -> None:
+        _, _, output = self._build()
+        skip_path = output / "artifacts" / "skip_ledger.jsonl.gz"
+        skip_path.write_bytes(b"tampered")
+        with self.assertRaisesRegex(RetrievalUnitError, "skip_ledger artifact SHA-256 mismatch"):
+            load_retrieval_units(output / "metadata" / "manifest.json")
+
+
+if __name__ == "__main__":
+    unittest.main()
