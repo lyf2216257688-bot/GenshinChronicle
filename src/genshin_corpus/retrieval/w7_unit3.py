@@ -1601,6 +1601,15 @@ class Unit3BSemanticExposureController:
         """Persist only the current restricted-checker safe feedback projection."""
         return _run_semantic_controller_operation(self, lambda store: _semantic_persist_feedback(store, overall))
 
+    def finalize(self) -> dict[str, Any]:
+        """Finalize only when validated persisted state authorizes FINALIZE.
+
+        The trusted internal operation delegates to the existing B-0 finalizer;
+        the semantic-facing caller receives metadata only, never final rows or
+        the persistence store.
+        """
+        return _run_semantic_controller_operation(self, _semantic_finalize)
+
 
 def _run_semantic_controller_operation(
     controller: Unit3BSemanticExposureController,
@@ -1767,6 +1776,27 @@ def _semantic_persist_feedback(store: Unit3BPersistenceStore, overall: str) -> d
     feedback = {"attempt_id": action["attempt_id"], "overall": overall}
     store.append_author_feedback(feedback)
     return dict(feedback)
+
+
+def _semantic_finalize(store: Unit3BPersistenceStore) -> dict[str, Any]:
+    """Run the authoritative finalizer and project only detached metadata."""
+    if _semantic_current_action(store).get("action") != "FINALIZE":
+        raise Unit3Blocked("SEMANTIC_EXPOSURE_ACTION_INVALID")
+    result = store.finalize()
+    manifest = result.get("manifest")
+    if not isinstance(manifest, Mapping):
+        raise Unit3Blocked("FINALIZATION_RESULT_INVALID")
+    # Manifest accounting/descriptors contain no candidate BODY rows.  Do not
+    # return the full finalizer result (which includes freeze-candidate rows).
+    safe_manifest = {
+        key: copy.deepcopy(manifest[key])
+        for key in ("schema_version", "status", "a2_dependency", "unit3b_tooling", "overlap_index_sha256", "accounting", "artifacts")
+        if key in manifest
+    }
+    descriptor = result.get("manifest_descriptor")
+    if not isinstance(descriptor, Mapping):
+        raise Unit3Blocked("FINALIZATION_RESULT_INVALID")
+    return {"manifest": safe_manifest, "manifest_descriptor": copy.deepcopy(dict(descriptor))}
 
 
 def open_production_unit3b_store(output_root: Path, *, tooling_checkpoint: str) -> Unit3BPersistenceStore:

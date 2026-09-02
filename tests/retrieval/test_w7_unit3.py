@@ -547,6 +547,82 @@ class W7Unit3FocusedTests(unittest.TestCase):
                 self.assertEqual(controller.current_candidate_body()["global_review_order"], 1)
                 self.assertEqual(controller.current_action(), {"action": "REVIEW_SEMANTIC"})
                 self.assertGreaterEqual(opener.call_count, 2)
+
+    def test_sanctioned_finalize_zero_rows_is_state_bound_and_role_safe(self) -> None:
+        with _synthetic_root(0) as root:
+            store = _store(root)
+            for record in _pack():
+                store.append_semantic_state(_early_reject(record))
+            with patch(
+                "genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store",
+                side_effect=lambda *args, **kwargs: _store(root),
+            ):
+                controller = open_production_unit3b_semantic_exposure(root, tooling_checkpoint="synthetic-unit3b-checkpoint")
+                self.assertEqual(controller.current_action(), {"action": "FINALIZE"})
+                result = controller.finalize()
+                self.assertEqual(result["manifest"]["status"], "complete")
+                self.assertEqual(result["manifest"]["accounting"]["reviewed"], 48)
+                self.assertEqual(result["manifest"]["accounting"]["final"]["semantic"]["selected"], 0)
+                self.assertEqual(result["manifest"]["accounting"]["final"]["control"]["selected"], 0)
+                self.assertEqual(result["manifest"]["accounting"]["final"]["WR"]["selected"], 0)
+                self.assertEqual(result["manifest"]["accounting"]["final"]["HN"]["selected"], 0)
+                self.assertEqual(
+                    {queue: result["manifest"]["accounting"]["final"][queue]["quota"] - result["manifest"]["accounting"]["final"][queue]["selected"] for queue in QUEUE_ORDER},
+                    {"semantic": 8, "control": 4, "WR": 6, "HN": 6},
+                )
+                self.assertNotIn("final_rows", result)
+                self.assertNotIn("freeze_rows", result)
+                self.assertFalse(hasattr(controller, "records"))
+                self.assertFalse(hasattr(controller, "_validated_store"))
+                with self.assertRaises(TypeError):
+                    controller.finalize(selected=["caller-controlled"])  # type: ignore[call-arg]
+
+    def test_sanctioned_finalize_premature_and_resume_through_production_wiring(self) -> None:
+        with _synthetic_root(1) as root:
+            store = _store(root)
+            with patch(
+                "genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store",
+                side_effect=lambda *args, **kwargs: _store(root),
+            ):
+                controller = open_production_unit3b_semantic_exposure(root, tooling_checkpoint="synthetic-unit3b-checkpoint")
+                with self.assertRaisesRegex(Unit3Blocked, "SEMANTIC_EXPOSURE_ACTION_INVALID"):
+                    controller.finalize()
+                for record in _pack():
+                    store.append_semantic_state(_early_reject(record))
+                original = w7_unit3._atomic_write_bytes
+                def interrupt_manifest(path: Path, body: bytes, *, replace: bool) -> None:
+                    if path.name == "unit3_manifest.json":
+                        raise Unit3Blocked("PERSISTENCE_WRITE_FAILED")
+                    original(path, body, replace=replace)
+                with patch.object(w7_unit3, "_atomic_write_bytes", side_effect=interrupt_manifest):
+                    with self.assertRaises(Unit3Blocked):
+                        controller.finalize()
+                self.assertFalse(store._path("manifest").exists())
+                resumed = controller.finalize()
+                self.assertEqual(resumed["manifest"]["accounting"]["reviewed"], 48)
+                manifest_bytes = store._path("manifest").read_bytes()
+                self.assertEqual(controller.finalize(), resumed)
+                self.assertEqual(store._path("manifest").read_bytes(), manifest_bytes)
+
+    def test_sanctioned_finalize_reopen_reconstructs_and_tamper_fails_closed(self) -> None:
+        with _synthetic_root(2) as root:
+            store = _store(root)
+            for record in _pack():
+                store.append_semantic_state(_early_reject(record))
+            with patch(
+                "genshin_corpus.retrieval.w7_unit3.open_production_unit3b_store",
+                side_effect=lambda *args, **kwargs: _store(root),
+            ):
+                controller = open_production_unit3b_semantic_exposure(root, tooling_checkpoint="synthetic-unit3b-checkpoint")
+                first = controller.finalize()
+                final_path = store._path("final_ledger")
+                final_bytes = final_path.read_bytes()
+                self.assertEqual(first["manifest"]["artifacts"]["final_ledger"]["row_count"], 48)
+                self.assertEqual(controller.finalize(), first)
+                final_path.write_bytes(final_bytes + b"tampered")
+                with self.assertRaises(Unit3Blocked):
+                    controller.finalize()
+
     def test_review_pack_is_frozen_48_ordered_nested_allowlisted_and_silent(self) -> None:
         pack = _pack()
         self.assertEqual(validate_review_pack(pack), {"candidate_count": 48, "forbidden_field_count": 0, "outside_scope_text_count": 0, "legacy_c1_sensitive_field_count": 0})
