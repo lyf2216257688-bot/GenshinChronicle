@@ -502,11 +502,18 @@ Canonical
 → provider-neutral Evidence Packet JSON / Markdown
 ```
 
-It adds no BM25/Dense/Hybrid retrieval implementation, embedding, benchmark
-production, GenerationProvider, or Canonical change. Retrieval Unit identity
-is source-occurrence based; build identity is recorded separately. Known
-non-indexable Canonical structures are audited skips, while unknown schema,
-kind, or malformed supported shape fails closed.
+It adds no benchmark production, GenerationProvider, or Canonical change.
+Retrieval Unit identity is source-occurrence based; build identity is recorded
+separately. Known non-indexable Canonical structures are audited skips, while
+unknown schema, kind, or malformed supported shape fails closed.
+
+P04-RAG-W2 subsequently implemented the versioned candidate-retrieval layer
+over that W1 artifact: deterministic BM25 lexical retrieval, local
+bge-small-zh-v1.5 Dense vectors with exact dot-product search, and simple RRF
+Hybrid. Lexical and Dense build identities are isolated; candidates retain
+retrieval audit metadata while W1 RU/Assembly remain provenance authority.
+No production-scale corpus build, benchmark production, or GenerationProvider
+was run in W2.
 
 The completed Plan answered the following from the live repository:
 

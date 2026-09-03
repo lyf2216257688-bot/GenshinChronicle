@@ -2,7 +2,7 @@
 
 ## Active phase
 
-**Phase 04 - First End-to-End RAG implementation (post-W7 direction reset; P04-RAG-W1 ACCEPTED)**
+**Phase 04 - First End-to-End RAG implementation (post-W7 direction reset; P04-RAG-W2 ACCEPTED)**
 
 ## Objective
 
@@ -206,15 +206,22 @@ scoped and authorized; this does not constitute a permanent rejection of
 reranking, ANN/vector DB, different embeddings, different Hybrid methods, or
 additional GenerationProviders when end-to-end evidence justifies them.
 
+P04-RAG-W2 — Versioned Candidate Retrieval over W1 RU (BM25 + local Dense +
+deterministic RRF Hybrid) implementation and narrow Dense correctness closure
+are complete and accepted at the scoped technical-lead gate. It uses separate lexical/Dense build identities, local
+bge-small-zh-v1.5 vectors over W1 Retrieval Units, deterministic candidate
+serialization, and direct candidate-neutral Evidence Assembly handoff. No
+GenerationProvider, benchmark production, or production-scale corpus run was
+performed.
+
 Current pending Codex task: **NONE**.
 
 ## Immediate next action
 
-Define and review exactly one candidate-retrieval work unit over the accepted
-versioned Retrieval Unit artifact. That work unit is not yet formally defined
-or authorized; its scope must preserve the build/identity boundary and must
-not silently pull BM25, Dense, Hybrid, embedding, GenerationProvider,
-benchmark production, or Canonical changes into the same work unit.
+The immediate next action is to define and review exactly one subsequent
+First End-to-End RAG work unit based on the accepted W1 + W2 baseline. That
+work unit is not yet formally defined or authorized. No specific subsequent
+implementation is pre-authorized here.
 
 ## Phase transition boundary
 

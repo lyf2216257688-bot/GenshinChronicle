@@ -1,8 +1,9 @@
 """Phase 04 deterministic Retrieval derivatives and Evidence Assembly.
 
-The package contains rebuildable experiment artifacts plus the P04-RAG-W1
-Retrieval Unit and candidate-neutral Evidence Assembly core.  It contains no
-BM25/Dense production integration, embeddings, or GenerationProvider.
+The package contains the P04-RAG-W1 Retrieval Unit and candidate-neutral
+Evidence Assembly core, plus the P04-RAG-W2 versioned lexical, local Dense,
+and deterministic Hybrid candidate-retrieval baseline. It does not contain a
+GenerationProvider.
 """
 
 from .benchmark import (
@@ -47,6 +48,21 @@ from .evidence_assembly import (
     evidence_packet_markdown,
     write_evidence_packet,
 )
+from .candidate_retrieval import (
+    CANDIDATE_SCHEMA_VERSION,
+    DENSE_INDEX_SCHEMA_VERSION,
+    LEXICAL_INDEX_SCHEMA_VERSION,
+    RRF_FUSION_VERSION,
+    CandidateRetrievalError,
+    build_dense_index,
+    build_lexical_index,
+    dense_candidates,
+    dense_candidates_local,
+    encode_dense_query,
+    hybrid_candidates,
+    lexical_candidates,
+    retrieve_candidates,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -80,6 +96,19 @@ __all__ = [
     "evidence_packet_json_bytes",
     "evidence_packet_markdown",
     "write_evidence_packet",
+    "CANDIDATE_SCHEMA_VERSION",
+    "DENSE_INDEX_SCHEMA_VERSION",
+    "LEXICAL_INDEX_SCHEMA_VERSION",
+    "RRF_FUSION_VERSION",
+    "CandidateRetrievalError",
+    "build_dense_index",
+    "build_lexical_index",
+    "dense_candidates",
+    "dense_candidates_local",
+    "encode_dense_query",
+    "hybrid_candidates",
+    "lexical_candidates",
+    "retrieve_candidates",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]
