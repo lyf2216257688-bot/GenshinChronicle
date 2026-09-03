@@ -240,9 +240,9 @@ Retrieval optimization have not started.
 
 ## Immediate next action
 
-The immediate next action is a repository checkpoint. After that checkpoint,
-the project may enter a new Generation stage/window; that stage is not yet
-implemented here.
+Repository checkpoint `e8de651` (`Materialize production retrieval baseline`)
+is complete. The immediate next action is Generation design / Plan for a new
+stage/window; Generation implementation is not yet authorized here.
 
 ## Phase transition boundary
 
@@ -269,9 +269,11 @@ knowledge graphs, different embeddings, and additional GenerationProviders
 may be reconsidered later if end-to-end evidence shows they address a real
 bottleneck.
 
-The planned first GenerationProvider is OpenAI. The long-term provider list is
-intentionally not frozen; later providers may be added or removed according
-to actual product needs.
+GenerationProvider remains provider-neutral. The first operational platform
+will be Alibaba Cloud Bailian / Model Studio and the first model family will be
+Qwen; the exact Qwen model and snapshot are TBD / not frozen. OpenAI remains a
+later quality-comparison and provider candidate, not the sole or mandatory
+provider.
 
 Knowledge-graph / semantic-identity layers and production UI remain outside
 the first runnable RAG baseline unless separately authorized.
