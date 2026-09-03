@@ -1,9 +1,9 @@
-"""Phase 04 deterministic Retrieval derivatives and Evidence Assembly.
+"""Phase 04 Retrieval and deterministic Evidence Assembly.
 
 The package contains the P04-RAG-W1 Retrieval Unit and candidate-neutral
 Evidence Assembly core, plus the P04-RAG-W2 versioned lexical, local Dense,
-and deterministic Hybrid candidate-retrieval baseline. It does not contain a
-GenerationProvider.
+and deterministic Hybrid candidate-retrieval baseline.  Generation is a
+separate package that consumes Evidence Packets through their public contract.
 """
 
 from .benchmark import (

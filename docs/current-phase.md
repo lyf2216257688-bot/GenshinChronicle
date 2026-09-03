@@ -235,14 +235,33 @@ Markdown outputs; determinism PASS.
 
 Therefore, the production Retrieval → Evidence Packet baseline is
 **MATERIALIZED / PASS**. This does not mean that full RAG is complete.
-GenerationProvider, the approximately 70-question benchmark/evaluation, and
-Retrieval optimization have not started.
+P04-RAG-G1 offline Generation control baseline is **PASS / CLOSED** at the
+technical-lead actual source/test gate: focused Generation tests passed 14/14,
+affected Retrieval/Evidence Assembly regression passed 73/73, and the normal
+Windows full suite passed 240/240. It adds a provider-neutral Generation
+request/result contract, a
+generation-visible Evidence Packet projection, deterministic request/config
+identities separate from nondeterministic execution occurrences, local citation
+membership/coverage validation only, and one injected-transport Bailian/Qwen
+control adapter. Its baseline configuration requires exact model
+`qwen3.7-plus-2026-05-26` and explicitly configures
+`enable_thinking=false`; aliases and challengers are not implemented. It made
+no real API call. Invalid control configuration fails before any provider
+invocation or occurrence and is not serialized as a Generation result; result
+statuses describe only valid-config occurrences. Citation
+`semantic_faithfulness` is invariantly `not_evaluated`, rather than a local
+semantic verdict. Real Bailian/Qwen API smoke is `NOT RUN`; it is the immediate
+next natural account-scoped activity, rather than a project blocker caused by
+absent region/workspace/API-key configuration. The approximately 70-question
+formal evaluation and Retrieval/Embedding/Rerank optimization are `NOT
+STARTED`.
 
 ## Immediate next action
 
 Repository checkpoint `e8de651` (`Materialize production retrieval baseline`)
-is complete. The immediate next action is Generation design / Plan for a new
-stage/window; Generation implementation is not yet authorized here.
+is complete. The immediate next natural activity is an account-scoped real
+Bailian/Qwen API smoke, which remains separately authorized. Same-Evidence
+Generation evaluation also requires separate authorization.
 
 ## Phase transition boundary
 
@@ -269,11 +288,14 @@ knowledge graphs, different embeddings, and additional GenerationProviders
 may be reconsidered later if end-to-end evidence shows they address a real
 bottleneck.
 
-GenerationProvider remains provider-neutral. The first operational platform
-will be Alibaba Cloud Bailian / Model Studio and the first model family will be
-Qwen; the exact Qwen model and snapshot are TBD / not frozen. OpenAI remains a
-later quality-comparison and provider candidate, not the sole or mandatory
-provider.
+GenerationProvider remains provider-neutral. The first operational platform is
+Alibaba Cloud Bailian / Model Studio and the first model family is Qwen. The
+implemented offline control baseline uses exact snapshot
+`qwen3.7-plus-2026-05-26` rather than the dynamic `qwen3.7-plus` alias, with
+explicit `enable_thinking=false` as a configurable operating point. This is a
+first control baseline, not a long-term generator winner. Qwen Max, later
+Qwen versions, and OpenAI remain later same-Evidence challengers/provider
+candidates, not current implementations.
 
 Knowledge-graph / semantic-identity layers and production UI remain outside
 the first runnable RAG baseline unless separately authorized.

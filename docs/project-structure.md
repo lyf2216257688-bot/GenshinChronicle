@@ -27,6 +27,10 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/retrieval/`: Phase 04 corpus profiling, benchmark
   contracts, rebuildable representation experiments, and an offline lexical
   baseline; it contains no production retrieval engine or index.
+- `src/genshin_corpus/generation/`: provider-neutral Generation contracts,
+  generation-visible Evidence Packet projection, result/citation-integrity
+  persistence, and explicitly scoped provider adapters. It consumes an
+  Evidence Packet but does not own Retrieval or Evidence Assembly policy.
 
 ## Tests and fixtures
 
@@ -35,6 +39,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   tests.
 - `tests/canonical/`: hand-built Canonical contract fixtures and focused tests.
 - `tests/retrieval/`: Phase 04 profiler and benchmark-contract focused tests.
+- `tests/generation/`: focused offline Generation contract and injected
+  transport-adapter tests; no test calls a remote Generation API.
 - `tests/fixtures/`: small sanitized source samples used by automated tests.
 
 ## Data directories

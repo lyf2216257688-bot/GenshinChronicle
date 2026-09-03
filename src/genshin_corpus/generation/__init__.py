@@ -1,0 +1,61 @@
+"""Provider-neutral Generation contracts and provider-specific adapters.
+
+Generation consumes Evidence Packets but owns neither Retrieval nor Evidence
+Assembly policy.  The first adapter is offline/injected-transport only.
+"""
+
+from .generation import (
+    BASELINE_QWEN_MODEL_ID,
+    DEFAULT_GENERATION_INSTRUCTION,
+    EXACT_SNAPSHOT_POLICY,
+    GENERATION_PROVIDER_ID_BAILIAN,
+    GENERATION_REQUEST_SCHEMA_VERSION,
+    GENERATION_RESULT_SCHEMA_VERSION,
+    SEMANTIC_FAITHFULNESS_NOT_EVALUATED,
+    BailianControlConfig,
+    BailianGenerationProvider,
+    BailianTransport,
+    BailianTransportError,
+    BailianTransportResponse,
+    CitationCoveragePolicy,
+    CitationValidation,
+    GenerationConfigurationError,
+    GenerationContractError,
+    GenerationEvidence,
+    GenerationInstruction,
+    GenerationProvider,
+    GenerationRequest,
+    GenerationResult,
+    generation_result_json_bytes,
+    project_generation_request,
+    validate_citations,
+    write_generation_result,
+)
+
+__all__ = [
+    "BASELINE_QWEN_MODEL_ID",
+    "DEFAULT_GENERATION_INSTRUCTION",
+    "EXACT_SNAPSHOT_POLICY",
+    "GENERATION_PROVIDER_ID_BAILIAN",
+    "GENERATION_REQUEST_SCHEMA_VERSION",
+    "GENERATION_RESULT_SCHEMA_VERSION",
+    "SEMANTIC_FAITHFULNESS_NOT_EVALUATED",
+    "BailianControlConfig",
+    "BailianGenerationProvider",
+    "BailianTransport",
+    "BailianTransportError",
+    "BailianTransportResponse",
+    "CitationCoveragePolicy",
+    "CitationValidation",
+    "GenerationConfigurationError",
+    "GenerationContractError",
+    "GenerationEvidence",
+    "GenerationInstruction",
+    "GenerationProvider",
+    "GenerationRequest",
+    "GenerationResult",
+    "generation_result_json_bytes",
+    "project_generation_request",
+    "validate_citations",
+    "write_generation_result",
+]
