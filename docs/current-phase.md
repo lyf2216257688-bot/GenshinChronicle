@@ -216,12 +216,33 @@ performed.
 
 Current pending Codex task: **NONE**.
 
+Production materialization attempt #1 is retained as a partial run: RU and
+lexical artifacts were generated, while Dense was not generated because of a
+Dense runtime-preflight gap that was subsequently repaired. The runtime-
+preflight repair actual gate is **PASS**.
+
+Production materialization attempt #2 is **COMPLETE / PASS** under the
+technical-lead actual evidence gate: the Canonical input contains 16,437
+complete records; W1 produced 535,802 Retrieval Units with failure count 0;
+lexical and Dense each contain 535,802 rows bound to the same W1 RU build.
+Dense uses the pinned local-only CPU bge-small-zh-v1.5 model, revision
+`7999e1d3359715c523056ef9478215996d62a620`, SHA-256
+`354763b9b1357bc9c44f62c6be2276321081ed2567773608c0d0785b61d5a026`, with
+512-dimensional FP32/L2 vectors. Evidence Packet JSON and Markdown were
+generated for q01/q02 × lexical/dense/hybrid. q01 Hybrid was repeated with
+the same artifacts, query, and configuration and produced byte-exact JSON and
+Markdown outputs; determinism PASS.
+
+Therefore, the production Retrieval → Evidence Packet baseline is
+**MATERIALIZED / PASS**. This does not mean that full RAG is complete.
+GenerationProvider, the approximately 70-question benchmark/evaluation, and
+Retrieval optimization have not started.
+
 ## Immediate next action
 
-The immediate next action is to define and review exactly one subsequent
-First End-to-End RAG work unit based on the accepted W1 + W2 baseline. That
-work unit is not yet formally defined or authorized. No specific subsequent
-implementation is pre-authorized here.
+The immediate next action is a repository checkpoint. After that checkpoint,
+the project may enter a new Generation stage/window; that stage is not yet
+implemented here.
 
 ## Phase transition boundary
 

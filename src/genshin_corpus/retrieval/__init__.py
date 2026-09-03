@@ -63,6 +63,12 @@ from .candidate_retrieval import (
     lexical_candidates,
     retrieve_candidates,
 )
+from .production_materialization import (
+    PINNED_BGE_SMALL_MODEL_SHA256,
+    ProductionMaterializationError,
+    materialize_production,
+    preflight_production_inputs,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -109,6 +115,10 @@ __all__ = [
     "hybrid_candidates",
     "lexical_candidates",
     "retrieve_candidates",
+    "PINNED_BGE_SMALL_MODEL_SHA256",
+    "ProductionMaterializationError",
+    "materialize_production",
+    "preflight_production_inputs",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]
