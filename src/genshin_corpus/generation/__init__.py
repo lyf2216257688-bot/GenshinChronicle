@@ -1,7 +1,9 @@
 """Provider-neutral Generation contracts and provider-specific adapters.
 
 Generation consumes Evidence Packets but owns neither Retrieval nor Evidence
-Assembly policy.  The first adapter is offline/injected-transport only.
+Assembly policy.  Provider-neutral use keeps an injected transport boundary;
+the first scoped Bailian adapter also exposes its explicitly authorized live
+HTTP transport.
 """
 
 from .generation import (
@@ -14,6 +16,7 @@ from .generation import (
     SEMANTIC_FAITHFULNESS_NOT_EVALUATED,
     BailianControlConfig,
     BailianGenerationProvider,
+    BailianOpenAICompatibleTransport,
     BailianTransport,
     BailianTransportError,
     BailianTransportResponse,
@@ -26,9 +29,12 @@ from .generation import (
     GenerationProvider,
     GenerationRequest,
     GenerationResult,
+    DEFAULT_G2_SMOKE_PACKET,
     generation_result_json_bytes,
     project_generation_request,
+    run_bailian_control_smoke,
     validate_citations,
+    workspace_from_bailian_base_url,
     write_generation_result,
 )
 
@@ -42,6 +48,7 @@ __all__ = [
     "SEMANTIC_FAITHFULNESS_NOT_EVALUATED",
     "BailianControlConfig",
     "BailianGenerationProvider",
+    "BailianOpenAICompatibleTransport",
     "BailianTransport",
     "BailianTransportError",
     "BailianTransportResponse",
@@ -54,8 +61,11 @@ __all__ = [
     "GenerationProvider",
     "GenerationRequest",
     "GenerationResult",
+    "DEFAULT_G2_SMOKE_PACKET",
     "generation_result_json_bytes",
     "project_generation_request",
+    "run_bailian_control_smoke",
     "validate_citations",
+    "workspace_from_bailian_base_url",
     "write_generation_result",
 ]

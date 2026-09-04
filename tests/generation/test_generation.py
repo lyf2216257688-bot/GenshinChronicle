@@ -6,11 +6,13 @@ import shutil
 import unittest
 from dataclasses import FrozenInstanceError
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 
 from genshin_corpus.generation.generation import (
     BASELINE_QWEN_MODEL_ID,
     BailianControlConfig,
     BailianGenerationProvider,
+    BailianOpenAICompatibleTransport,
     BailianTransportError,
     BailianTransportResponse,
     CitationCoveragePolicy,
@@ -19,7 +21,9 @@ from genshin_corpus.generation.generation import (
     GenerationResult,
     CitationValidation,
     project_generation_request,
+    run_bailian_control_smoke,
     validate_citations,
+    workspace_from_bailian_base_url,
     write_generation_result,
 )
 
@@ -33,6 +37,39 @@ class _FakeTransport:
     def invoke(self, payload: dict, *, timeout_seconds: float) -> BailianTransportResponse:
         self.payloads.append(payload)
         self.timeouts.append(timeout_seconds)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome  # type: ignore[return-value]
+
+
+class _FakeResponse:
+    def __init__(self, body: object, *, headers: dict[str, str] | None = None) -> None:
+        self._body = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+        self.headers = headers or {}
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+class _FakeOpener:
+    def __init__(self, outcomes: list[object]) -> None:
+        self.outcomes = list(outcomes)
+        self.requests: list[object] = []
+        self.timeouts: list[float] = []
+
+    def open(self, request: object, timeout: float) -> _FakeResponse:
+        self.requests.append(request)
+        self.timeouts.append(timeout)
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -192,6 +229,61 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(len(transport.payloads), 3)
         self.assertEqual(failure.provider_audit["attempts"][-1]["retry_decision"], "stop")
 
+    def test_retry_classifier_uses_only_documented_status_code_pairs(self) -> None:
+        for status, code in (
+            (429, "Throttling"),
+            (429, "Throttling.RateQuota"),
+            (429, "LimitRequests"),
+            (429, "limit_requests"),
+            (429, "Throttling.BurstRate"),
+            (429, "limit_burst_rate"),
+            (429, "Throttling.AllocationQuota"),
+            (429, "insufficient_quota"),
+            (500, "InternalError"),
+            (500, "internal_error"),
+            (500, "SystemError"),
+            (500, "ModelServiceFailed"),
+            (500, "RequestTimeOut"),
+            (500, "ModelServingError"),
+            (503, "ModelServingError"),
+            (503, "ModelUnavailable"),
+        ):
+            provider, transport = self._provider([
+                BailianTransportError(status_code=status, code=code, message="transient"),
+                BailianTransportResponse("恢复 [E01]"),
+            ])
+            self.assertEqual(provider.generate(self.request).execution_status, "succeeded")
+            self.assertEqual(len(transport.payloads), 2)
+        for status, code in (
+            (400, "Throttling.AllocationQuota"),
+            (500, "Throttling.AllocationQuota"),
+            (503, "InternalError"),
+            (503, "SystemError"),
+            (503, "ModelServiceFailed"),
+            (503, "RequestTimeOut"),
+            (429, "ModelServingError"),
+            (500, "ModelUnavailable"),
+            (429, "Throttling.User"),
+            (429, "Throttling.RateLimit"),
+            (429, "PurchaseRequired"),
+            (429, "BillingError"),
+            (429, "AccountArrears"),
+            (401, "InvalidApiKey"),
+            (403, "AccessDenied"),
+            (400, "InvalidParameter"),
+            (429, "Unknown429"),
+            (500, "Unknown500"),
+            (503, "Unknown503"),
+        ):
+            provider, transport = self._provider([
+                BailianTransportError(status_code=status, code=code, message="stop"),
+                BailianTransportResponse("不应调用 [E01]"),
+            ])
+            failure = provider.generate(self.request)
+            self.assertEqual(failure.execution_status, "provider_error")
+            self.assertEqual(len(transport.payloads), 1)
+            self.assertFalse(failure.provider_audit["attempts"][0]["retryable"])
+
     def test_default_sleeper_honors_configured_retry_backoff(self) -> None:
         config = BailianControlConfig(
             region="cn-beijing",
@@ -291,6 +383,155 @@ class GenerationTests(unittest.TestCase):
             project_generation_request(dict(self.packet, schema_version="future"), question="x")
         with self.assertRaisesRegex(GenerationContractError, "answer_text"):
             validate_citations("", self.request)
+
+
+class BailianLiveTransportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = BailianControlConfig(
+            region="cn-beijing",
+            endpoint="https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            workspace="workspace-a",
+            max_attempts=1,
+        )
+        self.payload = {
+            "model": BASELINE_QWEN_MODEL_ID,
+            "messages": [{"role": "user", "content": "问题"}],
+            "generation_parameters": {
+                "enable_thinking": False,
+                "temperature": 0.0,
+                "max_output_tokens": 1024,
+            },
+            "workspace": "workspace-a",
+        }
+
+    def test_wire_mapping_is_official_shape_and_never_sends_workspace(self) -> None:
+        opener = _FakeOpener([_FakeResponse({
+            "id": "request-1",
+            "choices": [{"message": {"content": "回答 [E01]"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 12, "completion_tokens": 3},
+        })])
+        transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=opener)
+        response = transport.invoke(self.payload, timeout_seconds=2.5)
+        request = opener.requests[0]
+        body = json.loads(request.data.decode("utf-8"))  # type: ignore[attr-defined]
+        self.assertEqual(request.full_url, "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions")  # type: ignore[attr-defined]
+        self.assertEqual(body["model"], BASELINE_QWEN_MODEL_ID)
+        self.assertEqual(body["enable_thinking"], False)
+        self.assertEqual(body["max_tokens"], 1024)
+        self.assertFalse(body["stream"])
+        self.assertNotIn("workspace", body)
+        self.assertNotIn("generation_parameters", body)
+        self.assertEqual(response.provider_request_id, "request-1")
+        self.assertEqual(response.finish_reason, "stop")
+        self.assertEqual(response.usage, {"prompt_tokens": 12, "completion_tokens": 3})
+        self.assertNotIn("test-secret", body.__repr__())
+
+    def test_endpoint_and_credential_boundary_fail_closed_before_environment_read(self) -> None:
+        bad = BailianControlConfig(
+            region="cn-beijing",
+            endpoint="https://attacker.example/compatible-mode/v1",
+            workspace="workspace-a",
+        )
+        reads: list[str] = []
+
+        class _Environment(dict[str, str]):
+            def get(self, key: str, default: object = None) -> object:
+                reads.append(key)
+                return super().get(key, default)
+
+        with self.assertRaisesRegex(GenerationConfigurationError, "workspace-dedicated"):
+            BailianOpenAICompatibleTransport.from_environment(bad, environment=_Environment(DASHSCOPE_API_KEY="test-secret"))
+        self.assertEqual(reads, [])
+        for value in (
+            "http://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "https://workspace-a.cn-beijing.maas.aliyuncs.com:444/compatible-mode/v1",
+            "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1?x=1",
+            "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/extra",
+        ):
+            with self.assertRaises(GenerationConfigurationError):
+                workspace_from_bailian_base_url(value)
+
+    def test_http_error_redirect_and_connection_error_are_safe_and_normalized(self) -> None:
+        response_headers = {"x-acs-request-id": "server-request", "Retry-After": "1.5"}
+        transient = HTTPError(
+            "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+            429,
+            "ignored",
+            response_headers,
+            _FakeResponse({"code": "Throttling.AllocationQuota", "message": "secret provider detail"}),
+        )
+        transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=_FakeOpener([transient]))
+        with self.assertRaises(BailianTransportError) as caught:
+            transport.invoke(self.payload, timeout_seconds=1)
+        error = caught.exception
+        self.assertEqual((error.status_code, error.code, error.provider_request_id, error.retry_after_seconds), (429, "Throttling.AllocationQuota", "server-request", 1.5))
+        self.assertNotIn("secret provider detail", repr(error))
+        redirect = HTTPError("https://safe", 302, "redirect", {"Location": "https://attacker"}, _FakeResponse(b""))
+        transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=_FakeOpener([redirect]))
+        with self.assertRaises(BailianTransportError) as caught:
+            transport.invoke(self.payload, timeout_seconds=1)
+        self.assertEqual(caught.exception.code, "RedirectRejected")
+        transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=_FakeOpener([URLError("offline")]))
+        with self.assertRaises(BailianTransportError) as caught:
+            transport.invoke(self.payload, timeout_seconds=1)
+        self.assertEqual((caught.exception.status_code, caught.exception.code), (None, "TransportConnectionError"))
+
+    def test_malformed_success_is_response_invalid_not_provider_error(self) -> None:
+        transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=_FakeOpener([_FakeResponse(b"not json")]))
+        response = transport.invoke(self.payload, timeout_seconds=1)
+        self.assertIsNone(response.answer_text)
+
+
+class BailianSmokeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.root = Path("tmp/.generation-smoke-test")
+        if self.root.exists():
+            shutil.rmtree(self.root)
+        self.root.mkdir(parents=True)
+        self.packet = self.root / "evidence_packet.json"
+        self.packet.write_text(json.dumps({
+            "schema_version": "phase04-evidence-packet-0.1",
+            "evidence": [{"evidence_id": "E01", "text": "证据", "members": []}],
+            "retrieval_audit": {"retrieval_metadata": {"query_id": "q01", "query_text": "问题"}},
+        }, ensure_ascii=False), encoding="utf-8")
+        self.environment = {
+            "BAILIAN_BASE_URL": "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "DASHSCOPE_API_KEY": "test-secret",
+        }
+
+    def tearDown(self) -> None:
+        if self.root.exists():
+            shutil.rmtree(self.root)
+
+    def test_smoke_prevents_second_request_for_an_existing_output(self) -> None:
+        output = self.root / "output"
+        output.mkdir()
+        (output / "generation_result.json").write_text("{}", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            run_bailian_control_smoke(packet_path=self.packet, output_root=output, environment=self.environment)
+
+    def test_smoke_uses_one_exact_baseline_occurrence_and_persists_safe_result(self) -> None:
+        transport = _FakeTransport([BailianTransportResponse("回答 [E01]", provider_request_id="request-safe")])
+        output = self.root / "output"
+        with patch(
+            "genshin_corpus.generation.generation.BailianOpenAICompatibleTransport.from_environment",
+            return_value=transport,
+        ) as factory:
+            result = run_bailian_control_smoke(
+                packet_path=self.packet,
+                output_root=output,
+                environment=self.environment,
+            )
+        self.assertEqual(result["execution_status"], "succeeded")
+        self.assertEqual(result["semantic_faithfulness"], "not_evaluated")
+        self.assertEqual(len(transport.payloads), 1)
+        config = factory.call_args.args[0]
+        self.assertEqual(config.model_id, BASELINE_QWEN_MODEL_ID)
+        self.assertFalse(config.enable_thinking)
+        self.assertEqual(config.max_attempts, 1)
+        body = (output / "generation_result.json").read_text(encoding="utf-8")
+        self.assertNotIn("test-secret", body)
+        self.assertNotIn("DASHSCOPE_API_KEY", body)
 
 
 if __name__ == "__main__":

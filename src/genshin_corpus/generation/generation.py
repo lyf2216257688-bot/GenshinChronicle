@@ -1,10 +1,11 @@
-"""Offline Generation contracts and the first Bailian/Qwen control adapter.
+"""Generation contracts and the first Bailian/Qwen control adapter.
 
 The provider-neutral request is deliberately limited to a versioned
 instruction, one question, and the generation-visible projection of an
 Evidence Packet.  Retrieval audit metadata and provider wire details stay out
-of that boundary.  This module contains no HTTP client and never calls a
-remote service by itself; a transport must be injected explicitly.
+of that boundary.  The provider-neutral adapter continues to receive an
+explicit transport; the scoped Bailian transport implements the live HTTP
+boundary separately in this module.
 """
 
 from __future__ import annotations
@@ -12,12 +13,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import math
+import os
 import re
 import time
 from pathlib import Path
 from collections.abc import Callable, Mapping
 from typing import Any, Protocol, runtime_checkable
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import uuid4
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
@@ -37,6 +43,29 @@ EXACT_SNAPSHOT_POLICY = "exact_snapshot_required"
 SEMANTIC_FAITHFULNESS_NOT_EVALUATED = "not_evaluated"
 _EXACT_QWEN_SNAPSHOT = re.compile(r"^qwen[0-9.]+-[a-z]+-[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _EVIDENCE_ID = re.compile(r"^E[0-9]{2,}$")
+_BAILIAN_BEIJING_HOST_SUFFIX = ".cn-beijing.maas.aliyuncs.com"
+_BAILIAN_COMPATIBLE_BASE_PATH = "/compatible-mode/v1"
+# Model Studio's retry guidance is code-and-status-specific.  This explicit
+# Chat Completion allowlist deliberately excludes plausible-looking but
+# undocumented combinations; unlisted values fail closed without retry.
+_BAILIAN_RETRYABLE_ERROR_PAIRS = frozenset({
+    (429, "Throttling"),
+    (429, "Throttling.RateQuota"),
+    (429, "LimitRequests"),
+    (429, "limit_requests"),
+    (429, "Throttling.BurstRate"),
+    (429, "limit_burst_rate"),
+    (429, "Throttling.AllocationQuota"),
+    (429, "insufficient_quota"),
+    (500, "InternalError"),
+    (500, "internal_error"),
+    (500, "SystemError"),
+    (500, "ModelServiceFailed"),
+    (500, "RequestTimeOut"),
+    (500, "ModelServingError"),
+    (503, "ModelServingError"),
+    (503, "ModelUnavailable"),
+})
 
 
 class GenerationContractError(ValueError):
@@ -517,15 +546,17 @@ class BailianTransportError(Exception):
     def __init__(
         self,
         *,
-        status_code: int,
+        status_code: int | None,
         code: str,
         message: str,
         provider_request_id: str | None = None,
         retry_after_seconds: float | None = None,
     ) -> None:
         super().__init__(message)
-        if not isinstance(status_code, int) or isinstance(status_code, bool) or status_code < 100:
-            raise GenerationContractError("Bailian error status_code must be an HTTP status integer")
+        if status_code is not None and (
+            not isinstance(status_code, int) or isinstance(status_code, bool) or status_code < 100
+        ):
+            raise GenerationContractError("Bailian error status_code must be null or an HTTP status integer")
         if not isinstance(code, str) or not code:
             raise GenerationContractError("Bailian error code must be a non-empty string")
         if not isinstance(message, str) or not message:
@@ -544,6 +575,231 @@ class BailianTransport(Protocol):
 
     def invoke(self, payload: Mapping[str, Any], *, timeout_seconds: float) -> BailianTransportResponse:
         """Return a normalized response or raise BailianTransportError."""
+
+
+class _RejectRedirectHandler(HTTPRedirectHandler):
+    """Do not let urllib issue a second credential-bearing request on redirect."""
+
+    def redirect_request(self, req: Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
+
+
+def _bailian_base_url(config: BailianControlConfig) -> str:
+    """Validate the only credential-bearing origin accepted by the live transport."""
+
+    try:
+        parsed = urlsplit(config.endpoint)
+        port = parsed.port
+    except ValueError as exc:
+        raise GenerationConfigurationError("Bailian endpoint has an invalid port") from exc
+    expected_host = f"{config.workspace}{_BAILIAN_BEIJING_HOST_SUFFIX}".lower()
+    if config.region != "cn-beijing":
+        raise GenerationConfigurationError("live Bailian transport requires region cn-beijing")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", config.workspace.lower()):
+        raise GenerationConfigurationError("Bailian workspace must be a safe endpoint host label")
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.hostname.lower() != expected_host
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, 443}
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {_BAILIAN_COMPATIBLE_BASE_PATH, f"{_BAILIAN_COMPATIBLE_BASE_PATH}/"}
+    ):
+        raise GenerationConfigurationError(
+            "Bailian endpoint must be the cn-beijing workspace-dedicated compatible-mode base URL"
+        )
+    return urlunsplit(("https", expected_host, _BAILIAN_COMPATIBLE_BASE_PATH, "", ""))
+
+
+def workspace_from_bailian_base_url(endpoint: str) -> str:
+    """Extract a non-secret Beijing workspace ID only after strict URL validation."""
+
+    try:
+        parsed = urlsplit(endpoint)
+        port = parsed.port
+    except ValueError as exc:
+        raise GenerationConfigurationError("BAILIAN_BASE_URL has an invalid port") from exc
+    hostname = (parsed.hostname or "").lower()
+    if (
+        parsed.scheme != "https"
+        or not hostname.endswith(_BAILIAN_BEIJING_HOST_SUFFIX)
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, 443}
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {_BAILIAN_COMPATIBLE_BASE_PATH, f"{_BAILIAN_COMPATIBLE_BASE_PATH}/"}
+    ):
+        raise GenerationConfigurationError(
+            "BAILIAN_BASE_URL must be the cn-beijing workspace-dedicated compatible-mode base URL"
+        )
+    workspace = hostname[: -len(_BAILIAN_BEIJING_HOST_SUFFIX)]
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", workspace):
+        raise GenerationConfigurationError("BAILIAN_BASE_URL has no safe workspace host label")
+    return workspace
+
+
+def _retry_after_seconds(headers: Any) -> float | None:
+    value = headers.get("Retry-After") if headers is not None else None
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    return parsed if math.isfinite(parsed) and parsed >= 0 else None
+
+
+def _provider_request_id(headers: Any) -> str | None:
+    if headers is None:
+        return None
+    for name in ("x-acs-request-id", "x-request-id"):
+        value = headers.get(name)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _error_code_and_message(body: bytes) -> tuple[str, str]:
+    """Parse only the documented code; never retain a provider error message."""
+
+    try:
+        value = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return "UnknownProviderError", "Bailian returned an unreadable error response"
+    if not isinstance(value, Mapping):
+        return "UnknownProviderError", "Bailian returned an invalid error response"
+    code = value.get("code")
+    return (
+        code if isinstance(code, str) and code else "UnknownProviderError",
+        "Bailian returned an error response",
+    )
+
+
+class BailianOpenAICompatibleTransport:
+    """One stdlib transport for Bailian's workspace-dedicated Chat Completion API.
+
+    It is provider-specific.  The provider-neutral request/result boundary sees
+    only :class:`BailianTransportResponse` and :class:`BailianTransportError`.
+    """
+
+    def __init__(self, config: BailianControlConfig, api_key: str, *, opener: Any | None = None) -> None:
+        self._base_url = _bailian_base_url(config)
+        if not isinstance(api_key, str) or not api_key:
+            raise GenerationConfigurationError("DASHSCOPE_API_KEY must be a non-empty environment value")
+        self._api_key = api_key
+        self._opener = opener or build_opener(_RejectRedirectHandler())
+
+    @classmethod
+    def from_environment(
+        cls,
+        config: BailianControlConfig,
+        *,
+        environment: Mapping[str, str] | None = None,
+        opener: Any | None = None,
+    ) -> BailianOpenAICompatibleTransport:
+        """Validate origin before reading the credential from the environment."""
+
+        _bailian_base_url(config)
+        values = os.environ if environment is None else environment
+        api_key = values.get(config.api_key_env)
+        return cls(config, api_key if isinstance(api_key, str) else "", opener=opener)
+
+    @property
+    def endpoint(self) -> str:
+        return f"{self._base_url}/chat/completions"
+
+    @staticmethod
+    def wire_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+        """Map the G1 adapter payload to the official OpenAI-compatible wire form."""
+
+        model, messages = payload.get("model"), payload.get("messages")
+        parameters = payload.get("generation_parameters")
+        if not isinstance(model, str) or not isinstance(messages, list) or not isinstance(parameters, Mapping):
+            raise GenerationContractError("Bailian adapter payload is invalid for OpenAI-compatible transport")
+        enable_thinking = parameters.get("enable_thinking")
+        temperature = parameters.get("temperature")
+        max_output_tokens = parameters.get("max_output_tokens")
+        if not isinstance(enable_thinking, bool):
+            raise GenerationContractError("Bailian enable_thinking must be a boolean")
+        if not isinstance(temperature, (int, float)) or isinstance(temperature, bool):
+            raise GenerationContractError("Bailian temperature must be numeric")
+        if not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool):
+            raise GenerationContractError("Bailian max_output_tokens must be an integer")
+        return {
+            "model": model,
+            "messages": messages,
+            "temperature": float(temperature),
+            "max_tokens": max_output_tokens,
+            "enable_thinking": enable_thinking,
+            "stream": False,
+        }
+
+    def invoke(self, payload: Mapping[str, Any], *, timeout_seconds: float) -> BailianTransportResponse:
+        wire = self.wire_payload(payload)
+        body = canonical_json_bytes(wire)
+        request = Request(
+            self.endpoint,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with self._opener.open(request, timeout=timeout_seconds) as response:
+                response_body = response.read()
+                headers = response.headers
+        except HTTPError as error:
+            try:
+                code, message = _error_code_and_message(error.read())
+            finally:
+                error.close()
+            if 300 <= error.code < 400:
+                code, message = "RedirectRejected", "Bailian redirect was rejected before a follow-up request"
+            raise BailianTransportError(
+                status_code=error.code,
+                code=code,
+                message=message,
+                provider_request_id=_provider_request_id(error.headers),
+                retry_after_seconds=_retry_after_seconds(error.headers),
+            ) from None
+        except URLError as error:
+            raise BailianTransportError(
+                status_code=None,
+                code="TransportConnectionError",
+                message="Bailian transport connection failed",
+            ) from None
+        try:
+            parsed = json.loads(response_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return BailianTransportResponse(
+                answer_text=None,
+                provider_request_id=_provider_request_id(headers),
+            )
+        if not isinstance(parsed, Mapping):
+            return BailianTransportResponse(
+                answer_text=None,
+                provider_request_id=_provider_request_id(headers),
+            )
+        choices = parsed.get("choices")
+        choice = choices[0] if isinstance(choices, list) and choices else None
+        message = choice.get("message") if isinstance(choice, Mapping) else None
+        answer = message.get("content") if isinstance(message, Mapping) else None
+        usage = parsed.get("usage")
+        finish_reason = choice.get("finish_reason") if isinstance(choice, Mapping) else None
+        response_id = parsed.get("id")
+        return BailianTransportResponse(
+            answer_text=answer,
+            provider_request_id=response_id if isinstance(response_id, str) and response_id else _provider_request_id(headers),
+            usage=usage if isinstance(usage, Mapping) else None,
+            finish_reason=finish_reason if isinstance(finish_reason, str) else None,
+        )
 
 
 def _utc_now() -> str:
@@ -598,13 +854,16 @@ class BailianGenerationProvider:
 
     @staticmethod
     def _error_category(error: BailianTransportError) -> tuple[str, bool]:
-        """Only the documented transient cases are retried in the control adapter."""
+        """Retry only documented transient Bailian code/status pairs."""
 
+        pair = (error.status_code, error.code)
+        if pair not in _BAILIAN_RETRYABLE_ERROR_PAIRS:
+            return "provider_error", False
         if error.status_code == 429:
             return "throttled", True
-        if error.status_code == 503 and error.code == "ModelUnavailable":
+        if pair == (503, "ModelUnavailable"):
             return "model_unavailable", True
-        return "provider_error", False
+        return "model_service_error", True
 
     def _provider_audit_base(self, occurrence_id: str, occurred_at: str) -> dict[str, Any]:
         return {
@@ -724,3 +983,68 @@ class BailianGenerationProvider:
                 provider_audit=audit,
             )
         raise AssertionError("bounded Bailian retry loop must return")
+
+
+DEFAULT_G2_SMOKE_PACKET = Path(
+    "data/retrieval/p04-rag-production/phase03-batch5b-p01eb-full-20260824-pm02/"
+    "packets/q01/hybrid/evidence_packet.json"
+)
+
+
+def run_bailian_control_smoke(
+    *,
+    packet_path: Path = DEFAULT_G2_SMOKE_PACKET,
+    output_root: Path,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Run exactly one locally authorized Qwen control occurrence.
+
+    The caller owns environment variables and authorization.  This helper
+    deliberately fixes ``max_attempts=1`` so one invocation can issue no more
+    than one provider request.  It never prints a secret, request body, or
+    provider error message.
+    """
+
+    packet_path = Path(packet_path)
+    output_root = Path(output_root)
+    if (output_root / "generation_result.json").exists():
+        raise FileExistsError("smoke output already contains generation_result.json; refusing to send a new request")
+    values = os.environ if environment is None else environment
+    endpoint = values.get("BAILIAN_BASE_URL")
+    if not isinstance(endpoint, str) or not endpoint:
+        raise GenerationConfigurationError("BAILIAN_BASE_URL must be set in the local environment")
+    workspace = workspace_from_bailian_base_url(endpoint)
+    try:
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GenerationContractError("smoke Evidence Packet is unreadable") from exc
+    if not isinstance(packet, Mapping):
+        raise GenerationContractError("smoke Evidence Packet must be an object")
+    retrieval_audit = packet.get("retrieval_audit")
+    retrieval_metadata = retrieval_audit.get("retrieval_metadata") if isinstance(retrieval_audit, Mapping) else None
+    question = retrieval_metadata.get("query_text") if isinstance(retrieval_metadata, Mapping) else None
+    question_id = retrieval_metadata.get("query_id") if isinstance(retrieval_metadata, Mapping) else None
+    if not isinstance(question, str) or not question.strip():
+        raise GenerationContractError("smoke Evidence Packet lacks retrieval_audit.retrieval_metadata.query_text")
+    if question_id is not None and not isinstance(question_id, str):
+        raise GenerationContractError("smoke Evidence Packet query_id must be text when present")
+    request = project_generation_request(packet, question=question, question_id=question_id)
+    config = BailianControlConfig(
+        region="cn-beijing",
+        endpoint=endpoint,
+        workspace=workspace,
+        model_id=BASELINE_QWEN_MODEL_ID,
+        enable_thinking=False,
+        max_attempts=1,
+    )
+    transport = BailianOpenAICompatibleTransport.from_environment(config, environment=environment)
+    result = BailianGenerationProvider(config, transport).generate(request)
+    persisted = write_generation_result(output_root, result)
+    return {
+        "execution_status": result.execution_status,
+        "semantic_request_identity": result.semantic_request_identity,
+        "execution_config_identity": result.execution_config_identity,
+        "computed_packet_sha256": request.evidence_packet_sha256,
+        "result_artifact": persisted,
+        "semantic_faithfulness": SEMANTIC_FAITHFULNESS_NOT_EVALUATED,
+    }

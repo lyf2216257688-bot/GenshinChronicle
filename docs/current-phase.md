@@ -250,18 +250,29 @@ no real API call. Invalid control configuration fails before any provider
 invocation or occurrence and is not serialized as a Generation result; result
 statuses describe only valid-config occurrences. Citation
 `semantic_faithfulness` is invariantly `not_evaluated`, rather than a local
-semantic verdict. Real Bailian/Qwen API smoke is `NOT RUN`; it is the immediate
-next natural account-scoped activity, rather than a project blocker caused by
-absent region/workspace/API-key configuration. The approximately 70-question
+semantic verdict.
+
+**P04-RAG-G2 — Bailian live transport + one-request Qwen control smoke** is
+**PASS / CLOSED**. Its offline source/security/test gate passed. The user then
+personally ran exactly one approved `q01/hybrid` production Packet smoke using
+`qwen3.7-plus-2026-05-26`, explicit `enable_thinking=false`, and
+`max_attempts=1`: it produced `succeeded` after exactly one HTTP 200 provider
+attempt with `finish_reason=stop`. Local citation integrity and configured
+coverage both passed. The persisted `generation_result.json` SHA-256 is
+`704e24bff6ba811ceee9e69dbbb5feca6ceb83e5430a65af3af9b6e4be3ca936`.
+This proves the scoped provider transport, local Generation integration, and
+citation structural path; it does **not** assess semantic faithfulness or
+answer quality, which remain `not_evaluated`. The approximately 70-question
 formal evaluation and Retrieval/Embedding/Rerank optimization are `NOT
 STARTED`.
 
 ## Immediate next action
 
 Repository checkpoint `e8de651` (`Materialize production retrieval baseline`)
-is complete. The immediate next natural activity is an account-scoped real
-Bailian/Qwen API smoke, which remains separately authorized. Same-Evidence
-Generation evaluation also requires separate authorization.
+and P04-RAG-G2 are complete. The immediate next action is no automatic
+execution: review the closed control-baseline evidence and separately authorize
+any same-Evidence Generation evaluation, challenger, or Retrieval optimization
+only when needed.
 
 ## Phase transition boundary
 
