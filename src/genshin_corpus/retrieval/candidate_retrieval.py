@@ -332,13 +332,27 @@ def dense_candidates(dense_manifest_path: Path, query_vector: Any, *, top_k: int
     return [{"unit_id": uid, "rank": rank, "retrieval": {"mode": "dense", "score": score, "arm_build_identity": manifest["arm_build_identity"], "query_config_identity": query_identity}} for rank, (score, uid) in enumerate(ranked[:top_k], 1)]
 
 
-def encode_dense_query(model_dir: Path, query: str, *, instruction: str = "为这个句子生成表示以用于检索相关文章：") -> Any:
-    """Encode one query with the pinned local model; never downloads or falls back."""
+def load_dense_query_model(model_dir: Path) -> Any:
+    """Construct the pinned local CPU query encoder without download fallback."""
     try:
         from sentence_transformers import SentenceTransformer
+        return SentenceTransformer(str(Path(model_dir)), local_files_only=True, device="cpu")
+    except Exception as exc:
+        raise CandidateRetrievalError("local Dense query model/runtime unavailable") from exc
+
+
+def encode_dense_query(
+    model_dir: Path,
+    query: str,
+    *,
+    instruction: str = "为这个句子生成表示以用于检索相关文章：",
+    model: Any | None = None,
+) -> Any:
+    """Encode one query with the pinned local model; never downloads or falls back."""
+    try:
         import numpy as np
-        model = SentenceTransformer(str(Path(model_dir)), local_files_only=True, device="cpu")
-        value = model.encode([f"{instruction}{query}" if instruction else query], convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False)
+        encoder = load_dense_query_model(model_dir) if model is None else model
+        value = encoder.encode([f"{instruction}{query}" if instruction else query], convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False)
         vector = np.asarray(value, dtype=np.float32)
         if vector.ndim != 2 or vector.shape[0] != 1 or not np.isfinite(vector).all():
             raise CandidateRetrievalError("Dense query encoding returned an invalid vector")
@@ -419,18 +433,22 @@ def retrieve_candidates(mode: str, *, lexical_manifest_path: Path | None = None,
         if dense_manifest_path is None:
             raise CandidateRetrievalError("Dense manifest is required")
         if model_dir is not None:
+            if query_vector is not None:
+                raise CandidateRetrievalError("precomputed Dense query vectors cannot be combined with a local model path")
             return dense_candidates_local(dense_manifest_path, model_dir, query, top_k=top_k, instruction=instruction)
         if query_vector is None:
             raise CandidateRetrievalError("Dense query vector or local model is required")
-        return dense_candidates(dense_manifest_path, query_vector, top_k=top_k)
+        return dense_candidates(dense_manifest_path, query_vector, top_k=top_k, query_instruction=instruction)
     if mode == "hybrid":
         if lexical_manifest_path is None or dense_manifest_path is None:
             raise CandidateRetrievalError("both arm manifests are required")
         lexical_rows = lexical_candidates(lexical_manifest_path, query, top_k=top_k)
         if model_dir is not None:
+            if query_vector is not None:
+                raise CandidateRetrievalError("precomputed Dense query vectors cannot be combined with a local model path")
             dense_rows = dense_candidates_local(dense_manifest_path, model_dir, query, top_k=top_k, instruction=instruction)
         elif query_vector is not None:
-            dense_rows = dense_candidates(dense_manifest_path, query_vector, top_k=top_k)
+            dense_rows = dense_candidates(dense_manifest_path, query_vector, top_k=top_k, query_instruction=instruction)
         else:
             raise CandidateRetrievalError("Dense query vector or local model is required")
         lexical_manifest, _ = _load_lexical(Path(lexical_manifest_path))

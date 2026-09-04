@@ -91,6 +91,26 @@ class RagW2Tests(unittest.TestCase):
         with self.assertRaisesRegex(CandidateRetrievalError, "SHA-256 does not match"):
             dense_candidates_local(self.root/"dense/metadata/manifest.json", self.root, "阿贝多")
 
+    def test_precomputed_vector_cannot_enter_local_model_path(self):
+        (self.root / "model.safetensors").write_bytes(b"weights-a")
+        build_dense_index(self.ru_manifest, self.root/"dense", model_dir=self.root, vectors=np.array([[1,0],[0,1],[1,0]], dtype=np.float32))
+        build_lexical_index(self.ru_manifest, self.root/"lex")
+        with self.assertRaisesRegex(CandidateRetrievalError, "cannot be combined"):
+            retrieve_candidates(
+                "dense",
+                dense_manifest_path=self.root/"dense/metadata/manifest.json",
+                model_dir=self.root,
+                query_vector=np.array([1, 0], dtype=np.float32),
+            )
+        with self.assertRaisesRegex(CandidateRetrievalError, "cannot be combined"):
+            retrieve_candidates(
+                "hybrid",
+                lexical_manifest_path=self.root/"lex/metadata/manifest.json",
+                dense_manifest_path=self.root/"dense/metadata/manifest.json",
+                model_dir=self.root,
+                query_vector=np.array([1, 0], dtype=np.float32),
+            )
+
     def test_dense_query_instruction_changes_query_identity_only(self):
         (self.root / "model.safetensors").write_bytes(b"weights-a")
         dm = build_dense_index(self.ru_manifest, self.root/"dense", model_dir=self.root, vectors=np.array([[1,0],[0,1],[1,0]], dtype=np.float32), instruction="corpus-placeholder")

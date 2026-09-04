@@ -37,6 +37,22 @@ from .generation import (
     workspace_from_bailian_base_url,
     write_generation_result,
 )
+from .measure import (
+    DEFAULT_M1_ACCEPTED_INPUT,
+    DEFAULT_M1_BASELINE_ROOT,
+    DEFAULT_M1_MODEL_DIR,
+    DEFAULT_M1_RUNTIME_ROOT,
+    M1_PROVIDER_ATTEMPT_BUDGET,
+    M1_QUESTION_COUNT,
+    M1_SCHEMA_VERSION,
+    AcceptedQuestion,
+    M1Baseline,
+    M1MeasureError,
+    load_accepted_questions,
+    preflight_m1,
+    run_m1_measure,
+    write_question_packets,
+)
 
 __all__ = [
     "BASELINE_QWEN_MODEL_ID",
@@ -68,4 +84,18 @@ __all__ = [
     "validate_citations",
     "workspace_from_bailian_base_url",
     "write_generation_result",
+    "DEFAULT_M1_ACCEPTED_INPUT",
+    "DEFAULT_M1_BASELINE_ROOT",
+    "DEFAULT_M1_MODEL_DIR",
+    "DEFAULT_M1_RUNTIME_ROOT",
+    "M1_PROVIDER_ATTEMPT_BUDGET",
+    "M1_QUESTION_COUNT",
+    "M1_SCHEMA_VERSION",
+    "AcceptedQuestion",
+    "M1Baseline",
+    "M1MeasureError",
+    "load_accepted_questions",
+    "preflight_m1",
+    "run_m1_measure",
+    "write_question_packets",
 ]

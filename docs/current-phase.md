@@ -263,16 +263,30 @@ coverage both passed. The persisted `generation_result.json` SHA-256 is
 This proves the scoped provider transport, local Generation integration, and
 citation structural path; it does **not** assess semantic faithfulness or
 answer quality, which remain `not_evaluated`. The approximately 70-question
-formal evaluation and Retrieval/Embedding/Rerank optimization are `NOT
-STARTED`.
+open-ended scenario Measure and Retrieval/Embedding/Rerank challenger work are
+`NOT STARTED`.
+
+**P04-RAG-M1 — six-question lightweight diagnostic Measure** is **PASS /
+CLOSED**. Its purpose was a small human-reviewed diagnostic of Evidence
+Packets and answers, not a formal semantic benchmark or gold-truth closure.
+`run-001` is preserved and was not reused: system Python lacked the local
+Dense runtime, so it stopped before provider invocation with 0 provider
+attempts. The bundled `.local/w6-runtime` actual-preflight repair then passed.
+`run-002` completed all 6 accepted questions with 6 provider attempts. q020
+exposed truncation at the fixed `max_output_tokens=1024` control value; this is
+not a Retrieval failure. Generation output length is therefore a
+user-configurable product direction, while exact M2 operating values remain
+undecided. The Dense execution batch now shares one verified encoder and
+performs one query encoding per question; preflight remains a separate actual
+probe. M1 semantic interpretation remains lightweight and observed, not a
+gold-benchmark conclusion. No Retrieval, Embedding, or Rerank challenger work
+is authorized by M1.
 
 ## Immediate next action
 
-Repository checkpoint `e8de651` (`Materialize production retrieval baseline`)
-and P04-RAG-G2 are complete. The immediate next action is no automatic
-execution: review the closed control-baseline evidence and separately authorize
-any same-Evidence Generation evaluation, challenger, or Retrieval optimization
-only when needed.
+P04-RAG-M1 is closed. The next work unit is **P04-RAG-M2 — 70Q Open-ended
+Scenario Measure**. Begin it in a new Codex window with a Plan; do not start
+Retrieval, Embedding, or Rerank challenger work.
 
 ## Phase transition boundary
 
