@@ -336,20 +336,47 @@ experiments, block splitting, retrieval changes, and Generation remain
 separately authorized work.
 
 **P04-RAG-A1-2-2 — exact dialogue-source-occurrence alias-suppression
-challenger** is implemented and actual-review **PASS** under policy identity
-`phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1`.
-Its scope is limited to mechanically proved `rich_text` <-> `dialogue_node`
-aliases for the same actual dialogue Raw occurrence; existing v1 and A1-2-1 v2
-behavior remains outside this challenger. The known Q012 result is the approved
-negative result: 122 Block characters released, rank-19 headroom 704 -> 826,
-the decisive 2,059-character Block remains omitted, and the remaining shortfall
-is 1,233 characters. Q012 is not rescued. The known Q032 retention-positive
-pairs satisfy the same narrow occurrence proof. Selection Precision remains
-**OPEN / NOT CLOSED**. No Candidate Boundary work has started. The historical
-reconstructed old-v2 Packet SHA mismatch remains **UNKNOWN / non-blocking**, and
-the full-70 no-Retrieval candidate source remains **UNKNOWN**. This work unit
-executed no Generation/Provider calls, new 22Q/70Q replay, Candidate Boundary,
-reranker, semantic selector, query rewrite, arm union, or budget increase.
+challenger** is implemented with implementation correctness **PASS** under policy
+identity `phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1`.
+Its 22-question / 66-row persisted-candidate measurement is actual-review
+**FAIL** for retention acceptance. The scope remains limited to mechanically
+proved `rich_text` <-> `dialogue_node` aliases for the same actual dialogue Raw
+occurrence; existing v1 and A1-2-1 v2 behavior remains outside this challenger.
+Candidate arrays were unchanged and all alias traces were reverified against the
+checkpointed occurrence proof.
+
+The retention failure is deterministic greedy-admission displacement, not an
+alias-proof mismatch: Q012/dense admitted a rank-17 2,713-character Block while
+non-alias control-visible direct ranks 18/19/20 were lost; Q041/lexical admitted
+rank 13 (1,432 chars) while ranks 14/17 were lost; Q050/lexical admitted rank 15
+(2,508 chars) while ranks 16/17/18 were lost; Q058/dense admitted rank 16
+(1,191 chars) while rank 18 was lost; and Q064/lexical admitted rank 15
+(1,200 chars) while rank 19 was lost. Each newly admitted Block already existed
+in the control with identical membership and character count, but was omitted
+there by `direct_total_context_char_budget_conflict`. Q045/dense separately
+shows that a pre-admission alias representative is insufficient when that
+representative is not final-Packet-visible. A1-2-2 is therefore **NOT ADOPTED**
+as production/default selection behavior; A1-2-1 v2 remains the accepted
+control/current selector, checkpoint `71675eb` remains valid, and no further
+A1-2-2 implementation work is authorized.
+
+For the Q012 Hybrid gate, the approved negative result remains: 122 chars
+released, rank-19 headroom 704 -> 826, the decisive 2,059-character Block
+remains omitted, and the shortfall is 1,233 chars. Q012 is not rescued. The
+known Q032 retention-positive pairs satisfy the narrow occurrence proof.
+`actual_characters_released` in the measure is the net final selected-Packet
+delta (`control_selected_chars - challenger_selected_chars`), not gross alias
+suppression: aggregate 11,722 is not 11,722 redundant chars removed, and dense
+`-418` means dense challenger Packets were cumulatively 418 selected chars
+larger under this net metric. It is not a semantic benefit measure.
+
+The current Selection Precision attempt stops here; Selection Precision remains
+**OPEN / NOT CLOSED**. Candidate Boundary is the next investigation direction
+but has **NOT STARTED**. The historical reconstructed old-v2 Packet SHA mismatch
+remains **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
+remains **UNKNOWN**. The measure used persisted candidates only: no Retrieval,
+Dense, Generation/Provider, Candidate Boundary, reranker, semantic selector,
+query rewrite, arm union, or budget increase was executed.
 
 ## Phase transition boundary
 
