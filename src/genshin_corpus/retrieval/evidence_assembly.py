@@ -1,8 +1,10 @@
 """Candidate-neutral, deterministic Evidence Assembly for Retrieval Units.
 
 Ranking belongs upstream.  This module accepts already ranked candidates and
-uses only Canonical containment, ordinal continuity, fragment coordinates, and
-observed dialogue edges to produce a provider-neutral Evidence Packet.
+uses Canonical containment, ordinal continuity, fragment coordinates, observed
+dialogue edges, and (only under the explicit A1-2-2 policy) mechanically proved
+exact dialogue-source-occurrence aliases to produce a provider-neutral Evidence
+Packet.
 """
 
 from __future__ import annotations
@@ -27,6 +29,9 @@ from .retrieval_units import RETRIEVAL_UNIT_SCHEMA_VERSION, RetrievalUnitError, 
 EVIDENCE_PACKET_SCHEMA_VERSION = "phase04-evidence-packet-0.1"
 EVIDENCE_ASSEMBLY_VERSION = "phase04-rag-w1-deterministic-assembly-0.1"
 V2_DIRECT_FIRST_CONTEXT_CAP_POLICY = "phase04-rag-a1-2-direct-first-context-cap-0.1"
+A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY = (
+    "phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1"
+)
 
 
 class EvidenceAssemblyError(ValueError):
@@ -80,7 +85,7 @@ class EvidenceAssemblyConfig:
 class EvidenceSelectionPolicy:
     """Versioned final-admission policy, independent from v1 configuration.
 
-    The challenger currently exposes only the approved direct-first policy.
+    The challengers currently expose only approved direct-first policies.
     Keeping this object separate ensures that ``EvidenceAssemblyConfig`` and
     its v1 packet identity retain their legacy meanings.
     """
@@ -89,7 +94,10 @@ class EvidenceSelectionPolicy:
     context_only_block_cap: int
 
     def __post_init__(self) -> None:
-        if self.identity != V2_DIRECT_FIRST_CONTEXT_CAP_POLICY:
+        if self.identity not in {
+            V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
+            A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
+        }:
             raise ValueError("unsupported Evidence Selection policy identity")
         if (
             not isinstance(self.context_only_block_cap, int)
@@ -107,6 +115,11 @@ class EvidenceSelectionPolicy:
 
 V2_DIRECT_FIRST_CONTEXT_CAP = EvidenceSelectionPolicy(
     identity=V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
+    context_only_block_cap=8,
+)
+
+A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION = EvidenceSelectionPolicy(
+    identity=A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
     context_only_block_cap=8,
 )
 
@@ -547,6 +560,164 @@ def _expand_context(
     return selected
 
 
+_ALIAS_RAW_IDENTITY_FIELDS = (
+    "source",
+    "locale",
+    "run_id",
+    "artifact_kind",
+    "artifact_path",
+    "artifact_sha256",
+    "content_id",
+    "json_pointer",
+)
+
+
+def _whole_fragment(unit: Mapping[str, Any]) -> bool:
+    return dict(_fragment(unit)) == {"kind": "whole"}
+
+
+def _raw_ref(value: Any) -> Mapping[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    if any(not isinstance(value.get(key), str) or not value[key] for key in _ALIAS_RAW_IDENTITY_FIELDS):
+        return None
+    pointer = value.get("embedded_json_pointer")
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        return None
+    return value
+
+
+def _pointer_terminal(pointer: str) -> str | None:
+    if not pointer.startswith("/"):
+        return None
+    token = pointer.rsplit("/", 1)[1]
+    output = ""
+    index = 0
+    while index < len(token):
+        char = token[index]
+        if char != "~":
+            output += char
+            index += 1
+            continue
+        if index + 1 >= len(token) or token[index + 1] not in {"0", "1"}:
+            return None
+        output += "~" if token[index + 1] == "0" else "/"
+        index += 2
+    return output
+
+
+def _dialogue_source_occurrence_alias_proof(
+    rich: Mapping[str, Any],
+    dialogue: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Return a narrow Raw-occurrence proof for one rich/dialogue alias."""
+
+    try:
+        if rich.get("content_type") != "rich_text" or dialogue.get("content_type") != "dialogue_node":
+            return None
+        if rich.get("retrieval_visible_text") != dialogue.get("retrieval_visible_text"):
+            return None
+        if not _whole_fragment(rich) or not _whole_fragment(dialogue):
+            return None
+        rich_source, dialogue_source = _mapping(rich.get("source"), "Retrieval Unit source"), _mapping(dialogue.get("source"), "Retrieval Unit source")
+        rich_address, dialogue_address = _address(rich), _address(dialogue)
+        for key in ("source_identity_key", "record_id", "section_ordinal", "component_observation_key", "component_ordinal"):
+            if rich_address.get(key) != dialogue_address.get(key):
+                return None
+        rich_context = _mapping(rich_source.get("record_context"), "Retrieval Unit record context")
+        dialogue_context = _mapping(dialogue_source.get("record_context"), "Retrieval Unit record context")
+        if rich_context.get("source_component_id") != "interactive_dialogue" or dialogue_context.get("source_component_id") != "interactive_dialogue":
+            return None
+        rich_lineage = _mapping(rich_source.get("lineage"), "Retrieval Unit lineage")
+        raw_refs = rich_lineage.get("raw_refs")
+        if rich_lineage.get("evidence_scope") != "direct_raw" or not isinstance(raw_refs, list) or len(raw_refs) != 1:
+            return None
+        rich_raw = _raw_ref(raw_refs[0])
+        dialogue_structure = _mapping(dialogue.get("structure"), "Retrieval Unit structure")
+        dialogue_detail = _mapping(dialogue_structure.get("dialogue"), "Retrieval Unit dialogue structure")
+        dialogue_raw = _raw_ref(dialogue_detail.get("node_raw_ref"))
+        if rich_raw is None or dialogue_raw is None:
+            return None
+        if any(rich_raw[key] != dialogue_raw[key] for key in _ALIAS_RAW_IDENTITY_FIELDS):
+            return None
+        rich_value_sha = rich_raw.get("source_value_sha256")
+        dialogue_value_sha = dialogue_raw.get("source_value_sha256")
+        for value in (rich_value_sha, dialogue_value_sha):
+            if value not in (None, "") and not isinstance(value, str):
+                return None
+        if rich_value_sha not in (None, "") or dialogue_value_sha not in (None, ""):
+            if rich_value_sha != dialogue_value_sha:
+                return None
+        dialogue_pointer = dialogue_raw["embedded_json_pointer"]
+        if rich_raw["embedded_json_pointer"] != f"{dialogue_pointer}/dialogue":
+            return None
+        node_id = _nested(dialogue).get("node_source_id")
+        if not isinstance(node_id, str) or not node_id or _pointer_terminal(dialogue_pointer) != node_id:
+            return None
+        return {
+            "kind": "exact_dialogue_source_occurrence_alias",
+            "text_sha256": sha256(str(rich["retrieval_visible_text"]).encode("utf-8")).hexdigest(),
+            "raw_identity": {key: rich_raw[key] for key in _ALIAS_RAW_IDENTITY_FIELDS},
+            "dialogue_node_raw_embedded_json_pointer": dialogue_pointer,
+            "rich_raw_embedded_json_pointer": rich_raw["embedded_json_pointer"],
+            "node_source_id": node_id,
+        }
+    except (EvidenceAssemblyError, KeyError, TypeError):
+        return None
+
+
+def _alias_representative_key(unit_id: str, selection: Mapping[str, Mapping[str, Any]], units_by_id: Mapping[str, Mapping[str, Any]]) -> tuple[Any, ...]:
+    retrieval = selection[unit_id].get("retrieval")
+    direct_key = (0, int(retrieval["rank"]), int(retrieval["input_index"])) if isinstance(retrieval, Mapping) else (1, 2**63, 2**63)
+    return (*direct_key, _source_order(units_by_id[unit_id]), unit_id)
+
+
+def _suppress_dialogue_source_occurrence_aliases(
+    selection: dict[str, dict[str, Any]],
+    units_by_id: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove only proved rich/dialogue aliases after all structural expansion."""
+
+    rich_ids = sorted((unit_id for unit_id in selection if units_by_id[unit_id].get("content_type") == "rich_text"))
+    dialogue_ids = sorted((unit_id for unit_id in selection if units_by_id[unit_id].get("content_type") == "dialogue_node"))
+    edges: list[tuple[str, str, dict[str, Any]]] = []
+    for rich_id in rich_ids:
+        for dialogue_id in dialogue_ids:
+            proof = _dialogue_source_occurrence_alias_proof(units_by_id[rich_id], units_by_id[dialogue_id])
+            if proof is not None:
+                edges.append((rich_id, dialogue_id, proof))
+    if not edges:
+        return []
+    participants = {unit_id for edge in edges for unit_id in edge[:2]}
+    groups: list[set[str]] = []
+    while participants:
+        group = {participants.pop()}
+        changed = True
+        while changed:
+            changed = False
+            for left, right, _ in edges:
+                if (left in group) ^ (right in group):
+                    group.update((left, right))
+                    participants.discard(left)
+                    participants.discard(right)
+                    changed = True
+        groups.append(group)
+    trace: list[dict[str, Any]] = []
+    for group in groups:
+        if len(group) != 2:
+            continue
+        left, right = sorted(group)
+        proof = next(item for first, second, item in edges if {first, second} == {left, right})
+        representative, suppressed = sorted(group, key=lambda unit_id: _alias_representative_key(unit_id, selection, units_by_id))
+        trace.append({
+            "suppressed_unit_id": suppressed,
+            "representative_unit_id": representative,
+            "proof": proof,
+        })
+        del selection[suppressed]
+    return sorted(trace, key=canonical_json_bytes)
+
+
 def _block_members(selection: Mapping[str, Mapping[str, Any]], units_by_id: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
     values = [units_by_id[unit_id] for unit_id in selection]
     values.sort(key=lambda item: (_source_order(item), str(item["unit_id"])))
@@ -736,8 +907,11 @@ def assemble_evidence_packet(
 ) -> dict[str, Any]:
     """Assemble one deterministic provider-neutral Evidence Packet.
 
-    ``ranked_candidates`` must be supplied by an upstream retrieval mode.  No
-    similarity, re-ranking, text identity, or model decision is performed.
+    ``ranked_candidates`` must be supplied by an upstream retrieval mode. v1
+    and the existing A1-2-1 v2 policy perform no text-identity selection.
+    A1-2-2 uses byte-exact text only inside its mechanically proved dialogue
+    Raw-occurrence alias check; no similarity, normalization, semantic
+    selection, re-ranking, or model decision is performed.
     ``selection_policy=None`` retains the byte-compatible v1 selector.
     """
 
@@ -755,6 +929,12 @@ def assemble_evidence_packet(
     selection = _expand_context(direct=direct, state=state, config=config)
     if diagnostics is not None:
         diagnostics.assembly_seconds["context_expansion"] = perf_counter() - expansion_started
+    alias_suppressions: list[dict[str, Any]] = []
+    if selection_policy is not None and selection_policy.identity == A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY:
+        alias_started = perf_counter()
+        alias_suppressions = _suppress_dialogue_source_occurrence_aliases(selection, state.units_by_id)
+        if diagnostics is not None:
+            diagnostics.assembly_seconds["dialogue_source_occurrence_alias_suppression"] = perf_counter() - alias_started
     block_started = perf_counter()
     blocks = _block_members(selection, state.units_by_id)
     if diagnostics is not None:
@@ -850,13 +1030,19 @@ def assemble_evidence_packet(
         if selection_policy is not None:
             if v2_selection is None:
                 raise EvidenceAssemblyError("v2 selection accounting is absent")
+            candidate_counts: dict[str, int] = {
+                "input": len(ranked_candidates),
+                "direct": len(direct),
+                "context": sum(1 for value in selection.values() if value["retrieval"] is None),
+            }
+            if selection_policy.identity == A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY:
+                candidate_counts["post_suppression_direct"] = sum(
+                    1 for value in selection.values() if value["retrieval"] is not None
+                )
+                candidate_counts["suppressed_alias_count"] = len(alias_suppressions)
             diagnostics.selection_trace.update({
                 "selection_policy": selection_policy.to_dict(),
-                "candidate_counts": {
-                    "input": len(ranked_candidates),
-                    "direct": len(direct),
-                    "context": len(selection) - len(direct),
-                },
+                "candidate_counts": candidate_counts,
                 "block_counts": {
                     "direct_containing": v2_selection["direct_containing_block_count"],
                     "context_only": v2_selection["context_only_block_count"],
@@ -865,6 +1051,8 @@ def assemble_evidence_packet(
                 },
                 "admission_order": v2_selection["admission_order"],
             })
+            if selection_policy.identity == A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY:
+                diagnostics.selection_trace["suppressed_aliases"] = alias_suppressions
     return packet
 
 

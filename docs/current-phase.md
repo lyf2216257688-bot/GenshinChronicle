@@ -335,6 +335,22 @@ the versioned admission-policy work unit; budget tuning, arm-union/depth
 experiments, block splitting, retrieval changes, and Generation remain
 separately authorized work.
 
+**P04-RAG-A1-2-2 — exact dialogue-source-occurrence alias-suppression
+challenger** is implemented and actual-review **PASS** under policy identity
+`phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1`.
+Its scope is limited to mechanically proved `rich_text` <-> `dialogue_node`
+aliases for the same actual dialogue Raw occurrence; existing v1 and A1-2-1 v2
+behavior remains outside this challenger. The known Q012 result is the approved
+negative result: 122 Block characters released, rank-19 headroom 704 -> 826,
+the decisive 2,059-character Block remains omitted, and the remaining shortfall
+is 1,233 characters. Q012 is not rescued. The known Q032 retention-positive
+pairs satisfy the same narrow occurrence proof. Selection Precision remains
+**OPEN / NOT CLOSED**. No Candidate Boundary work has started. The historical
+reconstructed old-v2 Packet SHA mismatch remains **UNKNOWN / non-blocking**, and
+the full-70 no-Retrieval candidate source remains **UNKNOWN**. This work unit
+executed no Generation/Provider calls, new 22Q/70Q replay, Candidate Boundary,
+reranker, semantic selector, query rewrite, arm union, or budget increase.
+
 ## Phase transition boundary
 
 Phase 01 Raw Collection, Phase 02 Parsed Schema / Parser Foundation, and Phase

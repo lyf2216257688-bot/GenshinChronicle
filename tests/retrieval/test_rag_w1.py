@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.evidence_assembly import (
+    A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION,
+    A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
     EvidenceAssemblyConfig,
     EvidenceAssemblyDiagnostics,
     EvidenceAssemblyError,
@@ -96,6 +98,18 @@ class RagW1Tests(unittest.TestCase):
             if all(dialogue.get(key) == value for key, value in selector.items()):
                 return unit
         self.fail(f"No {content_type} unit with selector {selector}")
+
+    def _dialogue_alias_units(self) -> tuple[list[dict], Path, dict, dict]:
+        self.config = RetrievalUnitBuildConfig(text_fragment_chars=1000, structured_fragment_chars=1000)
+        component = self.record["sections"][0]["component_contexts"][0]
+        component["source_component_id"] = "interactive_dialogue"
+        rich = self.record["sections"][0]["units"][0]
+        rich["value"]["normalized_text"] = "Start\nAlpha"
+        rich["lineage"]["raw_refs"][0]["embedded_json_pointer"] = "/contents/a/dialogue"
+        self._write_record()
+        self._write_manifest()
+        _, units, output = self._build("dialogue-alias")
+        return units, output, self._unit(units, "rich_text"), self._unit(units, "dialogue_node", node_source_id="a")
 
     def test_build_is_deterministic_and_unit_identity_is_occurrence_stable(self) -> None:
         first, first_units, first_root = self._build("build-a")
@@ -461,6 +475,115 @@ class RagW1Tests(unittest.TestCase):
         )
         self.assertEqual(len(packet["evidence"]), 2)
         self.assertEqual({member["unit_id"] for block in packet["evidence"] for member in block["members"]}, {item["unit_id"] for item in same_text})
+
+    def test_a1_2_2_suppresses_only_proved_dialogue_source_occurrence_alias(self) -> None:
+        units, output, rich, dialogue = self._dialogue_alias_units()
+        candidates = [
+            {"unit_id": dialogue["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic"}},
+            {"unit_id": rich["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic"}},
+        ]
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, dialogue_hops=0, per_block_chars=1000, total_context_chars=1000)
+        diagnostics = EvidenceAssemblyDiagnostics()
+        packet = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, selection_policy=A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION, diagnostics=diagnostics)
+        repeated_diagnostics = EvidenceAssemblyDiagnostics()
+        repeated = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, selection_policy=A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION, diagnostics=repeated_diagnostics)
+        members = [member for block in packet["evidence"] for member in block["members"]]
+        self.assertEqual([member["unit_id"] for member in members], [rich["unit_id"]])
+        self.assertEqual(packet["selection_policy"]["identity"], A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY)
+        self.assertEqual(packet["budget"]["used_context_chars"], len(rich["retrieval_visible_text"]))
+        self.assertEqual(members[0]["lineage"], rich["source"]["lineage"])
+        self.assertEqual(members[0]["canonical_address"], rich["source"]["canonical_address"])
+        trace = diagnostics.selection_trace["suppressed_aliases"]
+        self.assertEqual(trace[0]["suppressed_unit_id"], dialogue["unit_id"])
+        self.assertEqual(trace[0]["representative_unit_id"], rich["unit_id"])
+        self.assertEqual(trace[0]["proof"]["node_source_id"], "a")
+        self.assertEqual(diagnostics.selection_trace["candidate_counts"], {
+            "input": 2,
+            "direct": 2,
+            "context": 0,
+            "post_suppression_direct": 1,
+            "suppressed_alias_count": 1,
+        })
+        self.assertEqual(evidence_packet_json_bytes(packet), evidence_packet_json_bytes(repeated))
+        self.assertEqual(diagnostics.selection_trace, repeated_diagnostics.selection_trace)
+        self.assertEqual({unit["unit_id"] for unit in units if unit["unit_id"] in {rich["unit_id"], dialogue["unit_id"]}}, {rich["unit_id"], dialogue["unit_id"]})
+
+    def test_a1_2_2_alias_proof_fails_closed_for_non_alias_variants(self) -> None:
+        _, _, rich, dialogue = self._dialogue_alias_units()
+        cases = []
+        changed_node = json.loads(json.dumps(dialogue))
+        changed_node["nested_selector"]["node_source_id"] = "b"
+        cases.append(changed_node)
+        changed_artifact = json.loads(json.dumps(dialogue))
+        changed_artifact["structure"]["dialogue"]["node_raw_ref"]["artifact_sha256"] = "b" * 64
+        cases.append(changed_artifact)
+        changed_component = json.loads(json.dumps(dialogue))
+        changed_component["structure"]["dialogue"]["node_raw_ref"]["json_pointer"] = "/data/page/modules/other/components/0"
+        cases.append(changed_component)
+        same_scope_only = json.loads(json.dumps(dialogue))
+        same_scope_only["structure"]["dialogue"]["node_raw_ref"]["embedded_json_pointer"] = "/contents/b"
+        cases.append(same_scope_only)
+        fragmented = json.loads(json.dumps(dialogue))
+        fragmented["fragment_selector"] = {"kind": "unicode_codepoint_range", "fragment_index": 0, "fragment_count": 2}
+        cases.append(fragmented)
+        fragmented_rich = json.loads(json.dumps(rich))
+        fragmented_rich["fragment_selector"] = {"kind": "unicode_codepoint_range", "fragment_index": 0, "fragment_count": 2}
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(fragmented_rich, dialogue))
+        missing_proof = json.loads(json.dumps(dialogue))
+        missing_proof["structure"]["dialogue"]["node_raw_ref"] = None
+        cases.append(missing_proof)
+        for candidate in cases:
+            self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(rich, candidate))
+        contained = json.loads(json.dumps(dialogue))
+        contained["retrieval_visible_text"] = "Alpha"
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(rich, contained))
+        changed_value_sha = json.loads(json.dumps(dialogue))
+        changed_value_sha["structure"]["dialogue"]["node_raw_ref"]["source_value_sha256"] = "c" * 64
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(rich, changed_value_sha))
+        malformed_pointer = json.loads(json.dumps(dialogue))
+        malformed_pointer["structure"]["dialogue"]["node_raw_ref"]["embedded_json_pointer"] = "/contents/a~2"
+        malformed_pointer["structure"]["dialogue"]["node_raw_ref"]["node_source_id"] = "a"
+        malformed_rich = json.loads(json.dumps(rich))
+        malformed_rich["source"]["lineage"]["raw_refs"][0]["embedded_json_pointer"] = "/contents/a~2/dialogue"
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(malformed_rich, malformed_pointer))
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(rich, rich))
+        self.assertIsNone(evidence_assembly_module._dialogue_source_occurrence_alias_proof(dialogue, dialogue))
+
+    def test_a1_2_2_ambiguous_alias_group_remains_unsuppressed(self) -> None:
+        _, _, rich, dialogue = self._dialogue_alias_units()
+        second_dialogue = json.loads(json.dumps(dialogue))
+        second_dialogue["unit_id"] = "f" * 64
+        selection = {
+            rich["unit_id"]: {"retrieval": {"rank": 1, "input_index": 0}, "reasons": []},
+            dialogue["unit_id"]: {"retrieval": {"rank": 2, "input_index": 1}, "reasons": []},
+            second_dialogue["unit_id"]: {"retrieval": {"rank": 3, "input_index": 2}, "reasons": []},
+        }
+        units_by_id = {rich["unit_id"]: rich, dialogue["unit_id"]: dialogue, second_dialogue["unit_id"]: second_dialogue}
+        self.assertEqual(evidence_assembly_module._suppress_dialogue_source_occurrence_aliases(selection, units_by_id), [])
+        self.assertEqual(set(selection), set(units_by_id))
+
+    def test_a1_2_2_suppression_occurs_after_expansion_and_preserves_controls(self) -> None:
+        _, output, rich, dialogue = self._dialogue_alias_units()
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=1, dialogue_hops=1, per_block_chars=1000, total_context_chars=1000)
+        candidates = [
+            {"unit_id": rich["unit_id"], "rank": 1, "retrieval": {}},
+            {"unit_id": dialogue["unit_id"], "rank": 2, "retrieval": {}},
+        ]
+        challenger_trace = EvidenceAssemblyDiagnostics()
+        challenger = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, selection_policy=A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION, diagnostics=challenger_trace)
+        v2_before = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP)
+        v2_after = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config, selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP)
+        v1_before = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config)
+        v1_after = assemble_evidence_packet(output / "metadata" / "manifest.json", candidates, config=config)
+        challenger_ids = {member["unit_id"] for block in challenger["evidence"] for member in block["members"]}
+        self.assertIn(rich["unit_id"], challenger_ids)
+        self.assertNotIn(dialogue["unit_id"], challenger_ids)
+        retained_reasons = [reason["kind"] for block in challenger["evidence"] for member in block["members"] for reason in member["assembly_reasons"]]
+        self.assertIn("ordinal_neighbor", retained_reasons)
+        self.assertIn("observed_dialogue_edge", retained_reasons)
+        self.assertEqual(evidence_packet_json_bytes(v2_before), evidence_packet_json_bytes(v2_after))
+        self.assertEqual(evidence_packet_json_bytes(v1_before), evidence_packet_json_bytes(v1_after))
+        self.assertEqual(challenger_trace.selection_trace["candidate_counts"]["direct"], 2)
 
     def test_identical_text_different_occurrences_remains_distinct_and_no_cross_context_merge(self) -> None:
         self.record["sections"].append(json.loads(json.dumps(self.record["sections"][0])))
