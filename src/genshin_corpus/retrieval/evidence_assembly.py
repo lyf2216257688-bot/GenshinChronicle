@@ -12,7 +12,11 @@ from hashlib import sha256
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from time import perf_counter
 from typing import Any
+from types import MappingProxyType
+from weakref import WeakKeyDictionary
+import json
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
@@ -69,6 +73,81 @@ class EvidenceAssemblyConfig:
             "per_block_chars": self.per_block_chars,
             "total_context_chars": self.total_context_chars,
         }
+
+
+@dataclass
+class EvidenceAssemblyDiagnostics:
+    """Execution-only timings and selection trace; never part of Packet identity."""
+
+    preparation_seconds: dict[str, float]
+    assembly_seconds: dict[str, float]
+    serialization_seconds: dict[str, float]
+    selection_trace: dict[str, Any] | None = None
+
+    def __init__(self) -> None:
+        self.preparation_seconds = {}
+        self.assembly_seconds = {}
+        self.serialization_seconds = {}
+        self.selection_trace = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": "phase04-rag-a1-assembly-diagnostics-0.1",
+            "preparation_seconds": dict(sorted(self.preparation_seconds.items())),
+            "assembly_seconds": dict(sorted(self.assembly_seconds.items())),
+            "serialization_seconds": dict(sorted(self.serialization_seconds.items())),
+            "selection_trace": self.selection_trace,
+        }
+
+
+@dataclass(frozen=True)
+class _PreparedAssemblyState:
+    """Private mutable-data holder for one prepared, verified RU snapshot."""
+
+    units_by_id: Mapping[str, Mapping[str, Any]]
+    rich_by_context_ordinal: Mapping[tuple[Any, ...], Mapping[str, Any]]
+    structured_by_canonical_unit: Mapping[tuple[Any, ...], tuple[Mapping[str, Any], ...]]
+    structured_positions: Mapping[str, int]
+    fragment_chains: Mapping[tuple[Any, ...], tuple[Mapping[str, Any], ...]]
+    fragment_positions: Mapping[str, int]
+    dialogue_nodes: Mapping[tuple[Any, ...], tuple[Mapping[str, Any], ...]]
+    dialogue_neighbors: Mapping[tuple[Any, ...], Mapping[str, tuple[str, ...]]]
+    canonical_input_json: bytes
+    retrieval_unit_schema_version: Any
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True, eq=False)
+class PreparedAssemblyContext:
+    """Opaque handle for one fully verified RU snapshot and its lookups.
+
+    The large RU rows and structural indexes remain module-private.  This
+    avoids a deep copy of the corpus while preventing callers from changing a
+    prepared snapshot through the public context object.
+    """
+
+    retrieval_unit_manifest_path: Path
+    retrieval_unit_build_identity: str
+
+    @property
+    def build_manifest(self) -> Mapping[str, Any]:
+        """Return a detached, minimal build projection for compatibility."""
+
+        state = _prepared_state(self)
+        return MappingProxyType({
+            "build_identity": self.retrieval_unit_build_identity,
+            "canonical_input": json.loads(state.canonical_input_json),
+            "retrieval_unit_schema_version": state.retrieval_unit_schema_version,
+        })
+
+
+_PREPARED_ASSEMBLY_STATES: WeakKeyDictionary[PreparedAssemblyContext, _PreparedAssemblyState] = WeakKeyDictionary()
+
+
+def _prepared_state(context: PreparedAssemblyContext) -> _PreparedAssemblyState:
+    try:
+        return _PREPARED_ASSEMBLY_STATES[context]
+    except KeyError as exc:
+        raise EvidenceAssemblyError("Prepared Assembly context is not a verified snapshot") from exc
 
 
 def _mapping(value: Any, label: str) -> Mapping[str, Any]:
@@ -227,7 +306,10 @@ def _unit_public(unit: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _candidate_rows(candidates: Sequence[Mapping[str, Any]], units_by_id: Mapping[str, Mapping[str, Any]]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+def _candidate_rows(
+    candidates: Sequence[Mapping[str, Any]],
+    units_by_id: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     selected: dict[str, dict[str, Any]] = {}
     rejected: list[dict[str, Any]] = []
     for index, raw_candidate in enumerate(candidates):
@@ -249,7 +331,20 @@ def _candidate_rows(candidates: Sequence[Mapping[str, Any]], units_by_id: Mappin
             selected[unit_id] = row
         else:
             rejected.append({"unit_id": unit_id, "rank": rank, "input_index": index, "reason": "duplicate_source_occurrence"})
-    return selected, rejected
+    trace = []
+    selected_indexes = {row["input_index"] for row in selected.values()}
+    rejected_indexes = {row["input_index"] for row in rejected}
+    for index, raw_candidate in enumerate(candidates):
+        candidate = _mapping(raw_candidate, f"candidate {index}")
+        trace.append({
+            "input_index": index,
+            "unit_id": candidate["unit_id"],
+            "rank": candidate["rank"],
+            "outcome": "direct_candidate" if index in selected_indexes else "duplicate_source_occurrence",
+        })
+    if selected_indexes | rejected_indexes != set(range(len(candidates))):
+        raise EvidenceAssemblyError("candidate accounting is incomplete")
+    return selected, rejected, trace
 
 
 def _append_reason(selection: dict[str, dict[str, Any]], unit_id: str, reason: Mapping[str, Any]) -> None:
@@ -260,19 +355,35 @@ def _append_reason(selection: dict[str, dict[str, Any]], unit_id: str, reason: M
         current["reasons"].append(dict(reason))
 
 
-def _expand_context(
+def prepare_evidence_assembly_context(
+    retrieval_unit_manifest_path: Path,
     *,
-    direct: Mapping[str, Mapping[str, Any]],
-    units_by_id: Mapping[str, Mapping[str, Any]],
-    config: EvidenceAssemblyConfig,
-) -> dict[str, dict[str, Any]]:
-    selected: dict[str, dict[str, Any]] = {}
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> PreparedAssemblyContext:
+    """Load and validate one RU snapshot, then build query-independent lookups."""
+
+    started = perf_counter()
+    load_started = perf_counter()
+    build_manifest, units = load_retrieval_units(
+        retrieval_unit_manifest_path,
+        timings=None if diagnostics is None else diagnostics.preparation_seconds,
+    )
+    if diagnostics is not None:
+        diagnostics.preparation_seconds["load_and_validate"] = perf_counter() - load_started
+    index_started = perf_counter()
+    units_by_id: dict[str, Mapping[str, Any]] = {}
     rich_by_context_ordinal: dict[tuple[Any, ...], Mapping[str, Any]] = {}
     structured_by_canonical_unit: dict[tuple[Any, ...], list[Mapping[str, Any]]] = defaultdict(list)
     fragment_chains: dict[tuple[Any, ...], list[Mapping[str, Any]]] = defaultdict(list)
     dialogue_nodes: dict[tuple[Any, ...], list[Mapping[str, Any]]] = defaultdict(list)
-    dialogue_edges: dict[tuple[Any, ...], list[tuple[str, str]]] = defaultdict(list)
-    for unit in units_by_id.values():
+    dialogue_edges: dict[tuple[Any, ...], set[tuple[str, str]]] = defaultdict(set)
+    for unit in units:
+        unit_id = unit.get("unit_id")
+        if not isinstance(unit_id, str) or unit_id in units_by_id:
+            raise EvidenceAssemblyError("Retrieval Unit artifact has duplicate or invalid unit_id")
+        if unit.get("schema_version") != RETRIEVAL_UNIT_SCHEMA_VERSION:
+            raise EvidenceAssemblyError("Retrieval Unit artifact schema is unsupported")
+        units_by_id[unit_id] = unit
         if unit.get("content_type") == "rich_text" and _fragment(unit).get("kind") == "whole":
             address = _address(unit)
             rich_by_context_ordinal[(*_base_address(unit, include_unit_ordinal=False), address["canonical_unit_ordinal"])] = unit
@@ -282,22 +393,65 @@ def _expand_context(
         locator = _dialogue_locator(unit)
         if locator is not None:
             dialogue_nodes[locator].append(unit)
-            structure = _mapping(unit.get("structure"), "Retrieval Unit structure")
-            dialogue = _mapping(structure.get("dialogue"), "Retrieval Unit dialogue structure")
+            dialogue = _mapping(_mapping(unit.get("structure"), "Retrieval Unit structure").get("dialogue"), "Retrieval Unit dialogue structure")
             group_base = locator[:-1]
             for edge in dialogue.get("observed_edges", []):
                 if isinstance(edge, Mapping) and isinstance(edge.get("parent_id"), str) and isinstance(edge.get("child_id"), str):
-                    pair = (edge["parent_id"], edge["child_id"])
-                    if pair not in dialogue_edges[group_base]:
-                        dialogue_edges[group_base].append(pair)
+                    dialogue_edges[group_base].add((edge["parent_id"], edge["child_id"]))
+    fragment_positions: dict[str, int] = {}
     for values in fragment_chains.values():
         values.sort(key=lambda item: (_fragment_index(item), _source_order(item), str(item["unit_id"])))
+        for position, unit in enumerate(values):
+            fragment_positions[str(unit["unit_id"])] = position
+    structured_positions: dict[str, int] = {}
     for values in structured_by_canonical_unit.values():
         values.sort(key=lambda item: (_source_order(item), str(item["unit_id"])))
+        for position, unit in enumerate(values):
+            structured_positions[str(unit["unit_id"])] = position
     for values in dialogue_nodes.values():
         values.sort(key=lambda item: (_source_order(item), str(item["unit_id"])))
-    for key in dialogue_edges:
-        dialogue_edges[key].sort()
+    dialogue_neighbors: dict[tuple[Any, ...], dict[str, tuple[str, ...]]] = {}
+    for group_base, edges in dialogue_edges.items():
+        neighbors: dict[str, set[str]] = defaultdict(set)
+        for parent_id, child_id in edges:
+            neighbors[parent_id].add(child_id)
+            neighbors[child_id].add(parent_id)
+        dialogue_neighbors[group_base] = {node_id: tuple(sorted(values)) for node_id, values in neighbors.items()}
+    if diagnostics is not None:
+        diagnostics.preparation_seconds["structural_index"] = perf_counter() - index_started
+        diagnostics.preparation_seconds["total"] = perf_counter() - started
+    build_identity = build_manifest.get("build_identity")
+    if not isinstance(build_identity, str) or not build_identity:
+        raise EvidenceAssemblyError("Retrieval Unit build manifest lacks build_identity")
+    canonical_input_json = canonical_json_bytes(
+        dict(_mapping(build_manifest.get("canonical_input"), "Retrieval Unit build canonical input"))
+    )
+    context = PreparedAssemblyContext(
+        retrieval_unit_manifest_path=Path(retrieval_unit_manifest_path).resolve(),
+        retrieval_unit_build_identity=build_identity,
+    )
+    _PREPARED_ASSEMBLY_STATES[context] = _PreparedAssemblyState(
+        units_by_id=MappingProxyType(units_by_id),
+        rich_by_context_ordinal=MappingProxyType(rich_by_context_ordinal),
+        structured_by_canonical_unit=MappingProxyType({key: tuple(values) for key, values in structured_by_canonical_unit.items()}),
+        structured_positions=MappingProxyType(structured_positions),
+        fragment_chains=MappingProxyType({key: tuple(values) for key, values in fragment_chains.items()}),
+        fragment_positions=MappingProxyType(fragment_positions),
+        dialogue_nodes=MappingProxyType({key: tuple(values) for key, values in dialogue_nodes.items()}),
+        dialogue_neighbors=MappingProxyType({key: MappingProxyType(value) for key, value in dialogue_neighbors.items()}),
+        canonical_input_json=canonical_input_json,
+        retrieval_unit_schema_version=build_manifest.get("retrieval_unit_schema_version"),
+    )
+    return context
+
+
+def _expand_context(
+    *,
+    direct: Mapping[str, Mapping[str, Any]],
+    state: _PreparedAssemblyState,
+    config: EvidenceAssemblyConfig,
+) -> dict[str, dict[str, Any]]:
+    selected: dict[str, dict[str, Any]] = {}
 
     for unit_id, candidate in sorted(direct.items(), key=lambda item: (item[1]["rank"], item[1]["input_index"], item[0])):
         _append_reason(selected, unit_id, {"kind": "retrieved", "rank": candidate["rank"], "input_index": candidate["input_index"]})
@@ -305,23 +459,22 @@ def _expand_context(
 
     # Structural neighbor expansion starts from direct candidates only, avoiding recursive drift.
     for unit_id, candidate in direct.items():
-        unit = units_by_id[unit_id]
+        unit = state.units_by_id[unit_id]
         content_type = unit.get("content_type")
         before = config.structured_neighbor_before if content_type == "structured" else config.neighbor_before
         after = config.structured_neighbor_after if content_type == "structured" else config.neighbor_after
         chain_key = (content_type, *_base_address(unit), canonical_json_bytes(dict(_nested(unit))))
-        chain = fragment_chains.get(chain_key, [])
+        chain = state.fragment_chains.get(chain_key, ())
         if chain and (before or after):
-            position = next((index for index, item in enumerate(chain) if item.get("unit_id") == unit_id), None)
-            if position is not None:
-                for related in chain[max(0, position - before):position]:
-                    _append_reason(selected, str(related["unit_id"]), {"kind": "fragment_neighbor", "from_unit_id": unit_id})
-                for related in chain[position + 1:position + 1 + after]:
-                    _append_reason(selected, str(related["unit_id"]), {"kind": "fragment_neighbor", "from_unit_id": unit_id})
+            position = state.fragment_positions[unit_id]
+            for related in chain[max(0, position - before):position]:
+                _append_reason(selected, str(related["unit_id"]), {"kind": "fragment_neighbor", "from_unit_id": unit_id})
+            for related in chain[position + 1:position + 1 + after]:
+                _append_reason(selected, str(related["unit_id"]), {"kind": "fragment_neighbor", "from_unit_id": unit_id})
         if content_type == "structured" and (before or after):
-            chain = structured_by_canonical_unit.get(_base_address(unit), [])
-            position = next((index for index, item in enumerate(chain) if item.get("unit_id") == unit_id), None)
-            if position is not None:
+            chain = state.structured_by_canonical_unit.get(_base_address(unit), ())
+            if chain:
+                position = state.structured_positions[unit_id]
                 for related in chain[max(0, position - before):position]:
                     _append_reason(selected, str(related["unit_id"]), {"kind": "structured_neighbor", "from_unit_id": unit_id})
                 for related in chain[position + 1:position + 1 + after]:
@@ -334,7 +487,7 @@ def _expand_context(
             for ordinal in range(int(address["canonical_unit_ordinal"]) - before, int(address["canonical_unit_ordinal"]) + after + 1):
                 if ordinal < 0 or ordinal == address["canonical_unit_ordinal"]:
                     continue
-                related = rich_by_context_ordinal.get((*_base_address(unit, include_unit_ordinal=False), ordinal))
+                related = state.rich_by_context_ordinal.get((*_base_address(unit, include_unit_ordinal=False), ordinal))
                 if related is not None:
                     _append_reason(selected, str(related["unit_id"]), {"kind": "ordinal_neighbor", "from_unit_id": unit_id})
         locator = _dialogue_locator(unit)
@@ -344,14 +497,12 @@ def _expand_context(
             group_base = locator[:-1]
             for hop in range(1, config.dialogue_hops + 1):
                 next_nodes: set[str] = set()
-                for parent_id, child_id in dialogue_edges.get(group_base, []):
-                    if parent_id in frontier and child_id not in seen:
-                        next_nodes.add(child_id)
-                    if child_id in frontier and parent_id not in seen:
-                        next_nodes.add(parent_id)
+                neighbors = state.dialogue_neighbors.get(group_base, {})
+                for node_id in frontier:
+                    next_nodes.update(item for item in neighbors.get(node_id, ()) if item not in seen)
                 for node_id in sorted(next_nodes):
                     related_locator = (*group_base, node_id)
-                    for related in dialogue_nodes.get(related_locator, []):
+                    for related in state.dialogue_nodes.get(related_locator, ()):
                         _append_reason(selected, str(related["unit_id"]), {"kind": "observed_dialogue_edge", "from_unit_id": unit_id, "hop": hop})
                 seen.update(next_nodes)
                 frontier = next_nodes
@@ -436,6 +587,8 @@ def assemble_evidence_packet(
     *,
     config: EvidenceAssemblyConfig | None = None,
     retrieval_audit: Mapping[str, Any] | None = None,
+    prepared_context: PreparedAssemblyContext | None = None,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
 ) -> dict[str, Any]:
     """Assemble one deterministic provider-neutral Evidence Packet.
 
@@ -444,18 +597,27 @@ def assemble_evidence_packet(
     """
 
     config = config or EvidenceAssemblyConfig()
-    build_manifest, units = load_retrieval_units(retrieval_unit_manifest_path)
-    units_by_id: dict[str, Mapping[str, Any]] = {}
-    for unit in units:
-        unit_id = unit.get("unit_id")
-        if not isinstance(unit_id, str) or unit_id in units_by_id:
-            raise EvidenceAssemblyError("Retrieval Unit artifact has duplicate or invalid unit_id")
-        if unit.get("schema_version") != RETRIEVAL_UNIT_SCHEMA_VERSION:
-            raise EvidenceAssemblyError("Retrieval Unit artifact schema is unsupported")
-        units_by_id[unit_id] = unit
-    direct, deduplicated = _candidate_rows(ranked_candidates, units_by_id)
-    selection = _expand_context(direct=direct, units_by_id=units_by_id, config=config)
-    blocks, omitted = _select_blocks(_block_members(selection, units_by_id), config)
+    if prepared_context is None:
+        prepared_context = prepare_evidence_assembly_context(retrieval_unit_manifest_path, diagnostics=diagnostics)
+    elif prepared_context.retrieval_unit_manifest_path != Path(retrieval_unit_manifest_path).resolve():
+        raise EvidenceAssemblyError("Prepared Assembly context does not match the requested Retrieval Unit manifest")
+    state = _prepared_state(prepared_context)
+    candidate_started = perf_counter()
+    direct, deduplicated, candidate_trace = _candidate_rows(ranked_candidates, state.units_by_id)
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["candidate_normalization"] = perf_counter() - candidate_started
+    expansion_started = perf_counter()
+    selection = _expand_context(direct=direct, state=state, config=config)
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["context_expansion"] = perf_counter() - expansion_started
+    block_started = perf_counter()
+    blocks = _block_members(selection, state.units_by_id)
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["block_construction"] = perf_counter() - block_started
+    selection_started = perf_counter()
+    blocks, omitted = _select_blocks(blocks, config)
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["block_selection"] = perf_counter() - selection_started
     evidence = []
     for index, block in enumerate(blocks, 1):
         evidence.append({
@@ -466,11 +628,12 @@ def assemble_evidence_packet(
             "members": block["members"],
         })
     audit = dict(retrieval_audit or {})
+    build_manifest = prepared_context.build_manifest
     packet = {
         "schema_version": EVIDENCE_PACKET_SCHEMA_VERSION,
         "assembly_version": EVIDENCE_ASSEMBLY_VERSION,
         "retrieval_unit_build": {
-            "build_identity": build_manifest.get("build_identity"),
+            "build_identity": prepared_context.retrieval_unit_build_identity,
             "canonical_input": dict(_mapping(build_manifest.get("canonical_input"), "Retrieval Unit build canonical input")),
             "retrieval_unit_schema_version": build_manifest.get("retrieval_unit_schema_version"),
         },
@@ -492,6 +655,23 @@ def assemble_evidence_packet(
             "omitted_blocks": omitted,
         },
     }
+    if diagnostics is not None:
+        omitted_by_unit = {
+            unit_id: item["reason"]
+            for item in omitted
+            for unit_id in item["unit_ids"]
+        }
+        diagnostics.selection_trace = {
+            "candidate_outcomes": candidate_trace,
+            "selected_units": [
+                {
+                    "unit_id": unit_id,
+                    "reasons": sorted(value["reasons"], key=canonical_json_bytes),
+                    "outcome": omitted_by_unit.get(unit_id, "included"),
+                }
+                for unit_id, value in sorted(selection.items())
+            ],
+        }
     return packet
 
 
@@ -499,6 +679,24 @@ def evidence_packet_json_bytes(packet: Mapping[str, Any]) -> bytes:
     """Return deterministic JSON packet bytes with no clocks, paths, or UUIDs."""
 
     return canonical_json_bytes(dict(packet))
+
+
+def render_evidence_packet(
+    packet: Mapping[str, Any],
+    *,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> tuple[bytes, bytes]:
+    """Render Packet bytes while optionally recording non-identity timing."""
+
+    json_started = perf_counter()
+    json_body = evidence_packet_json_bytes(packet)
+    if diagnostics is not None:
+        diagnostics.serialization_seconds["json"] = perf_counter() - json_started
+    markdown_started = perf_counter()
+    markdown_body = evidence_packet_markdown(packet).encode("utf-8")
+    if diagnostics is not None:
+        diagnostics.serialization_seconds["markdown"] = perf_counter() - markdown_started
+    return json_body, markdown_body
 
 
 def evidence_packet_markdown(packet: Mapping[str, Any]) -> str:
@@ -527,12 +725,16 @@ def evidence_packet_markdown(packet: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def write_evidence_packet(output_root: Path, packet: Mapping[str, Any]) -> dict[str, Any]:
+def write_evidence_packet(
+    output_root: Path,
+    packet: Mapping[str, Any],
+    *,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> dict[str, Any]:
     """Persist JSON/Markdown packet bytes conflict-safely and deterministically."""
 
     output_root = Path(output_root)
-    json_body = evidence_packet_json_bytes(packet)
-    markdown_body = evidence_packet_markdown(packet).encode("utf-8")
+    json_body, markdown_body = render_evidence_packet(packet, diagnostics=diagnostics)
     paths = {
         "json": output_root / "evidence_packet.json",
         "markdown": output_root / "evidence_packet.md",

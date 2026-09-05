@@ -14,6 +14,7 @@ import json
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from genshin_corpus.canonical.contracts import CANONICAL_SCHEMA_VERSION
@@ -836,26 +837,46 @@ def build_retrieval_units(
         raise
 
 
-def _read_gzip_jsonl(path: Path, label: str) -> list[Mapping[str, Any]]:
+def _read_gzip_jsonl(
+    path: Path,
+    label: str,
+    *,
+    timings: dict[str, float] | None = None,
+    timing_key: str | None = None,
+) -> list[Mapping[str, Any]]:
+    started = perf_counter()
     try:
         with gzip.open(path, "rt", encoding="utf-8") as handle:
             values = [json.loads(line) for line in handle if line.strip()]
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, gzip.BadGzipFile) as exc:
         raise RetrievalUnitError(f"cannot read {label}: {path}") from exc
+    if timings is not None and timing_key is not None:
+        timings[timing_key] = perf_counter() - started
     return [_mapping(value, f"{label} row {index}") for index, value in enumerate(values, 1)]
 
 
-def load_retrieval_units(build_manifest_path: Path) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
+def load_retrieval_units(
+    build_manifest_path: Path,
+    *,
+    timings: dict[str, float] | None = None,
+) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
     """Load a completed RU artifact and verify every recorded content hash."""
 
     build_manifest_path = Path(build_manifest_path)
+    manifest_started = perf_counter()
     manifest = _read_json(build_manifest_path, "Retrieval Unit manifest")
+    if timings is not None:
+        timings["manifest_read_and_parse"] = perf_counter() - manifest_started
+    validation_started = perf_counter()
     if manifest.get("status") != "complete" or manifest.get("schema_version") != RETRIEVAL_UNIT_BUILD_SCHEMA_VERSION:
         raise RetrievalUnitError("Retrieval Unit manifest is not a supported complete build")
     artifacts = _mapping(manifest.get("artifacts"), "Retrieval Unit manifest.artifacts")
+    if timings is not None:
+        timings["manifest_validation"] = perf_counter() - validation_started
     root = build_manifest_path.parent.parent
 
     def artifact_body(key: str) -> tuple[Mapping[str, Any], Path, bytes]:
+        started = perf_counter()
         descriptor = _mapping(artifacts.get(key), f"Retrieval Unit manifest.artifacts.{key}")
         relative_path = _required_str(descriptor, "path", f"Retrieval Unit {key} artifact")
         path = root / relative_path
@@ -867,14 +888,16 @@ def load_retrieval_units(build_manifest_path: Path) -> tuple[Mapping[str, Any], 
             raise RetrievalUnitError(f"Retrieval Unit {key} artifact SHA-256 mismatch")
         if descriptor.get("byte_count") != len(body):
             raise RetrievalUnitError(f"Retrieval Unit {key} artifact byte accounting mismatch")
+        if timings is not None:
+            timings[f"{key}_read_and_integrity"] = perf_counter() - started
         return descriptor, path, body
 
     descriptor, path, _ = artifact_body("retrieval_units")
-    rows = _read_gzip_jsonl(path, "Retrieval Unit artifact")
+    rows = _read_gzip_jsonl(path, "Retrieval Unit artifact", timings=timings, timing_key="retrieval_units_decompress_and_parse")
     if descriptor.get("row_count") != len(rows):
         raise RetrievalUnitError("Retrieval Unit artifact accounting mismatch")
     skip_descriptor, skip_path, _ = artifact_body("skip_ledger")
-    skips = _read_gzip_jsonl(skip_path, "Retrieval Unit skip ledger")
+    skips = _read_gzip_jsonl(skip_path, "Retrieval Unit skip ledger", timings=timings, timing_key="skip_ledger_decompress_and_parse")
     if skip_descriptor.get("row_count") != len(skips):
         raise RetrievalUnitError("Retrieval Unit skip ledger accounting mismatch")
     failure_descriptor, _, failure_body = artifact_body("failure_ledger")
@@ -884,7 +907,10 @@ def load_retrieval_units(build_manifest_path: Path) -> tuple[Mapping[str, Any], 
         raise RetrievalUnitError("Retrieval Unit failure ledger is not valid JSON") from exc
     if failure_descriptor.get("byte_count") != len(failure_body) or failure.get("status") != "clear" or failure.get("failure_count") != 0:
         raise RetrievalUnitError("Retrieval Unit build failure ledger is not clear")
+    row_validation_started = perf_counter()
     for index, row in enumerate(rows, 1):
         if row.get("schema_version") != RETRIEVAL_UNIT_SCHEMA_VERSION or not isinstance(row.get("unit_id"), str):
             raise RetrievalUnitError(f"invalid Retrieval Unit row {index}")
+    if timings is not None:
+        timings["row_validation"] = perf_counter() - row_validation_started
     return manifest, rows

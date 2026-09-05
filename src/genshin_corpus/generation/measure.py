@@ -23,6 +23,7 @@ from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_j
 from genshin_corpus.collector.storage import atomic_write
 from genshin_corpus.retrieval.candidate_retrieval import (
     BatchCandidateRetriever,
+    CandidateBundle,
     DEFAULT_DENSE_MODEL_REVISION,
     encode_dense_query,
     load_batch_candidate_retriever,
@@ -31,7 +32,9 @@ from genshin_corpus.retrieval.candidate_retrieval import (
 )
 from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
+    PreparedAssemblyContext,
     assemble_evidence_packet,
+    prepare_evidence_assembly_context,
     write_evidence_packet,
 )
 
@@ -515,23 +518,35 @@ def _candidates_for_question(
 def _assemble_question_packets(
     question: AcceptedQuestion,
     baseline: M1Baseline,
-    candidates_by_mode: Mapping[str, Sequence[Mapping[str, Any]]],
+    candidates: CandidateBundle | Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    prepared_context: PreparedAssemblyContext | None = None,
 ) -> dict[str, Mapping[str, Any]]:
     """Build the same three Evidence Packets from already-ranked candidates."""
 
-    if set(candidates_by_mode) != set(_MODES):
+    bundle = candidates if isinstance(candidates, CandidateBundle) else CandidateBundle.from_current_windows(candidates)
+    if set(bundle.candidate_windows) != set(_MODES):
         raise M1MeasureError("Measure requires lexical, dense, and hybrid candidates")
+    if prepared_context is not None:
+        expected_build = prepared_context.retrieval_unit_build_identity
+        if bundle.retrieval_unit_build_identity != expected_build:
+            raise M1MeasureError("CandidateBundle is not bound to the prepared Retrieval Unit build")
     packets: dict[str, Mapping[str, Any]] = {}
     for mode in _MODES:
-        packets[mode] = assemble_evidence_packet(
-            baseline.retrieval_unit_manifest,
-            candidates_by_mode[mode],
-            config=EvidenceAssemblyConfig(),
-            retrieval_audit={
+        assembly_kwargs: dict[str, Any] = {
+            "config": EvidenceAssemblyConfig(),
+            "retrieval_audit": {
                 "query_id": question.question_id,
                 "query_text": question.question,
                 "mode": mode,
             },
+        }
+        if prepared_context is not None:
+            assembly_kwargs["prepared_context"] = prepared_context
+        packets[mode] = assemble_evidence_packet(
+            baseline.retrieval_unit_manifest,
+            bundle.candidates_for(mode),
+            **assembly_kwargs,
         )
     return packets
 
@@ -548,7 +563,9 @@ def _packet_for_question(
     return _assemble_question_packets(
         question,
         baseline,
-        _candidates_for_question(question, baseline, dense_model, batch_retriever=batch_retriever),
+        CandidateBundle.from_current_windows(
+            _candidates_for_question(question, baseline, dense_model, batch_retriever=batch_retriever)
+        ),
     )
 
 
@@ -666,6 +683,11 @@ def _run_measure(
             if use_batch_retrieval
             else None
         )
+        prepared_context = (
+            prepare_evidence_assembly_context(baseline.retrieval_unit_manifest)
+            if use_batch_retrieval
+            else None
+        )
         if capture_execution_timing and preparation_started is not None:
             execution_timing["batch_preparation_seconds"] = perf_counter() - preparation_started
         output_root.mkdir(parents=True)
@@ -686,7 +708,15 @@ def _run_measure(
                 if capture_execution_timing:
                     execution_timing["retrieval_seconds"] += perf_counter() - retrieval_started
                 assembly_started = perf_counter()
-                packets = _assemble_question_packets(question, baseline, candidates_by_mode)
+                packets = _assemble_question_packets(
+                    question,
+                    baseline,
+                    CandidateBundle.from_current_windows(
+                        candidates_by_mode,
+                        retrieval_unit_build_identity=str(batch_retriever.lexical_manifest["retrieval_unit_build_identity"]),
+                    ),
+                    prepared_context=prepared_context,
+                )
                 if capture_execution_timing:
                     execution_timing["evidence_assembly_seconds"] += perf_counter() - assembly_started
             else:

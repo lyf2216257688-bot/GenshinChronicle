@@ -11,10 +11,14 @@ from unittest.mock import patch
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
+    EvidenceAssemblyDiagnostics,
     EvidenceAssemblyError,
+    PreparedAssemblyContext,
     assemble_evidence_packet,
     evidence_packet_json_bytes,
     evidence_packet_markdown,
+    prepare_evidence_assembly_context,
+    render_evidence_packet,
     write_evidence_packet,
 )
 from genshin_corpus.retrieval.retrieval_units import (
@@ -263,6 +267,62 @@ class RagW1Tests(unittest.TestCase):
         first_write = write_evidence_packet(output_packet, packet_one)
         second_write = write_evidence_packet(output_packet, packet_two)
         self.assertEqual(first_write, second_write)
+
+    def test_prepared_context_preserves_v1_packet_bytes_and_records_diagnostics(self) -> None:
+        _, units, output = self._build()
+        first_rich = next(item for item in units if item["content_type"] == "rich_text")
+        structured = self._unit(units, "structured")
+        candidates = [
+            {"unit_id": first_rich["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic", "score": 1.0}},
+            {"unit_id": structured["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic", "score": 0.5}},
+        ]
+        manifest = output / "metadata" / "manifest.json"
+        config = EvidenceAssemblyConfig(neighbor_before=1, neighbor_after=1, per_block_chars=100, total_context_chars=1000)
+        legacy = assemble_evidence_packet(manifest, candidates, config=config)
+        diagnostics = EvidenceAssemblyDiagnostics()
+        context = prepare_evidence_assembly_context(manifest, diagnostics=diagnostics)
+        prepared = assemble_evidence_packet(manifest, candidates, config=config, prepared_context=context, diagnostics=diagnostics)
+        self.assertEqual(evidence_packet_json_bytes(legacy), evidence_packet_json_bytes(prepared))
+        self.assertEqual(evidence_packet_markdown(legacy), evidence_packet_markdown(prepared))
+        json_body, markdown_body = render_evidence_packet(prepared, diagnostics=diagnostics)
+        self.assertEqual(json_body, evidence_packet_json_bytes(prepared))
+        self.assertEqual(markdown_body.decode("utf-8"), evidence_packet_markdown(prepared))
+        report = diagnostics.to_dict()
+        self.assertIn("retrieval_units_decompress_and_parse", report["preparation_seconds"])
+        self.assertIn("row_validation", report["preparation_seconds"])
+        self.assertIn("structural_index", report["preparation_seconds"])
+        self.assertIn("context_expansion", report["assembly_seconds"])
+        self.assertIn("block_selection", report["assembly_seconds"])
+        self.assertIn("json", report["serialization_seconds"])
+        self.assertEqual([item["outcome"] for item in report["selection_trace"]["candidate_outcomes"]], ["direct_candidate", "direct_candidate"])
+
+    def test_prepared_context_public_views_cannot_mutate_verified_snapshot(self) -> None:
+        _, units, output = self._build()
+        candidate = next(item for item in units if item["content_type"] == "rich_text")
+        manifest = output / "metadata" / "manifest.json"
+        context = prepare_evidence_assembly_context(manifest)
+        candidates = [{"unit_id": candidate["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic"}}]
+        before = evidence_packet_json_bytes(
+            assemble_evidence_packet(manifest, candidates, prepared_context=context)
+        )
+
+        self.assertFalse(hasattr(context, "units_by_id"))
+        self.assertFalse(hasattr(context, "fragment_chains"))
+        public_build = context.build_manifest
+        with self.assertRaises(TypeError):
+            public_build["build_identity"] = "tampered"
+        public_build["canonical_input"]["tampered"] = True
+
+        after = evidence_packet_json_bytes(
+            assemble_evidence_packet(manifest, candidates, prepared_context=context)
+        )
+        self.assertEqual(before, after)
+        forged = PreparedAssemblyContext(
+            retrieval_unit_manifest_path=context.retrieval_unit_manifest_path,
+            retrieval_unit_build_identity=context.retrieval_unit_build_identity,
+        )
+        with self.assertRaisesRegex(EvidenceAssemblyError, "not a verified snapshot"):
+            assemble_evidence_packet(manifest, candidates, prepared_context=forged)
 
     def test_fragment_gap_never_merges(self) -> None:
         _, units, output = self._build()

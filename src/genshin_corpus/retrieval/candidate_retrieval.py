@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
 import gzip
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
@@ -33,6 +35,82 @@ DEFAULT_DENSE_MODEL_REVISION = "7999e1d3359715c523056ef9478215996d62a620"
 
 class CandidateRetrievalError(ValueError):
     pass
+
+
+def _freeze_candidate_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_candidate_value(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_candidate_value(item) for item in value)
+    return deepcopy(value)
+
+
+def _thaw_candidate_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_candidate_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_candidate_value(item) for item in value]
+    return deepcopy(value)
+
+
+@dataclass(frozen=True)
+class CandidateBundle:
+    """Immutable snapshot of the candidates returned by the current arm windows.
+
+    The bundle intentionally preserves only the lexical, Dense, and Hybrid
+    windows supplied by their current retrievers.  It does not represent an
+    exhaustive corpus-wide candidate set.
+    """
+
+    candidate_windows: Mapping[str, tuple[Mapping[str, Any], ...]]
+    retrieval_unit_build_identity: str | None
+
+    @classmethod
+    def from_current_windows(
+        cls,
+        candidates_by_mode: Mapping[str, Sequence[Mapping[str, Any]]],
+        *,
+        retrieval_unit_build_identity: str | None = None,
+    ) -> "CandidateBundle":
+        if not candidates_by_mode:
+            raise CandidateRetrievalError("CandidateBundle requires at least one candidate window")
+        windows: dict[str, tuple[Mapping[str, Any], ...]] = {}
+        for mode, rows in candidates_by_mode.items():
+            if not isinstance(mode, str) or not mode:
+                raise CandidateRetrievalError("CandidateBundle mode must be a non-empty string")
+            if isinstance(rows, (str, bytes)) or not isinstance(rows, Sequence):
+                raise CandidateRetrievalError(f"CandidateBundle {mode} window must be a sequence")
+            copied: list[Mapping[str, Any]] = []
+            for index, row in enumerate(rows):
+                value = _mapping(row, f"CandidateBundle {mode} candidate {index}")
+                copied.append(_freeze_candidate_value(value))
+            windows[mode] = tuple(copied)
+        if retrieval_unit_build_identity is not None and (
+            not isinstance(retrieval_unit_build_identity, str) or not retrieval_unit_build_identity
+        ):
+            raise CandidateRetrievalError("CandidateBundle Retrieval Unit build identity must be a non-empty string")
+        return cls(
+            candidate_windows=MappingProxyType(windows),
+            retrieval_unit_build_identity=retrieval_unit_build_identity,
+        )
+
+    def candidates_for(self, mode: str) -> tuple[Mapping[str, Any], ...]:
+        try:
+            return tuple(_thaw_candidate_value(row) for row in self.candidate_windows[mode])
+        except KeyError as exc:
+            raise CandidateRetrievalError(f"CandidateBundle lacks {mode} window") from exc
+
+    def audit_projection(self) -> dict[str, Any]:
+        """Return detached rows so diagnostics cannot mutate the stored windows."""
+
+        return {
+            "schema_version": "phase04-rag-a1-candidate-bundle-0.1",
+            "retrieval_unit_build_identity": self.retrieval_unit_build_identity,
+            "candidate_windows": {
+                mode: [_thaw_candidate_value(row) for row in rows]
+                for mode, rows in sorted(self.candidate_windows.items())
+            },
+        }
 
 
 def _mapping(value: Any, label: str) -> Mapping[str, Any]:

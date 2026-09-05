@@ -10,6 +10,7 @@ import numpy as np
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.candidate_retrieval import (
+    CandidateBundle,
     CandidateRetrievalError,
     build_dense_index,
     build_lexical_index,
@@ -75,6 +76,31 @@ class RagW2Tests(unittest.TestCase):
         packet = assemble_evidence_packet(self.ru_manifest, hybrid, config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000))
         self.assertEqual(packet["evidence"][0]["members"][0]["unit_id"], hybrid[0]["unit_id"])
         self.assertEqual(packet["evidence"][0]["members"][0]["canonical_address"]["record_id"], "r")
+
+    def test_candidate_bundle_preserves_current_window_rows_and_provenance(self):
+        lm = build_lexical_index(self.ru_manifest, self.root / "lex")
+        dm = build_dense_index(
+            self.ru_manifest,
+            self.root / "dense",
+            model_dir=self.root,
+            vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32),
+        )
+        lexical = lexical_candidates(self.root / "lex/metadata/manifest.json", "阿贝多", top_k=3)
+        dense = dense_candidates(self.root / "dense/metadata/manifest.json", np.array([1, 0], dtype=np.float32), top_k=3)
+        hybrid = hybrid_candidates(
+            lexical,
+            dense,
+            lexical_build_identity=lm["arm_build_identity"],
+            dense_build_identity=dm["arm_build_identity"],
+            top_k=3,
+        )
+        bundle = CandidateBundle.from_current_windows({"lexical": lexical, "dense": dense, "hybrid": hybrid})
+        original = bundle.audit_projection()
+        lexical[0]["retrieval"]["score"] = -1.0
+        self.assertEqual(bundle.audit_projection(), original)
+        self.assertEqual(len(bundle.candidates_for("lexical")), len(lexical))
+        self.assertEqual(bundle.candidates_for("hybrid")[0]["retrieval"]["components"], hybrid[0]["retrieval"]["components"])
+        self.assertIn("arm_build_identities", bundle.candidates_for("hybrid")[0]["retrieval"])
 
     def test_batch_retriever_loads_each_arm_once_and_matches_public_candidates(self):
         lm = build_lexical_index(self.ru_manifest, self.root / "lex")

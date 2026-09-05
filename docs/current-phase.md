@@ -283,8 +283,8 @@ probe. M1 semantic interpretation remains lightweight and observed, not a
 gold-benchmark conclusion. No Retrieval, Embedding, or Rerank challenger work
 is authorized by M1.
 
-**P04-RAG-M2 — 70Q Open-ended Scenario Measure** is **APPROVED / EXECUTE**
-under the user's direct-Execute decision. Its offline implementation is ready:
+**P04-RAG-M2 — 70Q Open-ended Scenario Measure** was executed under the
+user's direct-Execute decision. Its offline implementation enforced that:
 the reviewed source is strictly parsed as exactly Q001–Q070, while the runtime
 input contains only `question_id` and unaltered `question` text. `参考答案` and
 `人工审核` are held in a separate review-only sidecar and cannot enter
@@ -294,20 +294,30 @@ one actual Dense preflight, one verified encoder per batch, one query encoding
 per question, 70 single-attempt provider occurrences, per-question artifacts,
 and a compact review index for later semantic triage. The pre-live actual
 review found redundant per-question arm loading/ranking in the inherited path;
-the bounded M2 batch-reuse repair is implemented and tested: it verifies and
+the bounded M2 batch-reuse repair verifies and
 loads the existing lexical/Dense indexes once, computes each arm once per
 question, and builds Hybrid by the same deterministic RRF over those exact arm
 candidates. Execution-only aggregate timing separates batch preparation,
 Retrieval, Evidence Assembly, provider Generation, and total time without
-affecting identities or correctness. No Bailian call or paid 70Q run has been
-issued; M2 is not closed and its semantic outcome remains UNKNOWN.
+affecting identities or correctness. The paid 70Q run completed at
+`.local/p04-rag-m2/run-001`: the manifest is `complete`, with 70 single-attempt
+provider occurrences and the retained per-question Packet, Generation, and
+review-index artifacts. Its recorded aggregate timing is evidence only. The
+initial strict human semantic audit is complete: RAG-grounded outcomes are PASS
+37 / PARTIAL 11 / FAIL 21 / ERROR 1, not a general model-correctness rate.
+Representative attribution identifies Q028/Q068 as Assembly-loss cases and
+Q020/Q052 as Generation controls; Q011 upstream recall remains UNKNOWN. This
+execution does not select a Retrieval, embedding, reranking, or Assembly
+challenger technology.
 
 ## Immediate next action
 
-P04-RAG-M2 is in approved direct-Execute state. Its prepared runtime input and
-offline preflight are the only current execution path; do not start Retrieval,
-Embedding, or Rerank challenger work. The single paid 70Q provider run remains
-not executed pending an explicit user instruction.
+P04-RAG-M2 execution is complete; do not rerun or overwrite `run-001`.
+**P04-RAG-A1-1 — Candidate fidelity and prepared Evidence Assembly context**
+is implemented and locally verified as the v1-compatible diagnostic foundation.
+It preserves existing Evidence selection semantics, does not start A1-2, and
+issues no provider calls. A1-2 remains separately scoped; Retrieval, embedding,
+reranking, and other challenger work remain outside this completed unit.
 
 ## Phase transition boundary
 

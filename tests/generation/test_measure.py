@@ -19,9 +19,10 @@ from genshin_corpus.generation.measure import (
     preflight_m2,
     run_m1_measure,
     run_m2_measure,
+    _assemble_question_packets,
     write_question_packets,
 )
-from genshin_corpus.retrieval.candidate_retrieval import DEFAULT_DENSE_MODEL_REVISION
+from genshin_corpus.retrieval.candidate_retrieval import CandidateBundle, DEFAULT_DENSE_MODEL_REVISION
 
 
 class _FakeTransport:
@@ -344,6 +345,7 @@ class M1MeasureTests(unittest.TestCase):
 
         class _FakeBatchRetriever:
             dense_manifest = {"instruction": "为这个句子生成表示以用于检索相关文章："}
+            lexical_manifest = {"retrieval_unit_build_identity": "fixture-ru-build"}
 
             def candidates_for_query(self, query, query_vector, *, instruction):
                 batch_queries.append((query, query_vector, instruction))
@@ -357,13 +359,18 @@ class M1MeasureTests(unittest.TestCase):
             encoded.append((query, model))
             return [1.0, 0.0]
 
-        def fake_assemble(manifest_path, candidates, *, config, retrieval_audit):
+        def fake_assemble(manifest_path, candidates, *, config, retrieval_audit, prepared_context):
+            self.assertIs(prepared_context, prepared_context_sentinel)
             return self._packet(retrieval_audit["query_id"], retrieval_audit["mode"])
 
         output = self.root / "m2-run"
         configs = []
         fake_batch = _FakeBatchRetriever()
-        with patch("genshin_corpus.generation.measure._probe_dense_query_runtime", return_value={"runtime_root": "injected", "embedding_dimension": 512}), patch("genshin_corpus.generation.measure.load_dense_query_model", return_value=model) as load_model, patch("genshin_corpus.generation.measure.load_batch_candidate_retriever", return_value=fake_batch) as load_batch, patch("genshin_corpus.generation.measure.encode_dense_query", side_effect=fake_encode), patch("genshin_corpus.generation.measure.assemble_evidence_packet", side_effect=fake_assemble):
+        class _FakePreparedContext:
+            retrieval_unit_build_identity = "fixture-ru-build"
+
+        prepared_context_sentinel = _FakePreparedContext()
+        with patch("genshin_corpus.generation.measure._probe_dense_query_runtime", return_value={"runtime_root": "injected", "embedding_dimension": 512}), patch("genshin_corpus.generation.measure.load_dense_query_model", return_value=model) as load_model, patch("genshin_corpus.generation.measure.load_batch_candidate_retriever", return_value=fake_batch) as load_batch, patch("genshin_corpus.generation.measure.prepare_evidence_assembly_context", return_value=prepared_context_sentinel) as prepare_context, patch("genshin_corpus.generation.measure.encode_dense_query", side_effect=fake_encode), patch("genshin_corpus.generation.measure.assemble_evidence_packet", side_effect=fake_assemble):
             self.assertEqual(preflight_m2(questions, baseline=self.baseline)["status"], "ready_to_execute")
             result = run_m2_measure(
                 questions,
@@ -380,6 +387,7 @@ class M1MeasureTests(unittest.TestCase):
         self.assertEqual(configs[0].max_output_tokens, DEFAULT_M2_MAX_OUTPUT_TOKENS)
         load_model.assert_called_once_with(self.baseline.model_dir)
         load_batch.assert_called_once_with(self.baseline.lexical_manifest, self.baseline.dense_manifest)
+        prepare_context.assert_called_once_with(self.baseline.retrieval_unit_manifest)
         self.assertEqual(len(encoded), 70)
         self.assertEqual({id(item[1]) for item in encoded}, {id(model)})
         self.assertEqual([item[0] for item in encoded], [f"M2 问题 {index}" for index in range(1, 71)])
@@ -394,6 +402,24 @@ class M1MeasureTests(unittest.TestCase):
             self.assertGreaterEqual(result["execution_timing"][name], 0.0)
         visible = "\n".join(path.read_text(encoding="utf-8") for path in output.rglob("*.json"))
         self.assertNotIn("REVIEW_ANSWER", visible)
+
+    def test_prepared_context_rejects_candidate_bundle_from_another_ru_build(self) -> None:
+        class _PreparedContext:
+            retrieval_unit_build_identity = "expected-ru-build"
+
+        bundle = CandidateBundle.from_current_windows(
+            {mode: [{"unit_id": "u1", "rank": 1, "retrieval": {"mode": mode}}] for mode in ("lexical", "dense", "hybrid")},
+            retrieval_unit_build_identity="other-ru-build",
+        )
+        with patch("genshin_corpus.generation.measure.assemble_evidence_packet") as assemble:
+            with self.assertRaisesRegex(M1MeasureError, "not bound"):
+                _assemble_question_packets(
+                    AcceptedQuestion(question_id="q", question="问题"),
+                    self.baseline,
+                    bundle,
+                    prepared_context=_PreparedContext(),
+                )
+        assemble.assert_not_called()
 
     def test_m2_dense_revision_mismatch_stops_before_batch_index_load(self) -> None:
         questions = self._write_m2_runtime_questions()
