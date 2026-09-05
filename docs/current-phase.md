@@ -315,9 +315,25 @@ challenger technology.
 P04-RAG-M2 execution is complete; do not rerun or overwrite `run-001`.
 **P04-RAG-A1-1 — Candidate fidelity and prepared Evidence Assembly context**
 is implemented and locally verified as the v1-compatible diagnostic foundation.
-It preserves existing Evidence selection semantics, does not start A1-2, and
-issues no provider calls. A1-2 remains separately scoped; Retrieval, embedding,
+It preserves existing Evidence selection semantics and issues no provider
+calls. Its follow-on work remains separately scoped; Retrieval, embedding,
 reranking, and other challenger work remain outside this completed unit.
+
+**P04-RAG-A1-2-1 — versioned v2 Evidence Selection challenger** is
+implemented and verified by a no-Generation replay at
+`.local/p04-rag-a1-2-review/diagnostic.json`. v1 remains the unchanged
+byte-compatible control. v2 admits direct-containing structural blocks before
+context-only blocks, with an explicit context-only cap of 8 and deterministic
+total-character budget conflicts recorded as operating-point omissions rather
+than integrity failures. The primary replay held corpus/build, arm outputs,
+Hybrid top-20, RRF, RU, expansion, per-block limit, and 12,000-character total
+budget fixed; it verified Q028/Q068 carrier visibility, Q020/Q052 Hybrid
+visible-evidence non-regression, v1 preserved-M2 byte equality, and v2 repeat
+determinism with 0 provider calls. Its timing/memory values are replay evidence
+under one Prepared Assembly Context, not M2 original timing. This closes only
+the versioned admission-policy work unit; budget tuning, arm-union/depth
+experiments, block splitting, retrieval changes, and Generation remain
+separately authorized work.
 
 ## Phase transition boundary
 

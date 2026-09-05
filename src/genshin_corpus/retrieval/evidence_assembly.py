@@ -26,6 +26,7 @@ from .retrieval_units import RETRIEVAL_UNIT_SCHEMA_VERSION, RetrievalUnitError, 
 
 EVIDENCE_PACKET_SCHEMA_VERSION = "phase04-evidence-packet-0.1"
 EVIDENCE_ASSEMBLY_VERSION = "phase04-rag-w1-deterministic-assembly-0.1"
+V2_DIRECT_FIRST_CONTEXT_CAP_POLICY = "phase04-rag-a1-2-direct-first-context-cap-0.1"
 
 
 class EvidenceAssemblyError(ValueError):
@@ -73,6 +74,41 @@ class EvidenceAssemblyConfig:
             "per_block_chars": self.per_block_chars,
             "total_context_chars": self.total_context_chars,
         }
+
+
+@dataclass(frozen=True)
+class EvidenceSelectionPolicy:
+    """Versioned final-admission policy, independent from v1 configuration.
+
+    The challenger currently exposes only the approved direct-first policy.
+    Keeping this object separate ensures that ``EvidenceAssemblyConfig`` and
+    its v1 packet identity retain their legacy meanings.
+    """
+
+    identity: str
+    context_only_block_cap: int
+
+    def __post_init__(self) -> None:
+        if self.identity != V2_DIRECT_FIRST_CONTEXT_CAP_POLICY:
+            raise ValueError("unsupported Evidence Selection policy identity")
+        if (
+            not isinstance(self.context_only_block_cap, int)
+            or isinstance(self.context_only_block_cap, bool)
+            or self.context_only_block_cap <= 0
+        ):
+            raise ValueError("context_only_block_cap must be a positive integer")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "identity": self.identity,
+            "context_only_block_cap": self.context_only_block_cap,
+        }
+
+
+V2_DIRECT_FIRST_CONTEXT_CAP = EvidenceSelectionPolicy(
+    identity=V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
+    context_only_block_cap=8,
+)
 
 
 @dataclass
@@ -528,12 +564,12 @@ def _block_members(selection: Mapping[str, Mapping[str, Any]], units_by_id: Mapp
 
 def _finish_block(members: list[Mapping[str, Any]], selection: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     member_rows = []
-    direct_ranks: list[int] = []
+    direct_candidates: list[tuple[int, int, str]] = []
     for member in members:
         selection_info = selection[str(member["unit_id"])]
         retrieval = selection_info.get("retrieval")
         if isinstance(retrieval, Mapping):
-            direct_ranks.append(int(retrieval["rank"]))
+            direct_candidates.append((int(retrieval["rank"]), int(retrieval["input_index"]), str(member["unit_id"])))
         public = _unit_public(member)
         public["assembly_reasons"] = sorted(selection_info["reasons"], key=canonical_json_bytes)
         public["retrieval"] = None if retrieval is None else {
@@ -552,12 +588,14 @@ def _finish_block(members: list[Mapping[str, Any]], selection: Mapping[str, Mapp
             separator = "\n\n"
         text_parts.extend((separator, right_row["text"]))
     text = "".join(text_parts)
+    direct_candidates.sort()
     return {
         "members": member_rows,
         "text": text,
         "char_count": len(text),
         "source_order": member_rows[0]["source_order"],
-        "priority": min(direct_ranks) if direct_ranks else None,
+        "priority": direct_candidates[0][0] if direct_candidates else None,
+        "direct_candidate_order": direct_candidates,
     }
 
 
@@ -581,6 +619,111 @@ def _select_blocks(blocks: list[dict[str, Any]], config: EvidenceAssemblyConfig)
     return accepted, omitted
 
 
+def _block_unit_ids(block: Mapping[str, Any]) -> list[str]:
+    return [str(member["unit_id"]) for member in block["members"]]
+
+
+def _v2_direct_admission_key(block: Mapping[str, Any]) -> tuple[Any, ...]:
+    direct_candidates = block["direct_candidate_order"]
+    if not direct_candidates:
+        raise EvidenceAssemblyError("direct-containing block lacks a direct candidate order")
+    rank, input_index, _ = direct_candidates[0]
+    return (rank, input_index, tuple(block["source_order"]), tuple(_block_unit_ids(block)))
+
+
+def _v2_context_admission_key(block: Mapping[str, Any]) -> tuple[Any, ...]:
+    return (tuple(block["source_order"]), tuple(_block_unit_ids(block)))
+
+
+def _select_blocks_v2(
+    blocks: list[dict[str, Any]],
+    config: EvidenceAssemblyConfig,
+    policy: EvidenceSelectionPolicy,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Admit direct-containing blocks before bounded context-only blocks.
+
+    Selection remains structural and deterministic.  A char-budget conflict is
+    recorded as an operating-point omission; validation failures continue to
+    raise before this function is reached.
+    """
+
+    direct_blocks = sorted(
+        (block for block in blocks if block["priority"] is not None),
+        key=_v2_direct_admission_key,
+    )
+    context_blocks = sorted(
+        (block for block in blocks if block["priority"] is None),
+        key=_v2_context_admission_key,
+    )
+    accepted: list[dict[str, Any]] = []
+    omitted: list[dict[str, Any]] = []
+    admission_order: list[dict[str, Any]] = []
+    used_chars = 0
+    accepted_direct = 0
+    accepted_context = 0
+
+    for block in direct_blocks:
+        unit_ids = _block_unit_ids(block)
+        key = _v2_direct_admission_key(block)
+        if block["char_count"] > config.per_block_chars:
+            reason = "per_block_char_limit"
+        elif used_chars + block["char_count"] > config.total_context_chars:
+            reason = "direct_total_context_char_budget_conflict"
+        else:
+            accepted.append(block)
+            accepted_direct += 1
+            used_chars += block["char_count"]
+            admission_order.append({"block_kind": "direct_containing", "unit_ids": unit_ids, "admission_key": list(key), "outcome": "admitted"})
+            continue
+        omitted.append({"unit_ids": unit_ids, "reason": reason, "char_count": block["char_count"], "block_kind": "direct_containing"})
+        admission_order.append({"block_kind": "direct_containing", "unit_ids": unit_ids, "admission_key": list(key), "outcome": "omitted", "reason": reason})
+
+    for block in context_blocks:
+        unit_ids = _block_unit_ids(block)
+        key = _v2_context_admission_key(block)
+        if block["char_count"] > config.per_block_chars:
+            reason = "per_block_char_limit"
+        elif accepted_context >= policy.context_only_block_cap:
+            reason = "context_only_block_cap"
+        elif used_chars + block["char_count"] > config.total_context_chars:
+            reason = "context_total_context_char_budget"
+        else:
+            accepted.append(block)
+            accepted_context += 1
+            used_chars += block["char_count"]
+            admission_order.append({"block_kind": "context_only", "unit_ids": unit_ids, "admission_key": list(key), "outcome": "admitted"})
+            continue
+        omitted.append({"unit_ids": unit_ids, "reason": reason, "char_count": block["char_count"], "block_kind": "context_only"})
+        admission_order.append({"block_kind": "context_only", "unit_ids": unit_ids, "admission_key": list(key), "outcome": "omitted", "reason": reason})
+
+    accepted.sort(key=lambda block: (tuple(block["source_order"]), tuple(_block_unit_ids(block))))
+    return accepted, omitted, {
+        "direct_containing_block_count": len(direct_blocks),
+        "context_only_block_count": len(context_blocks),
+        "selected_direct_containing_blocks": accepted_direct,
+        "selected_context_only_blocks": accepted_context,
+        "admission_order": admission_order,
+    }
+
+
+def _v2_packet_config(config: EvidenceAssemblyConfig) -> dict[str, Any]:
+    """Expose only configuration fields used by the v2 policy.
+
+    In particular, the v1 total-block cap is intentionally absent: v2's 8 is
+    the policy's context-only cap, not a generic evidence-block limit.
+    """
+
+    return {
+        "neighbor_before": config.neighbor_before,
+        "neighbor_after": config.neighbor_after,
+        "structured_neighbor_before": config.structured_neighbor_before,
+        "structured_neighbor_after": config.structured_neighbor_after,
+        "dialogue_hops": config.dialogue_hops,
+        "per_block_chars": config.per_block_chars,
+        "total_context_chars": config.total_context_chars,
+    }
+
+
 def assemble_evidence_packet(
     retrieval_unit_manifest_path: Path,
     ranked_candidates: Sequence[Mapping[str, Any]],
@@ -589,11 +732,13 @@ def assemble_evidence_packet(
     retrieval_audit: Mapping[str, Any] | None = None,
     prepared_context: PreparedAssemblyContext | None = None,
     diagnostics: EvidenceAssemblyDiagnostics | None = None,
+    selection_policy: EvidenceSelectionPolicy | None = None,
 ) -> dict[str, Any]:
     """Assemble one deterministic provider-neutral Evidence Packet.
 
     ``ranked_candidates`` must be supplied by an upstream retrieval mode.  No
     similarity, re-ranking, text identity, or model decision is performed.
+    ``selection_policy=None`` retains the byte-compatible v1 selector.
     """
 
     config = config or EvidenceAssemblyConfig()
@@ -615,7 +760,11 @@ def assemble_evidence_packet(
     if diagnostics is not None:
         diagnostics.assembly_seconds["block_construction"] = perf_counter() - block_started
     selection_started = perf_counter()
-    blocks, omitted = _select_blocks(blocks, config)
+    v2_selection: dict[str, Any] | None = None
+    if selection_policy is None:
+        blocks, omitted = _select_blocks(blocks, config)
+    else:
+        blocks, omitted, v2_selection = _select_blocks_v2(blocks, config, selection_policy)
     if diagnostics is not None:
         diagnostics.assembly_seconds["block_selection"] = perf_counter() - selection_started
     evidence = []
@@ -655,6 +804,32 @@ def assemble_evidence_packet(
             "omitted_blocks": omitted,
         },
     }
+    if selection_policy is not None:
+        if v2_selection is None:
+            raise EvidenceAssemblyError("v2 selection accounting is absent")
+        policy_dict = selection_policy.to_dict()
+        packet["selection_policy"] = policy_dict
+        packet["selection_policy_identity"] = sha256_json({
+            "assembly_version": EVIDENCE_ASSEMBLY_VERSION,
+            "selection_policy": policy_dict,
+            "assembly_config": _v2_packet_config(config),
+        })
+        packet["assembly_config"] = _v2_packet_config(config)
+        packet["assembly_config_identity"] = sha256_json({
+            "assembly_version": EVIDENCE_ASSEMBLY_VERSION,
+            "config": _v2_packet_config(config),
+            "selection_policy": policy_dict,
+        })
+        packet["budget"] = {
+            "per_block_chars": config.per_block_chars,
+            "total_context_chars": config.total_context_chars,
+            "context_only_block_cap": selection_policy.context_only_block_cap,
+            "used_direct_containing_blocks": v2_selection["selected_direct_containing_blocks"],
+            "used_context_only_blocks": v2_selection["selected_context_only_blocks"],
+            "used_evidence_blocks": len(evidence),
+            "used_context_chars": sum(item["char_count"] for item in evidence),
+            "omitted_blocks": omitted,
+        }
     if diagnostics is not None:
         omitted_by_unit = {
             unit_id: item["reason"]
@@ -672,6 +847,24 @@ def assemble_evidence_packet(
                 for unit_id, value in sorted(selection.items())
             ],
         }
+        if selection_policy is not None:
+            if v2_selection is None:
+                raise EvidenceAssemblyError("v2 selection accounting is absent")
+            diagnostics.selection_trace.update({
+                "selection_policy": selection_policy.to_dict(),
+                "candidate_counts": {
+                    "input": len(ranked_candidates),
+                    "direct": len(direct),
+                    "context": len(selection) - len(direct),
+                },
+                "block_counts": {
+                    "direct_containing": v2_selection["direct_containing_block_count"],
+                    "context_only": v2_selection["context_only_block_count"],
+                    "selected_direct_containing": v2_selection["selected_direct_containing_blocks"],
+                    "selected_context_only": v2_selection["selected_context_only_blocks"],
+                },
+                "admission_order": v2_selection["admission_order"],
+            })
     return packet
 
 

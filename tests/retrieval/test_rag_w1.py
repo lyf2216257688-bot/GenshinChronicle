@@ -13,7 +13,10 @@ from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
     EvidenceAssemblyDiagnostics,
     EvidenceAssemblyError,
+    EvidenceSelectionPolicy,
     PreparedAssemblyContext,
+    V2_DIRECT_FIRST_CONTEXT_CAP,
+    V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
     assemble_evidence_packet,
     evidence_packet_json_bytes,
     evidence_packet_markdown,
@@ -21,6 +24,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     render_evidence_packet,
     write_evidence_packet,
 )
+from genshin_corpus.retrieval import evidence_assembly as evidence_assembly_module
 from genshin_corpus.retrieval.retrieval_units import (
     RetrievalUnitBuildConfig,
     RetrievalUnitError,
@@ -360,6 +364,103 @@ class RagW1Tests(unittest.TestCase):
         self.assertTrue(any(reason["kind"] == "observed_dialogue_edge" for reason in shared_member["assembly_reasons"]))
         self.assertIn("raw_refs", shared_member["lineage"])
         self.assertEqual(shared_member["canonical_address"]["parsed_json_pointer"], "/modules/0/components/0/units/3")
+
+    def test_v2_direct_block_keeps_its_bounded_structural_context(self) -> None:
+        _, units, output = self._build()
+        structured = [item for item in units if item["content_type"] == "structured"]
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": structured[0]["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic"}}],
+            config=EvidenceAssemblyConfig(
+                neighbor_before=0,
+                neighbor_after=0,
+                structured_neighbor_before=0,
+                structured_neighbor_after=1,
+                per_block_chars=100,
+                total_context_chars=1000,
+            ),
+            selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+        )
+        members = [member for block in packet["evidence"] for member in block["members"]]
+        self.assertEqual([member["unit_id"] for member in members], [structured[0]["unit_id"], structured[1]["unit_id"]])
+        self.assertEqual(packet["budget"]["used_direct_containing_blocks"], 1)
+        self.assertEqual(packet["budget"]["used_context_only_blocks"], 0)
+        self.assertNotIn("max_evidence_blocks", packet["budget"])
+        self.assertNotIn("max_evidence_blocks", packet["assembly_config"])
+        self.assertTrue(any(reason["kind"] == "structured_neighbor" for reason in members[1]["assembly_reasons"]))
+
+    def test_v2_context_only_saturation_cannot_starve_direct_block(self) -> None:
+        direct = {
+            "members": [{"unit_id": "direct"}],
+            "char_count": 4,
+            "source_order": [9],
+            "priority": 2,
+            "direct_candidate_order": [(2, 5, "direct")],
+        }
+        contexts = [
+            {"members": [{"unit_id": "context-a"}], "char_count": 4, "source_order": [1], "priority": None, "direct_candidate_order": []},
+            {"members": [{"unit_id": "context-b"}], "char_count": 4, "source_order": [2], "priority": None, "direct_candidate_order": []},
+        ]
+        selected, omitted, accounting = evidence_assembly_module._select_blocks_v2(
+            [*contexts, direct],
+            EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, total_context_chars=100, per_block_chars=100),
+            EvidenceSelectionPolicy(V2_DIRECT_FIRST_CONTEXT_CAP_POLICY, context_only_block_cap=1),
+        )
+        self.assertIn("direct", [member["unit_id"] for block in selected for member in block["members"]])
+        self.assertEqual(accounting["selected_direct_containing_blocks"], 1)
+        self.assertEqual(accounting["selected_context_only_blocks"], 1)
+        self.assertEqual(omitted, [{"unit_ids": ["context-b"], "reason": "context_only_block_cap", "char_count": 4, "block_kind": "context_only"}])
+        self.assertEqual(accounting["admission_order"][0]["unit_ids"], ["direct"])
+
+    def test_v2_direct_total_char_conflict_is_deterministic_and_auditable(self) -> None:
+        _, units, output = self._build()
+        first_rich = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "ABCD")
+        structured = self._unit(units, "structured")
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=4)
+        candidates = [
+            {"unit_id": first_rich["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic"}},
+            {"unit_id": structured["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic"}},
+        ]
+        diagnostics = EvidenceAssemblyDiagnostics()
+        first = assemble_evidence_packet(
+            output / "metadata" / "manifest.json", candidates, config=config,
+            selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP, diagnostics=diagnostics,
+        )
+        second = assemble_evidence_packet(
+            output / "metadata" / "manifest.json", candidates, config=config,
+            selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+        )
+        self.assertEqual(evidence_packet_json_bytes(first), evidence_packet_json_bytes(second))
+        self.assertTrue(any(
+            item["reason"] == "direct_total_context_char_budget_conflict" and structured["unit_id"] in item["unit_ids"]
+            for item in first["budget"]["omitted_blocks"]
+        ))
+        self.assertEqual(diagnostics.selection_trace["admission_order"][0]["outcome"], "admitted")
+        self.assertEqual(diagnostics.selection_trace["admission_order"][1]["reason"], "direct_total_context_char_budget_conflict")
+
+    def test_v2_identical_text_occurrences_remain_distinct(self) -> None:
+        self.record["sections"].append(json.loads(json.dumps(self.record["sections"][0])))
+        second = self.record["sections"][1]
+        second["ordinal"] = 1
+        second["component_contexts"][0]["ordinal"] = 0
+        second["component_contexts"][0]["observation_key"] = "content:fixture-rag-1:component:fixture:ordinal:other"
+        for unit in second["units"]:
+            unit["parent_component_key"] = second["component_contexts"][0]["observation_key"]
+        second["units"] = [second["units"][0]]
+        second["component_contexts"][0]["child_unit_ordinals"] = [0]
+        second["component_contexts"][0]["unit_count"] = 1
+        self._write_record()
+        self._write_manifest()
+        _, units, output = self._build()
+        same_text = [item for item in units if item["retrieval_visible_text"] == "ABCD"]
+        packet = assemble_evidence_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": item["unit_id"], "rank": index + 1, "retrieval": {}} for index, item in enumerate(same_text)],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000),
+            selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+        )
+        self.assertEqual(len(packet["evidence"]), 2)
+        self.assertEqual({member["unit_id"] for block in packet["evidence"] for member in block["members"]}, {item["unit_id"] for item in same_text})
 
     def test_identical_text_different_occurrences_remains_distinct_and_no_cross_context_merge(self) -> None:
         self.record["sections"].append(json.loads(json.dumps(self.record["sections"][0])))
