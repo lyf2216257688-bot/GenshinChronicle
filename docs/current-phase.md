@@ -275,18 +275,39 @@ attempts. The bundled `.local/w6-runtime` actual-preflight repair then passed.
 `run-002` completed all 6 accepted questions with 6 provider attempts. q020
 exposed truncation at the fixed `max_output_tokens=1024` control value; this is
 not a Retrieval failure. Generation output length is therefore a
-user-configurable product direction, while exact M2 operating values remain
-undecided. The Dense execution batch now shares one verified encoder and
+user-configurable product direction. M2 selects `max_output_tokens=2048` as
+one explicit 70Q operating point to avoid repeating that observed limit; it is
+not a long-term product optimum. The Dense execution batch now shares one verified encoder and
 performs one query encoding per question; preflight remains a separate actual
 probe. M1 semantic interpretation remains lightweight and observed, not a
 gold-benchmark conclusion. No Retrieval, Embedding, or Rerank challenger work
 is authorized by M1.
 
+**P04-RAG-M2 — 70Q Open-ended Scenario Measure** is **APPROVED / EXECUTE**
+under the user's direct-Execute decision. Its offline implementation is ready:
+the reviewed source is strictly parsed as exactly Q001–Q070, while the runtime
+input contains only `question_id` and unaltered `question` text. `参考答案` and
+`人工审核` are held in a separate review-only sidecar and cannot enter
+Retrieval, Evidence Packets, Generation, or request identity. M2 reuses the
+checkpointed lexical/Dense/Hybrid Packet path and hybrid Generation path, with
+one actual Dense preflight, one verified encoder per batch, one query encoding
+per question, 70 single-attempt provider occurrences, per-question artifacts,
+and a compact review index for later semantic triage. The pre-live actual
+review found redundant per-question arm loading/ranking in the inherited path;
+the bounded M2 batch-reuse repair is implemented and tested: it verifies and
+loads the existing lexical/Dense indexes once, computes each arm once per
+question, and builds Hybrid by the same deterministic RRF over those exact arm
+candidates. Execution-only aggregate timing separates batch preparation,
+Retrieval, Evidence Assembly, provider Generation, and total time without
+affecting identities or correctness. No Bailian call or paid 70Q run has been
+issued; M2 is not closed and its semantic outcome remains UNKNOWN.
+
 ## Immediate next action
 
-P04-RAG-M1 is closed. The next work unit is **P04-RAG-M2 — 70Q Open-ended
-Scenario Measure**. Begin it in a new Codex window with a Plan; do not start
-Retrieval, Embedding, or Rerank challenger work.
+P04-RAG-M2 is in approved direct-Execute state. Its prepared runtime input and
+offline preflight are the only current execution path; do not start Retrieval,
+Embedding, or Rerank challenger work. The single paid 70Q provider run remains
+not executed pending an explicit user instruction.
 
 ## Phase transition boundary
 

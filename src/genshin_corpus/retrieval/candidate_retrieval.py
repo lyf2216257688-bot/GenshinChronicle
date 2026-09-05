@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
 import gzip
@@ -180,6 +181,21 @@ def lexical_candidates(
     if k1 < 0 or not 0 <= b <= 1:
         raise CandidateRetrievalError("invalid BM25 parameters")
     manifest, rows = _load_lexical(Path(lexical_manifest_path))
+    return _lexical_candidates_from_loaded(manifest, rows, query, top_k=top_k, k1=k1, b=b, analyzer=analyzer)
+
+
+def _lexical_candidates_from_loaded(
+    manifest: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    query: str,
+    *,
+    top_k: int,
+    k1: float,
+    b: float,
+    analyzer: Callable[[str], list[str]],
+) -> list[dict[str, Any]]:
+    """Score one query against a previously validated lexical artifact."""
+
     terms = Counter(analyzer(str(query)))
     lengths = [int(row.get("length", 0)) for row in rows]
     average = sum(lengths) / len(lengths) if lengths else 0.0
@@ -315,6 +331,27 @@ def _load_dense(path: Path) -> tuple[Mapping[str, Any], Any, list[Mapping[str, A
 def dense_candidates(dense_manifest_path: Path, query_vector: Any, *, top_k: int = 20, query_instruction: str | None = None) -> list[dict[str, Any]]:
     top_k = _positive_int(top_k, "top_k")
     manifest, vectors, rows = _load_dense(Path(dense_manifest_path))
+    return _dense_candidates_from_loaded(
+        manifest,
+        vectors,
+        rows,
+        query_vector,
+        top_k=top_k,
+        query_instruction=query_instruction,
+    )
+
+
+def _dense_candidates_from_loaded(
+    manifest: Mapping[str, Any],
+    vectors: Any,
+    rows: Sequence[Mapping[str, Any]],
+    query_vector: Any,
+    *,
+    top_k: int,
+    query_instruction: str | None,
+) -> list[dict[str, Any]]:
+    """Score one query against a previously validated Dense artifact."""
+
     import numpy as np
     query = np.asarray(query_vector, dtype=np.float32)
     if query.ndim != 1 or query.shape[0] != vectors.shape[1] or not np.isfinite(query).all():
@@ -422,6 +459,78 @@ def hybrid_candidates(lexical: Sequence[Mapping[str, Any]], dense: Sequence[Mapp
     scored.sort(key=lambda x: (-x[0], x[1]))
     fusion_identity = sha256_json({"method": "rrf", "version": RRF_FUSION_VERSION, "rrf_k": rrf_k, "top_k": top_k})
     return [{"unit_id": uid, "rank": rank, "retrieval": {"mode": "hybrid", "score": value, "arm_build_identities": {"lexical": lexical_build_identity, "dense": dense_build_identity}, "fusion": {"method": "rrf", "version": RRF_FUSION_VERSION, "config_identity": fusion_identity}, "components": item}} for rank, (value, uid, item) in enumerate(scored[:top_k], 1)]
+
+
+@dataclass(frozen=True)
+class BatchCandidateRetriever:
+    """One Measure batch's already-validated lexical and Dense index state."""
+
+    lexical_manifest: Mapping[str, Any]
+    lexical_rows: Sequence[Mapping[str, Any]]
+    dense_manifest: Mapping[str, Any]
+    dense_vectors: Any
+    dense_rows: Sequence[Mapping[str, Any]]
+
+    def candidates_for_query(
+        self,
+        query: str,
+        query_vector: Any,
+        *,
+        instruction: str,
+        top_k: int = 20,
+        k1: float = 1.2,
+        b: float = 0.75,
+        rrf_k: int = 60,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Compute each arm once and fuse those exact rows with existing RRF."""
+
+        top_k = _positive_int(top_k, "top_k")
+        k1, b = _finite_float(k1, "k1"), _finite_float(b, "b")
+        if k1 < 0 or not 0 <= b <= 1:
+            raise CandidateRetrievalError("invalid BM25 parameters")
+        lexical = _lexical_candidates_from_loaded(
+            self.lexical_manifest,
+            self.lexical_rows,
+            query,
+            top_k=top_k,
+            k1=k1,
+            b=b,
+            analyzer=analyze,
+        )
+        dense = _dense_candidates_from_loaded(
+            self.dense_manifest,
+            self.dense_vectors,
+            self.dense_rows,
+            query_vector,
+            top_k=top_k,
+            query_instruction=instruction,
+        )
+        hybrid = hybrid_candidates(
+            lexical,
+            dense,
+            lexical_build_identity=str(self.lexical_manifest["arm_build_identity"]),
+            dense_build_identity=str(self.dense_manifest["arm_build_identity"]),
+            top_k=top_k,
+            rrf_k=rrf_k,
+        )
+        return {"lexical": lexical, "dense": dense, "hybrid": hybrid}
+
+
+def load_batch_candidate_retriever(
+    lexical_manifest_path: Path,
+    dense_manifest_path: Path,
+) -> BatchCandidateRetriever:
+    """Load and fully validate both existing production indexes once per batch."""
+
+    lexical_manifest, lexical_rows = _load_lexical(Path(lexical_manifest_path))
+    dense_manifest, dense_vectors, dense_rows = _load_dense(Path(dense_manifest_path))
+    return BatchCandidateRetriever(
+        lexical_manifest=lexical_manifest,
+        lexical_rows=lexical_rows,
+        dense_manifest=dense_manifest,
+        dense_vectors=dense_vectors,
+        dense_rows=dense_rows,
+    )
 
 
 def retrieve_candidates(mode: str, *, lexical_manifest_path: Path | None = None, dense_manifest_path: Path | None = None, model_dir: Path | None = None, query: str = "", query_vector: Any | None = None, instruction: str = "为这个句子生成表示以用于检索相关文章：", top_k: int = 20, rrf_k: int = 60) -> list[dict[str, Any]]:

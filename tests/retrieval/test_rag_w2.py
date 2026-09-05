@@ -15,6 +15,7 @@ from genshin_corpus.retrieval.candidate_retrieval import (
     build_lexical_index,
     dense_candidates,
     dense_candidates_local,
+    load_batch_candidate_retriever,
     _document_frequencies,
     hybrid_candidates,
     lexical_candidates,
@@ -74,6 +75,83 @@ class RagW2Tests(unittest.TestCase):
         packet = assemble_evidence_packet(self.ru_manifest, hybrid, config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000))
         self.assertEqual(packet["evidence"][0]["members"][0]["unit_id"], hybrid[0]["unit_id"])
         self.assertEqual(packet["evidence"][0]["members"][0]["canonical_address"]["record_id"], "r")
+
+    def test_batch_retriever_loads_each_arm_once_and_matches_public_candidates(self):
+        lm = build_lexical_index(self.ru_manifest, self.root / "lex")
+        dm = build_dense_index(
+            self.ru_manifest,
+            self.root / "dense",
+            model_dir=self.root,
+            vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32),
+        )
+        lexical_path = self.root / "lex/metadata/manifest.json"
+        dense_path = self.root / "dense/metadata/manifest.json"
+        query_vector = np.array([1, 0], dtype=np.float32)
+        expected_lexical = lexical_candidates(lexical_path, "阿贝多", top_k=3)
+        expected_dense = dense_candidates(dense_path, query_vector, top_k=3, query_instruction="指令")
+        expected_hybrid = hybrid_candidates(
+            expected_lexical,
+            expected_dense,
+            lexical_build_identity=lm["arm_build_identity"],
+            dense_build_identity=dm["arm_build_identity"],
+            top_k=3,
+        )
+        from genshin_corpus.retrieval import candidate_retrieval as module
+
+        with patch.object(module, "_load_lexical", wraps=module._load_lexical) as load_lexical, patch.object(module, "_load_dense", wraps=module._load_dense) as load_dense:
+            batch = load_batch_candidate_retriever(lexical_path, dense_path)
+            with patch.object(module, "hybrid_candidates", wraps=module.hybrid_candidates) as fusion:
+                actual = batch.candidates_for_query("阿贝多", query_vector, instruction="指令", top_k=3)
+
+        self.assertEqual(load_lexical.call_count, 1)
+        self.assertEqual(load_dense.call_count, 1)
+        self.assertEqual(actual["lexical"], expected_lexical)
+        self.assertEqual(actual["dense"], expected_dense)
+        self.assertEqual(actual["hybrid"], expected_hybrid)
+        self.assertIs(fusion.call_args.args[0], actual["lexical"])
+        self.assertIs(fusion.call_args.args[1], actual["dense"])
+
+    def test_batch_retriever_fails_closed_on_dense_artifact_integrity(self):
+        build_lexical_index(self.ru_manifest, self.root / "lex")
+        build_dense_index(
+            self.ru_manifest,
+            self.root / "dense",
+            model_dir=self.root,
+            vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32),
+        )
+        vector_path = self.root / "dense/artifacts/vectors.f32.npy"
+        vector_path.write_bytes(vector_path.read_bytes() + b"changed")
+        with self.assertRaisesRegex(CandidateRetrievalError, "SHA-256 mismatch"):
+            load_batch_candidate_retriever(
+                self.root / "lex/metadata/manifest.json",
+                self.root / "dense/metadata/manifest.json",
+            )
+
+    def test_batch_retriever_validates_once_and_computes_each_arm_once_for_70_queries(self):
+        build_lexical_index(self.ru_manifest, self.root / "lex")
+        build_dense_index(
+            self.ru_manifest,
+            self.root / "dense",
+            model_dir=self.root,
+            vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32),
+        )
+        lexical_path = self.root / "lex/metadata/manifest.json"
+        dense_path = self.root / "dense/metadata/manifest.json"
+        from genshin_corpus.retrieval import candidate_retrieval as module
+
+        with patch.object(module, "_load_lexical", wraps=module._load_lexical) as load_lexical, patch.object(module, "_load_dense", wraps=module._load_dense) as load_dense, patch.object(module, "_lexical_candidates_from_loaded", wraps=module._lexical_candidates_from_loaded) as compute_lexical, patch.object(module, "_dense_candidates_from_loaded", wraps=module._dense_candidates_from_loaded) as compute_dense:
+            batch = load_batch_candidate_retriever(lexical_path, dense_path)
+            for index in range(70):
+                batch.candidates_for_query(
+                    f"阿贝多 {index}",
+                    np.array([1, 0], dtype=np.float32),
+                    instruction="指令",
+                )
+
+        self.assertEqual(load_lexical.call_count, 1)
+        self.assertEqual(load_dense.call_count, 1)
+        self.assertEqual(compute_lexical.call_count, 70)
+        self.assertEqual(compute_dense.call_count, 70)
 
     def test_dense_rejects_wrong_query_dimension(self):
         build_dense_index(self.ru_manifest, self.root/"dense", model_dir=self.root, vectors=np.array([[1,0],[0,1],[1,1]], dtype=np.float32))
