@@ -371,12 +371,35 @@ suppression: aggregate 11,722 is not 11,722 redundant chars removed, and dense
 larger under this net metric. It is not a semantic benefit measure.
 
 The current Selection Precision attempt stops here; Selection Precision remains
-**OPEN / NOT CLOSED**. Candidate Boundary is the next investigation direction
-but has **NOT STARTED**. The historical reconstructed old-v2 Packet SHA mismatch
-remains **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
-remains **UNKNOWN**. The measure used persisted candidates only: no Retrieval,
-Dense, Generation/Provider, Candidate Boundary, reranker, semantic selector,
-query rewrite, arm union, or budget increase was executed.
+**OPEN / NOT CLOSED**. The read-only Candidate Boundary shadow diagnostic is
+**COMPLETE / PASS**. Its original measurement remains valid: the persisted
+lexical and Dense Top20 union was reconstructed with exact current RRF
+semantics, the Hybrid prefix matched **22/22**, CONTROL Packet reproduction
+matched **22/22**, and the original aggregates and eight CONTROL-visible direct
+losses remain valid. The original artifact is
+`.local/p04-rag-candidate-boundary-shadow/diagnostic.json` (446647 bytes;
+SHA-256 `6e8d59bd4cd33200f25e88927cd91da564b7af128572f8911104633a6be12e58`).
+
+The original `decisive_carrier_traces` field was invalid because it bound the
+wrong units; it is not used as the Candidate Boundary gate result. The
+corrected bindings are recorded in
+`.local/p04-rag-candidate-boundary-shadow/review-correction.json` (3491 bytes;
+SHA-256 `b0060bc2b6218a0ac348ced5d5fe3689d3f085b756e8f9d9b3f697d12bc73da0`).
+The corrected Q016/Q041/Q046 decisive carriers are mechanically beyond the
+current Hybrid Top20 and are all omitted by the unchanged A1-2-1 Assembly;
+Candidate Boundary alone is therefore insufficient under the current
+Assembly, and the shadow demonstrates cross-layer retention risk. No semantic
+or end-to-end quality gain is claimed. Candidate Boundary production policy
+remains **NOT AUTHORIZED / NOT STARTED**; the next technical direction is a
+Selection / Assembly architecture investigation, not A1-2-2 repair and not
+Candidate Boundary implementation.
+
+The historical reconstructed old-v2 Packet SHA mismatch remains
+**UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
+remains **UNKNOWN**. The diagnostic used persisted candidates only: no
+Retrieval, Dense, RRF reconstruction replay, Assembly replay,
+Generation/Provider, reranker, semantic selector, query rewrite, arm union, or
+budget increase was executed.
 
 ## Phase transition boundary
 
