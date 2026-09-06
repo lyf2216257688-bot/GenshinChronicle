@@ -425,16 +425,61 @@ with 148 omissions. These are Packet/admission observations, not semantic or
 end-to-end quality evidence. Finite-budget direct omission therefore remains
 material and unresolved under unchanged v2-style admission.
 
-A1-3 used persisted attribution candidate supply only. It did not replay the
-Candidate Boundary full pre-truncation RRF expanded candidate union, so it does
-not establish whether the corrected Q016/Q041/Q046 expanded carriers survive
-the A1-3 shadow Packet. The prior Candidate Boundary correction remains valid
-historical evidence, but its carrier bindings are not newly replayed A1-3
-results. After A1-3 closure, the next technical decision is whether the
-isolated grouping/accounting evidence and remaining admission-budget evidence
-justify Candidate Boundary re-evaluation under the revised shadow contract or
-further admission-policy investigation. Neither option is authorized or
-started by this closure.
+A1-3's original bounded diagnostic used persisted attribution candidate supply
+only. The subsequent **P04 A1-3 x Candidate Boundary cross-measure** is
+**ACTUAL-GATE PASS** as a read-only/local diagnostic work unit; it is not
+CLOSED or CHECKPOINTED. Its original diagnostic is
+`.local/p04-rag-a1-3-candidate-boundary-cross-measure/diagnostic.json`
+(SHA-256 `fb815cd5e13813ccf270e9192cafb13d46d5d47052ea0903e7d3bbf1bb09683f`).
+It made zero Retrieval calls, Dense encoding/rebuild calls, Provider calls, or
+Generation calls, and made no production/default policy change. A1-2-1 v2
+remains the accepted/current selector, A1-3 remains experimental/shadow, and
+Candidate Boundary production remains **NOT AUTHORIZED**.
+
+The cross-measure reconstructed the current-RRF first20 exactly against the
+persisted Hybrid Top20 for **22/22** questions. It admitted 380 CONTROL direct
+roots and incurred zero CONTROL-admitted direct-root losses after EXPANDED
+candidate supply: the A1-3 real expanded-candidate direct-root retention
+contract is **PASS**. In this 22Q cross-measure, A1-3 incurred none of the previously
+observed accidental higher-priority direct-root retention losses under
+lower-priority candidate expansion. It does not change the correctness
+invariants of identity, provenance, determinism, fail-closed behavior, or
+stable A1-3 retention behavior; the 12k context/evidence budget, Top-K, and
+RRF constants remain operating points, not an approved architecture fix.
+
+CONTROL/EXPANDED direct `direct_total_context_char_budget_conflict` omissions
+were 44/259. Q012 remains omitted by that reason; the corrected Q016, Q041,
+and both corrected Q046 decisive carriers are present in expanded candidate
+scope and likewise remain omitted by that reason. Expanded supply therefore
+did not rescue any verified decisive carrier under unchanged admission policy.
+No semantic or end-to-end answer-quality gain is claimed, and this unresolved
+22Q diagnostic subset is not representative evidence for the full 70Q
+population.
+
+The original diagnostic remains immutable. Its correction sidecar is
+`.local/p04-rag-a1-3-candidate-boundary-cross-measure/review-correction.json`
+(SHA-256 `d6b0755de8c8e5df5aabeab307642b9cc372e8ac2696ad0ceb54217ae3595765`)
+and is authoritative only for the ambiguous original
+`aggregate.rank_gt20_newly_packet_visible` name/value as a strict visibility
+delta. The valid renamed count is
+`rank_gt20_expanded_candidate_packet_visible = 136`; the strict
+`rank_gt20_visibility_delta_control_to_expanded = 130`; and
+`rank_gt20_expanded_candidates_already_control_visible = 6`, with those six
+already Packet-visible in CONTROL through context. This correction changes none
+of the 380 CONTROL direct roots, zero direct-root losses, 44/259 budget-conflict
+counts, carrier dispositions, or absence of semantic/answer-quality evidence.
+
+Decision evidence is now narrow: **admission-policy investigation** is the
+stronger next architecture decision candidate than an immediate reranker or
+embedding replacement. This does not approve, select, implement, or start an
+admission architecture. Reranker/ranking challengers are deferred pending
+downstream admission semantics; embedding/query/RU/upstream Retrieval work is
+deferred pending later attribution; Candidate Boundary production remains **NOT
+AUTHORIZED**; and no next implementation or experiment is authorized by this
+docs sync. This cross-measure resolves only the prior uncertainty about A1-3
+behavior under expanded Candidate Boundary supply. Semantic quality, Generation
+quality, final admission policy, reranker value, embedding value, and the best
+fix for the 18 upstream cases remain unresolved.
 
 The historical reconstructed old-v2 Packet SHA mismatch remains
 **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
