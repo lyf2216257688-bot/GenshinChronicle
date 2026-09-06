@@ -390,9 +390,51 @@ current Hybrid Top20 and are all omitted by the unchanged A1-2-1 Assembly;
 Candidate Boundary alone is therefore insufficient under the current
 Assembly, and the shadow demonstrates cross-layer retention risk. No semantic
 or end-to-end quality gain is claimed. Candidate Boundary production policy
-remains **NOT AUTHORIZED / NOT STARTED**; the next technical direction is a
-Selection / Assembly architecture investigation, not A1-2-2 repair and not
-Candidate Boundary implementation.
+remains **NOT AUTHORIZED / NOT STARTED**.
+
+**P04-RAG-A1-3 — candidate-anchored Selection / Assembly shadow** is
+**ACTUAL-GATE PASS** as an experimental capability only. It introduces
+candidate-anchored immutable direct footprints and explicit shared-context
+membership/accounting, so candidate-anchor grouping no longer relies on
+incidental global source-order merging. It remains a shadow Packet path: v1 is
+unchanged and A1-2-1 v2 remains the accepted/current selector. It does not
+make A1-3 production/default behavior and does not change Candidate Retrieval,
+BM25, Dense, Hybrid/RRF, Top-K, the current evidence budget, Generation, or
+Candidate Boundary production policy.
+
+The bounded persisted-attribution 22Q diagnostic is
+`.local/p04-rag-a1-3-candidate-anchored-shadow-22q/diagnostic.json`
+(SHA-256 `182bfb545871f11b287a7122776cabe242a3a881c7769948f87e32a3605ab267`).
+Its correction sidecar is authoritative for invalid aggregate/control fields:
+`.local/p04-rag-a1-3-candidate-anchored-shadow-22q/review-correction.json`
+(SHA-256 `7922edf3d57e80d67c0916d2439cc00e9468fafd05551a48336be9d2f6154cd7`).
+Valid evidence is persisted candidate binding 66/66, original per-row
+same-input shadow Packet determinism 66/66, original per-row same-input shadow
+trace determinism 66/66, and corrected A1-2-1 v2 control Packet reconstruction
+66/66. The bounded reconstruction made zero Retrieval, Dense, Provider, or
+Generation calls. The original diagnostic aggregate determinism and v2-control
+hash-match fields are invalid and are not gate evidence.
+
+The experimental shadow Packet hashes remain **UNKNOWN / non-blocking** for
+independent reconstruction because the effective historical shadow
+`retrieval_audit` input was not persisted. This does not invalidate the
+per-row same-input determinism evidence or corrected v2 control reconstruction.
+The 66 mechanical mode rows selected all 20 direct roots in 24 rows and fewer
+than 20 in 42; `direct_total_context_char_budget_conflict` occurred in 37 rows
+with 148 omissions. These are Packet/admission observations, not semantic or
+end-to-end quality evidence. Finite-budget direct omission therefore remains
+material and unresolved under unchanged v2-style admission.
+
+A1-3 used persisted attribution candidate supply only. It did not replay the
+Candidate Boundary full pre-truncation RRF expanded candidate union, so it does
+not establish whether the corrected Q016/Q041/Q046 expanded carriers survive
+the A1-3 shadow Packet. The prior Candidate Boundary correction remains valid
+historical evidence, but its carrier bindings are not newly replayed A1-3
+results. After A1-3 closure, the next technical decision is whether the
+isolated grouping/accounting evidence and remaining admission-budget evidence
+justify Candidate Boundary re-evaluation under the revised shadow contract or
+further admission-policy investigation. Neither option is authorized or
+started by this closure.
 
 The historical reconstructed old-v2 Packet SHA mismatch remains
 **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source

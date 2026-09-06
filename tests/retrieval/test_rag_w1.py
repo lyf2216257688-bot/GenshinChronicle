@@ -12,6 +12,7 @@ from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.evidence_assembly import (
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION,
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
+    CANDIDATE_ANCHORED_SHADOW_POLICY,
     EvidenceAssemblyConfig,
     EvidenceAssemblyDiagnostics,
     EvidenceAssemblyError,
@@ -20,6 +21,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     V2_DIRECT_FIRST_CONTEXT_CAP,
     V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
     assemble_evidence_packet,
+    assemble_candidate_anchored_shadow_packet,
     evidence_packet_json_bytes,
     evidence_packet_markdown,
     prepare_evidence_assembly_context,
@@ -475,6 +477,111 @@ class RagW1Tests(unittest.TestCase):
         )
         self.assertEqual(len(packet["evidence"]), 2)
         self.assertEqual({member["unit_id"] for block in packet["evidence"] for member in block["members"]}, {item["unit_id"] for item in same_text})
+
+    def test_candidate_anchored_shadow_consolidates_only_same_unit_id_and_keeps_observations(self) -> None:
+        _, units, output = self._build()
+        rich = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "ABCD")
+        structured = self._unit(units, "structured")
+        candidates = [
+            {"unit_id": rich["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic", "observation": "later"}},
+            {"unit_id": rich["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic", "observation": "winner"}},
+            {"unit_id": structured["unit_id"], "rank": 3, "retrieval": {"mode": "synthetic"}},
+        ]
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=1000)
+        diagnostics = EvidenceAssemblyDiagnostics()
+        packet = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json", candidates, config=config, diagnostics=diagnostics,
+        )
+        repeated_diagnostics = EvidenceAssemblyDiagnostics()
+        repeated = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json", candidates, config=config, diagnostics=repeated_diagnostics,
+        )
+        self.assertEqual(packet["assembly_version"], CANDIDATE_ANCHORED_SHADOW_POLICY)
+        self.assertEqual(evidence_packet_json_bytes(packet), evidence_packet_json_bytes(repeated))
+        self.assertEqual(diagnostics.selection_trace, repeated_diagnostics.selection_trace)
+        self.assertEqual(packet["retrieval_audit"]["direct_candidate_count"], 2)
+        self.assertEqual(packet["shadow_contract"]["candidate_observations"][0]["candidate"]["retrieval"]["observation"], "later")
+        self.assertEqual(len(diagnostics.selection_trace["candidate_outcomes"]), 3)
+        self.assertEqual(
+            [item["outcome"] for item in diagnostics.selection_trace["candidate_outcomes"]],
+            ["duplicate_source_occurrence", "direct_candidate", "direct_candidate"],
+        )
+        direct_roots = [item["anchor_unit_id"] for item in packet["shadow_contract"]["direct_footprints"]]
+        self.assertEqual(direct_roots, [rich["unit_id"], structured["unit_id"]])
+
+    def test_candidate_anchored_shadow_lower_priority_append_cannot_mutate_existing_footprint(self) -> None:
+        _, units, output = self._build()
+        rich = [item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] in {"ABCD", "EFGH"}]
+        first, second = rich
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=1, per_block_chars=100, total_context_chars=1000)
+        baseline = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json", [{"unit_id": first["unit_id"], "rank": 1, "retrieval": {}}], config=config,
+        )
+        expanded = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [
+                {"unit_id": first["unit_id"], "rank": 1, "retrieval": {}},
+                {"unit_id": second["unit_id"], "rank": 2, "retrieval": {}},
+            ],
+            config=config,
+        )
+        before = baseline["shadow_contract"]["direct_footprints"][0]
+        after = next(item for item in expanded["shadow_contract"]["direct_footprints"] if item["anchor_unit_id"] == first["unit_id"])
+        self.assertEqual(before["immutable_direct_footprint"], after["immutable_direct_footprint"])
+        self.assertEqual(before["marginal_direct_chars"], after["marginal_direct_chars"])
+        self.assertEqual(before["budget_after"], after["budget_after"])
+        self.assertEqual(baseline["evidence"][0]["text"], expanded["evidence"][0]["text"])
+        second_outcome = next(item for item in expanded["shadow_contract"]["direct_footprints"] if item["anchor_unit_id"] == second["unit_id"])
+        self.assertTrue(second_outcome["root_visible_before_admission"])
+
+    def test_candidate_anchored_shadow_records_higher_priority_budget_displacement(self) -> None:
+        _, units, output = self._build()
+        rich = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "ABCD")
+        lower = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "next")
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=0, per_block_chars=100, total_context_chars=4)
+        baseline = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json", [{"unit_id": lower["unit_id"], "rank": 2, "retrieval": {}}], config=config,
+        )
+        self.assertEqual(baseline["shadow_contract"]["direct_footprints"][0]["outcome"], "admitted")
+        challenged = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [
+                {"unit_id": rich["unit_id"], "rank": 1, "retrieval": {}},
+                {"unit_id": lower["unit_id"], "rank": 2, "retrieval": {}},
+            ],
+            config=config,
+        )
+        displaced = next(item for item in challenged["shadow_contract"]["direct_footprints"] if item["anchor_unit_id"] == lower["unit_id"])
+        self.assertEqual(displaced["reason"], "direct_total_context_char_budget_conflict")
+        self.assertEqual(displaced["displaced_by_anchor_ids"], [rich["unit_id"]])
+        self.assertEqual(displaced["budget_before"], 4)
+        self.assertEqual(displaced["budget_after"], 4)
+
+    def test_candidate_anchored_shadow_context_membership_is_single_rendered_and_auditable(self) -> None:
+        _, units, output = self._build()
+        node_a = self._unit(units, "dialogue_node", node_source_id="a")
+        packet = assemble_candidate_anchored_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": node_a["unit_id"], "rank": 1, "retrieval": {}}],
+            config=EvidenceAssemblyConfig(
+                neighbor_before=0,
+                neighbor_after=0,
+                dialogue_hops=1,
+                per_block_chars=100,
+                total_context_chars=1000,
+            ),
+        )
+        occurrences = {item["unit_id"]: item for item in packet["shadow_contract"]["context_occurrences"]}
+        context_rows = [item for item in occurrences.values() if any(
+            membership["membership_kind"] == "context" for membership in item["memberships"]
+        )]
+        self.assertTrue(context_rows)
+        for row in context_rows:
+            self.assertEqual(row["presentation_owner_anchor_unit_id"], node_a["unit_id"])
+            self.assertEqual(row["rendering"]["phase"], "context")
+            self.assertEqual(row["rendering"]["anchor_unit_id"], node_a["unit_id"])
+        rendered_ids = [member["unit_id"] for block in packet["evidence"] for member in block["members"]]
+        self.assertEqual(len(rendered_ids), len(set(rendered_ids)))
 
     def test_a1_2_2_suppresses_only_proved_dialogue_source_occurrence_alias(self) -> None:
         units, output, rich, dialogue = self._dialogue_alias_units()

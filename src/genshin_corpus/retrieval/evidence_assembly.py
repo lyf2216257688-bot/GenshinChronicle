@@ -29,6 +29,7 @@ from .retrieval_units import RETRIEVAL_UNIT_SCHEMA_VERSION, RetrievalUnitError, 
 EVIDENCE_PACKET_SCHEMA_VERSION = "phase04-evidence-packet-0.1"
 EVIDENCE_ASSEMBLY_VERSION = "phase04-rag-w1-deterministic-assembly-0.1"
 V2_DIRECT_FIRST_CONTEXT_CAP_POLICY = "phase04-rag-a1-2-direct-first-context-cap-0.1"
+CANDIDATE_ANCHORED_SHADOW_POLICY = "phase04-rag-a1-3-candidate-anchored-shadow-0.1"
 A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY = (
     "phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1"
 )
@@ -893,6 +894,382 @@ def _v2_packet_config(config: EvidenceAssemblyConfig) -> dict[str, Any]:
         "per_block_chars": config.per_block_chars,
         "total_context_chars": config.total_context_chars,
     }
+
+
+def _shadow_anchor_key(candidate: Mapping[str, Any]) -> tuple[Any, ...]:
+    return (int(candidate["rank"]), int(candidate["input_index"]), str(candidate["unit_id"]))
+
+
+def _shadow_block_parts(
+    block: Mapping[str, Any],
+    *,
+    allowed_unit_ids: set[str],
+    units_by_id: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return non-duplicated structural subblocks without inventing adjacency."""
+
+    original_members = list(block["members"])
+    parts: list[list[Mapping[str, Any]]] = []
+    current: list[Mapping[str, Any]] = []
+    for public_member in original_members:
+        unit_id = str(public_member["unit_id"])
+        if unit_id not in allowed_unit_ids:
+            if current:
+                parts.append(current)
+                current = []
+            continue
+        unit = units_by_id[unit_id]
+        if current and not _mergeable(current[-1], unit):
+            parts.append(current)
+            current = []
+        current.append(unit)
+    if current:
+        parts.append(current)
+
+    public_by_id = {str(member["unit_id"]): member for member in original_members}
+    output: list[dict[str, Any]] = []
+    for members in parts:
+        member_rows = [dict(public_by_id[str(unit["unit_id"])]) for unit in members]
+        text_parts = [member_rows[0]["text"]]
+        for left, right, right_row in zip(members, members[1:], member_rows[1:]):
+            if _fragment_adjacent(left, right):
+                separator = ""
+            elif _structured_line_adjacent(left, right):
+                separator = "\n"
+            else:
+                separator = "\n\n"
+            text_parts.extend((separator, right_row["text"]))
+        text = "".join(text_parts)
+        output.append({
+            "members": member_rows,
+            "text": text,
+            "char_count": len(text),
+            "source_order": member_rows[0]["source_order"],
+        })
+    return output
+
+
+def _candidate_anchored_shadow_plan(
+    direct: Mapping[str, Mapping[str, Any]],
+    state: _PreparedAssemblyState,
+    config: EvidenceAssemblyConfig,
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    """Build immutable per-direct-candidate footprints from verified structure."""
+
+    anchors: list[dict[str, Any]] = []
+    memberships: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for unit_id, candidate in sorted(direct.items(), key=lambda item: _shadow_anchor_key(item[1])):
+        local_selection = _expand_context(direct={unit_id: candidate}, state=state, config=config)
+        local_blocks = _block_members(local_selection, state.units_by_id)
+        direct_blocks = [
+            block for block in local_blocks
+            if unit_id in _block_unit_ids(block)
+        ]
+        if len(direct_blocks) != 1:
+            raise EvidenceAssemblyError("candidate-anchored shadow requires exactly one direct root block")
+        direct_block = direct_blocks[0]
+        context_blocks = [block for block in local_blocks if block is not direct_block]
+        anchor_key = _shadow_anchor_key(candidate)
+        anchor = {
+            "anchor_unit_id": unit_id,
+            "anchor_key": anchor_key,
+            "candidate": dict(candidate),
+            "direct_block": direct_block,
+            "context_blocks": context_blocks,
+            "immutable_direct_footprint": {
+                "unit_ids": _block_unit_ids(direct_block),
+                "char_count": direct_block["char_count"],
+            },
+        }
+        anchors.append(anchor)
+        for selected_id, selection_info in sorted(local_selection.items()):
+            memberships[selected_id].append({
+                "anchor_unit_id": unit_id,
+                "anchor_key": list(anchor_key),
+                "membership_kind": "direct_root" if selected_id == unit_id else "context",
+                "relations": sorted(selection_info["reasons"], key=canonical_json_bytes),
+            })
+    return anchors, dict(memberships)
+
+
+def _annotate_shadow_members(
+    blocks: Sequence[Mapping[str, Any]],
+    memberships: Mapping[str, Sequence[Mapping[str, Any]]],
+    rendered_by: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for block in blocks:
+        members = []
+        for original in block["members"]:
+            member = dict(original)
+            unit_id = str(member["unit_id"])
+            member["shadow_anchor_memberships"] = [dict(item) for item in memberships[unit_id]]
+            member["shadow_rendering"] = dict(rendered_by[unit_id])
+            members.append(member)
+        output.append({
+            "members": members,
+            "text": block["text"],
+            "char_count": block["char_count"],
+            "source_order": list(block["source_order"]),
+        })
+    return output
+
+
+def assemble_candidate_anchored_shadow_packet(
+    retrieval_unit_manifest_path: Path,
+    ranked_candidates: Sequence[Mapping[str, Any]],
+    *,
+    config: EvidenceAssemblyConfig | None = None,
+    retrieval_audit: Mapping[str, Any] | None = None,
+    prepared_context: PreparedAssemblyContext | None = None,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> dict[str, Any]:
+    """Assemble a shadow Packet with candidate-anchored, immutable footprints.
+
+    This is deliberately separate from the accepted v1 and A1-2-1 v2 paths.
+    It keeps v2's direct-first then bounded-context admission order while
+    preventing a newly supplied lower-priority candidate from changing a
+    pre-existing anchor's structural footprint or priority.
+    """
+
+    config = config or EvidenceAssemblyConfig()
+    if prepared_context is None:
+        prepared_context = prepare_evidence_assembly_context(retrieval_unit_manifest_path, diagnostics=diagnostics)
+    elif prepared_context.retrieval_unit_manifest_path != Path(retrieval_unit_manifest_path).resolve():
+        raise EvidenceAssemblyError("Prepared Assembly context does not match the requested Retrieval Unit manifest")
+    state = _prepared_state(prepared_context)
+    candidate_started = perf_counter()
+    direct, deduplicated, candidate_trace = _candidate_rows(ranked_candidates, state.units_by_id)
+    candidate_observations = [
+        {
+            "input_index": index,
+            "candidate": dict(_mapping(candidate, f"candidate {index}")),
+            "outcome": candidate_trace[index]["outcome"],
+        }
+        for index, candidate in enumerate(ranked_candidates)
+    ]
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["candidate_normalization"] = perf_counter() - candidate_started
+    planning_started = perf_counter()
+    anchors, memberships = _candidate_anchored_shadow_plan(direct, state, config)
+    if diagnostics is not None:
+        diagnostics.assembly_seconds["candidate_anchored_footprints"] = perf_counter() - planning_started
+
+    membership_owner = {
+        unit_id: min(rows, key=lambda row: tuple(row["anchor_key"]))["anchor_unit_id"]
+        for unit_id, rows in memberships.items()
+    }
+    rendered_by: dict[str, dict[str, Any]] = {}
+    selected_blocks: list[dict[str, Any]] = []
+    omitted: list[dict[str, Any]] = []
+    anchor_outcomes: list[dict[str, Any]] = []
+    admission_order: list[dict[str, Any]] = []
+    selected_anchor_ids: list[str] = []
+    used_chars = 0
+
+    # The direct phase retains the accepted v2 ordering.  Each direct block is
+    # constructed before admission, so later anchors cannot mutate its cost.
+    for anchor in anchors:
+        root_id = anchor["anchor_unit_id"]
+        block = anchor["direct_block"]
+        all_ids = _block_unit_ids(block)
+        newly_rendered = set(all_ids) - set(rendered_by)
+        rendered_root_before_admission = root_id in rendered_by
+        parts = _shadow_block_parts(block, allowed_unit_ids=newly_rendered, units_by_id=state.units_by_id)
+        marginal_chars = sum(part["char_count"] for part in parts)
+        before = used_chars
+        outcome: str
+        reason: str | None = None
+        if block["char_count"] > config.per_block_chars:
+            outcome, reason = "omitted", "per_block_char_limit"
+        elif rendered_root_before_admission:
+            outcome = "already_visible_via_higher_priority_anchor"
+        elif used_chars + marginal_chars > config.total_context_chars:
+            outcome, reason = "omitted", "direct_total_context_char_budget_conflict"
+        else:
+            outcome = "admitted"
+            selected_anchor_ids.append(root_id)
+            used_chars += marginal_chars
+            for part in parts:
+                for member in part["members"]:
+                    rendered_by[str(member["unit_id"])] = {
+                        "phase": "direct",
+                        "anchor_unit_id": root_id,
+                        "budget_charge_block": f"direct:{root_id}",
+                    }
+                selected_blocks.append({**part, "shadow_phase": "direct", "shadow_anchor_unit_id": root_id})
+        anchor_outcome = {
+            "anchor_unit_id": root_id,
+            "anchor_key": list(anchor["anchor_key"]),
+            "immutable_direct_footprint": dict(anchor["immutable_direct_footprint"]),
+            "marginal_direct_chars": marginal_chars,
+            "budget_before": before,
+            "budget_after": used_chars,
+            "outcome": outcome,
+            "root_visible_before_admission": rendered_root_before_admission,
+        }
+        if reason is not None:
+            anchor_outcome["reason"] = reason
+            anchor_outcome["displaced_by_anchor_ids"] = list(selected_anchor_ids)
+            omitted.append({
+                "unit_ids": all_ids,
+                "reason": reason,
+                "char_count": block["char_count"],
+                "block_kind": "direct_containing",
+                "anchor_unit_id": root_id,
+                "budget_before": before,
+                "required_marginal_chars": marginal_chars,
+                "displaced_by_anchor_ids": list(selected_anchor_ids),
+            })
+        anchor_outcomes.append(anchor_outcome)
+        admission_order.append(dict(anchor_outcome))
+
+    # Context remains optional and follows the existing v2 cap.  Direct roots
+    # are never reintroduced as context after their direct disposition.
+    context_candidates: list[tuple[tuple[Any, ...], str, dict[str, Any]]] = []
+    direct_ids = set(direct)
+    for anchor in anchors:
+        for block in anchor["context_blocks"]:
+            allowed = {
+                unit_id for unit_id in _block_unit_ids(block)
+                if unit_id not in direct_ids and membership_owner.get(unit_id) == anchor["anchor_unit_id"]
+            }
+            for part in _shadow_block_parts(block, allowed_unit_ids=allowed, units_by_id=state.units_by_id):
+                context_candidates.append((
+                    (tuple(part["source_order"]), tuple(_block_unit_ids(part)), tuple(anchor["anchor_key"])),
+                    anchor["anchor_unit_id"],
+                    part,
+                ))
+    selected_context = 0
+    for _, owner_id, block in sorted(context_candidates, key=lambda item: item[0]):
+        unit_ids = _block_unit_ids(block)
+        newly_rendered = set(unit_ids) - set(rendered_by)
+        if not newly_rendered:
+            continue
+        parts = _shadow_block_parts(block, allowed_unit_ids=newly_rendered, units_by_id=state.units_by_id)
+        marginal_chars = sum(part["char_count"] for part in parts)
+        before = used_chars
+        if block["char_count"] > config.per_block_chars:
+            reason = "per_block_char_limit"
+        elif selected_context >= V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap:
+            reason = "context_only_block_cap"
+        elif used_chars + marginal_chars > config.total_context_chars:
+            reason = "context_total_context_char_budget"
+        else:
+            selected_context += 1
+            used_chars += marginal_chars
+            for part in parts:
+                for member in part["members"]:
+                    rendered_by[str(member["unit_id"])] = {
+                        "phase": "context",
+                        "anchor_unit_id": owner_id,
+                        "budget_charge_block": f"context:{owner_id}",
+                    }
+                selected_blocks.append({**part, "shadow_phase": "context", "shadow_anchor_unit_id": owner_id})
+            admission_order.append({
+                "block_kind": "context_only",
+                "anchor_unit_id": owner_id,
+                "unit_ids": unit_ids,
+                "budget_before": before,
+                "budget_after": used_chars,
+                "marginal_chars": marginal_chars,
+                "outcome": "admitted",
+            })
+            continue
+        omitted.append({
+            "unit_ids": unit_ids,
+            "reason": reason,
+            "char_count": block["char_count"],
+            "block_kind": "context_only",
+            "anchor_unit_id": owner_id,
+            "budget_before": before,
+            "required_marginal_chars": marginal_chars,
+        })
+        admission_order.append({
+            "block_kind": "context_only",
+            "anchor_unit_id": owner_id,
+            "unit_ids": unit_ids,
+            "budget_before": before,
+            "outcome": "omitted",
+            "reason": reason,
+        })
+
+    selected_blocks.sort(key=lambda block: (tuple(block["source_order"]), tuple(_block_unit_ids(block))))
+    public_blocks = _annotate_shadow_members(selected_blocks, memberships, rendered_by)
+    evidence = [
+        {
+            "evidence_id": f"E{index:02d}",
+            "text": block["text"],
+            "char_count": block["char_count"],
+            "source_order": block["source_order"],
+            "members": block["members"],
+        }
+        for index, block in enumerate(public_blocks, 1)
+    ]
+    build_manifest = prepared_context.build_manifest
+    occurrence_audit = []
+    for unit_id in sorted(memberships):
+        occurrence_audit.append({
+            "unit_id": unit_id,
+            "presentation_owner_anchor_unit_id": membership_owner[unit_id],
+            "memberships": [dict(item) for item in memberships[unit_id]],
+            "rendering": rendered_by.get(unit_id, {"phase": "omitted"}),
+        })
+    packet = {
+        "schema_version": EVIDENCE_PACKET_SCHEMA_VERSION,
+        "assembly_version": CANDIDATE_ANCHORED_SHADOW_POLICY,
+        "retrieval_unit_build": {
+            "build_identity": prepared_context.retrieval_unit_build_identity,
+            "canonical_input": dict(_mapping(build_manifest.get("canonical_input"), "Retrieval Unit build canonical input")),
+            "retrieval_unit_schema_version": build_manifest.get("retrieval_unit_schema_version"),
+        },
+        "assembly_config": _v2_packet_config(config),
+        "assembly_config_identity": sha256_json({
+            "assembly_version": CANDIDATE_ANCHORED_SHADOW_POLICY,
+            "config": _v2_packet_config(config),
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        }),
+        "selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        "selection_policy_identity": sha256_json({
+            "assembly_version": CANDIDATE_ANCHORED_SHADOW_POLICY,
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            "assembly_config": _v2_packet_config(config),
+        }),
+        "retrieval_audit": {
+            "input_candidate_count": len(ranked_candidates),
+            "deduplicated_candidates": deduplicated,
+            "direct_candidate_count": len(direct),
+            "retrieval_metadata": dict(retrieval_audit or {}),
+        },
+        "shadow_contract": {
+            "identity": CANDIDATE_ANCHORED_SHADOW_POLICY,
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            "candidate_observations": candidate_observations,
+            "direct_footprints": anchor_outcomes,
+            "context_occurrences": occurrence_audit,
+        },
+        "evidence": evidence,
+        "budget": {
+            "per_block_chars": config.per_block_chars,
+            "total_context_chars": config.total_context_chars,
+            "context_only_block_cap": V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap,
+            "used_direct_containing_blocks": sum(1 for item in anchor_outcomes if item["outcome"] == "admitted"),
+            "used_context_only_blocks": selected_context,
+            "used_evidence_blocks": len(evidence),
+            "used_context_chars": sum(item["char_count"] for item in evidence),
+            "omitted_blocks": omitted,
+        },
+    }
+    if diagnostics is not None:
+        diagnostics.selection_trace = {
+            "shadow_contract": CANDIDATE_ANCHORED_SHADOW_POLICY,
+            "candidate_outcomes": candidate_trace,
+            "candidate_observations": candidate_observations,
+            "direct_footprints": anchor_outcomes,
+            "context_occurrences": occurrence_audit,
+            "admission_order": admission_order,
+        }
+    return packet
 
 
 def assemble_evidence_packet(
