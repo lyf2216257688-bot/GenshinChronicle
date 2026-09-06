@@ -469,9 +469,95 @@ already Packet-visible in CONTROL through context. This correction changes none
 of the 380 CONTROL direct roots, zero direct-root losses, 44/259 budget-conflict
 counts, carrier dispositions, or absence of semantic/answer-quality evidence.
 
-Decision evidence is now narrow: **admission-policy investigation** is the
-stronger next architecture decision candidate than an immediate reranker or
-embedding replacement. This does not approve, select, implement, or start an
+**P04 Bounded Budget Sensitivity Measure** is **ACTUAL-GATE PASS** as a
+read-only/local diagnostic work unit; it is not CLOSED or CHECKPOINTED. Its
+primary diagnostic is `.local/p04-rag-budget-sensitivity/diagnostic.json`
+(SHA-256 `fb85b467032275405e70303e89ea4f27631f12753f99149ca6045dbb30d0629c`),
+produced by `.local/p04-rag-budget-sensitivity/run.py` (SHA-256
+`261fdf42b91eebe86da9d55756659ba941367595e500266c0003e0ffea7f12b6`). It used
+the accepted persisted 22Q EXPANDED candidate inputs and exact
+`retrieval_audit`, preserved the current-RRF first20 binding and accepted B0
+Packet/trace identities **22/22**, and made zero live Retrieval calls, Dense
+encoding/rebuild calls, Provider calls, or Generation calls. It made no
+production/default policy change.
+
+The measure held candidate supply/order, direct-root identities and priorities,
+immutable footprints, membership/ownership, per-block limit, context
+construction, context-only cap, provenance, and admission semantics fixed. The
+only changed field was `total_context_chars`: B0 = `12,000` and B1 = `14,965`.
+B1 is only the deterministic diagnostic sensitivity point derived from the
+accepted B0 trace: the maximum direct total-budget-conflict `would_total` among
+roots within the existing per-block limit, uniquely Q064 rank 32
+(`budget_before = 11,985`, marginal direct chars = `2,980`,
+`would_total = 14,965`, shortfall = `2,965`). It is not an optimum, production
+recommendation, globally required budget, or an upper bound guaranteeing
+recovery of all current budget-conflicted roots. No production budget change is
+authorized.
+
+Actual B0 -> B1 mechanics were admitted direct roots `513 -> 588` (net `+75`),
+direct selected chars `256,660 -> 311,854`, and context selected chars
+`2,981 -> 4,396`. Direct transitions were 86 B0 total-budget-conflict -> B1
+admitted, 173 total-budget-conflict at both points, 18 non-total direct
+constraints (all existing per-block limits), and 11 B0 admitted -> B1
+total-budget-conflict. Direct total-budget-conflict omissions therefore changed
+`259 -> 184` by `259 - 86 + 11 = 184`; admitted-root accounting is
+`513 + 86 - 11 = 588`.
+
+The 11 B0-admitted -> B1-budget-conflicted roots are not an A1-3 correctness
+regression. Under the unchanged priority-ordered greedy trajectory, added
+capacity admitted previously omitted higher-priority footprints which then
+consumed capacity; later lower-priority roots became infeasible. This is a
+finite-capacity trajectory/displacement effect, not a violation of identity,
+immutable-footprint, provenance, ownership/membership, or determinism
+constraints. Larger budget is not set-monotonic, and these transitions do not
+prove the greedy policy semantically wrong.
+
+Verified decisive carrier dispositions were Q012 B0 total-budget omitted -> B1
+admitted / mechanically Packet-visible; corrected Q016 and Q041 total-budget
+omitted at both points; and both corrected Q046 carriers B0 total-budget
+omitted -> B1 admitted / mechanically Packet-visible. Thus **3/5** verified
+decisive carrier occurrences are mechanically Packet-visible at B1. They are
+not semantically rescued, and no answer-quality or Generation gain was
+measured.
+
+Context-only selected blocks changed `77 -> 87`; context total-budget omissions
+changed `328 -> 277`; context-only-cap omissions changed `20 -> 61`; and
+aggregate per-block-limit omissions remained 19. The direct-root non-total
+constraint count is 18; the aggregate per-block count also includes one
+context-side omission. These counts do not establish semantic utility.
+
+The measure verifies that 12k is an active mechanical capacity constraint under
+the current admission policy on this selected unresolved 22Q diagnostic subset.
+B1 mechanically recovers substantial direct evidence, including 3/5 verified
+decisive carrier occurrences, while the 11 downstream conflicts show that
+capacity and the unchanged greedy trajectory interact. Larger/bounded
+configurable evidence budget is therefore a materially supported design axis,
+but not an authorized production/default policy, and `14,965` is not a proposed
+production default. The stronger next investigation is an admission-policy
+challenger: finite capacity still requires explicit evidence tradeoffs and the
+current footprint/admission semantics determine what survives. It should
+examine direct evidence roots against supporting context/footprint capacity,
+but this status record authorizes no two-ledger, direct-first, quota, packing,
+splitting, or other implementation shape. Rank priority itself is not
+disproved.
+
+Reranker/ranking work remains deferred one layer, not rejected; Q016/Q041
+remaining omitted does not erase existing ranking evidence. Embedding/query/RU/
+upstream Retrieval changes remain deferred pending later attribution. A1-2-1
+v2 remains the accepted/current selector; A1-3 remains experimental/shadow;
+Candidate Boundary production remains **NOT AUTHORIZED**; and 12k remains the
+current control operating point, not a correctness invariant or proven optimum.
+Budget, Top-K, and RRF remain operating points. Identity, provenance,
+deterministic ordering, fail-closed behavior, and A1-3 immutable-footprint /
+retention properties remain correctness constraints. Semantic usefulness of
+recovered roots, larger-Packet answer-quality impact, the appropriate production
+budget, bounded-adaptive-budget value, final admission policy, reranker value,
+embedding value, and full-70 prevalence remain unresolved. This selected 22Q
+result must not be extrapolated to the full 70Q workload.
+
+The preceding Candidate Boundary cross-measure established that
+**admission-policy investigation** was the stronger next architecture decision
+candidate than an immediate reranker or embedding replacement. This does not approve, select, implement, or start an
 admission architecture. Reranker/ranking challengers are deferred pending
 downstream admission semantics; embedding/query/RU/upstream Retrieval work is
 deferred pending later attribution; Candidate Boundary production remains **NOT
@@ -483,10 +569,11 @@ fix for the 18 upstream cases remain unresolved.
 
 The historical reconstructed old-v2 Packet SHA mismatch remains
 **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
-remains **UNKNOWN**. The diagnostic used persisted candidates only: no
-Retrieval, Dense, RRF reconstruction replay, Assembly replay,
-Generation/Provider, reranker, semantic selector, query rewrite, arm union, or
-budget increase was executed.
+remains **UNKNOWN**. The preceding Candidate Boundary cross-measure itself used
+persisted candidates only: no Retrieval, Dense, RRF reconstruction replay,
+Assembly replay, Generation/Provider, reranker, semantic selector, query
+rewrite, arm union, or budget increase was executed. The later bounded Budget
+Sensitivity Measure is the separately recorded Assembly replay above.
 
 ## Phase transition boundary
 
