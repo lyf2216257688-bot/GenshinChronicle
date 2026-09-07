@@ -30,6 +30,7 @@ EVIDENCE_PACKET_SCHEMA_VERSION = "phase04-evidence-packet-0.1"
 EVIDENCE_ASSEMBLY_VERSION = "phase04-rag-w1-deterministic-assembly-0.1"
 V2_DIRECT_FIRST_CONTEXT_CAP_POLICY = "phase04-rag-a1-2-direct-first-context-cap-0.1"
 CANDIDATE_ANCHORED_SHADOW_POLICY = "phase04-rag-a1-3-candidate-anchored-shadow-0.1"
+DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY = "phase04-rag-a1-3-deferred-footprint-charge-shadow-0.1"
 A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY = (
     "phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1"
 )
@@ -1263,6 +1264,376 @@ def assemble_candidate_anchored_shadow_packet(
     if diagnostics is not None:
         diagnostics.selection_trace = {
             "shadow_contract": CANDIDATE_ANCHORED_SHADOW_POLICY,
+            "candidate_outcomes": candidate_trace,
+            "candidate_observations": candidate_observations,
+            "direct_footprints": anchor_outcomes,
+            "context_occurrences": occurrence_audit,
+            "admission_order": admission_order,
+        }
+    return packet
+
+
+def assemble_deferred_footprint_charge_shadow_packet(
+    retrieval_unit_manifest_path: Path,
+    ranked_candidates: Sequence[Mapping[str, Any]],
+    *,
+    config: EvidenceAssemblyConfig | None = None,
+    retrieval_audit: Mapping[str, Any] | None = None,
+    prepared_context: PreparedAssemblyContext | None = None,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> dict[str, Any]:
+    """Assemble a diagnostic Packet with deferred non-root footprint charging.
+
+    This is an A1-3-derived shadow policy.  It admits each direct root as a
+    singleton projection, but retains the complete immutable direct footprint
+    and its original per-block eligibility check.  Non-root footprint members
+    are charged in anchor order before the existing context-only pass.
+    """
+
+    config = config or EvidenceAssemblyConfig()
+    if prepared_context is None:
+        prepared_context = prepare_evidence_assembly_context(retrieval_unit_manifest_path, diagnostics=diagnostics)
+    elif prepared_context.retrieval_unit_manifest_path != Path(retrieval_unit_manifest_path).resolve():
+        raise EvidenceAssemblyError("Prepared Assembly context does not match the requested Retrieval Unit manifest")
+    state = _prepared_state(prepared_context)
+    direct, deduplicated, candidate_trace = _candidate_rows(ranked_candidates, state.units_by_id)
+    candidate_observations = [
+        {
+            "input_index": index,
+            "candidate": dict(_mapping(candidate, f"candidate {index}")),
+            "outcome": candidate_trace[index]["outcome"],
+        }
+        for index, candidate in enumerate(ranked_candidates)
+    ]
+    anchors, memberships = _candidate_anchored_shadow_plan(direct, state, config)
+    membership_owner = {
+        unit_id: min(rows, key=lambda row: tuple(row["anchor_key"]))["anchor_unit_id"]
+        for unit_id, rows in memberships.items()
+    }
+
+    rendered_by: dict[str, dict[str, Any]] = {}
+    selected_blocks: list[dict[str, Any]] = []
+    omitted: list[dict[str, Any]] = []
+    admission_order: list[dict[str, Any]] = []
+    anchor_outcomes: list[dict[str, Any]] = []
+    direct_ids = set(direct)
+    direct_admitted_anchor_ids: list[str] = []
+    used_chars = 0
+
+    # Pass 1: preserve priority order, but charge only the actual root RU.
+    for anchor in anchors:
+        root_id = anchor["anchor_unit_id"]
+        full_block = anchor["direct_block"]
+        full_ids = _block_unit_ids(full_block)
+        root_parts = _shadow_block_parts(
+            full_block,
+            allowed_unit_ids={root_id},
+            units_by_id=state.units_by_id,
+        )
+        if len(root_parts) != 1 or _block_unit_ids(root_parts[0]) != [root_id]:
+            raise EvidenceAssemblyError("deferred footprint shadow requires one legal singleton root projection")
+        root_part = root_parts[0]
+        root_chars = int(root_part["char_count"])
+        full_eligible = int(full_block["char_count"]) <= config.per_block_chars
+        before = used_chars
+        root_visible_before_admission = root_id in rendered_by
+        outcome: str
+        reason: str | None = None
+        if not full_eligible:
+            outcome, reason = "omitted", "per_block_char_limit"
+        elif root_visible_before_admission:
+            outcome = "already_visible_via_higher_priority_anchor"
+        elif used_chars + root_chars > config.total_context_chars:
+            outcome, reason = "omitted", "direct_total_context_char_budget_conflict"
+        else:
+            outcome = "admitted"
+            direct_admitted_anchor_ids.append(root_id)
+            used_chars += root_chars
+            for member in root_part["members"]:
+                unit_id = str(member["unit_id"])
+                rendered_by[unit_id] = {
+                    "phase": "direct_root",
+                    "anchor_unit_id": root_id,
+                    "budget_charge_block": f"direct_root:{root_id}",
+                }
+            selected_blocks.append({
+                **root_part,
+                "shadow_phase": "direct_root",
+                "shadow_anchor_unit_id": root_id,
+            })
+        row = {
+            "anchor_unit_id": root_id,
+            "anchor_key": list(anchor["anchor_key"]),
+            "immutable_direct_footprint": dict(anchor["immutable_direct_footprint"]),
+            "full_footprint_per_block_eligible": full_eligible,
+            "root_projection": {
+                "unit_ids": [root_id],
+                "char_count": root_chars,
+                "source_order": list(root_part["source_order"]),
+                "owner_anchor_unit_id": root_id,
+                "render_phase": "direct_root" if outcome == "admitted" else "omitted",
+            },
+            "root_marginal_chars": root_chars if outcome == "admitted" else 0,
+            "budget_before": before,
+            "budget_after": used_chars,
+            "outcome": outcome,
+            "root_visible_before_admission": root_visible_before_admission,
+            "owner_anchor_unit_id": root_id,
+            "render_phase": "direct_root" if outcome == "admitted" else "omitted",
+            "reason": reason,
+            "displaced_by_anchor_ids": list(direct_admitted_anchor_ids) if reason is not None else [],
+            "deferred_footprint_parts": [],
+            "deferred_footprint_marginal_chars": 0,
+        }
+        if reason is not None:
+            omitted.append({
+                "unit_ids": full_ids,
+                "reason": reason,
+                "char_count": int(full_block["char_count"]),
+                "block_kind": "direct_containing",
+                "anchor_unit_id": root_id,
+                "budget_before": before,
+                "required_marginal_chars": root_chars,
+                "displaced_by_anchor_ids": list(direct_admitted_anchor_ids),
+            })
+        anchor_outcomes.append(row)
+        admission_order.append({
+            "block_kind": "direct_root",
+            "anchor_unit_id": root_id,
+            "unit_ids": [root_id],
+            "full_footprint_unit_ids": full_ids,
+            "budget_before": before,
+            "budget_after": used_chars,
+            "marginal_chars": row["root_marginal_chars"],
+            "outcome": outcome,
+            **({"reason": reason} if reason is not None else {}),
+        })
+
+    # Pass 2: charge non-root members of each immutable footprint in anchor order.
+    deferred_ids: set[str] = set()
+    anchor_by_id = {anchor["anchor_unit_id"]: anchor for anchor in anchors}
+    for row in anchor_outcomes:
+        anchor = anchor_by_id[row["anchor_unit_id"]]
+        full_ids = set(_block_unit_ids(anchor["direct_block"]))
+        # Direct candidacy does not cancel a RU's membership in an earlier
+        # immutable footprint.  Duplicate rendering/charging is handled by
+        # rendered_by, so later direct roots become already-visible when the
+        # higher-priority anchor admitted the shared occurrence.
+        allowed = full_ids - {anchor["anchor_unit_id"]}
+        deferred_ids.update(allowed)
+        if not row["full_footprint_per_block_eligible"]:
+            continue
+        for part in _shadow_block_parts(
+            anchor["direct_block"],
+            allowed_unit_ids=allowed,
+            units_by_id=state.units_by_id,
+        ):
+            newly_rendered = set(_block_unit_ids(part)) - set(rendered_by)
+            part_rows = []
+            part_outcome = "already_visible_via_higher_priority_anchor"
+            part_reason: str | None = None
+            before = used_chars
+            if newly_rendered:
+                part_rows = _shadow_block_parts(
+                    part,
+                    allowed_unit_ids=newly_rendered,
+                    units_by_id=state.units_by_id,
+                )
+                if any(item["char_count"] > config.per_block_chars for item in part_rows):
+                    part_outcome, part_reason = "omitted", "per_block_char_limit"
+                elif used_chars + sum(int(item["char_count"]) for item in part_rows) > config.total_context_chars:
+                    part_outcome, part_reason = "omitted", "deferred_footprint_total_context_char_budget_conflict"
+                else:
+                    part_outcome = "admitted"
+                    charge = sum(int(item["char_count"]) for item in part_rows)
+                    used_chars += charge
+                    for item in part_rows:
+                        for member in item["members"]:
+                            unit_id = str(member["unit_id"])
+                            rendered_by[unit_id] = {
+                                "phase": "deferred_footprint",
+                                "anchor_unit_id": anchor["anchor_unit_id"],
+                                "budget_charge_block": f"deferred_footprint:{anchor['anchor_unit_id']}",
+                            }
+                        selected_blocks.append({
+                            **item,
+                            "shadow_phase": "deferred_footprint",
+                            "shadow_anchor_unit_id": anchor["anchor_unit_id"],
+                        })
+            charge = used_chars - before
+            part_audit = {
+                "unit_ids": _block_unit_ids(part),
+                "source_order": list(part["source_order"]),
+                "char_count": int(part["char_count"]),
+                "marginal_chars": charge,
+                "budget_before": before,
+                "budget_after": used_chars,
+                "outcome": part_outcome,
+                "owner_anchor_unit_id": anchor["anchor_unit_id"],
+                "render_phase": "deferred_footprint" if part_outcome == "admitted" else "omitted",
+                "reason": part_reason,
+                "displaced_by_anchor_ids": list(direct_admitted_anchor_ids) if part_reason is not None else [],
+            }
+            if part_reason is not None:
+                omitted.append({
+                    "unit_ids": _block_unit_ids(part),
+                    "reason": part_reason,
+                    "char_count": int(part["char_count"]),
+                    "block_kind": "deferred_direct_footprint",
+                    "anchor_unit_id": anchor["anchor_unit_id"],
+                    "budget_before": before,
+                    "required_marginal_chars": int(part["char_count"]),
+                    "displaced_by_anchor_ids": list(direct_admitted_anchor_ids),
+                })
+            row["deferred_footprint_parts"].append(part_audit)
+            row["deferred_footprint_marginal_chars"] += charge
+            admission_order.append({
+                "block_kind": "deferred_direct_footprint",
+                "anchor_unit_id": anchor["anchor_unit_id"],
+                **part_audit,
+            })
+
+    # Pass 3: retain the existing context-only admission order/capacity rules.
+    context_candidates: list[tuple[tuple[Any, ...], str, dict[str, Any]]] = []
+    for anchor in anchors:
+        for block in anchor["context_blocks"]:
+            allowed = {
+                unit_id for unit_id in _block_unit_ids(block)
+                if unit_id not in direct_ids
+                and unit_id not in deferred_ids
+                and membership_owner.get(unit_id) == anchor["anchor_unit_id"]
+            }
+            for part in _shadow_block_parts(block, allowed_unit_ids=allowed, units_by_id=state.units_by_id):
+                context_candidates.append((
+                    (tuple(part["source_order"]), tuple(_block_unit_ids(part)), tuple(anchor["anchor_key"])),
+                    anchor["anchor_unit_id"],
+                    part,
+                ))
+    selected_context = 0
+    for _, owner_id, block in sorted(context_candidates, key=lambda item: item[0]):
+        unit_ids = _block_unit_ids(block)
+        newly_rendered = set(unit_ids) - set(rendered_by)
+        if not newly_rendered:
+            continue
+        parts = _shadow_block_parts(block, allowed_unit_ids=newly_rendered, units_by_id=state.units_by_id)
+        marginal_chars = sum(int(part["char_count"]) for part in parts)
+        before = used_chars
+        if block["char_count"] > config.per_block_chars:
+            reason = "per_block_char_limit"
+        elif selected_context >= V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap:
+            reason = "context_only_block_cap"
+        elif used_chars + marginal_chars > config.total_context_chars:
+            reason = "context_total_context_char_budget"
+        else:
+            selected_context += 1
+            used_chars += marginal_chars
+            for part in parts:
+                for member in part["members"]:
+                    unit_id = str(member["unit_id"])
+                    rendered_by[unit_id] = {
+                        "phase": "context",
+                        "anchor_unit_id": owner_id,
+                        "budget_charge_block": f"context:{owner_id}",
+                    }
+                selected_blocks.append({**part, "shadow_phase": "context", "shadow_anchor_unit_id": owner_id})
+            admission_order.append({
+                "block_kind": "context_only",
+                "anchor_unit_id": owner_id,
+                "unit_ids": unit_ids,
+                "budget_before": before,
+                "budget_after": used_chars,
+                "marginal_chars": marginal_chars,
+                "outcome": "admitted",
+            })
+            continue
+        omitted.append({
+            "unit_ids": unit_ids,
+            "reason": reason,
+            "char_count": int(block["char_count"]),
+            "block_kind": "context_only",
+            "anchor_unit_id": owner_id,
+            "budget_before": before,
+            "required_marginal_chars": marginal_chars,
+        })
+        admission_order.append({
+            "block_kind": "context_only",
+            "anchor_unit_id": owner_id,
+            "unit_ids": unit_ids,
+            "budget_before": before,
+            "outcome": "omitted",
+            "reason": reason,
+        })
+
+    selected_blocks.sort(key=lambda block: (tuple(block["source_order"]), tuple(_block_unit_ids(block))))
+    public_blocks = _annotate_shadow_members(selected_blocks, memberships, rendered_by)
+    evidence = [
+        {
+            "evidence_id": f"E{index:02d}",
+            "text": block["text"],
+            "char_count": block["char_count"],
+            "source_order": block["source_order"],
+            "members": block["members"],
+        }
+        for index, block in enumerate(public_blocks, 1)
+    ]
+    build_manifest = prepared_context.build_manifest
+    occurrence_audit = [
+        {
+            "unit_id": unit_id,
+            "presentation_owner_anchor_unit_id": membership_owner[unit_id],
+            "memberships": [dict(item) for item in memberships[unit_id]],
+            "rendering": rendered_by.get(unit_id, {"phase": "omitted"}),
+        }
+        for unit_id in sorted(memberships)
+    ]
+    packet = {
+        "schema_version": EVIDENCE_PACKET_SCHEMA_VERSION,
+        "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+        "retrieval_unit_build": {
+            "build_identity": prepared_context.retrieval_unit_build_identity,
+            "canonical_input": dict(_mapping(build_manifest.get("canonical_input"), "Retrieval Unit build canonical input")),
+            "retrieval_unit_schema_version": build_manifest.get("retrieval_unit_schema_version"),
+        },
+        "assembly_config": _v2_packet_config(config),
+        "assembly_config_identity": sha256_json({
+            "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+            "config": _v2_packet_config(config),
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        }),
+        "selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        "selection_policy_identity": sha256_json({
+            "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            "assembly_config": _v2_packet_config(config),
+        }),
+        "retrieval_audit": {
+            "input_candidate_count": len(ranked_candidates),
+            "deduplicated_candidates": deduplicated,
+            "direct_candidate_count": len(direct),
+            "retrieval_metadata": dict(retrieval_audit or {}),
+        },
+        "shadow_contract": {
+            "identity": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            "candidate_observations": candidate_observations,
+            "direct_footprints": anchor_outcomes,
+            "context_occurrences": occurrence_audit,
+        },
+        "evidence": evidence,
+        "budget": {
+            "per_block_chars": config.per_block_chars,
+            "total_context_chars": config.total_context_chars,
+            "context_only_block_cap": V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap,
+            "used_direct_containing_blocks": sum(1 for row in anchor_outcomes if row["outcome"] == "admitted"),
+            "used_context_only_blocks": selected_context,
+            "used_evidence_blocks": len(evidence),
+            "used_context_chars": sum(int(item["char_count"]) for item in evidence),
+            "omitted_blocks": omitted,
+        },
+    }
+    if diagnostics is not None:
+        diagnostics.selection_trace = {
+            "shadow_contract": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
             "candidate_outcomes": candidate_trace,
             "candidate_observations": candidate_observations,
             "direct_footprints": anchor_outcomes,

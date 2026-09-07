@@ -13,6 +13,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION,
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
     CANDIDATE_ANCHORED_SHADOW_POLICY,
+    DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
     EvidenceAssemblyConfig,
     EvidenceAssemblyDiagnostics,
     EvidenceAssemblyError,
@@ -22,6 +23,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
     assemble_evidence_packet,
     assemble_candidate_anchored_shadow_packet,
+    assemble_deferred_footprint_charge_shadow_packet,
     evidence_packet_json_bytes,
     evidence_packet_markdown,
     prepare_evidence_assembly_context,
@@ -556,6 +558,87 @@ class RagW1Tests(unittest.TestCase):
         self.assertEqual(displaced["displaced_by_anchor_ids"], [rich["unit_id"]])
         self.assertEqual(displaced["budget_before"], 4)
         self.assertEqual(displaced["budget_after"], 4)
+
+    def test_deferred_footprint_shadow_charges_singleton_root_without_bypassing_full_block_limit(self) -> None:
+        _, units, output = self._build()
+        first = next(item for item in units if item["content_type"] == "rich_text" and item["retrieval_visible_text"] == "ABCD")
+        config = EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=1, per_block_chars=100, total_context_chars=4)
+        first_diagnostics = EvidenceAssemblyDiagnostics()
+        first_packet = assemble_deferred_footprint_charge_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": first["unit_id"], "rank": 1, "retrieval": {}}],
+            config=config,
+            diagnostics=first_diagnostics,
+        )
+        second_diagnostics = EvidenceAssemblyDiagnostics()
+        second_packet = assemble_deferred_footprint_charge_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": first["unit_id"], "rank": 1, "retrieval": {}}],
+            config=config,
+            diagnostics=second_diagnostics,
+        )
+        root = first_packet["shadow_contract"]["direct_footprints"][0]
+        rendered_ids = [member["unit_id"] for block in first_packet["evidence"] for member in block["members"]]
+        self.assertEqual(first_packet["assembly_version"], DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY)
+        self.assertEqual(rendered_ids, [first["unit_id"]])
+        self.assertEqual(root["root_projection"]["char_count"], 4)
+        self.assertEqual(root["immutable_direct_footprint"]["char_count"], 8)
+        self.assertEqual(root["deferred_footprint_parts"][0]["reason"], "deferred_footprint_total_context_char_budget_conflict")
+        self.assertEqual(evidence_packet_json_bytes(first_packet), evidence_packet_json_bytes(second_packet))
+        self.assertEqual(first_diagnostics.selection_trace, second_diagnostics.selection_trace)
+
+        oversized = assemble_deferred_footprint_charge_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [{"unit_id": first["unit_id"], "rank": 1, "retrieval": {}}],
+            config=EvidenceAssemblyConfig(neighbor_before=0, neighbor_after=1, per_block_chars=4, total_context_chars=100),
+        )
+        oversized_root = oversized["shadow_contract"]["direct_footprints"][0]
+        self.assertEqual(oversized_root["outcome"], "omitted")
+        self.assertEqual(oversized_root["reason"], "per_block_char_limit")
+        self.assertEqual(oversized["evidence"], [])
+
+    def test_deferred_shadow_preserves_shared_occurrence_membership_for_later_direct_candidate(self) -> None:
+        _, units, output = self._build()
+        rich = [
+            item for item in units
+            if item["content_type"] == "rich_text"
+            and item["retrieval_visible_text"] in {"ABCD", "EFGH"}
+        ]
+        first, later = rich
+        packet = assemble_deferred_footprint_charge_shadow_packet(
+            output / "metadata" / "manifest.json",
+            [
+                {"unit_id": first["unit_id"], "rank": 1, "retrieval": {}},
+                {"unit_id": later["unit_id"], "rank": 2, "retrieval": {}},
+            ],
+            config=EvidenceAssemblyConfig(
+                neighbor_before=0,
+                neighbor_after=1,
+                per_block_chars=100,
+                total_context_chars=1000,
+            ),
+        )
+        roots = packet["shadow_contract"]["direct_footprints"]
+        first_root, later_root = roots
+        deferred = [
+            unit_id
+            for part in first_root["deferred_footprint_parts"]
+            for unit_id in part["unit_ids"]
+        ]
+        self.assertIn(later["unit_id"], deferred)
+        shared_part = next(
+            part for part in first_root["deferred_footprint_parts"]
+            if later["unit_id"] in part["unit_ids"]
+        )
+        self.assertEqual(shared_part["outcome"], "already_visible_via_higher_priority_anchor")
+        self.assertEqual(later_root["outcome"], "admitted")
+        rendered = [
+            member for block in packet["evidence"] for member in block["members"]
+            if member["unit_id"] == later["unit_id"]
+        ]
+        self.assertEqual(len(rendered), 1)
+        self.assertEqual(rendered[0]["shadow_rendering"]["anchor_unit_id"], later["unit_id"])
+        self.assertEqual(rendered[0]["shadow_rendering"]["phase"], "direct_root")
 
     def test_candidate_anchored_shadow_context_membership_is_single_rendered_and_auditable(self) -> None:
         _, units, output = self._build()

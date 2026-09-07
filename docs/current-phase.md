@@ -557,15 +557,47 @@ result must not be extrapolated to the full 70Q workload.
 
 The preceding Candidate Boundary cross-measure established that
 **admission-policy investigation** was the stronger next architecture decision
-candidate than an immediate reranker or embedding replacement. This does not approve, select, implement, or start an
-admission architecture. Reranker/ranking challengers are deferred pending
-downstream admission semantics; embedding/query/RU/upstream Retrieval work is
-deferred pending later attribution; Candidate Boundary production remains **NOT
-AUTHORIZED**; and no next implementation or experiment is authorized by this
-docs sync. This cross-measure resolves only the prior uncertainty about A1-3
-behavior under expanded Candidate Boundary supply. Semantic quality, Generation
-quality, final admission policy, reranker value, embedding value, and the best
-fix for the 18 upstream cases remain unresolved.
+candidate than an immediate reranker or embedding replacement. The subsequent
+**P04 Evidence Admission Challenger — Deferred-Footprint-Charge Shadow** is now
+ACCEPTED / CHECKPOINTED as a diagnostic-only mechanical work unit. It repaired
+the confirmed shared-occurrence eligibility defect and is mechanically
+supported at B0 = `12,000` on the accepted persisted 22Q EXPANDED candidate
+supply. Its accepted `.0.4` diagnostic is
+`.local/p04-rag-a1-3-deferred-footprint-charge-shadow-b0-0.4/diagnostic.json`
+(SHA-256 `fe72eb6ee13fed537964d6e57963ad069c320a9de00dcb1db997bd4fe9d81107`),
+qualified by
+`.local/p04-rag-a1-3-deferred-footprint-charge-shadow-b0-0.4/review-correction.json`
+(SHA-256 `7bcd0f8093ea56aaa42f2d60a9e03d58b6434efc531f05e8a427545493031df7`).
+
+The accepted same-supply transitions versus accepted A1-3 EXPANDED are 518
+visible in both, 145 invisible in both, 131 A1-3-invisible ->
+challenger-visible, and 4 A1-3-visible -> challenger-invisible. All four
+remaining losses are mechanically explained: Q012/Q016/Q057 by exact
+direct total-budget arithmetic and Q061 by the preserved full-footprint
+per-block limit. The five tracked decisive carrier occurrences — Q012, Q016,
+Q041, and both Q046 occurrences — are mechanically Packet-visible via admitted
+singleton direct roots. They are not semantically rescued.
+
+The sidecar corrects shared-footprint counting bases: 29 unique occurrences and
+30 occurrence-to-footprint-anchor relations, with occurrence eligibility
+partition 21/8 and relation eligibility partition 22/8. It rejects
+`29 - 22 = 7`. The challenger trace label
+`already_visible_via_higher_priority_anchor` is over-specific: it means only
+that an occurrence was already rendered before that deferred admission attempt.
+Authoritative actual rendering is `context_occurrences[].rendering`. Focused
+and affected validation passed `tests.retrieval.test_rag_w1` 33/33, and the
+accepted evidence record is
+`docs/research/phase-04/p04-a1-3-deferred-footprint-charge.md`.
+
+Mechanical admission hypothesis is **supported**; semantic / answer-quality
+utility remains **UNKNOWN**. This selected 22Q result is not a full-70
+prevalence claim. A1-2-1 v2 remains the accepted/current selector; A1-3 and
+this challenger remain experimental/shadow; 12k remains the control operating
+point; and production/default adoption is **NOT AUTHORIZED**. Reranker/ranking
+challengers remain deferred, not rejected; embedding/query/RU/upstream
+Retrieval changes remain deferred pending later attribution; and Candidate
+Boundary production remains **NOT AUTHORIZED**. No next implementation or
+experiment is authorized by this checkpoint.
 
 The historical reconstructed old-v2 Packet SHA mismatch remains
 **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source
