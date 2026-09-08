@@ -13,6 +13,8 @@ from genshin_corpus.retrieval.evidence_assembly import (
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION,
     A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
     CANDIDATE_ANCHORED_SHADOW_POLICY,
+    DEFERRED_FOOTPRINT_CHARGE,
+    DEFERRED_FOOTPRINT_CHARGE_POLICY,
     DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
     EvidenceAssemblyConfig,
     EvidenceAssemblyDiagnostics,
@@ -23,6 +25,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
     assemble_evidence_packet,
     assemble_candidate_anchored_shadow_packet,
+    assemble_deferred_footprint_charge_packet,
     assemble_deferred_footprint_charge_shadow_packet,
     evidence_packet_json_bytes,
     evidence_packet_markdown,
@@ -30,6 +33,7 @@ from genshin_corpus.retrieval.evidence_assembly import (
     render_evidence_packet,
     write_evidence_packet,
 )
+from genshin_corpus.generation.generation import project_generation_request
 from genshin_corpus.retrieval import evidence_assembly as evidence_assembly_module
 from genshin_corpus.retrieval.retrieval_units import (
     RetrievalUnitBuildConfig,
@@ -596,6 +600,114 @@ class RagW1Tests(unittest.TestCase):
         self.assertEqual(oversized_root["outcome"], "omitted")
         self.assertEqual(oversized_root["reason"], "per_block_char_limit")
         self.assertEqual(oversized["evidence"], [])
+
+    def test_generic_assembly_rejects_deferred_policy_before_preparation(self) -> None:
+        with self.assertRaisesRegex(
+            EvidenceAssemblyError,
+            "assemble_deferred_footprint_charge_packet",
+        ):
+            assemble_evidence_packet(
+                self.root / "does-not-exist" / "manifest.json",
+                [],
+                selection_policy=DEFERRED_FOOTPRINT_CHARGE,
+            )
+
+    def test_deferred_formal_packet_preserves_pre_refactor_controls_and_shadow_contract(self) -> None:
+        _, units, output = self._build("deferred-formal")
+        rich = [
+            item for item in units
+            if item["content_type"] == "rich_text"
+            and item["retrieval_visible_text"] in {"ABCD", "EFGH"}
+        ]
+        candidates = [
+            {"unit_id": rich[0]["unit_id"], "rank": 1, "retrieval": {"mode": "synthetic"}},
+            {"unit_id": rich[1]["unit_id"], "rank": 2, "retrieval": {"mode": "synthetic"}},
+        ]
+        config = EvidenceAssemblyConfig(
+            neighbor_before=0,
+            neighbor_after=1,
+            per_block_chars=100,
+            total_context_chars=1000,
+        )
+        manifest = output / "metadata" / "manifest.json"
+
+        def assemble_with_trace(assembler, **kwargs):
+            diagnostics = EvidenceAssemblyDiagnostics()
+            packet = assembler(
+                manifest,
+                candidates,
+                config=config,
+                retrieval_audit={"mode": "synthetic"},
+                diagnostics=diagnostics,
+                **kwargs,
+            )
+            return packet, diagnostics.selection_trace
+
+        v1, v1_trace = assemble_with_trace(assemble_evidence_packet)
+        v2, v2_trace = assemble_with_trace(
+            assemble_evidence_packet,
+            selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+        )
+        shadow, shadow_trace = assemble_with_trace(assemble_deferred_footprint_charge_shadow_packet)
+        formal, formal_trace = assemble_with_trace(assemble_deferred_footprint_charge_packet)
+
+        # These SHA-256 values were captured from this fixture before Gate A.
+        expected_goldens = {
+            "v1": ("93b35678b8aa1d333e0adb5a451dd59a7884232ffb6d4922fc0a6d60849764c2", "e09f9f39aaf775a6a18a516f0b399a4da47927caafb84335b2f87450827f9ae3"),
+            "v2": ("5c0bd6ef221ad22bfc136d925903d838b588a126647b8e5dd89d45988b1b37a8", "7b9c6a59ee9be6b722dc18cf8cfcb2f26eb1b5a3d344a8653731bb813208700e"),
+            "shadow": ("5ab38d8dc2f8133dfb8abbf556df5b768a1d9a0758e4b63e73809ed386dcacc5", "5d3a82a49f893b98f87bb2699430c77c53b11d08541ac2d290cc0152edcf3616"),
+        }
+        for label, packet, trace in (("v1", v1, v1_trace), ("v2", v2, v2_trace), ("shadow", shadow, shadow_trace)):
+            self.assertEqual(hashlib.sha256(evidence_packet_json_bytes(packet)).hexdigest(), expected_goldens[label][0])
+            self.assertEqual(hashlib.sha256(canonical_json_bytes(trace)).hexdigest(), expected_goldens[label][1])
+
+        self.assertEqual(formal["assembly_version"], DEFERRED_FOOTPRINT_CHARGE_POLICY)
+        self.assertEqual(formal["selection_policy"], DEFERRED_FOOTPRINT_CHARGE.to_dict())
+        self.assertEqual(formal["admission_contract"]["identity"], DEFERRED_FOOTPRINT_CHARGE_POLICY)
+        self.assertNotIn("shadow_contract", formal)
+        self.assertNotIn("shadow", canonical_json_bytes(formal).decode("utf-8"))
+
+        def generation_visible_projection(packet: dict) -> dict:
+            semantic = project_generation_request(packet, question="fixture question").semantic_projection()
+            return {
+                "schema_version": semantic["schema_version"],
+                "instruction": semantic["instruction"],
+                "evidence": semantic["evidence"],
+                "citation_policy": semantic["citation_policy"],
+                "evidence_packet_schema_version": semantic["evidence_packet_schema_version"],
+            }
+
+        self.assertEqual(generation_visible_projection(formal), generation_visible_projection(shadow))
+        self.assertEqual(evidence_packet_markdown(formal), evidence_packet_markdown(shadow))
+
+        def normalized_packet(packet: dict, *, shadow_packet: bool) -> dict:
+            value = json.loads(canonical_json_bytes(packet).decode("utf-8"))
+            for key in (
+                "assembly_version",
+                "assembly_config_identity",
+                "selection_policy",
+                "selection_policy_identity",
+            ):
+                value.pop(key)
+            contract = value.pop("shadow_contract" if shadow_packet else "admission_contract")
+            contract.pop("identity")
+            contract.pop("control_selection_policy", None)
+            value["admission_contract"] = contract
+            for block in value["evidence"]:
+                for member in block["members"]:
+                    memberships = member.pop("shadow_anchor_memberships" if shadow_packet else "admission_anchor_memberships")
+                    rendering = member.pop("shadow_rendering" if shadow_packet else "admission_rendering")
+                    member["admission_anchor_memberships"] = memberships
+                    member["admission_rendering"] = rendering
+            return value
+
+        self.assertEqual(normalized_packet(formal, shadow_packet=False), normalized_packet(shadow, shadow_packet=True))
+        normalized_formal_trace = dict(formal_trace)
+        normalized_formal_trace["admission_contract"] = "normalized-admission-contract"
+        normalized_shadow_trace = dict(shadow_trace)
+        normalized_shadow_trace["admission_contract"] = "normalized-admission-contract"
+        normalized_shadow_trace.pop("shadow_contract")
+        self.assertEqual(normalized_formal_trace, normalized_shadow_trace)
 
     def test_deferred_shadow_preserves_shared_occurrence_membership_for_later_direct_candidate(self) -> None:
         _, units, output = self._build()

@@ -31,6 +31,7 @@ EVIDENCE_ASSEMBLY_VERSION = "phase04-rag-w1-deterministic-assembly-0.1"
 V2_DIRECT_FIRST_CONTEXT_CAP_POLICY = "phase04-rag-a1-2-direct-first-context-cap-0.1"
 CANDIDATE_ANCHORED_SHADOW_POLICY = "phase04-rag-a1-3-candidate-anchored-shadow-0.1"
 DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY = "phase04-rag-a1-3-deferred-footprint-charge-shadow-0.1"
+DEFERRED_FOOTPRINT_CHARGE_POLICY = "phase04-rag-a1-3-deferred-footprint-charge-0.1"
 A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY = (
     "phase04-rag-a1-2-2-exact-dialogue-source-occurrence-alias-suppression-0.1"
 )
@@ -99,6 +100,7 @@ class EvidenceSelectionPolicy:
         if self.identity not in {
             V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
             A1_2_2_EXACT_DIALOGUE_SOURCE_OCCURRENCE_ALIAS_SUPPRESSION_POLICY,
+            DEFERRED_FOOTPRINT_CHARGE_POLICY,
         }:
             raise ValueError("unsupported Evidence Selection policy identity")
         if (
@@ -117,6 +119,11 @@ class EvidenceSelectionPolicy:
 
 V2_DIRECT_FIRST_CONTEXT_CAP = EvidenceSelectionPolicy(
     identity=V2_DIRECT_FIRST_CONTEXT_CAP_POLICY,
+    context_only_block_cap=8,
+)
+
+DEFERRED_FOOTPRINT_CHARGE = EvidenceSelectionPolicy(
+    identity=DEFERRED_FOOTPRINT_CHARGE_POLICY,
     context_only_block_cap=8,
 )
 
@@ -993,10 +1000,13 @@ def _candidate_anchored_shadow_plan(
     return anchors, dict(memberships)
 
 
-def _annotate_shadow_members(
+def _annotate_admission_members(
     blocks: Sequence[Mapping[str, Any]],
     memberships: Mapping[str, Sequence[Mapping[str, Any]]],
     rendered_by: Mapping[str, Mapping[str, Any]],
+    *,
+    membership_key: str,
+    rendering_key: str,
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     for block in blocks:
@@ -1004,8 +1014,8 @@ def _annotate_shadow_members(
         for original in block["members"]:
             member = dict(original)
             unit_id = str(member["unit_id"])
-            member["shadow_anchor_memberships"] = [dict(item) for item in memberships[unit_id]]
-            member["shadow_rendering"] = dict(rendered_by[unit_id])
+            member[membership_key] = [dict(item) for item in memberships[unit_id]]
+            member[rendering_key] = dict(rendered_by[unit_id])
             members.append(member)
         output.append({
             "members": members,
@@ -1014,6 +1024,22 @@ def _annotate_shadow_members(
             "source_order": list(block["source_order"]),
         })
     return output
+
+
+def _annotate_shadow_members(
+    blocks: Sequence[Mapping[str, Any]],
+    memberships: Mapping[str, Sequence[Mapping[str, Any]]],
+    rendered_by: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Retain the historical shadow-member serialization exactly."""
+
+    return _annotate_admission_members(
+        blocks,
+        memberships,
+        rendered_by,
+        membership_key="shadow_anchor_memberships",
+        rendering_key="shadow_rendering",
+    )
 
 
 def assemble_candidate_anchored_shadow_packet(
@@ -1273,7 +1299,7 @@ def assemble_candidate_anchored_shadow_packet(
     return packet
 
 
-def assemble_deferred_footprint_charge_shadow_packet(
+def _assemble_deferred_footprint_charge_packet(
     retrieval_unit_manifest_path: Path,
     ranked_candidates: Sequence[Mapping[str, Any]],
     *,
@@ -1281,13 +1307,18 @@ def assemble_deferred_footprint_charge_shadow_packet(
     retrieval_audit: Mapping[str, Any] | None = None,
     prepared_context: PreparedAssemblyContext | None = None,
     diagnostics: EvidenceAssemblyDiagnostics | None = None,
+    assembly_version: str,
+    selection_policy: EvidenceSelectionPolicy,
+    admission_contract_key: str,
+    membership_key: str,
+    rendering_key: str,
+    control_selection_policy: EvidenceSelectionPolicy | None,
 ) -> dict[str, Any]:
-    """Assemble a diagnostic Packet with deferred non-root footprint charging.
+    """Assemble a Packet with deferred non-root footprint charging.
 
-    This is an A1-3-derived shadow policy.  It admits each direct root as a
-    singleton projection, but retains the complete immutable direct footprint
-    and its original per-block eligibility check.  Non-root footprint members
-    are charged in anchor order before the existing context-only pass.
+    Callers supply the public contract identity and metadata namespace.  The
+    admission algorithm remains common to the formal and historical shadow
+    entry points.
     """
 
     config = config or EvidenceAssemblyConfig()
@@ -1520,7 +1551,7 @@ def assemble_deferred_footprint_charge_shadow_packet(
         before = used_chars
         if block["char_count"] > config.per_block_chars:
             reason = "per_block_char_limit"
-        elif selected_context >= V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap:
+        elif selected_context >= selection_policy.context_only_block_cap:
             reason = "context_only_block_cap"
         elif used_chars + marginal_chars > config.total_context_chars:
             reason = "context_total_context_char_budget"
@@ -1565,7 +1596,13 @@ def assemble_deferred_footprint_charge_shadow_packet(
         })
 
     selected_blocks.sort(key=lambda block: (tuple(block["source_order"]), tuple(_block_unit_ids(block))))
-    public_blocks = _annotate_shadow_members(selected_blocks, memberships, rendered_by)
+    public_blocks = _annotate_admission_members(
+        selected_blocks,
+        memberships,
+        rendered_by,
+        membership_key=membership_key,
+        rendering_key=rendering_key,
+    )
     evidence = [
         {
             "evidence_id": f"E{index:02d}",
@@ -1586,9 +1623,14 @@ def assemble_deferred_footprint_charge_shadow_packet(
         }
         for unit_id in sorted(memberships)
     ]
+    policy_binding = (
+        {"control_selection_policy": control_selection_policy.to_dict()}
+        if control_selection_policy is not None
+        else {"selection_policy": selection_policy.to_dict()}
+    )
     packet = {
         "schema_version": EVIDENCE_PACKET_SCHEMA_VERSION,
-        "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+        "assembly_version": assembly_version,
         "retrieval_unit_build": {
             "build_identity": prepared_context.retrieval_unit_build_identity,
             "canonical_input": dict(_mapping(build_manifest.get("canonical_input"), "Retrieval Unit build canonical input")),
@@ -1596,14 +1638,14 @@ def assemble_deferred_footprint_charge_shadow_packet(
         },
         "assembly_config": _v2_packet_config(config),
         "assembly_config_identity": sha256_json({
-            "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+            "assembly_version": assembly_version,
             "config": _v2_packet_config(config),
-            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            **policy_binding,
         }),
-        "selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        "selection_policy": selection_policy.to_dict(),
         "selection_policy_identity": sha256_json({
-            "assembly_version": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
-            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+            "assembly_version": assembly_version,
+            **policy_binding,
             "assembly_config": _v2_packet_config(config),
         }),
         "retrieval_audit": {
@@ -1612,9 +1654,8 @@ def assemble_deferred_footprint_charge_shadow_packet(
             "direct_candidate_count": len(direct),
             "retrieval_metadata": dict(retrieval_audit or {}),
         },
-        "shadow_contract": {
-            "identity": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
-            "control_selection_policy": V2_DIRECT_FIRST_CONTEXT_CAP.to_dict(),
+        admission_contract_key: {
+            "identity": assembly_version,
             "candidate_observations": candidate_observations,
             "direct_footprints": anchor_outcomes,
             "context_occurrences": occurrence_audit,
@@ -1623,7 +1664,7 @@ def assemble_deferred_footprint_charge_shadow_packet(
         "budget": {
             "per_block_chars": config.per_block_chars,
             "total_context_chars": config.total_context_chars,
-            "context_only_block_cap": V2_DIRECT_FIRST_CONTEXT_CAP.context_only_block_cap,
+            "context_only_block_cap": selection_policy.context_only_block_cap,
             "used_direct_containing_blocks": sum(1 for row in anchor_outcomes if row["outcome"] == "admitted"),
             "used_context_only_blocks": selected_context,
             "used_evidence_blocks": len(evidence),
@@ -1633,14 +1674,70 @@ def assemble_deferred_footprint_charge_shadow_packet(
     }
     if diagnostics is not None:
         diagnostics.selection_trace = {
-            "shadow_contract": DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+            admission_contract_key: assembly_version,
             "candidate_outcomes": candidate_trace,
             "candidate_observations": candidate_observations,
             "direct_footprints": anchor_outcomes,
             "context_occurrences": occurrence_audit,
             "admission_order": admission_order,
         }
+    if control_selection_policy is not None:
+        packet[admission_contract_key]["control_selection_policy"] = control_selection_policy.to_dict()
     return packet
+
+
+def assemble_deferred_footprint_charge_packet(
+    retrieval_unit_manifest_path: Path,
+    ranked_candidates: Sequence[Mapping[str, Any]],
+    *,
+    config: EvidenceAssemblyConfig | None = None,
+    retrieval_audit: Mapping[str, Any] | None = None,
+    prepared_context: PreparedAssemblyContext | None = None,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> dict[str, Any]:
+    """Assemble a formal Deferred-Footprint-Charge Evidence Packet."""
+
+    return _assemble_deferred_footprint_charge_packet(
+        retrieval_unit_manifest_path,
+        ranked_candidates,
+        config=config,
+        retrieval_audit=retrieval_audit,
+        prepared_context=prepared_context,
+        diagnostics=diagnostics,
+        assembly_version=DEFERRED_FOOTPRINT_CHARGE_POLICY,
+        selection_policy=DEFERRED_FOOTPRINT_CHARGE,
+        admission_contract_key="admission_contract",
+        membership_key="admission_anchor_memberships",
+        rendering_key="admission_rendering",
+        control_selection_policy=None,
+    )
+
+
+def assemble_deferred_footprint_charge_shadow_packet(
+    retrieval_unit_manifest_path: Path,
+    ranked_candidates: Sequence[Mapping[str, Any]],
+    *,
+    config: EvidenceAssemblyConfig | None = None,
+    retrieval_audit: Mapping[str, Any] | None = None,
+    prepared_context: PreparedAssemblyContext | None = None,
+    diagnostics: EvidenceAssemblyDiagnostics | None = None,
+) -> dict[str, Any]:
+    """Assemble the historical Deferred-Footprint-Charge shadow Packet."""
+
+    return _assemble_deferred_footprint_charge_packet(
+        retrieval_unit_manifest_path,
+        ranked_candidates,
+        config=config,
+        retrieval_audit=retrieval_audit,
+        prepared_context=prepared_context,
+        diagnostics=diagnostics,
+        assembly_version=DEFERRED_FOOTPRINT_CHARGE_SHADOW_POLICY,
+        selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+        admission_contract_key="shadow_contract",
+        membership_key="shadow_anchor_memberships",
+        rendering_key="shadow_rendering",
+        control_selection_policy=V2_DIRECT_FIRST_CONTEXT_CAP,
+    )
 
 
 def assemble_evidence_packet(
@@ -1663,6 +1760,13 @@ def assemble_evidence_packet(
     ``selection_policy=None`` retains the byte-compatible v1 selector.
     """
 
+    if (
+        selection_policy is not None
+        and selection_policy.identity == DEFERRED_FOOTPRINT_CHARGE_POLICY
+    ):
+        raise EvidenceAssemblyError(
+            "Deferred-Footprint-Charge requires assemble_deferred_footprint_charge_packet"
+        )
     config = config or EvidenceAssemblyConfig()
     if prepared_context is None:
         prepared_context = prepare_evidence_assembly_context(retrieval_unit_manifest_path, diagnostics=diagnostics)
