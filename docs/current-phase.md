@@ -310,7 +310,56 @@ Q020/Q052 as Generation controls; Q011 upstream recall remains UNKNOWN. This
 execution does not select a Retrieval, embedding, reranking, or Assembly
 challenger technology.
 
-## Immediate next action
+## Post-Step-0 Current Authority
+
+The following post-Step-0 update is the current authority for the A1 admission
+comparison. It supersedes only earlier statements in this status record that
+described the full-70 candidate supply as UNKNOWN or stated that no further
+admission implementation was authorized.
+
+**A1-2-1 v2 remains the accepted/current production control selector.** A1-3,
+Candidate Boundary, and Deferred-Footprint remain experimental/shadow only;
+none is production/default behavior. Deferred-Footprint's mechanical admission
+capability closed at `7b2fa07`: its mechanical admission hypothesis was
+supported, but that result alone was not a production-adoption result.
+
+The provider-free Stage 0 Packet-semantic validation is COMPLETE / PASS. It
+established material paired Packet-semantic improvements on the targeted
+unresolved subset, without a full-70 prevalence claim. Targeted paired Stage 1
+Generation validation is likewise COMPLETE / PASS as directional evidence
+only: Q012 GAIN, Q016 NEUTRAL, Q041 GAIN, and Q046 GAIN (3 GAIN / 1 NEUTRAL /
+0 regression). It is neither a population prevalence result nor evidence of
+full-70 superiority.
+
+The primary broader question remains a provider-free comparison of A1-2-1 v2
+against Deferred-Footprint using the **same frozen Hybrid Top20 supply**, the
+same RU/build, B0 = `12,000`, and the same per-block/configuration. Expanded
+Candidate Boundary is excluded from this primary comparison. Reference answers
+and human review never enter runtime or a Provider.
+
+The historical full-70 candidate-supply gap is CLOSED by accepted Step 0 at
+`.local/p04-rag-broader-admission-70q-candidate-supply/`. Its run identity is
+`fe0f40824fd5ef20b00c0668c5594ab0d8d9869e367551f5d4ba75a94ae82f1e`, and
+its implementation/checkpoint is `3dd5317`. Actual reproduction was Q001-Q070
+70/70; lexical, Dense, and Hybrid candidate hashes 70/70 each; 210/210 total
+exact hashes; and persisted historical full Hybrid arrays 22/22 exact. Provider
+and Generation calls were both 0. This accepted `.local` candidate supply is
+frozen input: do not rerun or resume it.
+
+The next authorized work unit is to implement and fast-test the provider-free
+broader-admission 70Q comparison runner, A1-2-1 v2 versus Deferred-Footprint,
+over that frozen Hybrid Top20 supply. The implementation work unit must **not**
+run the real full-70 comparison. Real full-70 execution requires a later actual
+source/test gate and separate user authorization.
+
+Production scope remains `zh-CN + MiHoYo OBC only`. Evidence Packets remain an
+auditable interface, not a substitute for RAG quality. B0 = `12,000` is the
+primary comparison operating point; `14,965` remains sensitivity evidence only,
+not a production default. This synchronization authorizes no reranker, query
+rewrite, embedding change, RU redesign, agentic retrieval, GraphRAG, or RAGFlow
+migration.
+
+## Historical A1 Status
 
 P04-RAG-M2 execution is complete; do not rerun or overwrite `run-001`.
 **P04-RAG-A1-1 — Candidate fidelity and prepared Evidence Assembly context**
