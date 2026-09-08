@@ -310,32 +310,30 @@ Q020/Q052 as Generation controls; Q011 upstream recall remains UNKNOWN. This
 execution does not select a Retrieval, embedding, reranking, or Assembly
 challenger technology.
 
-## Post-Step-0 Current Authority
+## Post-Adoption Current Authority
 
-The following post-Step-0 update is the current authority for the A1 admission
-comparison. It supersedes only earlier statements in this status record that
-described the full-70 candidate supply as UNKNOWN or stated that no further
-admission implementation was authorized.
+The following is the current authority for Evidence Assembly admission. After
+explicit user authorization and an actual source/diff gate PASS, the
+production-facing materialization caller uses the formal
+`assemble_deferred_footprint_charge_packet` API. **Formal
+Deferred-Footprint-Charge is the current production-facing Assembly default.**
+The generic v1 path is the historical callable production baseline before this
+adoption. A1-2-1 v2 remains the accepted post-M2 comparison/admission control;
+it is not the production default. Candidate Boundary remains unadopted.
 
-**A1-2-1 v2 remains the accepted/current production control selector.** A1-3,
-Candidate Boundary, and Deferred-Footprint remain experimental/shadow only;
-none is production/default behavior. Deferred-Footprint's mechanical admission
-capability closed at `7b2fa07`: its mechanical admission hypothesis was
-supported, but that result alone was not a production-adoption result.
+The provider-free Stage 0 Packet-semantic validation and targeted paired Stage
+1 validation are COMPLETE / PASS accepted evidence. They remain scoped
+evidence, not a population prevalence result, broad Deferred superiority claim,
+or a full-70 paid Generation uplift rate. The direct v1-to-Deferred semantic
+bridge is also COMPLETE / PASS accepted evidence under its bounded contract.
 
-The provider-free Stage 0 Packet-semantic validation is COMPLETE / PASS. It
-established material paired Packet-semantic improvements on the targeted
-unresolved subset, without a full-70 prevalence claim. Targeted paired Stage 1
-Generation validation is likewise COMPLETE / PASS as directional evidence
-only: Q012 GAIN, Q016 NEUTRAL, Q041 GAIN, and Q046 GAIN (3 GAIN / 1 NEUTRAL /
-0 regression). It is neither a population prevalence result nor evidence of
-full-70 superiority.
-
-The primary broader question remains a provider-free comparison of A1-2-1 v2
-against Deferred-Footprint using the **same frozen Hybrid Top20 supply**, the
-same RU/build, B0 = `12,000`, and the same per-block/configuration. Expanded
-Candidate Boundary is excluded from this primary comparison. Reference answers
-and human review never enter runtime or a Provider.
+The full-70 provider-free A1-2-1 v2 versus Deferred-Footprint comparison is
+COMPLETE / PASS accepted evidence over the same frozen Hybrid Top20 supply,
+the same RU/build, B0 = `12,000`, and the same per-block/configuration.
+Formal-to-Shadow parity is likewise COMPLETE / PASS accepted evidence. Neither
+completed evidence path performed Retrieval, Dense, RRF, Provider, or
+Generation calls. Expanded Candidate Boundary remains excluded from the
+comparison and unadopted.
 
 The historical full-70 candidate-supply gap is CLOSED by accepted Step 0 at
 `.local/p04-rag-broader-admission-70q-candidate-supply/`. Its run identity is
@@ -346,18 +344,18 @@ exact hashes; and persisted historical full Hybrid arrays 22/22 exact. Provider
 and Generation calls were both 0. This accepted `.local` candidate supply is
 frozen input: do not rerun or resume it.
 
-The next authorized work unit is to implement and fast-test the provider-free
-broader-admission 70Q comparison runner, A1-2-1 v2 versus Deferred-Footprint,
-over that frozen Hybrid Top20 supply. The implementation work unit must **not**
-run the real full-70 comparison. Real full-70 execution requires a later actual
-source/test gate and separate user authorization.
-
 Production scope remains `zh-CN + MiHoYo OBC only`. Evidence Packets remain an
 auditable interface, not a substitute for RAG quality. B0 = `12,000` is the
 primary comparison operating point; `14,965` remains sensitivity evidence only,
-not a production default. This synchronization authorizes no reranker, query
-rewrite, embedding change, RU redesign, agentic retrieval, GraphRAG, or RAGFlow
-migration.
+not a production default. This production-default switch authorizes no new
+paid or full production run, Retrieval challenger, reranker, embedding change,
+Candidate Boundary adoption, budget change, Generation/provider change, query
+rewrite, RU redesign, agentic retrieval, GraphRAG, or RAGFlow migration.
+
+Current pending Codex task: **NONE**. The immediate next action, after
+checkpointing this completed adoption, is an evidence-driven decision on
+exactly one next work unit; no optimization layer is pre-authorized by this
+synchronization.
 
 ## Historical A1 Status
 
@@ -405,9 +403,9 @@ in the control with identical membership and character count, but was omitted
 there by `direct_total_context_char_budget_conflict`. Q045/dense separately
 shows that a pre-admission alias representative is insufficient when that
 representative is not final-Packet-visible. A1-2-2 is therefore **NOT ADOPTED**
-as production/default selection behavior; A1-2-1 v2 remains the accepted
-control/current selector, checkpoint `71675eb` remains valid, and no further
-A1-2-2 implementation work is authorized.
+as production/default selection behavior; at that checkpoint, A1-2-1 v2 was
+the accepted control/current selector. Checkpoint `71675eb` remains valid, and
+no further A1-2-2 implementation work is authorized.
 
 For the Q012 Hybrid gate, the approved negative result remains: 122 chars
 released, rank-19 headroom 704 -> 826, the decisive 2,059-character Block
@@ -446,10 +444,10 @@ remains **NOT AUTHORIZED / NOT STARTED**.
 candidate-anchored immutable direct footprints and explicit shared-context
 membership/accounting, so candidate-anchor grouping no longer relies on
 incidental global source-order merging. It remains a shadow Packet path: v1 is
-unchanged and A1-2-1 v2 remains the accepted/current selector. It does not
-make A1-3 production/default behavior and does not change Candidate Retrieval,
-BM25, Dense, Hybrid/RRF, Top-K, the current evidence budget, Generation, or
-Candidate Boundary production policy.
+unchanged and, at that checkpoint, A1-2-1 v2 was the accepted/current selector.
+It does not make A1-3 production/default behavior and does not change Candidate
+Retrieval, BM25, Dense, Hybrid/RRF, Top-K, the current evidence budget,
+Generation, or Candidate Boundary production policy.
 
 The bounded persisted-attribution 22Q diagnostic is
 `.local/p04-rag-a1-3-candidate-anchored-shadow-22q/diagnostic.json`
@@ -592,10 +590,11 @@ disproved.
 
 Reranker/ranking work remains deferred one layer, not rejected; Q016/Q041
 remaining omitted does not erase existing ranking evidence. Embedding/query/RU/
-upstream Retrieval changes remain deferred pending later attribution. A1-2-1
-v2 remains the accepted/current selector; A1-3 remains experimental/shadow;
-Candidate Boundary production remains **NOT AUTHORIZED**; and 12k remains the
-current control operating point, not a correctness invariant or proven optimum.
+upstream Retrieval changes remain deferred pending later attribution. At that
+checkpoint, A1-2-1 v2 was the accepted/current selector and A1-3 was
+experimental/shadow; Candidate Boundary production remains **NOT AUTHORIZED**;
+and 12k remains the current control operating point, not a correctness
+invariant or proven optimum.
 Budget, Top-K, and RRF remain operating points. Identity, provenance,
 deterministic ordering, fail-closed behavior, and A1-3 immutable-footprint /
 retention properties remain correctness constraints. Semantic usefulness of
@@ -640,13 +639,13 @@ accepted evidence record is
 
 Mechanical admission hypothesis is **supported**; semantic / answer-quality
 utility remains **UNKNOWN**. This selected 22Q result is not a full-70
-prevalence claim. A1-2-1 v2 remains the accepted/current selector; A1-3 and
-this challenger remain experimental/shadow; 12k remains the control operating
-point; and production/default adoption is **NOT AUTHORIZED**. Reranker/ranking
-challengers remain deferred, not rejected; embedding/query/RU/upstream
-Retrieval changes remain deferred pending later attribution; and Candidate
-Boundary production remains **NOT AUTHORIZED**. No next implementation or
-experiment is authorized by this checkpoint.
+prevalence claim. At this historical shadow checkpoint, A1-2-1 v2 was the
+accepted/current selector; A1-3 and this challenger were experimental/shadow,
+and production/default adoption was **NOT AUTHORIZED**. That historical status
+is superseded for the production-facing caller by the Post-Adoption Current
+Authority above. Reranker/ranking challengers remain deferred, not rejected;
+embedding/query/RU/upstream Retrieval changes remain deferred pending later
+attribution; and Candidate Boundary production remains **NOT AUTHORIZED**.
 
 The historical reconstructed old-v2 Packet SHA mismatch remains
 **UNKNOWN / non-blocking**, and the full-70 no-Retrieval candidate source

@@ -26,7 +26,7 @@ from genshin_corpus.retrieval.candidate_retrieval import (
 )
 from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
-    assemble_evidence_packet,
+    assemble_deferred_footprint_charge_packet,
     write_evidence_packet,
 )
 from genshin_corpus.retrieval.profiler import profile_canonical_run
@@ -213,7 +213,7 @@ def _materialize(
                 top_k=top_k,
                 rrf_k=rrf_k,
             )
-            packet = assemble_evidence_packet(
+            packet = assemble_deferred_footprint_charge_packet(
                 ru_manifest_path,
                 candidates,
                 config=assembly_config,
