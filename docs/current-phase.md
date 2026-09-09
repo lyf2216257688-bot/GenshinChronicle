@@ -387,14 +387,24 @@ Dense manifest records `model_name=qwen3.7-text-embedding`,
 `embedding_dimension=2048`, `row_count=1`, `dtype=float32`, and
 `normalization=L2`. Live Beijing provider availability and the requested
 2048-dimensional synchronous preflight are therefore no longer **UNKNOWN**.
-No Batch work has been executed or proven, no full 535,802-RU Qwen embedding
-build has started, no 70Q Qwen query-vector artifact has been built, no
-BGE-vs-Qwen full quality comparison has been run, and no production Dense
-adoption or switch has occurred. The sole immediate next action is the
-repository checkpoint of this live-preflight result/state only. No further
-provider/API work is authorized by this successful preflight; every real
-provider/API request remains separately subject to explicit user
-authorization. No broader retrieval or optimization work is pre-authorized.
+The narrow provider-free Qwen Batch JSONL seam is **IMPLEMENTED /
+OFFLINE-TESTED / ACTUAL-REVIEW PASS**. Actual review passed exact
+`retrieval_visible_text` reuse, deterministic RU-bound `custom_id`, fixed
+requested 2048 dimensions, strict result-row association, and reuse of the
+existing Qwen Dense validation/materialization path. It builds and parses only
+local Batch JSONL files; no upload, Batch job creation, polling, download,
+network call, retry framework, full-corpus partitioning, or paid Batch
+execution has been implemented or executed. Batch wire acceptance of
+`qwen3.7-text-embedding + 2048` remains **UNKNOWN**, and Batch
+document-vector compatibility with the already verified synchronous DashScope
+`text_type=document` result remains **UNKNOWN**. No full 535,802-RU Qwen
+embedding build, 70Q Qwen query-vector artifact, BGE-vs-Qwen full comparison,
+or production Dense switch has started. The sole immediate next action is the
+repository checkpoint of this completed provider-free Batch seam. Only after
+that checkpoint may a separately scoped one-document live Batch
+lifecycle/probe work unit begin; every real provider/Batch request still
+requires separate explicit user authorization. No broader retrieval or
+optimization work is pre-authorized.
 
 ## Historical A1 Status
 

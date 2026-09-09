@@ -104,6 +104,17 @@ from .qwen_embedding import (
     run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
+from .qwen_batch_embedding import (
+    QWEN_BATCH_EMBEDDINGS_PATH,
+    QWEN_BATCH_ENCODING_FORMAT,
+    QWEN_BATCH_JSONL_SCHEMA_VERSION,
+    QwenBatchEmbeddingConfig,
+    QwenBatchEmbeddingError,
+    build_qwen_batch_jsonl,
+    build_qwen_batch_records,
+    materialize_qwen_batch_results,
+    qwen_batch_custom_id,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -187,6 +198,15 @@ __all__ = [
     "QwenSynchronousPreflightConfig",
     "run_qwen_dashscope_synchronous_preflight",
     "run_qwen_synchronous_preflight",
+    "QWEN_BATCH_EMBEDDINGS_PATH",
+    "QWEN_BATCH_ENCODING_FORMAT",
+    "QWEN_BATCH_JSONL_SCHEMA_VERSION",
+    "QwenBatchEmbeddingConfig",
+    "QwenBatchEmbeddingError",
+    "build_qwen_batch_jsonl",
+    "build_qwen_batch_records",
+    "materialize_qwen_batch_results",
+    "qwen_batch_custom_id",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]

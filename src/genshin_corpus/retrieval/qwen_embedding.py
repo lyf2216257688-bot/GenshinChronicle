@@ -756,18 +756,21 @@ def _run_attempt(
     )
 
 
-def _select_document_units(config: QwenSynchronousPreflightConfig) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
+def _select_document_units(
+    retrieval_unit_manifest_path: Path,
+    document_unit_ids: Sequence[str],
+) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
     try:
-        manifest, all_units = load_retrieval_units(Path(config.retrieval_unit_manifest_path))
+        manifest, all_units = load_retrieval_units(Path(retrieval_unit_manifest_path))
     except Exception as exc:
         raise QwenEmbeddingPreflightError("Qwen preflight requires a complete Retrieval Unit artifact") from exc
     build_identity = manifest.get("build_identity")
     if not isinstance(build_identity, str) or not build_identity:
         raise QwenEmbeddingPreflightError("Qwen preflight Retrieval Unit manifest lacks build identity")
     positions = {str(unit.get("unit_id")): index for index, unit in enumerate(all_units)}
-    if any(unit_id not in positions for unit_id in config.document_unit_ids):
+    if any(unit_id not in positions for unit_id in document_unit_ids):
         raise QwenEmbeddingPreflightError("Qwen preflight document unit is absent from the Retrieval Unit artifact")
-    selected_positions = [positions[unit_id] for unit_id in config.document_unit_ids]
+    selected_positions = [positions[unit_id] for unit_id in document_unit_ids]
     if selected_positions != sorted(selected_positions):
         raise QwenEmbeddingPreflightError("Qwen preflight document units must follow Retrieval Unit manifest order")
     selected = [all_units[index] for index in selected_positions]
@@ -823,6 +826,50 @@ def _provider_evidence_labels(execution_mode: str, outcome: str) -> tuple[str, s
     raise QwenEmbeddingPreflightError("Qwen preflight execution mode is invalid")
 
 
+def _write_qwen_dense_artifact(
+    output_root: Path,
+    *,
+    ru_manifest: Mapping[str, Any],
+    units: Sequence[Mapping[str, Any]],
+    document_request: QwenEmbeddingRequest,
+    document_vectors: Any,
+    metadata: Mapping[str, Any],
+) -> tuple[dict[str, Any], bytes]:
+    """Write the validated remote-Qwen vectors in the accepted Dense layout."""
+
+    vector_file = BytesIO()
+    import numpy as np
+
+    np.save(vector_file, document_vectors.astype(np.float32), allow_pickle=False)
+    vector_body = vector_file.getvalue()
+    row_rows = [{"occurrence_index": index, "unit_id": str(unit["unit_id"])} for index, unit in enumerate(units)]
+    row_body = _gzip_jsonl(row_rows)
+    arm_build_identity = sha256_json({
+        "retrieval_unit_build_identity": ru_manifest["build_identity"],
+        "dense_contract": dict(metadata),
+        "document_request_identity": document_request.request_identity,
+    })
+    dense_manifest = {
+        "schema_version": DENSE_INDEX_SCHEMA_VERSION,
+        "status": "complete",
+        "arm": "dense",
+        "arm_build_identity": arm_build_identity,
+        "retrieval_unit_build_identity": ru_manifest["build_identity"],
+        **dict(metadata),
+        "row_count": len(row_rows),
+        "artifacts": {
+            "vectors": _artifact_descriptor("artifacts/vectors.f32.npy", vector_body),
+            "rows": _artifact_descriptor("artifacts/rows.jsonl.gz", row_body, len(row_rows)),
+        },
+    }
+    dense_root = output_root / "dense"
+    atomic_write(dense_root / "artifacts" / "vectors.f32.npy", vector_body)
+    atomic_write(dense_root / "artifacts" / "rows.jsonl.gz", row_body)
+    dense_manifest_body = canonical_json_bytes(dense_manifest)
+    atomic_write(dense_root / "metadata" / "manifest.json", dense_manifest_body)
+    return dense_manifest, dense_manifest_body
+
+
 def run_qwen_synchronous_preflight(
     config: QwenSynchronousPreflightConfig,
     output_root: Path,
@@ -849,7 +896,7 @@ def run_qwen_synchronous_preflight(
     output_root = Path(output_root)
     if output_root.exists():
         raise FileExistsError("Qwen preflight output root already exists")
-    ru_manifest, units = _select_document_units(config)
+    ru_manifest, units = _select_document_units(config.retrieval_unit_manifest_path, config.document_unit_ids)
     transport_provenance = _dashscope_transport_provenance(transport)
     preflight_identity = _preflight_identity(config, ru_manifest, units, transport_provenance)
     document_request = QwenEmbeddingRequest(
@@ -903,14 +950,6 @@ def run_qwen_synchronous_preflight(
 
     if document.vectors is None or query.vectors is None:
         raise AssertionError("successful Qwen preflight attempts require vectors")
-    document_vectors = document.vectors
-    vector_file = BytesIO()
-    import numpy as np
-
-    np.save(vector_file, document_vectors.astype(np.float32), allow_pickle=False)
-    vector_body = vector_file.getvalue()
-    row_rows = [{"occurrence_index": index, "unit_id": str(unit["unit_id"])} for index, unit in enumerate(units)]
-    row_body = _gzip_jsonl(row_rows)
     remote_provenance = {
         "kind": "remote_provider",
         "transport_contract_version": (
@@ -949,34 +988,20 @@ def run_qwen_synchronous_preflight(
             "custom_query_instruction": None,
         },
     }
-    arm_build_identity = sha256_json({
-        "retrieval_unit_build_identity": ru_manifest["build_identity"],
-        "dense_contract": metadata,
-        "document_request_identity": document_request.request_identity,
-    })
-    dense_manifest = {
-        "schema_version": DENSE_INDEX_SCHEMA_VERSION,
-        "status": "complete",
-        "arm": "dense",
-        "arm_build_identity": arm_build_identity,
-        "retrieval_unit_build_identity": ru_manifest["build_identity"],
-        **metadata,
-        "row_count": len(row_rows),
-        "artifacts": {
-            "vectors": _artifact_descriptor("artifacts/vectors.f32.npy", vector_body),
-            "rows": _artifact_descriptor("artifacts/rows.jsonl.gz", row_body, len(row_rows)),
-        },
-    }
-    dense_root = output_root / "dense"
-    atomic_write(dense_root / "artifacts" / "vectors.f32.npy", vector_body)
-    atomic_write(dense_root / "artifacts" / "rows.jsonl.gz", row_body)
-    dense_manifest_body = canonical_json_bytes(dense_manifest)
-    atomic_write(dense_root / "metadata" / "manifest.json", dense_manifest_body)
+    dense_manifest, dense_manifest_body = _write_qwen_dense_artifact(
+        output_root,
+        ru_manifest=ru_manifest,
+        units=units,
+        document_request=document_request,
+        document_vectors=document.vectors,
+        metadata=metadata,
+    )
 
+    dense_root = output_root / "dense"
     candidates = dense_candidates(
         dense_root / "metadata" / "manifest.json",
         query.vectors[0],
-        top_k=min(len(row_rows), 20),
+        top_k=min(len(units), 20),
         query_instruction=None,
     )
     scoring_probe = {
