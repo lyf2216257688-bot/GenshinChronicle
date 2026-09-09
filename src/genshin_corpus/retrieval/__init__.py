@@ -84,6 +84,22 @@ from .production_materialization import (
     materialize_production,
     preflight_production_inputs,
 )
+from .qwen_embedding import (
+    QWEN_CORPUS_ROLE,
+    QWEN_EMBEDDING_DIMENSION,
+    QWEN_EMBEDDING_MODEL_ID,
+    QWEN_EMBEDDING_OUTPUT,
+    QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION,
+    QWEN_QUERY_ROLE,
+    QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION,
+    QwenEmbeddingPreflightError,
+    QwenEmbeddingRequest,
+    QwenEmbeddingResponse,
+    QwenEmbeddingTransport,
+    QwenEmbeddingTransportError,
+    QwenSynchronousPreflightConfig,
+    run_qwen_synchronous_preflight,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -149,6 +165,20 @@ __all__ = [
     "ProductionMaterializationError",
     "materialize_production",
     "preflight_production_inputs",
+    "QWEN_CORPUS_ROLE",
+    "QWEN_EMBEDDING_DIMENSION",
+    "QWEN_EMBEDDING_MODEL_ID",
+    "QWEN_EMBEDDING_OUTPUT",
+    "QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION",
+    "QWEN_QUERY_ROLE",
+    "QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION",
+    "QwenEmbeddingPreflightError",
+    "QwenEmbeddingRequest",
+    "QwenEmbeddingResponse",
+    "QwenEmbeddingTransport",
+    "QwenEmbeddingTransportError",
+    "QwenSynchronousPreflightConfig",
+    "run_qwen_synchronous_preflight",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]

@@ -214,7 +214,18 @@ serialization, and direct candidate-neutral Evidence Assembly handoff. No
 GenerationProvider, benchmark production, or production-scale corpus run was
 performed.
 
-Current pending Codex task: **NONE**.
+The first Qwen3.7 Embedding Challenger synchronous-preflight seam is
+**IMPLEMENTED / OFFLINE-TESTED**. It fixes the challenger operating point to
+`qwen3.7-text-embedding`, 2048 dimensions, dense-only output, document/query
+roles, and no custom query instruction. It uses a Qwen-specific injected
+transport seam and writes only a locally validated Dense-compatible artifact
+with remote-provider provenance; it adds no HTTP endpoint, region, SDK, Batch
+path, full-corpus build, 70Q query-vector artifact, or production caller.
+Accepted BGE artifacts, BM25, RRF, Top-K, and Formal Deferred Assembly remain
+unchanged. An injected pass does not establish live Qwen capability: actual
+2048-dimensional provider support, returned-model/role availability, and all
+provider wire details remain **UNKNOWN** pending separately authorized live
+synchronous preflight.
 
 Production materialization attempt #1 is retained as a partial run: RU and
 lexical artifacts were generated, while Dense was not generated because of a
@@ -352,10 +363,19 @@ paid or full production run, Retrieval challenger, reranker, embedding change,
 Candidate Boundary adoption, budget change, Generation/provider change, query
 rewrite, RU redesign, agentic retrieval, GraphRAG, or RAGFlow migration.
 
-Current pending Codex task: **NONE**. The immediate next action, after
-checkpointing this completed adoption, is an evidence-driven decision on
-exactly one next work unit; no optimization layer is pre-authorized by this
-synchronization.
+Formal Deferred-Footprint-Charge production adoption is **CLOSED**. The Qwen
+challenger Plan is complete, and its provider-free synchronous-preflight seam
+and issued-attempt accounting repair are implemented/offline-tested; the repair
+actual review is **PASS**. This offline implementation work unit is complete
+and awaiting its repository checkpoint. No live Qwen provider/API call has
+occurred, and live provider/API capability, including the approved
+2048-dimensional operating point, remains **UNKNOWN**. No Qwen Batch,
+full-corpus build, 70Q query-vector artifact, or production Dense adoption is
+authorized or started. The immediate next action is the repository checkpoint
+for this completed offline work unit. Only after that checkpoint and under
+separate explicit authorization may one live Qwen synchronous-adapter/preflight
+work unit begin; any real provider call still requires separate explicit user
+authorization. No broader retrieval or optimization work is pre-authorized.
 
 ## Historical A1 Status
 
