@@ -85,6 +85,7 @@ from .production_materialization import (
     preflight_production_inputs,
 )
 from .qwen_embedding import (
+    DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION,
     QWEN_CORPUS_ROLE,
     QWEN_EMBEDDING_DIMENSION,
     QWEN_EMBEDDING_MODEL_ID,
@@ -92,6 +93,8 @@ from .qwen_embedding import (
     QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION,
     QWEN_QUERY_ROLE,
     QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION,
+    DashScopeQwenEmbeddingConfig,
+    DashScopeQwenEmbeddingTransport,
     QwenEmbeddingPreflightError,
     QwenEmbeddingRequest,
     QwenEmbeddingResponse,
@@ -165,6 +168,7 @@ __all__ = [
     "ProductionMaterializationError",
     "materialize_production",
     "preflight_production_inputs",
+    "DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION",
     "QWEN_CORPUS_ROLE",
     "QWEN_EMBEDDING_DIMENSION",
     "QWEN_EMBEDDING_MODEL_ID",
@@ -172,6 +176,8 @@ __all__ = [
     "QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION",
     "QWEN_QUERY_ROLE",
     "QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION",
+    "DashScopeQwenEmbeddingConfig",
+    "DashScopeQwenEmbeddingTransport",
     "QwenEmbeddingPreflightError",
     "QwenEmbeddingRequest",
     "QwenEmbeddingResponse",

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+from io import BytesIO
 import json
 import shutil
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 
 import numpy as np
 
@@ -16,6 +18,8 @@ from genshin_corpus.retrieval.qwen_embedding import (
     QWEN_EMBEDDING_DIMENSION,
     QWEN_EMBEDDING_MODEL_ID,
     QWEN_QUERY_ROLE,
+    DashScopeQwenEmbeddingConfig,
+    DashScopeQwenEmbeddingTransport,
     QwenEmbeddingPreflightError,
     QwenEmbeddingRequest,
     QwenEmbeddingResponse,
@@ -48,6 +52,40 @@ class _IssuanceObservingTransport:
     def embed(self, request: QwenEmbeddingRequest) -> QwenEmbeddingResponse:
         self.observed.append([json.loads(line) for line in self.ledger_path.read_text(encoding="utf-8").splitlines()])
         return self.responses[request.role]
+
+
+class _FakeHttpResponse:
+    def __init__(self, body: bytes, headers: dict[str, str] | None = None, *, status: int = 200) -> None:
+        self._body = body
+        self.headers = headers or {}
+        self.status = status
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeHttpResponse":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+
+class _FakeHttpOpener:
+    def __init__(self, outcomes: list[object], *, on_open=None) -> None:
+        self.outcomes = iter(outcomes)
+        self.on_open = on_open
+        self.requests = []
+        self.timeouts = []
+
+    def open(self, request, timeout):
+        self.requests.append(request)
+        self.timeouts.append(timeout)
+        if self.on_open is not None:
+            self.on_open()
+        outcome = next(self.outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
 
 
 class QwenEmbeddingPreflightTests(unittest.TestCase):
@@ -262,6 +300,249 @@ class QwenEmbeddingPreflightTests(unittest.TestCase):
             ])
         )
         self.assertEqual(result["status"], "failed")
+
+
+class DashScopeQwenEmbeddingTransportTests(unittest.TestCase):
+    endpoint = "https://workspace-a.cn-beijing.maas.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
+
+    def _config(self) -> DashScopeQwenEmbeddingConfig:
+        return DashScopeQwenEmbeddingConfig(region="cn-beijing", workspace="workspace-a", endpoint=self.endpoint)
+
+    @staticmethod
+    def _provider_response(
+        count: int,
+        *,
+        model: str | None = QWEN_EMBEDDING_MODEL_ID,
+        role: str | None = None,
+        status_code: int | str | None = 200,
+    ) -> bytes:
+        embeddings = []
+        for index in reversed(range(count)):
+            vector = [0.0] * QWEN_EMBEDDING_DIMENSION
+            vector[index] = float(index + 1)
+            embeddings.append({"text_index": index, "embedding": vector})
+        payload = {
+            "code": "",
+            "message": "",
+            "request_id": "body-request-id",
+            "output": {"embeddings": embeddings},
+        }
+        if status_code is not None:
+            payload["status_code"] = status_code
+        if model is not None:
+            payload["model"] = model
+        if role is not None:
+            payload["output"]["text_type"] = role
+        return canonical_json_bytes(payload)
+
+    @staticmethod
+    def _headers(request) -> dict[str, str]:
+        return {name.lower(): value for name, value in request.header_items()}
+
+    def test_document_and_query_wire_requests_preserve_fixed_operating_point(self) -> None:
+        opener = _FakeHttpOpener([
+            _FakeHttpResponse(self._provider_response(2, role="document")),
+            _FakeHttpResponse(self._provider_response(1, role="query")),
+        ])
+        transport = DashScopeQwenEmbeddingTransport(self._config(), "test-secret", opener=opener)
+        document = transport.embed(QwenEmbeddingRequest(role="document", texts=("文档一", "文档二")))
+        query = transport.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+        self.assertEqual(document.returned_model, QWEN_EMBEDDING_MODEL_ID)
+        self.assertEqual(document.returned_role, "document")
+        self.assertEqual(query.returned_role, "query")
+        self.assertEqual(document.provider_request_id, "body-request-id")
+        self.assertEqual(document.vectors[0][0], 1.0)
+        self.assertEqual(document.vectors[1][1], 2.0)
+        self.assertEqual(opener.timeouts, [30.0, 30.0])
+        for request, role, texts in zip(opener.requests, ("document", "query"), (("文档一", "文档二"), ("查询",))):
+            self.assertEqual(request.full_url, self.endpoint)
+            self.assertEqual(request.get_method(), "POST")
+            self.assertEqual(self._headers(request)["authorization"], "Bearer test-secret")
+            wire = json.loads(request.data.decode("utf-8"))
+            self.assertEqual(wire["model"], QWEN_EMBEDDING_MODEL_ID)
+            self.assertEqual(wire["input"]["texts"], list(texts))
+            self.assertEqual(wire["parameters"], {"text_type": role, "dimension": 2048, "output_type": "dense"})
+            self.assertNotIn("instruct", wire)
+            self.assertNotIn("instruction", wire)
+
+    def test_realistic_success_payload_with_empty_code_is_not_an_error(self) -> None:
+        body = self._provider_response(1, role="query")
+        transport = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(body)])
+        )
+        response = transport.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(response.provider_request_id, "body-request-id")
+        self.assertEqual(response.returned_model, QWEN_EMBEDDING_MODEL_ID)
+        self.assertEqual(response.raw_response_bytes, body)
+
+    def test_string_200_body_status_is_success_and_other_body_statuses_fail_closed(self) -> None:
+        string_success = DashScopeQwenEmbeddingTransport(
+            self._config(),
+            "test-secret",
+            opener=_FakeHttpOpener([_FakeHttpResponse(self._provider_response(1, role="query", status_code="200"))]),
+        ).embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(string_success.provider_request_id, "body-request-id")
+
+        omitted_success = DashScopeQwenEmbeddingTransport(
+            self._config(),
+            "test-secret",
+            opener=_FakeHttpOpener([_FakeHttpResponse(self._provider_response(1, role="query", status_code=None))]),
+        ).embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(omitted_success.provider_request_id, "body-request-id")
+
+        non_success_body = self._provider_response(1, role="query", status_code=201)
+        transport = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(non_success_body)])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "UnexpectedResponseStatus") as caught:
+            transport.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(caught.exception.status_code, 200)
+        self.assertEqual(caught.exception.provider_request_id, "body-request-id")
+        self.assertEqual(caught.exception.raw_response_bytes, non_success_body)
+
+    def test_non_200_transport_status_cannot_become_success(self) -> None:
+        body = self._provider_response(1, role="query", status_code=200)
+        transport = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(body, status=201)])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "UnexpectedHTTPStatus") as caught:
+            transport.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(caught.exception.status_code, 201)
+        self.assertEqual(caught.exception.provider_request_id, "body-request-id")
+        self.assertEqual(caught.exception.raw_response_bytes, body)
+
+    def test_secret_free_configuration_identity_and_environment_boundary(self) -> None:
+        secret = "test-secret"
+        config = self._config()
+        identity = config.identity_projection()
+        self.assertEqual(identity["region"], "cn-beijing")
+        self.assertEqual(identity["workspace"], "workspace-a")
+        self.assertEqual(identity["endpoint"], self.endpoint)
+        self.assertNotIn("api_key_env", identity)
+        self.assertNotIn(secret, json.dumps(identity))
+        transport = DashScopeQwenEmbeddingTransport.from_environment(
+            config,
+            environment={"DASHSCOPE_API_KEY": secret},
+            opener=_FakeHttpOpener([]),
+        )
+        self.assertNotIn(secret, json.dumps(transport.identity_projection()))
+        self.assertNotIn("DASHSCOPE_API_KEY", json.dumps(transport.identity_projection()))
+        with self.assertRaisesRegex(QwenEmbeddingPreflightError, "environment"):
+            DashScopeQwenEmbeddingTransport.from_environment(config, environment={}, opener=_FakeHttpOpener([]))
+
+    def test_endpoint_must_bind_configured_workspace_and_region_before_transport_creation(self) -> None:
+        path = "/api/v1/services/embeddings/text-embedding/text-embedding"
+        for endpoint, workspace, region in (
+            (f"https://other.cn-beijing.maas.aliyuncs.com{path}", "workspace-a", "cn-beijing"),
+            (f"https://workspace-a.cn-shanghai.maas.aliyuncs.com{path}", "workspace-a", "cn-beijing"),
+            (f"https://unrelated.example.com{path}", "workspace-a", "cn-beijing"),
+        ):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaisesRegex(QwenEmbeddingPreflightError, "workspace-region"):
+                    DashScopeQwenEmbeddingConfig(region=region, workspace=workspace, endpoint=endpoint)
+
+    def test_success_missing_or_wrong_model_follows_existing_response_contract(self) -> None:
+        missing_model = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(self._provider_response(1, model=None))])
+        ).embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertIsNone(missing_model.returned_model)
+
+        wrong_model = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(self._provider_response(1, model="other"))])
+        ).embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        with self.assertRaisesRegex(QwenEmbeddingPreflightError, "returned model"):
+            qwen_module._validate_response(wrong_model, QwenEmbeddingRequest(role="query", texts=("查询",)), ())
+
+    def test_http_provider_malformed_and_transport_errors_preserve_no_false_success(self) -> None:
+        http_body = canonical_json_bytes({"request_id": "error-id", "code": "Throttling"})
+        http_error = HTTPError(self.endpoint, 429, "throttled", {"x-acs-request-id": "header-id"}, BytesIO(http_body))
+        transport = DashScopeQwenEmbeddingTransport(self._config(), "test-secret", opener=_FakeHttpOpener([http_error]))
+        with self.assertRaises(QwenEmbeddingTransportError) as caught:
+            transport.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+        self.assertEqual(caught.exception.code, "Throttling")
+        self.assertEqual(caught.exception.status_code, 429)
+        self.assertEqual(caught.exception.provider_request_id, "error-id")
+        self.assertEqual(caught.exception.raw_response_bytes, http_body)
+
+        provider_error = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(canonical_json_bytes({"code": "InvalidParameter"}))])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "InvalidParameter"):
+            provider_error.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+        malformed = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([_FakeHttpResponse(canonical_json_bytes({"output": {}}))])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "MalformedResponse"):
+            malformed.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+        network = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([URLError("offline")])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "TransportConnectionError"):
+            network.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+        unexpected = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([RuntimeError("local HTTP failure")])
+        )
+        with self.assertRaisesRegex(RuntimeError, "local HTTP failure"):
+            unexpected.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+    def test_adapter_preserves_issued_attempt_accounting_and_redacts_secret(self) -> None:
+        root = Path("data/retrieval/.qwen-dashscope-transport-test")
+        if root.exists():
+            shutil.rmtree(root)
+        try:
+            (root / "ru/artifacts").mkdir(parents=True)
+            unit = QwenEmbeddingPreflightTests._unit("u0", "文档", 0)
+            units_body = gzip.compress(canonical_json_bytes(unit) + b"\n", mtime=0)
+            skip_body = gzip.compress(b"", mtime=0)
+            failure_body = canonical_json_bytes({"status": "clear", "failure_count": 0})
+            (root / "ru/artifacts/retrieval_units.jsonl.gz").write_bytes(units_body)
+            (root / "ru/artifacts/skip_ledger.jsonl.gz").write_bytes(skip_body)
+            (root / "ru/metadata").mkdir()
+            (root / "ru/metadata/failure_ledger.json").write_bytes(failure_body)
+            manifest = {
+                "schema_version": "phase04-retrieval-unit-build-0.1",
+                "status": "complete",
+                "build_identity": "dashscope-fixture-ru",
+                "canonical_input": {"canonical_run_id": "fixture", "canonical_input_identity": "fixture", "canonical_schema_version": "phase03-draft-0.1"},
+                "artifacts": {
+                    "retrieval_units": QwenEmbeddingPreflightTests._descriptor("artifacts/retrieval_units.jsonl.gz", units_body, 1),
+                    "skip_ledger": QwenEmbeddingPreflightTests._descriptor("artifacts/skip_ledger.jsonl.gz", skip_body, 0),
+                    "failure_ledger": QwenEmbeddingPreflightTests._descriptor("metadata/failure_ledger.json", failure_body),
+                },
+            }
+            (root / "ru/metadata/manifest.json").write_bytes(canonical_json_bytes(manifest))
+            observed = []
+
+            def observe_issuance() -> None:
+                ledger = root / "run/metadata/provider_attempts.jsonl"
+                observed.append([json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()])
+
+            opener = _FakeHttpOpener([
+                _FakeHttpResponse(self._provider_response(1, role="document")),
+                _FakeHttpResponse(self._provider_response(1, role="query")),
+            ], on_open=observe_issuance)
+            transport = DashScopeQwenEmbeddingTransport(self._config(), "test-secret", opener=opener)
+            result = run_qwen_synchronous_preflight(
+                QwenSynchronousPreflightConfig(root / "ru/metadata/manifest.json", ("u0",), "查询"),
+                root / "run",
+                transport,
+            )
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(observed[0][-1]["status"], "issued")
+            self.assertEqual(observed[1][-1]["status"], "issued")
+            ledger = [json.loads(line) for line in (root / "run/metadata/provider_attempts.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["status"] for row in ledger], ["succeeded", "succeeded"])
+            manifest_text = (root / "run/metadata/preflight_manifest.json").read_text(encoding="utf-8")
+            self.assertIn("dashscope", manifest_text)
+            self.assertNotIn("test-secret", manifest_text)
+            self.assertNotIn("DASHSCOPE_API_KEY", manifest_text)
+        finally:
+            if root.exists():
+                shutil.rmtree(root)
 
 
 if __name__ == "__main__":

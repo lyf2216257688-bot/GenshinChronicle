@@ -1,9 +1,9 @@
-"""Injected-only Qwen embedding challenger preflight support.
+"""Qwen embedding challenger preflight support and DashScope HTTP adapter.
 
-This module deliberately defines no HTTP endpoint, SDK, region, or Batch
-contract.  Its transport is a local test/preflight boundary: a later live
-adapter must separately prove how the provider maps these semantic requests to
-its documented wire interface.
+The Qwen semantic seam stays provider-neutral.  The DashScope adapter is a
+Qwen-only mapping of that fixed semantic request to the documented synchronous
+DashScope embeddings endpoint; it does not establish live capability, region
+availability, or the requested 2048-dimensional operating point.
 """
 
 from __future__ import annotations
@@ -14,9 +14,14 @@ from hashlib import sha256
 from io import BytesIO
 import gzip
 import json
+import math
+import os
 from pathlib import Path
 import re
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
@@ -32,6 +37,8 @@ QWEN_EMBEDDING_DIMENSION = 2048
 QWEN_EMBEDDING_OUTPUT = "dense"
 QWEN_CORPUS_ROLE = "document"
 QWEN_QUERY_ROLE = "query"
+DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION = "phase04-rag-qwen37-dashscope-sync-transport-0.1"
+_DASHSCOPE_TEXT_EMBEDDING_PATH = "/api/v1/services/embeddings/text-embedding/text-embedding"
 
 _SAFE_PROVIDER_CODE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SENSITIVE_KEY_PARTS = ("api_key", "authorization", "credential", "secret", "password")
@@ -112,6 +119,7 @@ class QwenEmbeddingTransportError(Exception):
         *,
         status_code: int | None = None,
         raw_response_bytes: bytes | None = None,
+        provider_request_id: str | None = None,
     ) -> None:
         if not isinstance(code, str) or not _SAFE_PROVIDER_CODE.fullmatch(code):
             raise QwenEmbeddingPreflightError("Qwen transport error code is invalid")
@@ -121,10 +129,15 @@ class QwenEmbeddingTransportError(Exception):
             raise QwenEmbeddingPreflightError("Qwen transport error status must be an HTTP status integer or null")
         if raw_response_bytes is not None and not isinstance(raw_response_bytes, bytes):
             raise QwenEmbeddingPreflightError("Qwen transport error raw response must be bytes or null")
+        if provider_request_id is not None and (
+            not isinstance(provider_request_id, str) or not provider_request_id
+        ):
+            raise QwenEmbeddingPreflightError("Qwen transport error provider request ID must be a non-empty string or null")
         super().__init__(code)
         self.code = code
         self.status_code = status_code
         self.raw_response_bytes = raw_response_bytes
+        self.provider_request_id = provider_request_id
 
 
 class QwenEmbeddingTransport(Protocol):
@@ -132,6 +145,294 @@ class QwenEmbeddingTransport(Protocol):
 
     def embed(self, request: QwenEmbeddingRequest) -> QwenEmbeddingResponse:
         """Return a normalized response or raise :class:`QwenEmbeddingTransportError`."""
+
+
+@dataclass(frozen=True)
+class DashScopeQwenEmbeddingConfig:
+    """Explicit non-secret configuration for the DashScope Qwen adapter."""
+
+    region: str
+    endpoint: str
+    workspace: str
+    timeout_seconds: float = 30.0
+    api_key_env: str = "DASHSCOPE_API_KEY"
+
+    def __post_init__(self) -> None:
+        for name in ("region", "workspace"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", value):
+                raise QwenEmbeddingPreflightError(f"DashScope {name} must be a non-empty safe identifier")
+        if not isinstance(self.api_key_env, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", self.api_key_env):
+            raise QwenEmbeddingPreflightError("DashScope API key environment name is invalid")
+        if (
+            not isinstance(self.timeout_seconds, (int, float))
+            or isinstance(self.timeout_seconds, bool)
+            or not math.isfinite(float(self.timeout_seconds))
+            or self.timeout_seconds <= 0
+        ):
+            raise QwenEmbeddingPreflightError("DashScope timeout must be a finite positive number")
+        _dashscope_embedding_endpoint(self.endpoint, workspace=self.workspace, region=self.region)
+
+    def identity_projection(self) -> dict[str, Any]:
+        """Return configuration safe to persist or bind into an artifact identity."""
+
+        return {
+            "provider": "dashscope",
+            "transport_contract_version": DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION,
+            "region": self.region,
+            "workspace": self.workspace,
+            "endpoint": _dashscope_embedding_endpoint(self.endpoint, workspace=self.workspace, region=self.region),
+        }
+
+    @property
+    def configuration_identity(self) -> str:
+        return sha256_json(self.identity_projection())
+
+
+class _RejectDashScopeRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects before urllib can resend an authorization header."""
+
+    def redirect_request(self, req: Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
+
+
+def _dashscope_embedding_endpoint(endpoint: str, *, workspace: str, region: str) -> str:
+    """Validate the configured workspace-region owner of a credential-bearing URL."""
+
+    if not isinstance(endpoint, str):
+        raise QwenEmbeddingPreflightError("DashScope endpoint must be an explicit HTTPS URL")
+    try:
+        parsed = urlsplit(endpoint)
+        port = parsed.port
+    except ValueError as exc:
+        raise QwenEmbeddingPreflightError("DashScope endpoint has an invalid port") from exc
+    expected_host = f"{workspace}.{region}.maas.aliyuncs.com".lower()
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.hostname.lower() != expected_host
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in {None, 443}
+        or parsed.query
+        or parsed.fragment
+        or parsed.path.rstrip("/") != _DASHSCOPE_TEXT_EMBEDDING_PATH
+    ):
+        raise QwenEmbeddingPreflightError(
+            "DashScope endpoint must be the configured workspace-region HTTPS synchronous text-embedding URL"
+        )
+    return urlunsplit(("https", parsed.netloc, _DASHSCOPE_TEXT_EMBEDDING_PATH, "", ""))
+
+
+def _dashscope_provider_request_id(headers: Any, payload: Mapping[str, Any]) -> str | None:
+    value = payload.get("request_id")
+    if isinstance(value, str) and value:
+        return value
+    if headers is not None:
+        for name in ("x-acs-request-id", "x-request-id"):
+            value = headers.get(name)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def _dashscope_provider_error_code(payload: Any) -> str | None:
+    if not isinstance(payload, Mapping) or "code" not in payload:
+        return None
+    value = payload.get("code")
+    if value == "":
+        return None
+    if isinstance(value, str) and _SAFE_PROVIDER_CODE.fullmatch(value):
+        return value
+    return "UnsafeProviderErrorCode"
+
+
+def _dashscope_body_status_is_success(payload: Mapping[str, Any]) -> bool:
+    """Accept only DashScope's documented numeric or string HTTP-200 mirror."""
+
+    if "status_code" not in payload:
+        return True
+    value = payload["status_code"]
+    return (type(value) is int and value == 200) or (isinstance(value, str) and value == "200")
+
+
+def _dashscope_response_status(response: Any) -> int | None:
+    value = getattr(response, "status", None)
+    if value is None:
+        getcode = getattr(response, "getcode", None)
+        value = getcode() if callable(getcode) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+class DashScopeQwenEmbeddingTransport:
+    """Qwen-specific synchronous DashScope transport using the existing semantic seam."""
+
+    def __init__(self, config: DashScopeQwenEmbeddingConfig, api_key: str, *, opener: Any | None = None) -> None:
+        if not isinstance(config, DashScopeQwenEmbeddingConfig):
+            raise QwenEmbeddingPreflightError("DashScope Qwen transport requires DashScopeQwenEmbeddingConfig")
+        self._config = config
+        self._endpoint = _dashscope_embedding_endpoint(
+            config.endpoint, workspace=config.workspace, region=config.region
+        )
+        if not isinstance(api_key, str) or not api_key:
+            raise QwenEmbeddingPreflightError("DashScope API key must be a non-empty environment value")
+        self._api_key = api_key
+        self._opener = opener or build_opener(_RejectDashScopeRedirectHandler())
+
+    @classmethod
+    def from_environment(
+        cls,
+        config: DashScopeQwenEmbeddingConfig,
+        *,
+        environment: Mapping[str, str] | None = None,
+        opener: Any | None = None,
+    ) -> "DashScopeQwenEmbeddingTransport":
+        """Validate all non-secret configuration before reading the runtime credential."""
+
+        _dashscope_embedding_endpoint(config.endpoint, workspace=config.workspace, region=config.region)
+        values = os.environ if environment is None else environment
+        api_key = values.get(config.api_key_env)
+        return cls(config, api_key if isinstance(api_key, str) else "", opener=opener)
+
+    @property
+    def endpoint(self) -> str:
+        return self._endpoint
+
+    def identity_projection(self) -> dict[str, Any]:
+        return {
+            **self._config.identity_projection(),
+            "configuration_identity": self._config.configuration_identity,
+        }
+
+    def _secret_values_for_persistence(self) -> tuple[str, ...]:
+        """Internal redaction input; never expose this through audit or identity APIs."""
+
+        return (self._api_key,)
+
+    @staticmethod
+    def wire_payload(request: QwenEmbeddingRequest) -> dict[str, Any]:
+        if not isinstance(request, QwenEmbeddingRequest):
+            raise QwenEmbeddingPreflightError("DashScope Qwen transport requires a Qwen embedding request")
+        return {
+            "model": request.model_id,
+            "input": {"texts": list(request.texts)},
+            "parameters": {
+                "text_type": request.role,
+                "dimension": request.dimension,
+                "output_type": request.output,
+            },
+        }
+
+    @staticmethod
+    def _response_from_bytes(
+        request: QwenEmbeddingRequest,
+        raw_response_bytes: bytes,
+        headers: Any,
+    ) -> QwenEmbeddingResponse:
+        try:
+            payload = json.loads(raw_response_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise QwenEmbeddingTransportError("MalformedResponse", raw_response_bytes=raw_response_bytes) from None
+        if not isinstance(payload, Mapping):
+            raise QwenEmbeddingTransportError("MalformedResponse", raw_response_bytes=raw_response_bytes)
+        request_id = _dashscope_provider_request_id(headers, payload)
+        if not _dashscope_body_status_is_success(payload):
+            raise QwenEmbeddingTransportError(
+                "UnexpectedResponseStatus",
+                status_code=200,
+                raw_response_bytes=raw_response_bytes,
+                provider_request_id=request_id,
+            )
+        provider_code = _dashscope_provider_error_code(payload)
+        if provider_code is not None:
+            raise QwenEmbeddingTransportError(
+                provider_code,
+                status_code=200,
+                raw_response_bytes=raw_response_bytes,
+                provider_request_id=request_id,
+            )
+        output = payload.get("output")
+        embeddings = output.get("embeddings") if isinstance(output, Mapping) else None
+        if not isinstance(embeddings, list) or len(embeddings) != len(request.texts):
+            raise QwenEmbeddingTransportError(
+                "MalformedResponse", raw_response_bytes=raw_response_bytes, provider_request_id=request_id
+            )
+        ordered: list[Sequence[float] | None] = [None] * len(request.texts)
+        for item in embeddings:
+            text_index = item.get("text_index") if isinstance(item, Mapping) else None
+            vector = item.get("embedding") if isinstance(item, Mapping) else None
+            if (
+                not isinstance(text_index, int)
+                or isinstance(text_index, bool)
+                or not 0 <= text_index < len(ordered)
+                or ordered[text_index] is not None
+                or not isinstance(vector, list)
+            ):
+                raise QwenEmbeddingTransportError(
+                    "MalformedResponse", raw_response_bytes=raw_response_bytes, provider_request_id=request_id
+                )
+            ordered[text_index] = vector
+        if any(vector is None for vector in ordered):
+            raise QwenEmbeddingTransportError(
+                "MalformedResponse", raw_response_bytes=raw_response_bytes, provider_request_id=request_id
+            )
+        returned_model = payload.get("model")
+        returned_role = output.get("text_type") if isinstance(output, Mapping) else None
+        return QwenEmbeddingResponse(
+            vectors=tuple(vector for vector in ordered if vector is not None),
+            raw_response_bytes=raw_response_bytes,
+            returned_model=returned_model if isinstance(returned_model, str) else None,
+            returned_role=returned_role if isinstance(returned_role, str) else None,
+            provider_request_id=request_id,
+        )
+
+    def embed(self, request: QwenEmbeddingRequest) -> QwenEmbeddingResponse:
+        body = canonical_json_bytes(self.wire_payload(request))
+        http_request = Request(
+            self._endpoint,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with self._opener.open(http_request, timeout=float(self._config.timeout_seconds)) as response:
+                raw_response_bytes = response.read()
+                headers = response.headers
+                response_status = _dashscope_response_status(response)
+        except HTTPError as error:
+            try:
+                raw_response_bytes = error.read()
+            finally:
+                error.close()
+            try:
+                payload = json.loads(raw_response_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            code = "RedirectRejected" if 300 <= error.code < 400 else _dashscope_provider_error_code(payload) or "DashScopeHTTPError"
+            raise QwenEmbeddingTransportError(
+                code,
+                status_code=error.code,
+                raw_response_bytes=raw_response_bytes,
+                provider_request_id=_dashscope_provider_request_id(error.headers, payload) if isinstance(payload, Mapping) else None,
+            ) from None
+        except URLError:
+            raise QwenEmbeddingTransportError("TransportConnectionError") from None
+        if response_status != 200:
+            try:
+                payload = json.loads(raw_response_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            raise QwenEmbeddingTransportError(
+                "UnexpectedHTTPStatus",
+                status_code=response_status,
+                raw_response_bytes=raw_response_bytes,
+                provider_request_id=_dashscope_provider_request_id(headers, payload) if isinstance(payload, Mapping) else None,
+            )
+        return self._response_from_bytes(request, raw_response_bytes, headers)
 
 
 @dataclass(frozen=True)
@@ -323,6 +624,22 @@ def _write_attempt_ledger(output_root: Path, attempts: Sequence[Mapping[str, Any
     return _artifact_descriptor(relative_path, body, len(attempts))
 
 
+def _dashscope_transport_provenance(transport: QwenEmbeddingTransport) -> dict[str, Any] | None:
+    """Expose safe configuration only for the concrete DashScope adapter."""
+
+    if isinstance(transport, DashScopeQwenEmbeddingTransport):
+        return transport.identity_projection()
+    return None
+
+
+def _transport_secret_values(transport: QwenEmbeddingTransport) -> tuple[str, ...]:
+    """Supply the concrete adapter credential only to local persistence redaction."""
+
+    if isinstance(transport, DashScopeQwenEmbeddingTransport):
+        return transport._secret_values_for_persistence()
+    return ()
+
+
 def _issue_and_resolve_attempt(
     output_root: Path,
     attempts: list[dict[str, Any]],
@@ -353,6 +670,17 @@ def _run_attempt(
         response = transport.embed(request)
     except QwenEmbeddingTransportError as exc:
         response_artifact: dict[str, Any] | None = None
+        if exc.provider_request_id is not None and any(secret in exc.provider_request_id for secret in secret_values):
+            return _AttemptResult(
+                role=request.role,
+                request=request,
+                vectors=None,
+                returned_model=None,
+                returned_role=None,
+                provider_request_id=None,
+                response_artifact=None,
+                error={"category": "response_evidence_rejected", "code": "UnsafeProviderRequestId"},
+            )
         if exc.raw_response_bytes is not None:
             try:
                 response_artifact = _persist_response(
@@ -372,6 +700,9 @@ def _run_attempt(
                     response_artifact=None,
                     error={"category": "response_evidence_rejected", "code": "UnsafeResponseEvidence"},
                 )
+        error: dict[str, Any] = {"category": "transport_error", "code": exc.code, "status_code": exc.status_code}
+        if exc.provider_request_id is not None:
+            error["provider_request_id"] = exc.provider_request_id
         return _AttemptResult(
             role=request.role,
             request=request,
@@ -380,7 +711,7 @@ def _run_attempt(
             returned_role=None,
             provider_request_id=None,
             response_artifact=response_artifact,
-            error={"category": "transport_error", "code": exc.code, "status_code": exc.status_code},
+            error=error,
         )
     if not isinstance(response, QwenEmbeddingResponse):
         return _AttemptResult(
@@ -449,8 +780,9 @@ def _preflight_identity(
     config: QwenSynchronousPreflightConfig,
     ru_manifest: Mapping[str, Any],
     units: Sequence[Mapping[str, Any]],
+    transport_provenance: Mapping[str, Any] | None = None,
 ) -> str:
-    return sha256_json({
+    value: dict[str, Any] = {
         "schema_version": QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION,
         "retrieval_unit_build_identity": ru_manifest["build_identity"],
         "documents": [
@@ -466,7 +798,10 @@ def _preflight_identity(
             "query_role": config.query_role,
             "custom_query_instruction": config.custom_query_instruction,
         },
-    })
+    }
+    if transport_provenance is not None:
+        value["transport"] = dict(transport_provenance)
+    return sha256_json(value)
 
 
 def _write_preflight_manifest(output_root: Path, value: Mapping[str, Any]) -> dict[str, Any]:
@@ -492,14 +827,15 @@ def run_qwen_synchronous_preflight(
 
     if not callable(getattr(transport, "embed", None)):
         raise QwenEmbeddingPreflightError("Qwen preflight transport lacks the injected embed method")
-    secrets = tuple(secret_values)
+    secrets = tuple(dict.fromkeys((*secret_values, *_transport_secret_values(transport))))
     if any(not isinstance(value, str) or not value for value in secrets):
         raise QwenEmbeddingPreflightError("Qwen preflight secret values must be non-empty strings")
     output_root = Path(output_root)
     if output_root.exists():
         raise FileExistsError("Qwen preflight output root already exists")
     ru_manifest, units = _select_document_units(config)
-    preflight_identity = _preflight_identity(config, ru_manifest, units)
+    transport_provenance = _dashscope_transport_provenance(transport)
+    preflight_identity = _preflight_identity(config, ru_manifest, units, transport_provenance)
     document_request = QwenEmbeddingRequest(
         role=QWEN_CORPUS_ROLE,
         texts=tuple(str(unit["retrieval_visible_text"]) for unit in units),
@@ -521,6 +857,8 @@ def run_qwen_synchronous_preflight(
             "provider_attempts": ledger,
             "failure": dict(document.error),
         }
+        if transport_provenance is not None:
+            result["transport"] = transport_provenance
         _write_preflight_manifest(output_root, result)
         return result
 
@@ -538,6 +876,8 @@ def run_qwen_synchronous_preflight(
             "document_response_artifact": dict(document.response_artifact or {}),
             "failure": dict(query.error),
         }
+        if transport_provenance is not None:
+            result["transport"] = transport_provenance
         _write_preflight_manifest(output_root, result)
         return result
 
@@ -564,6 +904,8 @@ def run_qwen_synchronous_preflight(
         "remote_model_weight_sha256": None,
         "weight_hash_status": "not_available_for_remote_provider",
     }
+    if transport_provenance is not None:
+        remote_provenance["transport"] = transport_provenance
     metadata = {
         "model_name": QWEN_EMBEDDING_MODEL_ID,
         "model_revision": document.returned_model,

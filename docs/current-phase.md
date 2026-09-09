@@ -214,18 +214,21 @@ serialization, and direct candidate-neutral Evidence Assembly handoff. No
 GenerationProvider, benchmark production, or production-scale corpus run was
 performed.
 
-The first Qwen3.7 Embedding Challenger synchronous-preflight seam is
-**IMPLEMENTED / OFFLINE-TESTED**. It fixes the challenger operating point to
+The first Qwen3.7 Embedding Challenger synchronous-preflight seam and its
+Qwen-specific DashScope synchronous transport adapter are **IMPLEMENTED /
+OFFLINE-TESTED**. They fix the challenger operating point to
 `qwen3.7-text-embedding`, 2048 dimensions, dense-only output, document/query
-roles, and no custom query instruction. It uses a Qwen-specific injected
-transport seam and writes only a locally validated Dense-compatible artifact
-with remote-provider provenance; it adds no HTTP endpoint, region, SDK, Batch
+roles, and no custom query instruction. The adapter maps those semantics to
+the configured DashScope synchronous embeddings URL with `text_type` and
+`output_type` in `parameters`; its region, workspace, and endpoint provenance
+is explicit and secret-free. It writes only a locally validated
+Dense-compatible artifact with remote-provider provenance; it adds no Batch
 path, full-corpus build, 70Q query-vector artifact, or production caller.
 Accepted BGE artifacts, BM25, RRF, Top-K, and Formal Deferred Assembly remain
-unchanged. An injected pass does not establish live Qwen capability: actual
-2048-dimensional provider support, returned-model/role availability, and all
-provider wire details remain **UNKNOWN** pending separately authorized live
-synchronous preflight.
+unchanged. Offline adapter tests do not establish live Qwen capability: actual
+region/workspace availability, 2048-dimensional provider support,
+returned-model/role availability, and live provider behavior remain
+**UNKNOWN** pending separately authorized live synchronous preflight.
 
 Production materialization attempt #1 is retained as a partial run: RU and
 lexical artifacts were generated, while Dense was not generated because of a
@@ -368,13 +371,20 @@ checkpoint `0284777 phase04: add qwen embedding challenger preflight seam` is
 complete, and the working tree was clean immediately afterward. The Qwen
 challenger Plan and its provider-free synchronous-preflight seam, including the
 issued-attempt accounting repair, are complete, offline-tested, and reviewed
-**PASS**. No live Qwen provider/API call has occurred, and live provider/API
-behavior, including the requested 2048-dimensional operating point, remains
-**UNKNOWN**. No Qwen Batch, full-corpus build, 70Q query-vector artifact, or
-production Dense adoption is authorized or started. The next work unit is the
-Qwen live synchronous transport/preflight step; any real provider/API call
-still requires separate explicit user authorization. No broader retrieval or
-optimization work is pre-authorized.
+**PASS**. The Qwen-specific DashScope synchronous transport adapter is now
+implemented/offline-tested. Its workspace-region credential-binding repair,
+empty-code success handling, and final transport/body response-status guard
+are each **ACTUAL-REVIEW PASS**. The Qwen DashScope offline adapter work unit
+is complete and ready for its repository checkpoint. No live provider/API call
+has occurred, and live DashScope behavior, actual region/workspace
+availability, and acceptance of the requested 2048-dimensional operating point
+remain **UNKNOWN**. No Qwen Batch, full-corpus build, 70Q query-vector
+artifact, or production Dense adoption is authorized or started. The sole
+immediate next action is the repository checkpoint for this completed offline
+adapter work unit. Only after that checkpoint may a separately authorized live
+synchronous preflight be considered; any real provider/API request still
+requires explicit user authorization. No broader retrieval or optimization work
+is pre-authorized.
 
 ## Historical A1 Status
 
