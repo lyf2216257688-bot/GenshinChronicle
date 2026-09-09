@@ -397,25 +397,39 @@ OFFLINE-TESTED / ACTUAL-REVIEW PASS**. Actual review passed issued-before-
 upload/create persistence, immediate `file_id`/`batch_id` persistence,
 same-batch resume, ambiguous-create no-replacement behavior, terminal-failure
 no-retry behavior, and completed output materialization. The pre-live evidence
-repair is **ACTUAL-REVIEW PASS**: injected/offline runs remain unverified; live
-Batch success and Batch-2048 verification can be recorded only after an
-explicit real Beijing lifecycle reaches the same persisted Batch as completed,
-downloads its output, and successfully validates/materializes one 2048-d
-result. Materialized-resume idempotence is **ACTUAL-REVIEW PASS**: a
-materialized lifecycle remains terminal and is not re-uploaded, recreated,
-re-downloaded, downgraded, or rewritten. No real Batch job has yet been
-created. Batch wire acceptance of `qwen3.7-text-embedding + 2048` remains
-**UNKNOWN** until the authorized one-document live Batch probe, and Batch
-document-vector compatibility with the already verified synchronous DashScope
-`text_type=document` result remains **UNKNOWN**. No full 535,802-RU Qwen
-embedding build, 70Q Qwen query-vector artifact, BGE-vs-Qwen full comparison,
-or production Dense switch has started. The sole immediate next action is the
-repository checkpoint of this reviewed lifecycle work unit. After that
-checkpoint, the already explicitly authorized one-document Beijing live Batch
-probe may be executed, limited to one Batch job containing one RU and not
-authorizing full-corpus work. Every real provider/Batch request remains subject
-to that bounded authorization; no broader retrieval or optimization work is
-pre-authorized.
+repair and materialized-resume idempotence are each **ACTUAL-REVIEW PASS**:
+injected/offline runs remain unverified; live success can be recorded only
+after the same persisted Batch is completed, its output is downloaded, and one
+2048-d result is successfully validated/materialized; a materialized lifecycle
+is not re-uploaded, recreated, re-downloaded, downgraded, or rewritten.
+
+Starting from clean checkpoint `0be68f6 phase04: add qwen batch lifecycle`,
+the authorized one-RU Beijing Qwen3.7 live Batch probe created exactly one
+Batch job. Upload succeeded with its `file_id` persisted; exactly one
+`batch_id` was persisted; that same Batch was retrieved as `completed`, with
+an `output_file_id` and no `error_file_id`; and the lifecycle reached
+`materialized`. Its `execution_mode` was `live_beijing_batch` and
+`provider_api_status` was `live_beijing_batch_succeeded`. Batch wire acceptance
+for `qwen3.7-text-embedding` at dimension 2048 is therefore **VERIFIED**. The
+materialized Dense artifact records `model_name=qwen3.7-text-embedding`,
+`embedding_dimension=2048`, `row_count=1`, `dtype=float32`, and
+`normalization=L2`.
+
+A provider-free local comparison for that exact RU against the earlier
+synchronous DashScope `text_type=document` vector measured cosine similarity
+`0.9794625188808831`, L2 distance `0.2026695906069485`, and maximum absolute
+difference `0.016112105920910835`. The Batch and synchronous document vectors
+are not numerically equivalent. This one-vector observation is neither a
+retrieval-quality failure nor success, establishes no compatibility threshold,
+and leaves actual challenger quality for the later provider-free retrieval
+benchmark.
+
+No full 535,802-RU Qwen Batch build has started, no 70Q Qwen query-vector
+artifact has been built, no BGE-vs-Qwen full retrieval comparison has run, and
+no production Dense adoption/switch has occurred. No further provider/API work
+is authorized by this probe. The sole immediate next action is repository
+checkpoint of this live Batch probe result/state; no broader retrieval or
+optimization work is pre-authorized.
 
 ## Historical A1 Status
 
