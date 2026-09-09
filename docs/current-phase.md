@@ -374,17 +374,20 @@ issued-attempt accounting repair, are complete, offline-tested, and reviewed
 **PASS**. The Qwen-specific DashScope synchronous transport adapter is now
 implemented/offline-tested. Its workspace-region credential-binding repair,
 empty-code success handling, and final transport/body response-status guard
-are each **ACTUAL-REVIEW PASS**. The Qwen DashScope offline adapter work unit
-is complete and ready for its repository checkpoint. No live provider/API call
-has occurred, and live DashScope behavior, actual region/workspace
-availability, and acceptance of the requested 2048-dimensional operating point
-remain **UNKNOWN**. No Qwen Batch, full-corpus build, 70Q query-vector
-artifact, or production Dense adoption is authorized or started. The sole
-immediate next action is the repository checkpoint for this completed offline
-adapter work unit. Only after that checkpoint may a separately authorized live
-synchronous preflight be considered; any real provider/API request still
-requires explicit user authorization. No broader retrieval or optimization work
-is pre-authorized.
+are each **ACTUAL-REVIEW PASS**. The generic execution-mode isolation repair
+and CLI outcome exit-status repair are **ACTUAL-REVIEW PASS**. The explicit
+Qwen DashScope live synchronous preflight runner is offline-tested and
+**ACTUAL-REVIEW PASS**; its work unit is complete and ready for the repository
+checkpoint. No real provider/API request has occurred. Live DashScope behavior,
+actual workspace/region availability, provider response behavior, and
+acceptance of the requested 2048-dimensional operating point remain
+**UNKNOWN**. No Qwen Batch work, full-corpus Qwen build, 70Q Qwen query-vector
+artifact, or production Dense adoption has started. The sole immediate next
+action is the repository checkpoint for this completed live-preflight runner
+work unit. Only after that checkpoint may a real live synchronous preflight be
+considered, and every real provider/API request still requires separate
+explicit user authorization. No broader retrieval or optimization work is
+pre-authorized.
 
 ## Historical A1 Status
 

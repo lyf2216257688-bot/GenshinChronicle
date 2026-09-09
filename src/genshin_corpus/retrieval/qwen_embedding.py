@@ -811,14 +811,27 @@ def _write_preflight_manifest(output_root: Path, value: Mapping[str, Any]) -> di
     return _artifact_descriptor(relative_path, body)
 
 
+def _provider_evidence_labels(execution_mode: str, outcome: str) -> tuple[str, str]:
+    """Return an explicit evidence mode and outcome-bound provider status."""
+
+    if execution_mode == "injected_offline":
+        return execution_mode, "unverified_injected_only"
+    if execution_mode == "live_dashscope":
+        if outcome not in {"failed", "partial", "succeeded"}:
+            raise QwenEmbeddingPreflightError("Qwen live evidence outcome is invalid")
+        return execution_mode, f"live_dashscope_{outcome}"
+    raise QwenEmbeddingPreflightError("Qwen preflight execution mode is invalid")
+
+
 def run_qwen_synchronous_preflight(
     config: QwenSynchronousPreflightConfig,
     output_root: Path,
     transport: QwenEmbeddingTransport,
     *,
     secret_values: Sequence[str] = (),
+    execution_mode: str = "injected_offline",
 ) -> dict[str, Any]:
-    """Run two injected semantic probes and write a local compatibility artifact.
+    """Run document/query semantic probes and write a local compatibility artifact.
 
     The successful result proves only this module's local request/response and
     storage contracts.  It does not prove an endpoint, region, SDK, Batch API,
@@ -827,6 +840,9 @@ def run_qwen_synchronous_preflight(
 
     if not callable(getattr(transport, "embed", None)):
         raise QwenEmbeddingPreflightError("Qwen preflight transport lacks the injected embed method")
+    if execution_mode == "live_dashscope" and not isinstance(transport, DashScopeQwenEmbeddingTransport):
+        raise QwenEmbeddingPreflightError("live DashScope evidence requires DashScopeQwenEmbeddingTransport")
+    _provider_evidence_labels(execution_mode, "failed")
     secrets = tuple(dict.fromkeys((*secret_values, *_transport_secret_values(transport))))
     if any(not isinstance(value, str) or not value for value in secrets):
         raise QwenEmbeddingPreflightError("Qwen preflight secret values must be non-empty strings")
@@ -848,12 +864,14 @@ def run_qwen_synchronous_preflight(
         output_root, attempts, transport, document_request, secret_values=secrets
     )
     if document.error is not None:
+        evidence_mode, provider_api_status = _provider_evidence_labels(execution_mode, "failed")
         result = {
             "schema_version": QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION,
             "status": "failed",
             "preflight_identity": preflight_identity,
             "retrieval_unit_build_identity": ru_manifest["build_identity"],
-            "provider_api_status": "unverified_injected_only",
+            "execution_mode": evidence_mode,
+            "provider_api_status": provider_api_status,
             "provider_attempts": ledger,
             "failure": dict(document.error),
         }
@@ -866,12 +884,14 @@ def run_qwen_synchronous_preflight(
         output_root, attempts, transport, query_request, secret_values=secrets
     )
     if query.error is not None:
+        evidence_mode, provider_api_status = _provider_evidence_labels(execution_mode, "partial")
         result = {
             "schema_version": QWEN_SYNCHRONOUS_PREFLIGHT_SCHEMA_VERSION,
             "status": "partial",
             "preflight_identity": preflight_identity,
             "retrieval_unit_build_identity": ru_manifest["build_identity"],
-            "provider_api_status": "unverified_injected_only",
+            "execution_mode": evidence_mode,
+            "provider_api_status": provider_api_status,
             "provider_attempts": ledger,
             "document_response_artifact": dict(document.response_artifact or {}),
             "failure": dict(query.error),
@@ -893,8 +913,13 @@ def run_qwen_synchronous_preflight(
     row_body = _gzip_jsonl(row_rows)
     remote_provenance = {
         "kind": "remote_provider",
-        "transport_contract_version": QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION,
-        "provider_api_status": "unverified_injected_only",
+        "transport_contract_version": (
+            DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION
+            if execution_mode == "live_dashscope"
+            else QWEN_INJECTED_TRANSPORT_CONTRACT_VERSION
+        ),
+        "execution_mode": execution_mode,
+        "provider_api_status": _provider_evidence_labels(execution_mode, "succeeded")[1],
         "requested_model": QWEN_EMBEDDING_MODEL_ID,
         "document_returned_model": document.returned_model,
         "query_returned_model": query.returned_model,
@@ -967,7 +992,8 @@ def run_qwen_synchronous_preflight(
         "status": "complete",
         "preflight_identity": preflight_identity,
         "retrieval_unit_build_identity": ru_manifest["build_identity"],
-        "provider_api_status": "unverified_injected_only",
+        "execution_mode": execution_mode,
+        "provider_api_status": _provider_evidence_labels(execution_mode, "succeeded")[1],
         "provider_attempts": ledger,
         "dense_manifest": _artifact_descriptor("dense/metadata/manifest.json", dense_manifest_body),
         "scoring_probe": _artifact_descriptor("metadata/scoring_probe.json", scoring_body),
@@ -975,3 +1001,31 @@ def run_qwen_synchronous_preflight(
     }
     _write_preflight_manifest(output_root, result)
     return result
+
+
+def run_qwen_dashscope_synchronous_preflight(
+    config: QwenSynchronousPreflightConfig,
+    output_root: Path,
+    dashscope_config: DashScopeQwenEmbeddingConfig,
+    *,
+    environment: Mapping[str, str] | None = None,
+    opener: Any | None = None,
+) -> dict[str, Any]:
+    """Run the explicit live DashScope preflight through the environment boundary.
+
+    ``environment`` and ``opener`` are injectable only for provider-free tests;
+    production callers use the process environment and the reviewed stdlib
+    transport.  The API key is never accepted as a function or CLI argument.
+    """
+
+    transport = DashScopeQwenEmbeddingTransport.from_environment(
+        dashscope_config,
+        environment=environment,
+        opener=opener,
+    )
+    return run_qwen_synchronous_preflight(
+        config,
+        output_root,
+        transport,
+        execution_mode="live_dashscope",
+    )

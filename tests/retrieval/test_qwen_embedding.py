@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 from io import BytesIO
+import io
 import json
 import shutil
 import unittest
@@ -25,9 +26,11 @@ from genshin_corpus.retrieval.qwen_embedding import (
     QwenEmbeddingResponse,
     QwenEmbeddingTransportError,
     QwenSynchronousPreflightConfig,
+    run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
 from genshin_corpus.retrieval import qwen_embedding as qwen_module
+from genshin_corpus.retrieval import __main__ as retrieval_cli
 
 
 class _FakeTransport:
@@ -300,6 +303,116 @@ class QwenEmbeddingPreflightTests(unittest.TestCase):
             ])
         )
         self.assertEqual(result["status"], "failed")
+
+    @staticmethod
+    def _dashscope_body(count: int, role: str) -> bytes:
+        embeddings = []
+        for index in range(count):
+            vector = [0.0] * QWEN_EMBEDDING_DIMENSION
+            vector[index] = float(index + 1)
+            embeddings.append({"text_index": index, "embedding": vector})
+        return canonical_json_bytes({
+            "code": "",
+            "request_id": f"live-{role}",
+            "model": QWEN_EMBEDDING_MODEL_ID,
+            "output": {"text_type": role, "embeddings": embeddings},
+        })
+
+    def _dashscope_config(self) -> DashScopeQwenEmbeddingConfig:
+        return DashScopeQwenEmbeddingConfig(
+            region="cn-beijing",
+            workspace="workspace-a",
+            endpoint="https://workspace-a.cn-beijing.maas.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding",
+        )
+
+    def test_live_dashscope_success_is_distinct_from_injected_evidence(self) -> None:
+        opener = _FakeHttpOpener([
+            _FakeHttpResponse(self._dashscope_body(2, "document")),
+            _FakeHttpResponse(self._dashscope_body(1, "query")),
+        ])
+        result = run_qwen_dashscope_synchronous_preflight(
+            self._config(),
+            self.root / "live-success",
+            self._dashscope_config(),
+            environment={"DASHSCOPE_API_KEY": "test-secret"},
+            opener=opener,
+        )
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["execution_mode"], "live_dashscope")
+        self.assertEqual(result["provider_api_status"], "live_dashscope_succeeded")
+        rows = [json.loads(line) for line in (self.root / "live-success/metadata/provider_attempts.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([row["status"] for row in rows], ["succeeded", "succeeded"])
+        manifest = json.loads((self.root / "live-success/metadata/preflight_manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["provider_api_status"], "live_dashscope_succeeded")
+        self.assertEqual(manifest["remote_provider_provenance"]["provider_api_status"], "live_dashscope_succeeded")
+        self.assertNotIn("test-secret", json.dumps(manifest))
+        self.assertEqual(len(opener.requests), 2)
+
+    def test_live_dashscope_document_failure_is_not_provider_success(self) -> None:
+        body = canonical_json_bytes({"code": "InvalidParameter", "request_id": "live-failure"})
+        result = run_qwen_dashscope_synchronous_preflight(
+            self._config(),
+            self.root / "live-failure",
+            self._dashscope_config(),
+            environment={"DASHSCOPE_API_KEY": "test-secret"},
+            opener=_FakeHttpOpener([HTTPError(self._dashscope_config().endpoint, 400, "bad", {}, BytesIO(body))]),
+        )
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["execution_mode"], "live_dashscope")
+        self.assertEqual(result["provider_api_status"], "live_dashscope_failed")
+        self.assertEqual(result["provider_attempts"]["row_count"], 1)
+        self.assertEqual(result["provider_attempts"]["path"], "metadata/provider_attempts.jsonl")
+        self.assertFalse((self.root / "live-failure/dense").exists())
+
+    def test_live_dashscope_query_failure_is_partial_and_keeps_raw_evidence(self) -> None:
+        query_body = canonical_json_bytes({"code": "Throttled", "request_id": "live-query-failure"})
+        result = run_qwen_dashscope_synchronous_preflight(
+            self._config(),
+            self.root / "live-partial",
+            self._dashscope_config(),
+            environment={"DASHSCOPE_API_KEY": "test-secret"},
+            opener=_FakeHttpOpener([
+                _FakeHttpResponse(self._dashscope_body(2, "document")),
+                HTTPError(self._dashscope_config().endpoint, 429, "throttled", {}, BytesIO(query_body)),
+            ]),
+        )
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["provider_api_status"], "live_dashscope_partial")
+        rows = [json.loads(line) for line in (self.root / "live-partial/metadata/provider_attempts.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([row["status"] for row in rows], ["succeeded", "failed"])
+        self.assertTrue((self.root / "live-partial/responses/query.response.json").is_file())
+        self.assertNotIn("test-secret", (self.root / "live-partial/metadata/preflight_manifest.json").read_text(encoding="utf-8"))
+
+    def test_generic_runner_with_dashscope_transport_preserves_injected_evidence(self) -> None:
+        transport = DashScopeQwenEmbeddingTransport(
+            self._dashscope_config(),
+            "test-secret",
+            opener=_FakeHttpOpener([
+                _FakeHttpResponse(self._dashscope_body(2, "document")),
+                _FakeHttpResponse(self._dashscope_body(1, "query")),
+            ]),
+        )
+        result = run_qwen_synchronous_preflight(self._config(), self.root / "generic-dashscope", transport)
+        self.assertEqual(result["execution_mode"], "injected_offline")
+        self.assertEqual(result["provider_api_status"], "unverified_injected_only")
+
+    def test_live_dashscope_cli_exit_status_matches_preflight_status(self) -> None:
+        args = [
+            "qwen-dashscope-preflight",
+            "--retrieval-unit-manifest", "ru.json",
+            "--document-unit-id", "u0",
+            "--query-text", "查询",
+            "--output-root", "out",
+            "--region", "cn-beijing",
+            "--workspace", "workspace-a",
+            "--endpoint", "https://workspace-a.cn-beijing.maas.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding",
+        ]
+        for status, expected in (("complete", 0), ("failed", 1), ("partial", 1)):
+            with self.subTest(status=status):
+                with patch.object(retrieval_cli, "run_qwen_dashscope_synchronous_preflight", return_value={"status": status}):
+                    with patch("sys.stdout", new_callable=io.StringIO) as output:
+                        self.assertEqual(retrieval_cli.main(args), expected)
+                self.assertIn('"status"', output.getvalue())
 
 
 class DashScopeQwenEmbeddingTransportTests(unittest.TestCase):

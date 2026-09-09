@@ -101,6 +101,7 @@ from .qwen_embedding import (
     QwenEmbeddingTransport,
     QwenEmbeddingTransportError,
     QwenSynchronousPreflightConfig,
+    run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
 
@@ -184,6 +185,7 @@ __all__ = [
     "QwenEmbeddingTransport",
     "QwenEmbeddingTransportError",
     "QwenSynchronousPreflightConfig",
+    "run_qwen_dashscope_synchronous_preflight",
     "run_qwen_synchronous_preflight",
     "resolve_benchmark_locations",
     "validate_benchmark",
