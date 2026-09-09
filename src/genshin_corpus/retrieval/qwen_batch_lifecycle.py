@@ -313,12 +313,16 @@ def _assert_bound_input(config: QwenBatchEmbeddingConfig, state: Mapping[str, An
     input_descriptor = state.get("input")
     if not isinstance(input_descriptor, Mapping):
         raise QwenBatchLifecycleError("Qwen Batch lifecycle state lacks its input descriptor")
-    expected_sha256 = sha256(_one_document_input(config)).hexdigest()
+    expected_sha256 = sha256(build_qwen_batch_jsonl(config)).hexdigest()
     if input_descriptor.get("sha256") != expected_sha256:
         raise QwenBatchLifecycleError("Qwen Batch resume input does not match the persisted one-document JSONL")
 
 
-def _live_success_evidence(output_root: Path, state: Mapping[str, Any]) -> dict[str, Any]:
+def _live_success_evidence(
+    config: QwenBatchEmbeddingConfig,
+    output_root: Path,
+    state: Mapping[str, Any],
+) -> dict[str, Any]:
     """Prove the local prerequisites before recording any live Batch success."""
 
     batch = state.get("batch")
@@ -344,7 +348,7 @@ def _live_success_evidence(output_root: Path, state: Mapping[str, Any]) -> dict[
         not isinstance(manifest, Mapping)
         or manifest.get("model_name") != QWEN_EMBEDDING_MODEL_ID
         or manifest.get("embedding_dimension") != QWEN_EMBEDDING_DIMENSION
-        or manifest.get("row_count") != 1
+        or manifest.get("row_count") != len(config.document_unit_ids)
         or manifest.get("dtype") != "float32"
         or manifest.get("normalization") != "L2"
     ):
@@ -353,12 +357,16 @@ def _live_success_evidence(output_root: Path, state: Mapping[str, Any]) -> dict[
     if not isinstance(provenance, Mapping):
         raise QwenBatchLifecycleError("live Batch materialization lacks remote-provider provenance")
     returned_models = provenance.get("document_returned_models")
-    if not isinstance(returned_models, list) or len(returned_models) != 1 or not isinstance(returned_models[0], Mapping):
+    if (
+        not isinstance(returned_models, list)
+        or len(returned_models) != len(config.document_unit_ids)
+        or any(not isinstance(item, Mapping) for item in returned_models)
+    ):
         raise QwenBatchLifecycleError("live Batch materialization lacks returned-model evidence")
-    value = returned_models[0].get("model")
-    if value is not None and not isinstance(value, str):
+    values = [item.get("model") for item in returned_models]
+    if any(value is not None and not isinstance(value, str) for value in values):
         raise QwenBatchLifecycleError("live Batch returned model identity is malformed")
-    returned_model: str | None = value
+    returned_model: str | None = values[0] if len(set(values)) == 1 else None
     return {
         "execution_mode": QWEN_BATCH_LIVE_EXECUTION_MODE,
         "provider_api_status": "live_beijing_batch_succeeded",
@@ -372,14 +380,15 @@ def _live_success_evidence(output_root: Path, state: Mapping[str, Any]) -> dict[
     }
 
 
-def submit_qwen_batch_probe(
+def submit_qwen_batch_lifecycle(
     config: QwenBatchEmbeddingConfig,
     output_root: Path,
     client: QwenBatchLifecycleClient,
     *,
     execution_mode: str = QWEN_BATCH_OFFLINE_EXECUTION_MODE,
+    lifecycle_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Persist then submit one Batch input; never automatically replace a job."""
+    """Persist then submit one already-selected Batch input; never replace a job."""
 
     output_root = Path(output_root)
     _validate_execution_mode(execution_mode, client)
@@ -389,23 +398,28 @@ def submit_qwen_batch_probe(
         _validate_state_execution_mode(state, execution_mode)
         batch = state.get("batch")
         if isinstance(batch, Mapping) and isinstance(batch.get("batch_id"), str):
-            return resume_qwen_batch_probe(config, output_root, client, execution_mode=execution_mode)
+            return resume_qwen_batch_lifecycle(config, output_root, client, execution_mode=execution_mode)
         raise QwenBatchLifecycleError("existing Qwen Batch lifecycle state forbids automatic replacement submission")
     if output_root.exists():
         raise FileExistsError("Qwen Batch lifecycle output root already exists")
 
-    input_body = _one_document_input(config)
+    if lifecycle_binding is not None and not isinstance(lifecycle_binding, Mapping):
+        raise QwenBatchLifecycleError("Qwen Batch lifecycle binding must be an object or null")
+    input_body = build_qwen_batch_jsonl(config)
     input_path = output_root / "artifacts" / "input.jsonl"
     atomic_write(input_path, input_body)
-    state = _write_state(output_root, {
+    initial_state: dict[str, Any] = {
         "schema_version": QWEN_BATCH_LIFECYCLE_SCHEMA_VERSION,
         "status": "upload_issued",
         "execution_mode": execution_mode,
         "probe_evidence": _initial_probe_evidence(execution_mode),
         "provider": BeijingQwenBatchConfig().identity_projection(),
-        "input": _artifact_descriptor("artifacts/input.jsonl", input_body, 1),
+        "input": _artifact_descriptor("artifacts/input.jsonl", input_body, len(config.document_unit_ids)),
         "upload": {"status": "issued", "purpose": "batch"},
-    }, secrets=secrets)
+    }
+    if lifecycle_binding is not None:
+        initial_state["lifecycle_binding"] = dict(lifecycle_binding)
+    state = _write_state(output_root, initial_state, secrets=secrets)
     try:
         file_id = _provider_id(client.upload_file(input_body, purpose="batch"), "file_id")
     except QwenBatchLifecycleTransportError as exc:
@@ -488,7 +502,7 @@ def _download_terminal_files(
     return state
 
 
-def resume_qwen_batch_probe(
+def resume_qwen_batch_lifecycle(
     config: QwenBatchEmbeddingConfig,
     output_root: Path,
     client: QwenBatchLifecycleClient,
@@ -535,5 +549,31 @@ def resume_qwen_batch_probe(
         return _write_state(output_root, _state_with(state, status="materialization_failed", materialization_error=type(exc).__name__), secrets=secrets)
     completed_state = _state_with(state, status="materialized", materialization=materialization)
     if execution_mode == QWEN_BATCH_LIVE_EXECUTION_MODE:
-        completed_state["probe_evidence"] = _live_success_evidence(output_root, completed_state)
+        completed_state["probe_evidence"] = _live_success_evidence(config, output_root, completed_state)
     return _write_state(output_root, completed_state, secrets=secrets)
+
+
+def submit_qwen_batch_probe(
+    config: QwenBatchEmbeddingConfig,
+    output_root: Path,
+    client: QwenBatchLifecycleClient,
+    *,
+    execution_mode: str = QWEN_BATCH_OFFLINE_EXECUTION_MODE,
+) -> dict[str, Any]:
+    """The reviewed one-document lifecycle entry point."""
+
+    _one_document_input(config)
+    return submit_qwen_batch_lifecycle(config, output_root, client, execution_mode=execution_mode)
+
+
+def resume_qwen_batch_probe(
+    config: QwenBatchEmbeddingConfig,
+    output_root: Path,
+    client: QwenBatchLifecycleClient,
+    *,
+    execution_mode: str = QWEN_BATCH_OFFLINE_EXECUTION_MODE,
+) -> dict[str, Any]:
+    """Resume the reviewed one-document lifecycle entry point."""
+
+    _one_document_input(config)
+    return resume_qwen_batch_lifecycle(config, output_root, client, execution_mode=execution_mode)

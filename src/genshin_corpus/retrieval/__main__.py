@@ -14,6 +14,7 @@ from .qwen_embedding import (
     QwenSynchronousPreflightConfig,
     run_qwen_dashscope_synchronous_preflight,
 )
+from .qwen_full_batch_runner import qwen_full_batch_dry_run
 
 
 def _qwen_dashscope_main(argv: list[str]) -> int:
@@ -43,12 +44,23 @@ def _qwen_dashscope_main(argv: list[str]) -> int:
     return 0 if result.get("status") == "complete" else 1
 
 
+def _qwen_full_batch_dry_run_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Report a Qwen full Batch run without provider access")
+    parser.add_argument("--packing-root", required=True, type=Path)
+    parser.add_argument("--run-root", type=Path)
+    args = parser.parse_args(argv)
+    print(canonical_json_bytes(qwen_full_batch_dry_run(args.packing_root, args.run_root)).decode("utf-8"))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import sys
 
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "qwen-dashscope-preflight":
         return _qwen_dashscope_main(argv[1:])
+    if argv and argv[0] == "qwen-full-batch-dry-run":
+        return _qwen_full_batch_dry_run_main(argv[1:])
     parser = argparse.ArgumentParser(description="Read-only profile of one accepted Canonical run")
     parser.add_argument("--manifest", required=True, type=Path, help="Canonical run metadata/manifest.json")
     parser.add_argument("--output", type=Path, help="Optional aggregate JSON output path; Canonical data is never written")

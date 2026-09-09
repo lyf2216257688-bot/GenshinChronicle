@@ -446,13 +446,27 @@ list-price proxy is CNY `16.84045275`–`67.361811`; CNY 50 cannot yet be
 confidently classified as sufficient or insufficient from this deliberately
 broad proxy alone.
 
-No full-corpus shard has been uploaded, no full-corpus Batch job has been
-created, no full Qwen Dense corpus embedding artifact or 70Q Qwen query-vector
-artifact exists, no BGE-vs-Qwen full retrieval comparison has run, and no
-production Dense adoption/switch has occurred. No further provider/API work is
-authorized. The sole immediate next action is repository checkpoint of this
-reviewed provider-free packing/sizing work unit; no broader retrieval or
-optimization work is pre-authorized.
+The full-corpus Qwen Batch runner is **IMPLEMENTED / OFFLINE-TESTED /
+ACTUAL-REVIEW PASS**, and its immutable prepared-packing binding repair is
+**ACTUAL-REVIEW PASS**. Before submit, resume, merge, or an existing-run
+dry-run, it revalidates the current packing against the prepared paid-run
+binding: packing-manifest SHA-256 and byte count; packing identity; Retrieval
+Unit build identity and count; mapping descriptor; and the complete ordered
+11-shard descriptor list (shard index, ID, path, request count, byte count, and
+SHA-256). Packing drift fails closed before any provider/client call and never
+automatically re-prepares. One independent lifecycle remains bound to each
+shard; existing batch IDs are resumed rather than recreated; ambiguous or
+terminal shard failure stops later work; materialized shards are preserved; and
+final merge remains gated on all 535,802 results plus the reviewed
+2048-dimensional, finite, float32/L2-normalized, deterministic-order checks.
+The provider-free dry-run is read-only. No full-corpus shard has been uploaded
+and no full-corpus Batch job has been created. The sole immediate next action
+is repository checkpoint of this reviewed full-Batch runner work unit. After
+that checkpoint, the explicit paid Beijing run authorization is limited to the
+existing 11 finalized shards, exactly 535,802 accepted Retrieval Units, model
+`qwen3.7-text-embedding`, and 2048-dimensional dense Batch embeddings; it does
+not include 70Q query-vector generation, a BGE-vs-Qwen retrieval benchmark,
+production Dense adoption/switch, or unrelated provider work.
 
 ## Historical A1 Status
 
