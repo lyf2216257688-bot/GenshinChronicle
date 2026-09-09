@@ -363,19 +363,18 @@ paid or full production run, Retrieval challenger, reranker, embedding change,
 Candidate Boundary adoption, budget change, Generation/provider change, query
 rewrite, RU redesign, agentic retrieval, GraphRAG, or RAGFlow migration.
 
-Formal Deferred-Footprint-Charge production adoption is **CLOSED**. The Qwen
-challenger Plan is complete, and its provider-free synchronous-preflight seam
-and issued-attempt accounting repair are implemented/offline-tested; the repair
-actual review is **PASS**. This offline implementation work unit is complete
-and awaiting its repository checkpoint. No live Qwen provider/API call has
-occurred, and live provider/API capability, including the approved
-2048-dimensional operating point, remains **UNKNOWN**. No Qwen Batch,
-full-corpus build, 70Q query-vector artifact, or production Dense adoption is
-authorized or started. The immediate next action is the repository checkpoint
-for this completed offline work unit. Only after that checkpoint and under
-separate explicit authorization may one live Qwen synchronous-adapter/preflight
-work unit begin; any real provider call still requires separate explicit user
-authorization. No broader retrieval or optimization work is pre-authorized.
+Formal Deferred-Footprint-Charge production adoption is **CLOSED**. Repository
+checkpoint `0284777 phase04: add qwen embedding challenger preflight seam` is
+complete, and the working tree was clean immediately afterward. The Qwen
+challenger Plan and its provider-free synchronous-preflight seam, including the
+issued-attempt accounting repair, are complete, offline-tested, and reviewed
+**PASS**. No live Qwen provider/API call has occurred, and live provider/API
+behavior, including the requested 2048-dimensional operating point, remains
+**UNKNOWN**. No Qwen Batch, full-corpus build, 70Q query-vector artifact, or
+production Dense adoption is authorized or started. The next work unit is the
+Qwen live synchronous transport/preflight step; any real provider/API call
+still requires separate explicit user authorization. No broader retrieval or
+optimization work is pre-authorized.
 
 ## Historical A1 Status
 
