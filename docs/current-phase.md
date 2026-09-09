@@ -375,19 +375,26 @@ issued-attempt accounting repair, are complete, offline-tested, and reviewed
 implemented/offline-tested. Its workspace-region credential-binding repair,
 empty-code success handling, and final transport/body response-status guard
 are each **ACTUAL-REVIEW PASS**. The generic execution-mode isolation repair
-and CLI outcome exit-status repair are **ACTUAL-REVIEW PASS**. The explicit
-Qwen DashScope live synchronous preflight runner is offline-tested and
-**ACTUAL-REVIEW PASS**; its work unit is complete and ready for the repository
-checkpoint. No real provider/API request has occurred. Live DashScope behavior,
-actual workspace/region availability, provider response behavior, and
-acceptance of the requested 2048-dimensional operating point remain
-**UNKNOWN**. No Qwen Batch work, full-corpus Qwen build, 70Q Qwen query-vector
-artifact, or production Dense adoption has started. The sole immediate next
-action is the repository checkpoint for this completed live-preflight runner
-work unit. Only after that checkpoint may a real live synchronous preflight be
-considered, and every real provider/API request still requires separate
-explicit user authorization. No broader retrieval or optimization work is
-pre-authorized.
+and CLI outcome exit-status repair are **ACTUAL-REVIEW PASS**. Repository
+checkpoint `48a397b phase04: add qwen live preflight runner` was the clean
+starting point. The explicitly authorized Beijing Qwen3.7 live synchronous
+preflight completed successfully in `.local/p04-qwen-live-preflight-beijing-20260909-131758`:
+`execution_mode=live_dashscope`, `provider_api_status=live_dashscope_succeeded`,
+and both logical attempts, `document` then `query`, succeeded. The requested
+model was `qwen3.7-text-embedding`; the configured Beijing region/workspace
+endpoint was usable with the existing local `DASHSCOPE_API_KEY`. The persisted
+Dense manifest records `model_name=qwen3.7-text-embedding`,
+`embedding_dimension=2048`, `row_count=1`, `dtype=float32`, and
+`normalization=L2`. Live Beijing provider availability and the requested
+2048-dimensional synchronous preflight are therefore no longer **UNKNOWN**.
+No Batch work has been executed or proven, no full 535,802-RU Qwen embedding
+build has started, no 70Q Qwen query-vector artifact has been built, no
+BGE-vs-Qwen full quality comparison has been run, and no production Dense
+adoption or switch has occurred. The sole immediate next action is the
+repository checkpoint of this live-preflight result/state only. No further
+provider/API work is authorized by this successful preflight; every real
+provider/API request remains separately subject to explicit user
+authorization. No broader retrieval or optimization work is pre-authorized.
 
 ## Historical A1 Status
 
