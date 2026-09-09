@@ -93,23 +93,49 @@ def qwen_batch_custom_id(retrieval_unit_build_identity: str, unit: Mapping[str, 
     return f"qwen37-document-{identity}"
 
 
+def qwen_batch_record_for_unit(
+    *,
+    retrieval_unit_build_identity: str,
+    unit: Mapping[str, Any],
+    model_id: str = QWEN_EMBEDDING_MODEL_ID,
+    dimension: int = QWEN_EMBEDDING_DIMENSION,
+    encoding_format: str = QWEN_BATCH_ENCODING_FORMAT,
+) -> dict[str, Any]:
+    """Build one reviewed Batch row without changing its RU-visible text."""
+
+    if model_id != QWEN_EMBEDDING_MODEL_ID or dimension != QWEN_EMBEDDING_DIMENSION:
+        raise QwenBatchEmbeddingError("Qwen Batch record requires the fixed qwen3.7 2048-dimensional operating point")
+    if encoding_format != QWEN_BATCH_ENCODING_FORMAT:
+        raise QwenBatchEmbeddingError("Qwen Batch record requires encoding_format=float")
+    text = unit.get("retrieval_visible_text")
+    if not isinstance(text, str) or not text:
+        raise QwenBatchEmbeddingError("Qwen Batch Retrieval Unit text is invalid")
+    return {
+        "custom_id": qwen_batch_custom_id(retrieval_unit_build_identity, unit),
+        "method": "POST",
+        "url": QWEN_BATCH_EMBEDDINGS_PATH,
+        "body": {
+            "model": model_id,
+            "input": text,
+            "encoding_format": encoding_format,
+            "dimensions": dimension,
+        },
+    }
+
+
 def build_qwen_batch_records(config: QwenBatchEmbeddingConfig) -> list[dict[str, Any]]:
     """Build deterministic OpenAI-compatible document embedding Batch records."""
 
     ru_manifest, units = _select_batch_document_units(config)
     build_identity = str(ru_manifest["build_identity"])
     return [
-        {
-            "custom_id": qwen_batch_custom_id(build_identity, unit),
-            "method": "POST",
-            "url": QWEN_BATCH_EMBEDDINGS_PATH,
-            "body": {
-                "model": config.model_id,
-                "input": str(unit["retrieval_visible_text"]),
-                "encoding_format": config.encoding_format,
-                "dimensions": config.dimension,
-            },
-        }
+        qwen_batch_record_for_unit(
+            retrieval_unit_build_identity=build_identity,
+            unit=unit,
+            model_id=config.model_id,
+            dimension=config.dimension,
+            encoding_format=config.encoding_format,
+        )
         for unit in units
     ]
 

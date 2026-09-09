@@ -424,11 +424,34 @@ retrieval-quality failure nor success, establishes no compatibility threshold,
 and leaves actual challenger quality for the later provider-free retrieval
 benchmark.
 
-No full 535,802-RU Qwen Batch build has started, no 70Q Qwen query-vector
-artifact has been built, no BGE-vs-Qwen full retrieval comparison has run, and
-no production Dense adoption/switch has occurred. No further provider/API work
-is authorized by this probe. The sole immediate next action is repository
-checkpoint of this live Batch probe result/state; no broader retrieval or
+The provider-free full-corpus Batch packing/sizing pass is **COMPLETE /
+OFFLINE-SELF-CHECKED / ACTUAL-REVIEW PASS** at
+`.local/p04-qwen-batch-packing-20260909`: all 535,802 accepted RUs are
+represented exactly once in deterministic order across 11 JSONL shards. The
+first 10 shards contain 50,000 requests each; the final shard contains 35,802.
+Total JSONL bytes are `400923238`; largest shard bytes are `50059615`; expected
+535,802 x 2048 FP32 Dense storage is `4389289984` bytes. Actual review passed
+RU mapping completeness/uniqueness, shard row/count/byte/SHA accounting, and
+provider request/file/row limits. Mapping artifact SHA-256 and byte-count
+verification are included.
+
+The narrow `_pack_units` shard-descriptor off-by-one repair is
+**ACTUAL-REVIEW PASS**: physical shard path/index, returned descriptor, and RU
+mapping now share one shard index; corrected tests cover shard 0 and forced
+shard 0/1 transitions. The corrected read-only verifier passed the existing
+finalized packing manifest and physical shards without regenerating the
+535,802-RU artifact. Token/cost evidence remains heuristic/non-billing: the
+UTF-8-byte proxy token range is `67361811`–`269447244`, and the Beijing Batch
+list-price proxy is CNY `16.84045275`–`67.361811`; CNY 50 cannot yet be
+confidently classified as sufficient or insufficient from this deliberately
+broad proxy alone.
+
+No full-corpus shard has been uploaded, no full-corpus Batch job has been
+created, no full Qwen Dense corpus embedding artifact or 70Q Qwen query-vector
+artifact exists, no BGE-vs-Qwen full retrieval comparison has run, and no
+production Dense adoption/switch has occurred. No further provider/API work is
+authorized. The sole immediate next action is repository checkpoint of this
+reviewed provider-free packing/sizing work unit; no broader retrieval or
 optimization work is pre-authorized.
 
 ## Historical A1 Status

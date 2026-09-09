@@ -128,6 +128,18 @@ from .qwen_batch_lifecycle import (
     resume_qwen_batch_probe,
     submit_qwen_batch_probe,
 )
+from .qwen_batch_packing import (
+    QWEN_BATCH_MAX_FILE_BYTES,
+    QWEN_BATCH_MAX_REQUESTS_PER_FILE,
+    QWEN_BATCH_MAX_ROW_BYTES,
+    QWEN_BATCH_PACKING_SCHEMA_VERSION,
+    QwenBatchPackingConfig,
+    QwenBatchPackingError,
+    finalize_qwen_full_corpus_batch_packing,
+    pack_qwen_batch_units,
+    run_qwen_full_corpus_batch_packing,
+    verify_qwen_full_corpus_batch_packing,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -231,6 +243,16 @@ __all__ = [
     "QwenBatchLifecycleTransportError",
     "resume_qwen_batch_probe",
     "submit_qwen_batch_probe",
+    "QWEN_BATCH_MAX_FILE_BYTES",
+    "QWEN_BATCH_MAX_REQUESTS_PER_FILE",
+    "QWEN_BATCH_MAX_ROW_BYTES",
+    "QWEN_BATCH_PACKING_SCHEMA_VERSION",
+    "QwenBatchPackingConfig",
+    "QwenBatchPackingError",
+    "finalize_qwen_full_corpus_batch_packing",
+    "pack_qwen_batch_units",
+    "run_qwen_full_corpus_batch_packing",
+    "verify_qwen_full_corpus_batch_packing",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]
