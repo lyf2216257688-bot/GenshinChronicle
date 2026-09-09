@@ -3,6 +3,7 @@ import hashlib
 import json
 import shutil
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import numpy as np
@@ -18,7 +19,74 @@ from genshin_corpus.retrieval.qwen_batch_embedding import (
     build_qwen_batch_records,
     materialize_qwen_batch_results,
 )
+from genshin_corpus.retrieval.qwen_batch_lifecycle import (
+    QWEN_BATCH_LIVE_EXECUTION_MODE,
+    QWEN_BEIJING_BATCH_BASE_URL,
+    BeijingQwenBatchConfig,
+    DashScopeQwenBatchClient,
+    QwenBatchLifecycleError,
+    QwenBatchLifecycleTransportError,
+    resume_qwen_batch_probe,
+    submit_qwen_batch_probe,
+)
 from genshin_corpus.retrieval.qwen_embedding import QWEN_EMBEDDING_DIMENSION, QWEN_EMBEDDING_MODEL_ID
+
+
+class _FakeBatchLifecycleClient:
+    def __init__(self, *, create_error: QwenBatchLifecycleTransportError | None = None) -> None:
+        self.create_error = create_error
+        self.uploads: list[tuple[bytes, str]] = []
+        self.creates: list[dict[str, str]] = []
+        self.retrieves: list[str] = []
+        self.downloads: list[str] = []
+        self.retrieve_result: dict[str, object] = {"id": "batch-1", "status": "in_progress"}
+        self.files: dict[str, bytes] = {}
+
+    def _secret_values_for_persistence(self) -> tuple[str, ...]:
+        return ("test-secret",)
+
+    def upload_file(self, body: bytes, *, purpose: str) -> str:
+        self.uploads.append((body, purpose))
+        return "file-input-1"
+
+    def create_batch(self, *, input_file_id: str, endpoint: str, completion_window: str) -> str:
+        self.creates.append({"input_file_id": input_file_id, "endpoint": endpoint, "completion_window": completion_window})
+        if self.create_error is not None:
+            raise self.create_error
+        return "batch-1"
+
+    def retrieve_batch(self, batch_id: str) -> dict[str, object]:
+        self.retrieves.append(batch_id)
+        return self.retrieve_result
+
+    def download_file(self, file_id: str) -> bytes:
+        self.downloads.append(file_id)
+        return self.files[file_id]
+
+
+class _FakeBatchHttpResponse:
+    def __init__(self, body: bytes, *, status: int = 200) -> None:
+        self._body = body
+        self.status = status
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeBatchHttpResponse":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+
+class _FakeBatchHttpOpener:
+    def __init__(self, outcomes: list[_FakeBatchHttpResponse]) -> None:
+        self.outcomes = iter(outcomes)
+        self.requests = []
+
+    def open(self, request, timeout):
+        self.requests.append(request)
+        return next(self.outcomes)
 
 
 class QwenBatchEmbeddingTests(unittest.TestCase):
@@ -175,6 +243,186 @@ class QwenBatchEmbeddingTests(unittest.TestCase):
         with self.assertRaisesRegex(QwenBatchEmbeddingError, "2048"):
             QwenBatchEmbeddingConfig(self.config.retrieval_unit_manifest_path, self.config.document_unit_ids, dimension=1024)
         self.assertEqual(QWEN_BATCH_JSONL_SCHEMA_VERSION, "phase04-rag-qwen37-embedding-batch-jsonl-0.1")
+
+    def _one_document_config(self) -> QwenBatchEmbeddingConfig:
+        return QwenBatchEmbeddingConfig(self.config.retrieval_unit_manifest_path, ("u0",))
+
+    def test_lifecycle_persists_upload_and_batch_ids_before_returning_success(self) -> None:
+        client = _FakeBatchLifecycleClient()
+        root = self.root / "lifecycle-submit"
+        state = submit_qwen_batch_probe(self._one_document_config(), root, client)
+        self.assertEqual(state["status"], "created")
+        self.assertEqual(state["upload"]["file_id"], "file-input-1")
+        self.assertEqual(state["batch"]["batch_id"], "batch-1")
+        self.assertEqual(client.uploads[0][1], "batch")
+        self.assertEqual(client.creates, [{"input_file_id": "file-input-1", "endpoint": "/v1/embeddings", "completion_window": "24h"}])
+        state_text = (root / "metadata/lifecycle_state.json").read_text(encoding="utf-8")
+        self.assertNotIn("test-secret", state_text)
+        self.assertNotIn("DASHSCOPE_API_KEY", state_text)
+
+    def test_lifecycle_resume_retrieves_existing_batch_without_replacement(self) -> None:
+        client = _FakeBatchLifecycleClient()
+        root = self.root / "lifecycle-resume"
+        submit_qwen_batch_probe(self._one_document_config(), root, client)
+        client.retrieve_result = {"id": "batch-1", "status": "in_progress"}
+        state = submit_qwen_batch_probe(self._one_document_config(), root, client)
+        self.assertEqual(state["status"], "retrieved")
+        self.assertEqual(client.retrieves, ["batch-1"])
+        self.assertEqual(len(client.creates), 1)
+
+    def test_ambiguous_create_is_auditable_and_forbids_replacement(self) -> None:
+        client = _FakeBatchLifecycleClient(create_error=QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True))
+        root = self.root / "lifecycle-ambiguous"
+        state = submit_qwen_batch_probe(self._one_document_config(), root, client)
+        self.assertEqual(state["status"], "create_ambiguous")
+        self.assertEqual(state["batch"]["input_file_id"], "file-input-1")
+        with self.assertRaisesRegex(QwenBatchLifecycleError, "forbids automatic replacement"):
+            submit_qwen_batch_probe(self._one_document_config(), root, client)
+        self.assertEqual(len(client.creates), 1)
+
+    def test_terminal_batches_do_not_trigger_retry_or_replacement(self) -> None:
+        for provider_status in ("failed", "expired", "cancelled"):
+            with self.subTest(provider_status=provider_status):
+                client = _FakeBatchLifecycleClient()
+                root = self.root / f"lifecycle-{provider_status}"
+                submit_qwen_batch_probe(self._one_document_config(), root, client)
+                client.retrieve_result = {"id": "batch-1", "status": provider_status}
+                state = resume_qwen_batch_probe(self._one_document_config(), root, client)
+                self.assertEqual(state["status"], f"terminal_{provider_status}")
+                self.assertEqual(len(client.creates), 1)
+                self.assertEqual(client.downloads, [])
+
+    def test_completed_batch_downloads_output_and_error_then_materializes(self) -> None:
+        config = self._one_document_config()
+        client = _FakeBatchLifecycleClient()
+        root = self.root / "lifecycle-completed"
+        submit_qwen_batch_probe(config, root, client)
+        record = build_qwen_batch_records(config)[0]
+        client.retrieve_result = {
+            "id": "batch-1",
+            "status": "completed",
+            "output_file_id": "file-output-1",
+            "error_file_id": "file-error-1",
+        }
+        client.files = {
+            "file-output-1": canonical_json_bytes(self._success_row(record, 0)) + b"\n",
+            "file-error-1": canonical_json_bytes({"custom_id": record["custom_id"], "error": {"code": "NoErrorRows"}}) + b"\n",
+        }
+        state = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(state["status"], "materialized")
+        self.assertEqual(client.downloads, ["file-output-1", "file-error-1"])
+        self.assertEqual(state["batch"]["error_file_id"], "file-error-1")
+        self.assertTrue((root / "downloads/output.jsonl").is_file())
+        self.assertTrue((root / "downloads/error.jsonl").is_file())
+        manifest = json.loads((root / "materialized/dense/metadata/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["embedding_dimension"], 2048)
+        state_body = (root / "metadata/lifecycle_state.json").read_bytes()
+        manifest_body = (root / "materialized/dense/metadata/manifest.json").read_bytes()
+        resumed = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(resumed["status"], "materialized")
+        self.assertEqual(resumed["batch"]["batch_id"], "batch-1")
+        self.assertEqual(len(client.uploads), 1)
+        self.assertEqual(len(client.creates), 1)
+        self.assertEqual(client.downloads, ["file-output-1", "file-error-1"])
+        self.assertEqual((root / "metadata/lifecycle_state.json").read_bytes(), state_body)
+        self.assertEqual((root / "materialized/dense/metadata/manifest.json").read_bytes(), manifest_body)
+        self.assertEqual(state["probe_evidence"]["provider_api_status"], "unverified_batch_result_only")
+        self.assertEqual(state["probe_evidence"]["batch_2048_wire_acceptance"], "unknown")
+
+    def test_injected_concrete_dashscope_client_remains_offline_unverified(self) -> None:
+        config = self._one_document_config()
+        record = build_qwen_batch_records(config)[0]
+        output = canonical_json_bytes(self._success_row(record, 0)) + b"\n"
+        opener = _FakeBatchHttpOpener([
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+            _FakeBatchHttpResponse(output),
+        ])
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=opener
+        )
+        root = self.root / "concrete-offline"
+        with self.assertRaisesRegex(QwenBatchLifecycleError, "non-injected"):
+            submit_qwen_batch_probe(config, root, client, execution_mode=QWEN_BATCH_LIVE_EXECUTION_MODE)
+        self.assertEqual(opener.requests, [])
+        submit_qwen_batch_probe(config, root, client)
+        state = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(state["status"], "materialized")
+        self.assertEqual(state["probe_evidence"]["provider_api_status"], "unverified_batch_result_only")
+        self.assertEqual(state["probe_evidence"]["batch_2048_wire_acceptance"], "unknown")
+        self.assertEqual(len(opener.requests), 4)
+
+    def test_explicit_live_evidence_requires_completed_downloaded_valid_materialization(self) -> None:
+        config = self._one_document_config()
+        record = build_qwen_batch_records(config)[0]
+        output_row = self._success_row(record, 0)
+        del output_row["response"]["body"]["model"]
+        opener = _FakeBatchHttpOpener([
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes(output_row) + b"\n"),
+        ])
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=opener
+        )
+        root = self.root / "explicit-live-evidence"
+        # Unit-test the explicit live branch without treating the injected
+        # opener as real provider evidence in ordinary lifecycle tests.
+        with patch.object(client, "_live_evidence_eligible", True):
+            submit_qwen_batch_probe(config, root, client, execution_mode=QWEN_BATCH_LIVE_EXECUTION_MODE)
+            state = resume_qwen_batch_probe(config, root, client, execution_mode=QWEN_BATCH_LIVE_EXECUTION_MODE)
+        evidence = state["probe_evidence"]
+        self.assertEqual(evidence["provider_api_status"], "live_beijing_batch_succeeded")
+        self.assertEqual(evidence["batch_2048_wire_acceptance"], "verified")
+        self.assertEqual(evidence["requested_model_identity"], QWEN_EMBEDDING_MODEL_ID)
+        self.assertIsNone(evidence["returned_model_identity"])
+        self.assertEqual(evidence["validated_embedding_dimension"], 2048)
+
+    def test_non_successful_live_paths_never_record_verified_evidence(self) -> None:
+        config = self._one_document_config()
+        record = build_qwen_batch_records(config)[0]
+        cases = {
+            "failed": [
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "failed"})),
+            ],
+            "malformed": [
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"custom_id": record["custom_id"], "response": {"status_code": 200, "body": {"data": []}}}) + b"\n"),
+            ],
+            "partial": [
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+                _FakeBatchHttpResponse(canonical_json_bytes({"custom_id": record["custom_id"], "response": None, "error": {"code": "PartialFailure"}}) + b"\n"),
+            ],
+        }
+        for name, outcomes in cases.items():
+            with self.subTest(name=name):
+                client = DashScopeQwenBatchClient.from_environment(
+                    BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener(outcomes)
+                )
+                with patch.object(client, "_live_evidence_eligible", True):
+                    submit_qwen_batch_probe(config, self.root / f"live-{name}", client, execution_mode=QWEN_BATCH_LIVE_EXECUTION_MODE)
+                    state = resume_qwen_batch_probe(config, self.root / f"live-{name}", client, execution_mode=QWEN_BATCH_LIVE_EXECUTION_MODE)
+                self.assertNotEqual(state["probe_evidence"]["provider_api_status"], "live_beijing_batch_succeeded")
+                self.assertEqual(state["probe_evidence"]["batch_2048_wire_acceptance"], "unknown")
+
+    def test_beijing_origin_and_environment_boundary_are_fixed_and_secret_free(self) -> None:
+        with self.assertRaisesRegex(QwenBatchLifecycleError, "Beijing"):
+            BeijingQwenBatchConfig(base_url="https://cn-beijing.example.invalid/compatible-mode/v1")
+        with self.assertRaisesRegex(QwenBatchLifecycleError, "DASHSCOPE_API_KEY"):
+            BeijingQwenBatchConfig(api_key_env="OTHER_API_KEY")
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}
+        )
+        self.assertEqual(client.identity_projection()["base_url"], QWEN_BEIJING_BATCH_BASE_URL)
+        self.assertNotIn("test-secret", json.dumps(client.identity_projection()))
 
 
 if __name__ == "__main__":

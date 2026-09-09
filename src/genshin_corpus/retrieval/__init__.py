@@ -115,6 +115,19 @@ from .qwen_batch_embedding import (
     materialize_qwen_batch_results,
     qwen_batch_custom_id,
 )
+from .qwen_batch_lifecycle import (
+    QWEN_BATCH_LIVE_EXECUTION_MODE,
+    QWEN_BATCH_LIFECYCLE_SCHEMA_VERSION,
+    QWEN_BATCH_OFFLINE_EXECUTION_MODE,
+    QWEN_BEIJING_BATCH_BASE_URL,
+    BeijingQwenBatchConfig,
+    DashScopeQwenBatchClient,
+    QwenBatchLifecycleClient,
+    QwenBatchLifecycleError,
+    QwenBatchLifecycleTransportError,
+    resume_qwen_batch_probe,
+    submit_qwen_batch_probe,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -207,6 +220,17 @@ __all__ = [
     "build_qwen_batch_records",
     "materialize_qwen_batch_results",
     "qwen_batch_custom_id",
+    "QWEN_BATCH_LIFECYCLE_SCHEMA_VERSION",
+    "QWEN_BATCH_OFFLINE_EXECUTION_MODE",
+    "QWEN_BATCH_LIVE_EXECUTION_MODE",
+    "QWEN_BEIJING_BATCH_BASE_URL",
+    "BeijingQwenBatchConfig",
+    "DashScopeQwenBatchClient",
+    "QwenBatchLifecycleClient",
+    "QwenBatchLifecycleError",
+    "QwenBatchLifecycleTransportError",
+    "resume_qwen_batch_probe",
+    "submit_qwen_batch_probe",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]

@@ -1,8 +1,8 @@
 """Provider-free Qwen Batch JSONL construction and result materialization.
 
 This module deliberately has no upload, job, polling, download, credential,
-or network surface.  A later separately authorized lifecycle may supply its
-local Batch output to ``materialize_qwen_batch_results``.
+or network surface.  The separately scoped lifecycle runner supplies local
+Batch output to ``materialize_qwen_batch_results``.
 """
 
 from __future__ import annotations

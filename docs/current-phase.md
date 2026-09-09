@@ -391,20 +391,31 @@ The narrow provider-free Qwen Batch JSONL seam is **IMPLEMENTED /
 OFFLINE-TESTED / ACTUAL-REVIEW PASS**. Actual review passed exact
 `retrieval_visible_text` reuse, deterministic RU-bound `custom_id`, fixed
 requested 2048 dimensions, strict result-row association, and reuse of the
-existing Qwen Dense validation/materialization path. It builds and parses only
-local Batch JSONL files; no upload, Batch job creation, polling, download,
-network call, retry framework, full-corpus partitioning, or paid Batch
-execution has been implemented or executed. Batch wire acceptance of
-`qwen3.7-text-embedding + 2048` remains **UNKNOWN**, and Batch
+existing Qwen Dense validation/materialization path. The fixed-Beijing
+one-document Qwen Batch lifecycle adapter/runner is **IMPLEMENTED /
+OFFLINE-TESTED / ACTUAL-REVIEW PASS**. Actual review passed issued-before-
+upload/create persistence, immediate `file_id`/`batch_id` persistence,
+same-batch resume, ambiguous-create no-replacement behavior, terminal-failure
+no-retry behavior, and completed output materialization. The pre-live evidence
+repair is **ACTUAL-REVIEW PASS**: injected/offline runs remain unverified; live
+Batch success and Batch-2048 verification can be recorded only after an
+explicit real Beijing lifecycle reaches the same persisted Batch as completed,
+downloads its output, and successfully validates/materializes one 2048-d
+result. Materialized-resume idempotence is **ACTUAL-REVIEW PASS**: a
+materialized lifecycle remains terminal and is not re-uploaded, recreated,
+re-downloaded, downgraded, or rewritten. No real Batch job has yet been
+created. Batch wire acceptance of `qwen3.7-text-embedding + 2048` remains
+**UNKNOWN** until the authorized one-document live Batch probe, and Batch
 document-vector compatibility with the already verified synchronous DashScope
 `text_type=document` result remains **UNKNOWN**. No full 535,802-RU Qwen
 embedding build, 70Q Qwen query-vector artifact, BGE-vs-Qwen full comparison,
 or production Dense switch has started. The sole immediate next action is the
-repository checkpoint of this completed provider-free Batch seam. Only after
-that checkpoint may a separately scoped one-document live Batch
-lifecycle/probe work unit begin; every real provider/Batch request still
-requires separate explicit user authorization. No broader retrieval or
-optimization work is pre-authorized.
+repository checkpoint of this reviewed lifecycle work unit. After that
+checkpoint, the already explicitly authorized one-document Beijing live Batch
+probe may be executed, limited to one Batch job containing one RU and not
+authorizing full-corpus work. Every real provider/Batch request remains subject
+to that bounded authorization; no broader retrieval or optimization work is
+pre-authorized.
 
 ## Historical A1 Status
 
