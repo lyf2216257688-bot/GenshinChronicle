@@ -497,7 +497,56 @@ comparison. It must hold the same accepted 535,802-RU corpus, lexical/BM25
 arm (`k1=1.2`, `b=0.75`), RRF `k=60`, candidate Top20, Formal
 Deferred-Footprint-Charge, B0=`12000`, and per-block=`3000` fixed; only the
 Dense arm may change. No provider call, Generation, production Dense change,
-or comparison execution is authorized by this closure.
+or comparison execution was authorized by the Qwen query-vector closure alone.
+
+The first local BGE-vs-Qwen comparison root at
+`.local/p04-rag-bge-qwen-dense-comparison-70q-20260910-165920` remains
+preserved historical evidence, but technical-lead actual gate found a
+provenance-binding gap: its Qwen corpus rows mapping was checked only against
+the same supplied manifest descriptor, not a fixed accepted rows SHA-256. The
+corrected provider-free comparison is **COMPLETE** at
+`.local/p04-rag-bge-qwen-dense-comparison-70q-20260910-172843`, with run
+identity `f15ffb2c7f213e429cd962e53b34c2cc36c22278623377faa2e632586d8840f8`.
+The frozen BGE control gate accepted all Q001-Q070 records from supply run
+`fe0f40824fd5ef20b00c0668c5594ab0d8d9869e367551f5d4ba75a94ae82f1e` and
+validated all 210 external lexical/Dense/Hybrid candidate hashes, including
+70/70 exact deterministic frozen-window RRF reconstructions. BGE query
+encodings, BGE Dense reruns, and BM25 reruns were all 0. Qwen used only the
+accepted query artifact
+`a286fc34c643800cf5ba9d8071ce78be9938fa2f64507fa0ab828b71eeea3732`
+(vectors SHA-256
+`40eb1b2558aa8a7a44b98a09867a038ef4730670a75b3b14f1f161cda309a8bf`) and
+accepted 535,802-row corpus Dense arm
+`be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922`, RU build
+`49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998`, vectors
+SHA-256 `4d6337822459ede93f18d5384e37cbbbef4363b830a5e705d788864dc02dfb8a`,
+and rows SHA-256
+`54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701`.
+
+The fixed controls remained lexical/BM25 `k1=1.2`, `b=0.75`; RRF `k=60`;
+Top20; Formal Deferred-Footprint-Charge; B0=`12000`; and per-block=`3000`.
+There were 70 Qwen Dense computations and 70 Qwen RRF fusions, with 0 Provider
+and 0 Generation calls. Mechanically, BGE-versus-Qwen Dense Top20 differences
+total 895 BGE-only and 895 Qwen-only candidates; Hybrid Top20 differences total
+481 BGE-only and 481 Qwen-only candidates. All 70 Generation-visible Packet
+projections differ, with 911 BGE-only, 981 Qwen-only, and 1,466 shared visible
+unit occurrences. These are candidate/Packet membership and rank observations,
+not semantic improvement, answer-quality, or production-Dense-adoption
+evidence. The corrected run reproduced all 70 Q001-Q070
+`comparisons/Qxxx.json` artifacts byte-for-byte against the preserved first
+root, with exact aggregate mechanical values: Dense-only `895/895`,
+Hybrid-only `481/481`, and Packet evidence `911` BGE-only / `981` Qwen-only /
+`1466` shared. The new rows-SHA binding changes provenance/run identity only;
+it does not change any per-question mechanical result.
+
+The blinded Q001-Q070 Packet review preparation is
+`.local/p04-rag-bge-qwen-dense-comparison-70q-20260910-172843/review/blinded_packets.jsonl`;
+the deterministic separate unblinding map is
+`.local/p04-rag-bge-qwen-dense-comparison-70q-20260910-172843/review/unblinding.jsonl`.
+No Generation output or reviewer-facing BGE/Qwen label is included in the
+blinded records. Semantic review remains separate from this completed
+mechanical comparison; no Retrieval winner, Qwen quality advantage, or
+production Dense switch is established or authorized.
 
 ## Historical A1 Status
 
