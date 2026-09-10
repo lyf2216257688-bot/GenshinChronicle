@@ -104,6 +104,15 @@ from .qwen_embedding import (
     run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
+from .qwen_m2_query_vectors import (
+    QWEN_M2_QUERY_MAX_BATCH_SIZE,
+    QWEN_M2_QUERY_VECTOR_COUNT,
+    QWEN_M2_QUERY_VECTORS_SCHEMA_VERSION,
+    QwenM2QueryVectorConfig,
+    QwenM2QueryVectorsError,
+    load_qwen_m2_query_vectors,
+    materialize_qwen_m2_query_vectors,
+)
 from .qwen_batch_embedding import (
     QWEN_BATCH_EMBEDDINGS_PATH,
     QWEN_BATCH_ENCODING_FORMAT,
@@ -235,6 +244,13 @@ __all__ = [
     "QwenSynchronousPreflightConfig",
     "run_qwen_dashscope_synchronous_preflight",
     "run_qwen_synchronous_preflight",
+    "QWEN_M2_QUERY_MAX_BATCH_SIZE",
+    "QWEN_M2_QUERY_VECTOR_COUNT",
+    "QWEN_M2_QUERY_VECTORS_SCHEMA_VERSION",
+    "QwenM2QueryVectorConfig",
+    "QwenM2QueryVectorsError",
+    "load_qwen_m2_query_vectors",
+    "materialize_qwen_m2_query_vectors",
     "QWEN_BATCH_EMBEDDINGS_PATH",
     "QWEN_BATCH_ENCODING_FORMAT",
     "QWEN_BATCH_JSONL_SCHEMA_VERSION",
