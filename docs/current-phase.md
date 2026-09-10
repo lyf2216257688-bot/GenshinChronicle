@@ -446,21 +446,21 @@ list-price proxy is CNY `16.84045275`–`67.361811`; CNY 50 cannot yet be
 confidently classified as sufficient or insufficient from this deliberately
 broad proxy alone.
 
-The authorized Beijing Qwen3.7 full Batch execution is now complete for all
-11 existing shards: 11/11 jobs completed, 0 terminal failures, and 0 error
-files. Provider output files are ready for local download/materialization with
-an observed combined JSONL size of `23634784581` bytes (approximately 22.012
-GiB). Local full download has **NOT STARTED**, and the final full Qwen Dense
-artifact has **NOT BEEN MATERIALIZED**. The bounded streaming download,
-line-by-line validation/materialization, memmap merge, and interrupted-download
-recovery repair, including timeout, connection-reset, and Content-Length
-shortfall recovery, are **ACTUAL-REVIEW PASS**. The actual existing-run-root
-dry-run observed 11 existing `created` shards, 0 `not_submitted`, 0 failed,
-`new_batch_jobs_next_submit=0`, and `provider_api_calls=0`. Existing `batch_id`
-values remain the sole provider-job identities; no new or replacement Batch
-jobs are authorized. The sole immediate next action is repository checkpoint
-of this reviewed repair before executing the already-authorized download and
-materialization of the 11 existing outputs.
+Qwen3.7 full-corpus Dense is **MATERIALIZED / VERIFIED / ACTUAL-REVIEW PASS**:
+the live Beijing download/materialization completed with 11/11 shards
+materialized, 0 failed, 0 pending, and 0 new Batch jobs. The Dense artifact has
+535,802 rows, 2048 dimensions, `float32` dtype, and L2 normalization; its
+Retrieval Unit build identity is
+`49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998`, Qwen arm
+build identity is
+`be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922`, vectors
+SHA-256 is `4d6337822459ede93f18d5384e37cbbbef4363b830a5e705d788864dc02dfb8a`,
+rows SHA-256 is `54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701`,
+and Dense manifest SHA-256 is
+`6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5`. Shard
+provenance count is 11. The sole immediate next action is repository checkpoint
+of this completed work unit, followed by safe cleanup of redundant bulky
+shard-level artifacts before the provider-free 70Q BGE-vs-Qwen comparison.
 
 ## Historical A1 Status
 
