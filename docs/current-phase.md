@@ -446,21 +446,36 @@ list-price proxy is CNY `16.84045275`–`67.361811`; CNY 50 cannot yet be
 confidently classified as sufficient or insufficient from this deliberately
 broad proxy alone.
 
-Qwen3.7 full-corpus Dense is **MATERIALIZED / VERIFIED / ACTUAL-REVIEW PASS**:
-the live Beijing download/materialization completed with 11/11 shards
-materialized, 0 failed, 0 pending, and 0 new Batch jobs. The Dense artifact has
-535,802 rows, 2048 dimensions, `float32` dtype, and L2 normalization; its
-Retrieval Unit build identity is
+Qwen3.7 full-corpus Dense remains **MATERIALIZED / VERIFIED / ACTUAL-REVIEW
+PASS**: 11/11 shards materialized, 0 failed, 0 pending, and 0 new Batch jobs;
+`row_count=535802`, `embedding_dimension=2048`, `dtype=float32`, and
+`normalization=L2`. Retrieval Unit build identity is
 `49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998`, Qwen arm
 build identity is
 `be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922`, vectors
 SHA-256 is `4d6337822459ede93f18d5384e37cbbbef4363b830a5e705d788864dc02dfb8a`,
 rows SHA-256 is `54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701`,
 and Dense manifest SHA-256 is
-`6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5`. Shard
-provenance count is 11. The sole immediate next action is repository checkpoint
-of this completed work unit, followed by safe cleanup of redundant bulky
-shard-level artifacts before the provider-free 70Q BGE-vs-Qwen comparison.
+`6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5`; shard
+provenance count is 11. Redundant shard-level bulky cleanup is **COMPLETE**:
+`26.121 GiB` was reclaimed and the remaining Qwen full-run root is `4.677
+GiB`. Final vectors and rows SHA-256 were directly revalidated unchanged after
+cleanup. Shard lifecycle/audit metadata and per-shard Dense manifests were
+directly postchecked as preserved. Provider raw downloaded outputs and
+redundant per-shard Dense payloads were removed. For each shard,
+`artifacts/input.jsonl` was not in the cleanup delete targets, so delete-set
+semantics indicate it should remain; however, no independent post-cleanup
+per-shard re-enumeration/hash was performed, so physical retention is
+**PARTIAL / observed**, not direct PASS. No provider operation, new Batch job,
+source change, or test change occurred. After this docs checkpoint, the sole
+immediate next action is a read-only check of the exact local readiness of the
+Qwen 70Q query-vector artifact. If the required query vectors already exist
+and validate, proceed to the provider-free local BGE-vs-Qwen comparison. If
+new Qwen query-embedding provider calls are required, STOP for explicit user
+authorization; the previous full-corpus paid authorization does not cover
+those calls. The comparison must hold BM25 `k1=1.2/b=0.75`, RRF `k=60`,
+candidate Top20, Formal Deferred-Footprint-Charge, B0=`12000`, and
+per-block=`3000` fixed, changing only the Dense arm.
 
 ## Historical A1 Status
 
