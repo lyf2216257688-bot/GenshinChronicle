@@ -258,12 +258,18 @@ class DashScopeQwenBatchClient:
                     legacy_single_read = False
                     while True:
                         try:
-                            chunk = response.read(QWEN_BATCH_DOWNLOAD_CHUNK_BYTES)
+                            try:
+                                chunk = response.read(QWEN_BATCH_DOWNLOAD_CHUNK_BYTES)
+                            except (TimeoutError, ConnectionError) as exc:
+                                raise QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True) from exc
                         except TypeError:
                             # Older injected test doubles may only expose
                             # read() without a size argument.  The real
                             # urllib response always takes the bounded size.
-                            chunk = response.read()
+                            try:
+                                chunk = response.read()
+                            except (TimeoutError, ConnectionError) as exc:
+                                raise QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True) from exc
                             legacy_single_read = True
                         if not chunk:
                             break
@@ -287,7 +293,7 @@ class DashScopeQwenBatchClient:
         if byte_count <= 0:
             raise QwenBatchLifecycleTransportError("EmptyDownload", ambiguous=False)
         if expected_length is not None and byte_count != expected_length:
-            raise QwenBatchLifecycleTransportError("ContentLengthMismatch", ambiguous=False)
+            raise QwenBatchLifecycleTransportError("ContentLengthMismatch", ambiguous=True)
         try:
             os.replace(incomplete, output_path)
         except OSError as exc:
@@ -430,7 +436,7 @@ def _retryable_retrieve_error(code: Any) -> bool:
 def _retryable_download_error(code: Any) -> bool:
     """Only an interrupted provider read is safe to restart from byte zero."""
 
-    return code == "ConnectionError"
+    return code in {"ConnectionError", "ContentLengthMismatch"}
 
 
 def _initial_probe_evidence(execution_mode: str) -> dict[str, Any]:

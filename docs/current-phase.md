@@ -453,7 +453,8 @@ an observed combined JSONL size of `23634784581` bytes (approximately 22.012
 GiB). Local full download has **NOT STARTED**, and the final full Qwen Dense
 artifact has **NOT BEEN MATERIALIZED**. The bounded streaming download,
 line-by-line validation/materialization, memmap merge, and interrupted-download
-recovery repair are **ACTUAL-REVIEW PASS**. The actual existing-run-root
+recovery repair, including timeout, connection-reset, and Content-Length
+shortfall recovery, are **ACTUAL-REVIEW PASS**. The actual existing-run-root
 dry-run observed 11 existing `created` shards, 0 `not_submitted`, 0 failed,
 `new_batch_jobs_next_submit=0`, and `provider_api_calls=0`. Existing `batch_id`
 values remain the sole provider-job identities; no new or replacement Batch

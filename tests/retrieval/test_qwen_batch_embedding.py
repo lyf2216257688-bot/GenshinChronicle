@@ -92,18 +92,21 @@ class _FakeBatchHttpOpener:
 
 
 class _ChunkedBatchHttpResponse:
-    def __init__(self, body: bytes, *, chunk_size: int = 3, fail_after: int | None = None) -> None:
+    def __init__(self, body: bytes, *, chunk_size: int = 3, fail_after: int | None = None, read_failure: BaseException | None = None, content_length: int | None = None) -> None:
         self.body = body
         self.chunk_size = chunk_size
         self.fail_after = fail_after
+        self.read_failure = read_failure
         self.offset = 0
         self.read_sizes: list[int | None] = []
         self.status = 200
-        self.headers = {"Content-Length": str(len(body))}
+        self.headers = {"Content-Length": str(len(body) if content_length is None else content_length)}
 
     def read(self, size: int) -> bytes:
         self.read_sizes.append(size)
         if self.fail_after is not None and self.offset >= self.fail_after:
+            if self.read_failure is not None:
+                raise self.read_failure
             raise OSError("interrupted")
         end = min(self.offset + min(size, self.chunk_size), len(self.body))
         chunk = self.body[self.offset:end]
@@ -435,6 +438,72 @@ class QwenBatchEmbeddingTests(unittest.TestCase):
             interrupted_client.download_file_to_path("file-output-2", interrupted_path)
         self.assertFalse(interrupted_path.exists())
         self.assertTrue(interrupted_path.with_name(interrupted_path.name + ".incomplete").exists())
+
+    def test_concrete_adapter_classifies_timeout_and_connection_reset_as_retryable(self) -> None:
+        body = b'{"custom_id":"x"}\n'
+        for failure, name in ((TimeoutError("timed out"), "timeout"), (ConnectionResetError("reset"), "reset")):
+            with self.subTest(name=name):
+                response = _ChunkedBatchHttpResponse(body, chunk_size=2, fail_after=2, read_failure=failure)
+                client = DashScopeQwenBatchClient.from_environment(
+                    BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener([response])
+                )
+                path = self.root / f"{name}-output.jsonl"
+                with self.assertRaises(QwenBatchLifecycleTransportError) as raised:
+                    client.download_file_to_path("file-output-1", path)
+                self.assertEqual(raised.exception.code, "ConnectionError")
+                self.assertTrue(path.with_name(path.name + ".incomplete").exists())
+                self.assertFalse(path.exists())
+
+    def test_concrete_adapter_short_content_length_is_retryable(self) -> None:
+        body = b'{"custom_id":"x"}\n'
+        response = _ChunkedBatchHttpResponse(body, content_length=len(body) + 3)
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener([response])
+        )
+        path = self.root / "short-output.jsonl"
+        with self.assertRaises(QwenBatchLifecycleTransportError) as raised:
+            client.download_file_to_path("file-output-1", path)
+        self.assertEqual(raised.exception.code, "ContentLengthMismatch")
+        self.assertTrue(path.with_name(path.name + ".incomplete").exists())
+        self.assertFalse(path.exists())
+
+    def test_concrete_adapter_publish_failure_remains_blocked(self) -> None:
+        body = b'{"custom_id":"x"}\n'
+        response = _ChunkedBatchHttpResponse(body)
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener([response])
+        )
+        path = self.root / "publish-failure.jsonl"
+        with patch("genshin_corpus.retrieval.qwen_batch_lifecycle.os.replace", side_effect=OSError("disk")):
+            with self.assertRaises(QwenBatchLifecycleTransportError) as raised:
+                client.download_file_to_path("file-output-1", path)
+        self.assertEqual(raised.exception.code, "DownloadPublishError")
+        self.assertFalse(path.exists())
+
+    def test_concrete_adapter_resume_restarts_same_output_after_timeout(self) -> None:
+        config = self._one_document_config()
+        record = build_qwen_batch_records(config)[0]
+        output = canonical_json_bytes(self._success_row(record, 0)) + b"\n"
+        opener = _FakeBatchHttpOpener([
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "file-input-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1"})),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+            _ChunkedBatchHttpResponse(output, chunk_size=2, fail_after=2, read_failure=TimeoutError("timed out")),
+            _FakeBatchHttpResponse(canonical_json_bytes({"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"})),
+            _ChunkedBatchHttpResponse(output, chunk_size=2),
+        ])
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=opener
+        )
+        root = self.root / "adapter-resume"
+        submit_qwen_batch_probe(config, root, client)
+        first = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(first["status"], "output_download_retryable")
+        self.assertFalse((root / "downloads/output.jsonl").exists())
+        second = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(second["status"], "materialized")
+        self.assertEqual(second["batch"]["batch_id"], "batch-1")
+        self.assertEqual(len(opener.requests), 6)
 
     def test_interrupted_download_is_retryable_without_reissuing_batch(self) -> None:
         config = self._one_document_config()
