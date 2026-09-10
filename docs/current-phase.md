@@ -467,15 +467,37 @@ redundant per-shard Dense payloads were removed. For each shard,
 semantics indicate it should remain; however, no independent post-cleanup
 per-shard re-enumeration/hash was performed, so physical retention is
 **PARTIAL / observed**, not direct PASS. No provider operation, new Batch job,
-source change, or test change occurred. After this docs checkpoint, the sole
-immediate next action is a read-only check of the exact local readiness of the
-Qwen 70Q query-vector artifact. If the required query vectors already exist
-and validate, proceed to the provider-free local BGE-vs-Qwen comparison. If
-new Qwen query-embedding provider calls are required, STOP for explicit user
-authorization; the previous full-corpus paid authorization does not cover
-those calls. The comparison must hold BM25 `k1=1.2/b=0.75`, RRF `k=60`,
-candidate Top20, Formal Deferred-Footprint-Charge, B0=`12000`, and
-per-block=`3000` fixed, changing only the Dense arm.
+source change, or test change occurred. Qwen Q001-Q070 live query-vector
+materialization is **COMPLETE** at
+`.local/p04-qwen-m2-query-vectors-beijing-20260910-162427`. The fixed
+operating point was `qwen3.7-text-embedding`, `text_type=query`, dimension
+2048, dense-only, and no custom query instruction. It materialized all 70
+questions in exact Q001-Q070 order as a `70x2048` `float32` L2-normalized
+matrix through deterministic batches `20 + 20 + 20 + 10`: all four provider
+attempts succeeded, with no recovery, retry, or replacement run.
+
+The runtime input SHA-256 is
+`dab333ddfe3061758596cf4196443df274a2f065b8c9c36cbbfe5c52bebe380c`; the
+question mapping SHA-256 is
+`efedb55a73d3b5d54ab61ff737b25d07665aa6d16794ea77d534a1adb5febd5c`; run
+identity is `8a1bde72fa0bd3fcac797d5d90c78aa6ea8068b59bb27d9872651c24a29520a9`;
+artifact identity is
+`a286fc34c643800cf5ba9d8071ce78be9938fa2f64507fa0ab828b71eeea3732`; the
+provider-attempt ledger SHA-256 is
+`33980a1eb733f8c772bcf6e4969bb924d5f6989dcae4214cf881151505855ec8`; vectors
+SHA-256 is `40eb1b2558aa8a7a44b98a09867a038ef4730670a75b3b14f1f161cda309a8bf`;
+and question rows SHA-256 is
+`904abb8e88ee51c0494251775e44f93699913b8c6c2f23dc2a2dc8312c67af6b`. This
+proves query-vector materialization correctness and provenance only. It does
+not prove Qwen Dense is better than BGE and does not authorize production Dense
+adoption.
+
+The immediate next action is the provider-free local BGE-vs-Qwen 70Q
+comparison. It must hold the same accepted 535,802-RU corpus, lexical/BM25
+arm (`k1=1.2`, `b=0.75`), RRF `k=60`, candidate Top20, Formal
+Deferred-Footprint-Charge, B0=`12000`, and per-block=`3000` fixed; only the
+Dense arm may change. No provider call, Generation, production Dense change,
+or comparison execution is authorized by this closure.
 
 ## Historical A1 Status
 
