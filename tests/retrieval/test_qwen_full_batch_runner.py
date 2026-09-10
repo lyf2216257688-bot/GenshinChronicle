@@ -14,6 +14,7 @@ from genshin_corpus.retrieval.qwen_full_batch_runner import (
     QwenFullBatchRunnerError,
     merge_qwen_full_batch_results,
     prepare_qwen_full_batch_run,
+    qwen_full_batch_disk_preflight,
     qwen_full_batch_dry_run,
     resume_qwen_full_batch_run,
     submit_pending_qwen_full_batch_run,
@@ -163,6 +164,14 @@ class QwenFullBatchRunnerTests(unittest.TestCase):
         dry = qwen_full_batch_dry_run(self.packing_root, self.run_root)
         self.assertEqual(dry["new_batch_jobs_next_submit"], 11)
 
+    def test_disk_preflight_is_provider_free_and_reports_bounded_strategy(self):
+        report = qwen_full_batch_disk_preflight(self.packing_root, target_path=self.root, safety_margin_bytes=0)
+        self.assertEqual(report["provider_api_calls"], 0)
+        self.assertEqual(report["known_raw_provider_output_bytes"], 23_634_784_581)
+        self.assertEqual(report["expected_final_dense_bytes"], 11 * 2048 * 4)
+        self.assertEqual(report["estimated_working_space_bytes"], 23_634_784_581 + 2 * 11 * 2048 * 4)
+        self.assertIn(report["space_check"], {"pass", "fail", "unknown"})
+
     def test_changed_packing_identity_rejects_before_upload_or_create(self):
         prepare_qwen_full_batch_run(self.packing_root, self.run_root)
         self._rewrite_packing_manifest(lambda value: value.__setitem__("packing_identity", "coherently-replaced"))
@@ -214,6 +223,18 @@ class QwenFullBatchRunnerTests(unittest.TestCase):
             submit_pending_qwen_full_batch_run(self.packing_root, self.root / "ambiguous", client)
         self.assertEqual(len(client.creates), 2)
         self.assertEqual((self.root / "ambiguous/shards/shard-00002").exists(), False)
+
+    def test_transient_retrieve_failure_resumes_same_batch_without_submission(self):
+        client = self._prepare_submit()
+        state_path = self.run_root / "shards/shard-00000/metadata/lifecycle_state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["status"] = "retrieve_failed"
+        state["retrieve_error_code"] = "ConnectionError"
+        state_path.write_bytes(canonical_json_bytes(state))
+        client.retrieves.clear()
+        resume_qwen_full_batch_run(self.packing_root, self.run_root, client)
+        self.assertEqual(len(client.creates), 11)
+        self.assertEqual(client.retrieves[0], "batch-1")
 
     def test_completed_shards_merge_in_deterministic_ru_order_and_reject_bad_vectors(self):
         client = self._prepare_submit()

@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
+import io
 import json
 import math
 import os
@@ -29,6 +30,7 @@ from .qwen_batch_embedding import (
     QwenBatchEmbeddingError,
     build_qwen_batch_jsonl,
     materialize_qwen_batch_results,
+    materialize_qwen_batch_results_streaming,
 )
 from .qwen_embedding import QWEN_EMBEDDING_DIMENSION, QWEN_EMBEDDING_MODEL_ID, _artifact_descriptor, _contains_sensitive_value
 
@@ -37,6 +39,7 @@ QWEN_BEIJING_BATCH_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1
 QWEN_BATCH_LIFECYCLE_SCHEMA_VERSION = "phase04-rag-qwen37-batch-lifecycle-0.1"
 QWEN_BATCH_OFFLINE_EXECUTION_MODE = "injected_offline"
 QWEN_BATCH_LIVE_EXECUTION_MODE = "live_beijing_batch"
+QWEN_BATCH_DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 _SAFE_PROVIDER_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -98,6 +101,9 @@ class QwenBatchLifecycleClient(Protocol):
 
     def download_file(self, file_id: str) -> bytes:
         """Download one provider File content body."""
+
+    def download_file_to_path(self, file_id: str, output_path: Path) -> Mapping[str, Any]:
+        """Stream one provider File to an incomplete path, then publish it."""
 
 
 class _RejectRedirects(HTTPRedirectHandler):
@@ -213,6 +219,86 @@ class DashScopeQwenBatchClient:
         _provider_id(file_id, "file_id")
         return self._request("GET", f"/files/{file_id}/content")
 
+    def download_file_to_path(self, file_id: str, output_path: Path) -> Mapping[str, Any]:
+        """Stream file content in bounded chunks and publish only on completion."""
+
+        _provider_id(file_id, "file_id")
+        output_path = Path(output_path)
+        if output_path.exists():
+            raise QwenBatchLifecycleError("accepted Qwen Batch download already exists and cannot be overwritten")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        incomplete = output_path.with_name(output_path.name + ".incomplete")
+        try:
+            incomplete.unlink(missing_ok=True)
+        except OSError as exc:
+            raise QwenBatchLifecycleError("Qwen Batch incomplete download cannot be reset") from exc
+        request = Request(
+            f"{self._config.base_url}/files/{file_id}/content",
+            method="GET",
+            headers={"Authorization": f"Bearer {self._api_key}", "Accept": "application/jsonl"},
+        )
+        digest = sha256()
+        byte_count = 0
+        expected_length: int | None = None
+        try:
+            with self._opener.open(request, timeout=float(self._config.timeout_seconds)) as response:
+                status = getattr(response, "status", None)
+                if type(status) is not int or not 200 <= status < 300:
+                    raise QwenBatchLifecycleTransportError("UnexpectedHTTPStatus", ambiguous=False)
+                headers = getattr(response, "headers", None)
+                raw_length = headers.get("Content-Length") if headers is not None and hasattr(headers, "get") else None
+                if raw_length is not None:
+                    try:
+                        expected_length = int(raw_length)
+                    except (TypeError, ValueError):
+                        raise QwenBatchLifecycleTransportError("MalformedContentLength", ambiguous=False) from None
+                    if expected_length < 0:
+                        raise QwenBatchLifecycleTransportError("MalformedContentLength", ambiguous=False)
+                with incomplete.open("wb") as handle:
+                    legacy_single_read = False
+                    while True:
+                        try:
+                            chunk = response.read(QWEN_BATCH_DOWNLOAD_CHUNK_BYTES)
+                        except TypeError:
+                            # Older injected test doubles may only expose
+                            # read() without a size argument.  The real
+                            # urllib response always takes the bounded size.
+                            chunk = response.read()
+                            legacy_single_read = True
+                        if not chunk:
+                            break
+                        if not isinstance(chunk, bytes):
+                            raise QwenBatchLifecycleTransportError("MalformedDownloadChunk", ambiguous=False)
+                        handle.write(chunk)
+                        digest.update(chunk)
+                        byte_count += len(chunk)
+                        if legacy_single_read:
+                            break
+                    handle.flush()
+                    os.fsync(handle.fileno())
+        except QwenBatchLifecycleTransportError:
+            raise
+        except HTTPError:
+            raise QwenBatchLifecycleTransportError("HTTPError", ambiguous=False) from None
+        except URLError:
+            raise QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True) from None
+        except OSError:
+            raise QwenBatchLifecycleTransportError("DownloadWriteError", ambiguous=True) from None
+        if byte_count <= 0:
+            raise QwenBatchLifecycleTransportError("EmptyDownload", ambiguous=False)
+        if expected_length is not None and byte_count != expected_length:
+            raise QwenBatchLifecycleTransportError("ContentLengthMismatch", ambiguous=False)
+        try:
+            os.replace(incomplete, output_path)
+        except OSError as exc:
+            raise QwenBatchLifecycleTransportError("DownloadPublishError", ambiguous=True) from exc
+        return {
+            "path": str(output_path),
+            "byte_count": byte_count,
+            "sha256": digest.hexdigest(),
+            "provider_content_length": expected_length,
+        }
+
 
 def _provider_id(value: Any, label: str) -> str:
     if not isinstance(value, str) or not _SAFE_PROVIDER_ID.fullmatch(value):
@@ -255,22 +341,96 @@ def _read_state(output_root: Path, *, secrets: Sequence[str]) -> dict[str, Any]:
     return dict(value)
 
 
-def _safe_download(body: bytes, *, secrets: Sequence[str], label: str) -> bytes:
-    if not isinstance(body, bytes) or not body:
-        raise QwenBatchLifecycleError(f"Qwen Batch {label} download is empty or invalid")
+def _validate_download_jsonl(path: Path, *, secrets: Sequence[str], label: str) -> None:
+    row_count = 0
     try:
-        rows = [json.loads(line.decode("utf-8")) for line in body.splitlines() if line]
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise QwenBatchLifecycleError(f"Qwen Batch {label} download is not UTF-8 JSONL") from exc
-    if not rows or any(not isinstance(row, Mapping) or _contains_sensitive_value(row, tuple(secrets)) for row in rows):
-        raise QwenBatchLifecycleError(f"Qwen Batch {label} download is malformed or credential-like")
-    return body
+        with Path(path).open("rb") as handle:
+            for line in handle:
+                if not line:
+                    continue
+                try:
+                    value = json.loads(line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise QwenBatchLifecycleError(f"Qwen Batch {label} download is not UTF-8 JSONL") from exc
+                if not isinstance(value, Mapping) or _contains_sensitive_value(value, tuple(secrets)):
+                    raise QwenBatchLifecycleError(f"Qwen Batch {label} download is malformed or credential-like")
+                row_count += 1
+    except OSError as exc:
+        raise QwenBatchLifecycleError(f"Qwen Batch {label} download is unavailable") from exc
+    if row_count == 0:
+        raise QwenBatchLifecycleError(f"Qwen Batch {label} download is empty or invalid")
+
+
+def _stream_bytes_to_path(body: bytes, output_path: Path) -> dict[str, Any]:
+    """Compatibility path for injected fakes; real clients use streaming HTTP."""
+
+    if not isinstance(body, bytes) or not body:
+        raise QwenBatchLifecycleError("Qwen Batch download body is empty or invalid")
+    output_path = Path(output_path)
+    if output_path.exists():
+        raise QwenBatchLifecycleError("accepted Qwen Batch download already exists and cannot be overwritten")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    incomplete = output_path.with_name(output_path.name + ".incomplete")
+    digest = sha256()
+    byte_count = 0
+    try:
+        incomplete.unlink(missing_ok=True)
+        with incomplete.open("wb") as handle:
+            stream = io.BytesIO(body)
+            while True:
+                chunk = stream.read(QWEN_BATCH_DOWNLOAD_CHUNK_BYTES)
+                if not chunk:
+                    break
+                handle.write(chunk)
+                digest.update(chunk)
+                byte_count += len(chunk)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(incomplete, output_path)
+    except OSError as exc:
+        raise QwenBatchLifecycleError("Qwen Batch download could not be published") from exc
+    return {"path": str(output_path), "byte_count": byte_count, "sha256": digest.hexdigest(), "provider_content_length": None}
+
+
+def _download_file_to_path(client: QwenBatchLifecycleClient, file_id: str, output_path: Path) -> dict[str, Any]:
+    method = getattr(client, "download_file_to_path", None)
+    if callable(method):
+        result = method(file_id, output_path)
+        if not isinstance(result, Mapping):
+            raise QwenBatchLifecycleError("Qwen Batch streaming download descriptor is invalid")
+        return dict(result)
+    return _stream_bytes_to_path(client.download_file(file_id), output_path)
+
+
+def _local_download_descriptor(path: Path) -> dict[str, Any]:
+    digest = sha256()
+    byte_count = 0
+    try:
+        with Path(path).open("rb") as handle:
+            for chunk in iter(lambda: handle.read(QWEN_BATCH_DOWNLOAD_CHUNK_BYTES), b""):
+                digest.update(chunk)
+                byte_count += len(chunk)
+    except OSError as exc:
+        raise QwenBatchLifecycleError("Qwen Batch accepted download is unavailable") from exc
+    return {"path": str(path), "byte_count": byte_count, "sha256": digest.hexdigest(), "provider_content_length": None}
 
 
 def _state_with(state: Mapping[str, Any], **updates: Any) -> dict[str, Any]:
     result = dict(state)
     result.update(updates)
     return result
+
+
+def _retryable_retrieve_error(code: Any) -> bool:
+    """Only a connection interruption is safe to retry for read-only retrieve."""
+
+    return code == "ConnectionError"
+
+
+def _retryable_download_error(code: Any) -> bool:
+    """Only an interrupted provider read is safe to restart from byte zero."""
+
+    return code == "ConnectionError"
 
 
 def _initial_probe_evidence(execution_mode: str) -> dict[str, Any]:
@@ -481,23 +641,64 @@ def _download_terminal_files(
     downloads = dict(state.get("downloads") or {})
     for label, relative in (("output", "downloads/output.jsonl"), ("error", "downloads/error.jsonl")):
         file_id = batch.get(f"{label}_file_id")
-        if file_id is None or label in downloads:
+        if file_id is None:
             continue
+        existing = downloads.get(label)
+        if isinstance(existing, Mapping) and existing.get("status") == "succeeded":
+            accepted_path = output_root / relative
+            if accepted_path.exists():
+                _validate_download_jsonl(accepted_path, secrets=secrets, label=label)
+                continue
+            return _write_state(output_root, _state_with(
+                state,
+                status=f"{label}_download_failed",
+                downloads={**downloads, label: {"status": "failed", "file_id": file_id, "error_code": "AcceptedDownloadMissing"}},
+            ), secrets=secrets)
+        if isinstance(existing, Mapping) and existing.get("status") == "failed":
+            return state
+        if isinstance(existing, Mapping) and existing.get("status") == "retryable":
+            # A failed GET is read-only and the client publishes only after a
+            # complete transfer, so restarting from byte zero is safe when no
+            # accepted output exists.
+            pass
         issued = _write_state(output_root, _state_with(
             state,
             status=f"{label}_download_issued",
             downloads={**downloads, label: {"status": "issued", "file_id": file_id}},
         ), secrets=secrets)
         try:
-            body = _safe_download(client.download_file(file_id), secrets=secrets, label=label)
+            accepted_path = output_root / relative
+            if accepted_path.exists():
+                descriptor = _local_download_descriptor(accepted_path)
+                _validate_download_jsonl(accepted_path, secrets=secrets, label=label)
+            else:
+                descriptor = _download_file_to_path(client, file_id, accepted_path)
+                _validate_download_jsonl(accepted_path, secrets=secrets, label=label)
         except QwenBatchLifecycleTransportError as exc:
+            retryable = _retryable_download_error(exc.code)
             return _write_state(output_root, _state_with(
                 issued,
-                status=f"{label}_download_{'ambiguous' if exc.ambiguous else 'failed'}",
-                downloads={**downloads, label: {"status": "failed", "file_id": file_id, "error_code": exc.code}},
+                status=f"{label}_download_{'retryable' if retryable else 'failed'}",
+                downloads={**downloads, label: {"status": "retryable" if retryable else "failed", "file_id": file_id, "error_code": exc.code}},
             ), secrets=secrets)
-        atomic_write(output_root / relative, body)
-        downloads[label] = {"status": "succeeded", "file_id": file_id, "artifact": _artifact_descriptor(relative, body)}
+        except QwenBatchLifecycleError as exc:
+            return _write_state(output_root, _state_with(
+                issued,
+                status=f"{label}_download_failed",
+                downloads={**downloads, label: {"status": "failed", "file_id": file_id, "error_code": type(exc).__name__}},
+            ), secrets=secrets)
+        body_descriptor = {
+            "path": relative,
+            "byte_count": descriptor.get("byte_count"),
+            "sha256": descriptor.get("sha256"),
+        }
+        if not isinstance(body_descriptor["byte_count"], int) or not isinstance(body_descriptor["sha256"], str):
+            return _write_state(output_root, _state_with(
+                issued,
+                status=f"{label}_download_failed",
+                downloads={**downloads, label: {"status": "failed", "file_id": file_id, "error_code": "DownloadDigestMismatch"}},
+            ), secrets=secrets)
+        downloads[label] = {"status": "succeeded", "file_id": file_id, "artifact": body_descriptor}
         state = _write_state(output_root, _state_with(state, status="completed_downloaded", downloads=downloads), secrets=secrets)
     return state
 
@@ -523,29 +724,70 @@ def resume_qwen_batch_lifecycle(
     batch_id = _provider_id(batch["batch_id"], "batch_id")
     if state.get("status") == "materialized":
         return state
+    if isinstance(state.get("status"), str) and state["status"].startswith("terminal_"):
+        return state
+    persisted_status = state.get("status")
+    if (
+        persisted_status in {
+            "upload_failed",
+            "upload_ambiguous",
+            "create_failed",
+            "create_ambiguous",
+            "materialization_failed",
+            "completed_missing_output",
+            "output_download_failed",
+            "error_download_failed",
+            "output_download_ambiguous",
+            "error_download_ambiguous",
+        }
+        or (persisted_status == "retrieve_failed" and state.get("retrieve_error_code") != "ConnectionError")
+    ):
+        return state
+    materialized_root = output_root / "materialized"
+    materialization_path = materialized_root / "metadata" / "batch_materialization.json"
+    materialization_manifest_path = materialized_root / "dense" / "metadata" / "manifest.json"
+    if materialization_path.exists() and materialization_manifest_path.exists():
+        try:
+            materialization = json.loads(materialization_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise QwenBatchLifecycleError("Qwen Batch materialized state is malformed") from exc
+        if isinstance(materialization, Mapping) and materialization.get("status") == "complete":
+            completed_state = _state_with(state, status="materialized", materialization=dict(materialization))
+            if execution_mode == QWEN_BATCH_LIVE_EXECUTION_MODE:
+                completed_state["probe_evidence"] = _live_success_evidence(config, output_root, completed_state)
+            return _write_state(output_root, completed_state, secrets=secrets)
+    if (materialized_root / "metadata" / "materialization.incomplete").exists():
+        raise QwenBatchLifecycleError("Qwen Batch materialization remains incomplete")
     try:
         provider_batch = client.retrieve_batch(batch_id)
         snapshot = _batch_snapshot(batch_id, provider_batch)
     except QwenBatchLifecycleTransportError as exc:
-        return _write_state(output_root, _state_with(state, status="retrieve_failed", retrieve_error_code=exc.code), secrets=secrets)
-    state = _write_state(output_root, _state_with(state, status="retrieved", batch=snapshot), secrets=secrets)
+        status = "retrieve_retryable" if _retryable_retrieve_error(exc.code) else "retrieve_failed"
+        return _write_state(
+            output_root,
+            _state_with(state, status=status, retrieve_error_code=exc.code),
+            secrets=secrets,
+        )
+    # Reconcile the authoritative provider snapshot, including output_file_id,
+    # into a created local state before any download.  This is monotonic for
+    # non-terminal states and never creates a replacement job.
+    state = _write_state(output_root, _state_with(state, status="retrieved", batch={**dict(batch), **snapshot}), secrets=secrets)
     status = snapshot["provider_status"]
     if status in {"failed", "expired", "cancelled", "canceled"}:
         return _write_state(output_root, _state_with(state, status=f"terminal_{status}"), secrets=secrets)
     if status != "completed":
         return state
     state = _download_terminal_files(output_root, state, client, secrets=secrets)
-    if "output_file_id" not in snapshot:
+    if "output_file_id" not in state["batch"]:
         return _write_state(output_root, _state_with(state, status="completed_missing_output"), secrets=secrets)
     downloads = state.get("downloads")
     if not isinstance(downloads, Mapping) or not isinstance(downloads.get("output"), Mapping) or downloads["output"].get("status") != "succeeded":
         return state
-    materialized_root = output_root / "materialized"
     if materialized_root.exists():
-        return state
+        raise QwenBatchLifecycleError("Qwen Batch materialized output is incomplete")
     try:
-        materialization = materialize_qwen_batch_results(config, output_root / "downloads" / "output.jsonl", materialized_root)
-    except (FileExistsError, QwenBatchEmbeddingError) as exc:
+        materialization = materialize_qwen_batch_results_streaming(config, output_root / "downloads" / "output.jsonl", materialized_root)
+    except (FileExistsError, OSError, QwenBatchEmbeddingError) as exc:
         return _write_state(output_root, _state_with(state, status="materialization_failed", materialization_error=type(exc).__name__), secrets=secrets)
     completed_state = _state_with(state, status="materialized", materialization=materialization)
     if execution_mode == QWEN_BATCH_LIVE_EXECUTION_MODE:

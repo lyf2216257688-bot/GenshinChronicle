@@ -11,6 +11,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import gzip
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +33,7 @@ from .qwen_embedding import (
     _validate_response,
     _write_qwen_dense_artifact,
 )
+from .candidate_retrieval import DENSE_INDEX_SCHEMA_VERSION
 
 
 QWEN_BATCH_JSONL_SCHEMA_VERSION = "phase04-rag-qwen37-embedding-batch-jsonl-0.1"
@@ -305,3 +309,177 @@ def materialize_qwen_batch_results(
     materialization_body = canonical_json_bytes(materialization)
     atomic_write(output_root / "metadata" / "batch_materialization.json", materialization_body)
     return materialization
+
+
+def _file_descriptor(path: Path, *, artifact_path: str | None = None, row_count: int | None = None) -> dict[str, Any]:
+    digest = sha256()
+    byte_count = 0
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+            byte_count += len(chunk)
+    value: dict[str, Any] = {"path": artifact_path or str(path), "sha256": digest.hexdigest(), "byte_count": byte_count}
+    if row_count is not None:
+        value["row_count"] = row_count
+    return value
+
+
+def _write_gzip_rows_atomic(path: Path, units: Sequence[Mapping[str, Any]]) -> None:
+    """Write the rows sidecar incrementally and publish it only when complete."""
+
+    path = Path(path)
+    if path.exists():
+        raise FileExistsError("Qwen Batch rows artifact already exists and cannot be overwritten")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".incomplete", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as raw:
+            with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as rows_handle:
+                for index, unit in enumerate(units):
+                    rows_handle.write(canonical_json_bytes({"occurrence_index": index, "unit_id": str(unit["unit_id"])}) + b"\n")
+            raw.flush()
+            os.fsync(raw.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def materialize_qwen_batch_results_streaming(
+    config: QwenBatchEmbeddingConfig,
+    result_jsonl_path: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    """Materialize a large Batch result without retaining rows or vectors in RAM."""
+
+    import numpy as np
+
+    output_root = Path(output_root)
+    if output_root.exists():
+        manifest_path = output_root / "dense" / "metadata" / "manifest.json"
+        if manifest_path.exists():
+            raise FileExistsError("Qwen Batch output root already contains an accepted Dense artifact")
+        raise FileExistsError("Qwen Batch output root already contains an incomplete artifact")
+    ru_manifest, units = _select_batch_document_units(config)
+    records = build_qwen_batch_records(config)
+    if len(records) != len(units):
+        raise QwenBatchEmbeddingError("Qwen Batch request and Retrieval Unit counts differ")
+    expected = {record["custom_id"]: index for index, record in enumerate(records)}
+    if len(expected) != len(records):
+        raise QwenBatchEmbeddingError("Qwen Batch custom_id generation is not one-to-one with Retrieval Units")
+
+    output_root.mkdir(parents=True)
+    marker = output_root / "metadata" / "materialization.incomplete"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_bytes(b"streaming materialization incomplete\n")
+    vector_path = output_root / "dense" / "artifacts" / "vectors.f32.npy"
+    rows_path = output_root / "dense" / "artifacts" / "rows.jsonl.gz"
+    vector_path.parent.mkdir(parents=True, exist_ok=True)
+    vectors = np.lib.format.open_memmap(vector_path, mode="w+", dtype=np.float32, shape=(len(records), QWEN_EMBEDDING_DIMENSION))
+    seen: set[str] = set()
+    returned_models: list[str | None] = [None] * len(records)
+    try:
+        with Path(result_jsonl_path).open("rb") as source:
+            for line_number, line in enumerate(source, 1):
+                if not line.strip():
+                    raise QwenBatchEmbeddingError(f"Qwen Batch result row {line_number} is blank")
+                try:
+                    row = json.loads(line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise QwenBatchEmbeddingError(f"Qwen Batch result row {line_number} is not UTF-8 JSON") from exc
+                if not isinstance(row, Mapping) or _contains_sensitive_value(row, ()):
+                    raise QwenBatchEmbeddingError(f"Qwen Batch result row {line_number} is malformed or credential-like")
+                custom_id = row.get("custom_id")
+                if not isinstance(custom_id, str) or custom_id not in expected:
+                    raise QwenBatchEmbeddingError("Qwen Batch result contains an unknown custom_id")
+                if custom_id in seen:
+                    raise QwenBatchEmbeddingError("Qwen Batch result contains a duplicate custom_id")
+                index = expected[custom_id]
+                vector, returned_model = _result_vector(row, custom_id)
+                request = QwenEmbeddingRequest(role=QWEN_CORPUS_ROLE, texts=(str(units[index]["retrieval_visible_text"]),))
+                try:
+                    normalized = _validate_response(
+                        QwenEmbeddingResponse(vectors=(vector,), raw_response_bytes=b"{}", returned_model=returned_model),
+                        request,
+                        (),
+                    )[0]
+                except QwenEmbeddingPreflightError as exc:
+                    raise QwenBatchEmbeddingError(str(exc)) from exc
+                vectors[index] = normalized
+                returned_models[index] = returned_model
+                seen.add(custom_id)
+        if seen != set(expected):
+            raise QwenBatchEmbeddingError("Qwen Batch result rows do not exactly match the expected custom_id set")
+        vectors.flush()
+        del vectors
+        document_request = QwenEmbeddingRequest(role=QWEN_CORPUS_ROLE, texts=tuple(str(unit["retrieval_visible_text"]) for unit in units))
+        row_count = len(records)
+        _write_gzip_rows_atomic(rows_path, units)
+        remote_provenance = {
+            "kind": "remote_provider",
+            "transport_contract_version": QWEN_BATCH_JSONL_SCHEMA_VERSION,
+            "execution_mode": "provider_free_batch_result_parse",
+            "provider_api_status": "unverified_batch_result_only",
+            "batch_2048_wire_acceptance": "unknown",
+            "requested_model": QWEN_EMBEDDING_MODEL_ID,
+            "document_returned_models": [
+                {"custom_id": record["custom_id"], "model": returned_models[index]}
+                for index, record in enumerate(records)
+            ],
+            "document_model_binding": "returned_model_verified" if all(value is not None for value in returned_models) else "returned_model_not_available",
+            "local_model_weight_sha256": None,
+            "remote_model_weight_sha256": None,
+            "weight_hash_status": "not_available_for_remote_provider",
+        }
+        metadata = {
+            "model_name": QWEN_EMBEDDING_MODEL_ID,
+            "model_revision": None,
+            "model_sha256": None,
+            "embedding_dimension": QWEN_EMBEDDING_DIMENSION,
+            "dtype": "float32",
+            "normalization": "L2",
+            "instruction": None,
+            "vectorization_schema_version": QWEN_BATCH_JSONL_SCHEMA_VERSION,
+            "row_mapping_policy": "Batch custom_id -> W1 manifest order",
+            "remote_provider_provenance": remote_provenance,
+            "operating_point": {"endpoint_path": QWEN_BATCH_EMBEDDINGS_PATH, "encoding_format": QWEN_BATCH_ENCODING_FORMAT, "dimension": QWEN_EMBEDDING_DIMENSION},
+        }
+        arm_build_identity = sha256_json({
+            "retrieval_unit_build_identity": ru_manifest["build_identity"],
+            "dense_contract": metadata,
+            "document_request_identity": document_request.request_identity,
+        })
+        dense_manifest = {
+            "schema_version": DENSE_INDEX_SCHEMA_VERSION,
+            "status": "complete",
+            "arm": "dense",
+            "arm_build_identity": arm_build_identity,
+            "retrieval_unit_build_identity": ru_manifest["build_identity"],
+            **metadata,
+            "row_count": row_count,
+            "artifacts": {
+                "vectors": _file_descriptor(vector_path, artifact_path="artifacts/vectors.f32.npy"),
+                "rows": _file_descriptor(rows_path, artifact_path="artifacts/rows.jsonl.gz", row_count=row_count),
+            },
+        }
+        dense_manifest_body = canonical_json_bytes(dense_manifest)
+        atomic_write(output_root / "dense" / "metadata" / "manifest.json", dense_manifest_body)
+        materialization = {
+            "schema_version": QWEN_BATCH_JSONL_SCHEMA_VERSION,
+            "status": "complete",
+            "retrieval_unit_build_identity": ru_manifest["build_identity"],
+            "expected_row_count": row_count,
+            "result_row_count": row_count,
+            "batch_2048_wire_acceptance": "unknown",
+            "dense_manifest": _artifact_descriptor("dense/metadata/manifest.json", dense_manifest_body),
+            "remote_provider_provenance": remote_provenance,
+        }
+        atomic_write(output_root / "metadata" / "batch_materialization.json", canonical_json_bytes(materialization))
+        marker.unlink(missing_ok=True)
+        return materialization
+    except Exception:
+        try:
+            del vectors
+        except UnboundLocalError:
+            pass
+        raise

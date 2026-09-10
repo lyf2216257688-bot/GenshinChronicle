@@ -18,8 +18,10 @@ from genshin_corpus.retrieval.qwen_batch_embedding import (
     build_qwen_batch_jsonl,
     build_qwen_batch_records,
     materialize_qwen_batch_results,
+    materialize_qwen_batch_results_streaming,
 )
 from genshin_corpus.retrieval.qwen_batch_lifecycle import (
+    QWEN_BATCH_DOWNLOAD_CHUNK_BYTES,
     QWEN_BATCH_LIVE_EXECUTION_MODE,
     QWEN_BEIJING_BATCH_BASE_URL,
     BeijingQwenBatchConfig,
@@ -87,6 +89,70 @@ class _FakeBatchHttpOpener:
     def open(self, request, timeout):
         self.requests.append(request)
         return next(self.outcomes)
+
+
+class _ChunkedBatchHttpResponse:
+    def __init__(self, body: bytes, *, chunk_size: int = 3, fail_after: int | None = None) -> None:
+        self.body = body
+        self.chunk_size = chunk_size
+        self.fail_after = fail_after
+        self.offset = 0
+        self.read_sizes: list[int | None] = []
+        self.status = 200
+        self.headers = {"Content-Length": str(len(body))}
+
+    def read(self, size: int) -> bytes:
+        self.read_sizes.append(size)
+        if self.fail_after is not None and self.offset >= self.fail_after:
+            raise OSError("interrupted")
+        end = min(self.offset + min(size, self.chunk_size), len(self.body))
+        chunk = self.body[self.offset:end]
+        self.offset = end
+        return chunk
+
+    def __enter__(self) -> "_ChunkedBatchHttpResponse":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+
+class _InterruptedDownloadClient(_FakeBatchLifecycleClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.download_attempts = 0
+
+    def download_file_to_path(self, file_id: str, output_path: Path) -> dict[str, object]:
+        self.downloads.append(file_id)
+        self.download_attempts += 1
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        incomplete = output_path.with_name(output_path.name + ".incomplete")
+        if self.download_attempts == 1:
+            incomplete.write_bytes(b"partial\n")
+            raise QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True)
+        body = self.files[file_id]
+        incomplete.write_bytes(body)
+        incomplete.replace(output_path)
+        return {"path": str(output_path), "byte_count": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+
+
+class _RetryingRetrieveClient(_FakeBatchLifecycleClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.retrieve_attempts = 0
+
+    def retrieve_batch(self, batch_id: str) -> dict[str, object]:
+        self.retrieves.append(batch_id)
+        self.retrieve_attempts += 1
+        if self.retrieve_attempts == 1:
+            raise QwenBatchLifecycleTransportError("ConnectionError", ambiguous=True)
+        return self.retrieve_result
+
+
+class _MalformedDownloadClient(_FakeBatchLifecycleClient):
+    def download_file_to_path(self, file_id: str, output_path: Path) -> dict[str, object]:
+        self.downloads.append(file_id)
+        raise QwenBatchLifecycleTransportError("MalformedDownloadChunk", ambiguous=False)
 
 
 class QwenBatchEmbeddingTests(unittest.TestCase):
@@ -212,6 +278,21 @@ class QwenBatchEmbeddingTests(unittest.TestCase):
         persisted = (self.root / "materialized/metadata/batch_materialization.json").read_text(encoding="utf-8")
         self.assertNotIn("test-secret", persisted)
 
+    def test_streaming_materialization_is_ordered_and_publishes_relative_artifacts(self) -> None:
+        records = build_qwen_batch_records(self.config)
+        result_path = self._write_results([self._success_row(records[1], 1), self._success_row(records[0], 0)], "streaming.jsonl")
+        output_root = self.root / "streaming-materialized"
+        result = materialize_qwen_batch_results_streaming(self.config, result_path, output_root)
+        self.assertEqual(result["status"], "complete")
+        manifest = json.loads((output_root / "dense/metadata/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["artifacts"]["vectors"]["path"], "artifacts/vectors.f32.npy")
+        self.assertEqual(manifest["artifacts"]["rows"]["path"], "artifacts/rows.jsonl.gz")
+        self.assertFalse((output_root / "metadata/materialization.incomplete").exists())
+        with gzip.open(output_root / "dense/artifacts/rows.jsonl.gz", "rt", encoding="utf-8") as handle:
+            self.assertEqual([json.loads(line)["unit_id"] for line in handle], ["u0", "u1"])
+        with self.assertRaises(FileExistsError):
+            materialize_qwen_batch_results_streaming(self.config, result_path, output_root)
+
     def test_missing_duplicate_and_unknown_custom_ids_fail_closed(self) -> None:
         records = build_qwen_batch_records(self.config)
         cases = {
@@ -328,6 +409,77 @@ class QwenBatchEmbeddingTests(unittest.TestCase):
         self.assertEqual((root / "materialized/dense/metadata/manifest.json").read_bytes(), manifest_body)
         self.assertEqual(state["probe_evidence"]["provider_api_status"], "unverified_batch_result_only")
         self.assertEqual(state["probe_evidence"]["batch_2048_wire_acceptance"], "unknown")
+
+    def test_concrete_download_streams_chunks_and_keeps_interrupted_output_incomplete(self) -> None:
+        body = b'{"custom_id":"x"}\n'
+        response = _ChunkedBatchHttpResponse(body, chunk_size=2)
+        client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener([response])
+        )
+        path = self.root / "streamed-output.jsonl"
+        descriptor = client.download_file_to_path("file-output-1", path)
+        self.assertEqual(path.read_bytes(), body)
+        self.assertEqual(descriptor["byte_count"], len(body))
+        self.assertEqual(descriptor["sha256"], hashlib.sha256(body).hexdigest())
+        self.assertTrue(response.read_sizes)
+        self.assertTrue(all(size == QWEN_BATCH_DOWNLOAD_CHUNK_BYTES for size in response.read_sizes))
+        with self.assertRaises(QwenBatchLifecycleError):
+            client.download_file_to_path("file-output-1", path)
+
+        interrupted = _ChunkedBatchHttpResponse(body, chunk_size=2, fail_after=2)
+        interrupted_path = self.root / "interrupted-output.jsonl"
+        interrupted_client = DashScopeQwenBatchClient.from_environment(
+            BeijingQwenBatchConfig(), environment={"DASHSCOPE_API_KEY": "test-secret"}, opener=_FakeBatchHttpOpener([interrupted])
+        )
+        with self.assertRaises(QwenBatchLifecycleTransportError):
+            interrupted_client.download_file_to_path("file-output-2", interrupted_path)
+        self.assertFalse(interrupted_path.exists())
+        self.assertTrue(interrupted_path.with_name(interrupted_path.name + ".incomplete").exists())
+
+    def test_interrupted_download_is_retryable_without_reissuing_batch(self) -> None:
+        config = self._one_document_config()
+        record = build_qwen_batch_records(config)[0]
+        client = _InterruptedDownloadClient()
+        client.retrieve_result = {"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"}
+        client.files["file-output-1"] = canonical_json_bytes(self._success_row(record, 0)) + b"\n"
+        root = self.root / "retryable-download"
+        submit_qwen_batch_probe(config, root, client)
+        first = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(first["status"], "output_download_retryable")
+        self.assertFalse((root / "downloads/output.jsonl").exists())
+        self.assertTrue((root / "downloads/output.jsonl.incomplete").exists())
+        second = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(second["status"], "materialized")
+        self.assertEqual(len(client.uploads), 1)
+        self.assertEqual(len(client.creates), 1)
+        self.assertEqual(client.downloads, ["file-output-1", "file-output-1"])
+
+    def test_transient_retrieve_failure_is_read_only_retryable(self) -> None:
+        config = self._one_document_config()
+        client = _RetryingRetrieveClient()
+        root = self.root / "retryable-retrieve"
+        submit_qwen_batch_probe(config, root, client)
+        first = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(first["status"], "retrieve_retryable")
+        client.retrieve_result = {"id": "batch-1", "status": "in_progress"}
+        second = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(second["status"], "retrieved")
+        self.assertEqual(len(client.uploads), 1)
+        self.assertEqual(len(client.creates), 1)
+        self.assertEqual(client.retrieves, ["batch-1", "batch-1"])
+
+    def test_malformed_download_remains_blocked(self) -> None:
+        config = self._one_document_config()
+        client = _MalformedDownloadClient()
+        client.retrieve_result = {"id": "batch-1", "status": "completed", "output_file_id": "file-output-1"}
+        root = self.root / "malformed-download"
+        submit_qwen_batch_probe(config, root, client)
+        first = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(first["status"], "output_download_failed")
+        second = resume_qwen_batch_probe(config, root, client)
+        self.assertEqual(second["status"], "output_download_failed")
+        self.assertEqual(client.downloads, ["file-output-1"])
+        self.assertEqual(len(client.creates), 1)
 
     def test_injected_concrete_dashscope_client_remains_offline_unverified(self) -> None:
         config = self._one_document_config()

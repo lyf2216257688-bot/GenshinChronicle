@@ -13,7 +13,10 @@ from collections.abc import Iterator, Mapping
 import gzip
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Any
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
@@ -38,6 +41,8 @@ from .qwen_embedding import (
 
 
 QWEN_FULL_BATCH_RUNNER_SCHEMA_VERSION = "phase04-rag-qwen37-full-batch-runner-0.1"
+QWEN_OBSERVED_FULL_BATCH_OUTPUT_BYTES = 23_634_784_581
+QWEN_DEFAULT_DISK_SAFETY_MARGIN_BYTES = 5 * 1024**3
 
 
 class QwenFullBatchRunnerError(ValueError):
@@ -198,7 +203,17 @@ def _state_class(state: Mapping[str, Any] | None) -> str:
     status = state.get("status")
     if status == "materialized":
         return "materialized"
-    if isinstance(status, str) and ("failed" in status or "ambiguous" in status or status.startswith("terminal_")):
+    if status == "retrieve_retryable" or status in {"output_download_retryable", "error_download_retryable"}:
+        return "pending"
+    if status == "retrieve_failed":
+        return "pending" if state.get("retrieve_error_code") == "ConnectionError" else "failed"
+    if isinstance(status, str) and (
+        status in {"upload_failed", "create_failed", "upload_ambiguous", "create_ambiguous"}
+        or status.startswith("terminal_")
+        or status in {"materialization_failed", "completed_missing_output"}
+        or status.endswith("_download_failed")
+        or status.endswith("_download_ambiguous")
+    ):
         return "failed"
     if status == "created":
         return "created"
@@ -242,6 +257,49 @@ def qwen_full_batch_dry_run(packing_root: Path, run_root: Path | None = None) ->
         "request_count": packing["corpus"]["retrieval_unit_count"],
         "shard_status_counts": {key: counts.get(key, 0) for key in ("not_submitted", "created", "pending", "materialized", "failed")},
         "new_batch_jobs_next_submit": new_jobs,
+    }
+
+
+def qwen_full_batch_disk_preflight(
+    packing_root: Path,
+    run_root: Path | None = None,
+    *,
+    target_path: Path | None = None,
+    known_raw_provider_output_bytes: int = QWEN_OBSERVED_FULL_BATCH_OUTPUT_BYTES,
+    safety_margin_bytes: int = QWEN_DEFAULT_DISK_SAFETY_MARGIN_BYTES,
+) -> dict[str, Any]:
+    """Report provider-free working-space needs before any live download."""
+
+    packing, bindings = _packing_bindings(Path(packing_root))
+    if type(known_raw_provider_output_bytes) is not int or known_raw_provider_output_bytes < 0:
+        raise QwenFullBatchRunnerError("known raw provider output bytes must be a non-negative integer")
+    if type(safety_margin_bytes) is not int or safety_margin_bytes < 0:
+        raise QwenFullBatchRunnerError("disk safety margin must be a non-negative integer")
+    expected_dense_bytes = int(packing["corpus"]["retrieval_unit_count"]) * QWEN_EMBEDDING_DIMENSION * 4
+    # The current strategy retains raw output and all per-shard Dense vectors
+    # while writing a second, final Dense memmap during merge.
+    estimated_working_bytes = known_raw_provider_output_bytes + expected_dense_bytes + expected_dense_bytes
+    required_bytes = estimated_working_bytes + safety_margin_bytes
+    volume = Path(target_path or run_root or packing_root)
+    try:
+        free_bytes = shutil.disk_usage(volume).free
+    except OSError:
+        free_bytes = None
+    return {
+        "schema_version": QWEN_FULL_BATCH_RUNNER_SCHEMA_VERSION,
+        "operation": "disk_preflight",
+        "provider_api_calls": 0,
+        "shard_count": len(bindings),
+        "request_count": int(packing["corpus"]["retrieval_unit_count"]),
+        "known_raw_provider_output_bytes": known_raw_provider_output_bytes,
+        "expected_final_dense_bytes": expected_dense_bytes,
+        "estimated_working_space_bytes": estimated_working_bytes,
+        "safety_margin_bytes": safety_margin_bytes,
+        "estimated_required_free_bytes": required_bytes,
+        "target_path": str(volume),
+        "current_free_bytes": free_bytes,
+        "space_check": "pass" if free_bytes is not None and free_bytes >= required_bytes else "fail" if free_bytes is not None else "unknown",
+        "strategy": "raw provider outputs + retained per-shard Dense vectors + final Dense memmap; heuristic preflight, not a correctness invariant",
     }
 
 
@@ -394,54 +452,91 @@ def merge_qwen_full_batch_results(packing_root: Path, run_root: Path) -> dict[st
     final_root = Path(run_root) / "final"
     if final_root.exists():
         raise FileExistsError("Qwen full Batch final Dense artifact already exists")
+    final_root.mkdir(parents=True)
+    merge_marker = final_root / "metadata" / "merge.incomplete"
+    merge_marker.parent.mkdir(parents=True, exist_ok=True)
+    merge_marker.write_bytes(b"full Batch merge incomplete\n")
     vector_path = final_root / "dense" / "artifacts" / "vectors.f32.npy"
-    vector_path.parent.mkdir(parents=True, exist_ok=False)
+    vector_path.parent.mkdir(parents=True, exist_ok=True)
     vectors = np.lib.format.open_memmap(vector_path, mode="w+", dtype=np.float32, shape=(expected_count, QWEN_EMBEDDING_DIMENSION))
     seen_ids: set[str] = set()
     seen_custom: set[str] = set()
     mapping_iter = _mapping_rows(Path(packing_root))
-    row_lines: list[bytes] = []
+    rows_path = final_root / "dense" / "artifacts" / "rows.jsonl.gz"
+    rows_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, rows_temporary = tempfile.mkstemp(prefix=f".{rows_path.name}.", suffix=".incomplete", dir=str(rows_path.parent))
     position = 0
     try:
-        for binding, state in zip(bindings, states, strict=True):
-            shard_root = Path(run_root) / "shards" / f"shard-{binding['shard_index']:05d}" / "materialized"
-            dense_manifest = _read_json(shard_root / "dense" / "metadata" / "manifest.json", "shard Dense manifest")
-            if dense_manifest.get("embedding_dimension") != QWEN_EMBEDDING_DIMENSION or dense_manifest.get("dtype") != "float32" or dense_manifest.get("normalization") != "L2" or dense_manifest.get("row_count") != binding["request_count"]:
-                raise QwenFullBatchRunnerError("Qwen full Batch shard Dense contract is invalid")
-            shard_vectors = np.load(shard_root / "dense" / "artifacts" / "vectors.f32.npy", allow_pickle=False)
-            if shard_vectors.dtype != np.float32 or shard_vectors.shape != (binding["request_count"], QWEN_EMBEDDING_DIMENSION) or not np.isfinite(shard_vectors).all():
-                raise QwenFullBatchRunnerError("Qwen full Batch shard vectors are invalid")
-            norms = np.linalg.norm(shard_vectors, axis=1)
-            if np.any(norms == 0) or not np.allclose(norms, 1.0, rtol=0.0, atol=1e-5):
-                raise QwenFullBatchRunnerError("Qwen full Batch shard vectors violate L2 normalization")
-            with gzip.open(shard_root / "dense" / "artifacts" / "rows.jsonl.gz", "rt", encoding="utf-8") as handle:
-                shard_rows = [json.loads(line) for line in handle]
-            materialization = _read_json(shard_root / "metadata" / "batch_materialization.json", "shard materialization")
-            returned = materialization.get("remote_provider_provenance", {}).get("document_returned_models") if isinstance(materialization.get("remote_provider_provenance"), Mapping) else None
-            if not isinstance(returned, list) or len(returned) != binding["request_count"] or len(shard_rows) != binding["request_count"]:
-                raise QwenFullBatchRunnerError("Qwen full Batch shard materialization row accounting is invalid")
-            for row_index, (dense_row, returned_row) in enumerate(zip(shard_rows, returned, strict=True)):
-                mapping = next(mapping_iter, None)
-                if not isinstance(mapping, Mapping) or mapping.get("shard_index") != binding["shard_index"] or mapping.get("shard_id") != binding["shard_id"] or mapping.get("row_index") != row_index:
-                    raise QwenFullBatchRunnerError("Qwen full Batch mapping order is invalid")
-                unit_id, custom_id = mapping.get("unit_id"), mapping.get("custom_id")
-                if (not isinstance(unit_id, str) or not isinstance(custom_id, str) or unit_id in seen_ids or custom_id in seen_custom or dense_row.get("occurrence_index") != row_index or dense_row.get("unit_id") != unit_id or returned_row.get("custom_id") != custom_id):
-                    raise QwenFullBatchRunnerError("Qwen full Batch results are missing, duplicate, or unknown")
-                seen_ids.add(unit_id)
-                seen_custom.add(custom_id)
-                vectors[position] = shard_vectors[row_index]
-                row_lines.append(canonical_json_bytes({"occurrence_index": position, "unit_id": unit_id}) + b"\n")
-                position += 1
-        if next(mapping_iter, None) is not None or position != expected_count:
-            raise QwenFullBatchRunnerError("Qwen full Batch final result count is incomplete or duplicated")
+        with os.fdopen(fd, "wb") as rows_raw:
+            with gzip.GzipFile(fileobj=rows_raw, mode="wb", mtime=0) as rows_handle:
+                for binding, state in zip(bindings, states, strict=True):
+                    shard_root = Path(run_root) / "shards" / f"shard-{binding['shard_index']:05d}" / "materialized"
+                    dense_manifest = _read_json(shard_root / "dense" / "metadata" / "manifest.json", "shard Dense manifest")
+                    if dense_manifest.get("embedding_dimension") != QWEN_EMBEDDING_DIMENSION or dense_manifest.get("dtype") != "float32" or dense_manifest.get("normalization") != "L2" or dense_manifest.get("row_count") != binding["request_count"]:
+                        raise QwenFullBatchRunnerError("Qwen full Batch shard Dense contract is invalid")
+                    shard_vectors = np.load(
+                        shard_root / "dense" / "artifacts" / "vectors.f32.npy",
+                        allow_pickle=False,
+                        mmap_mode="r",
+                    )
+                    if shard_vectors.dtype != np.float32 or shard_vectors.shape != (binding["request_count"], QWEN_EMBEDDING_DIMENSION):
+                        raise QwenFullBatchRunnerError("Qwen full Batch shard vectors are invalid")
+                    for chunk_start in range(0, binding["request_count"], 1024):
+                        chunk = np.asarray(shard_vectors[chunk_start:chunk_start + 1024], dtype=np.float32)
+                        if not np.isfinite(chunk).all():
+                            raise QwenFullBatchRunnerError("Qwen full Batch shard vectors are invalid")
+                        norms = np.linalg.norm(chunk, axis=1)
+                        if np.any(norms == 0) or not np.allclose(norms, 1.0, rtol=0.0, atol=1e-5):
+                            raise QwenFullBatchRunnerError("Qwen full Batch shard vectors violate L2 normalization")
+
+                    def shard_rows_iter() -> Iterator[Mapping[str, Any]]:
+                        try:
+                            with gzip.open(shard_root / "dense" / "artifacts" / "rows.jsonl.gz", "rt", encoding="utf-8") as handle:
+                                for line in handle:
+                                    value = json.loads(line)
+                                    if not isinstance(value, Mapping):
+                                        raise QwenFullBatchRunnerError("Qwen full Batch shard row is invalid")
+                                    yield value
+                        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                            raise QwenFullBatchRunnerError("Qwen full Batch shard rows are unreadable") from exc
+
+                    materialization = _read_json(shard_root / "metadata" / "batch_materialization.json", "shard materialization")
+                    returned = materialization.get("remote_provider_provenance", {}).get("document_returned_models") if isinstance(materialization.get("remote_provider_provenance"), Mapping) else None
+                    if not isinstance(returned, list) or len(returned) != binding["request_count"]:
+                        raise QwenFullBatchRunnerError("Qwen full Batch shard materialization row accounting is invalid")
+                    row_count = 0
+                    for row_index, (dense_row, returned_row) in enumerate(zip(shard_rows_iter(), returned, strict=True)):
+                        mapping = next(mapping_iter, None)
+                        if not isinstance(mapping, Mapping) or mapping.get("shard_index") != binding["shard_index"] or mapping.get("shard_id") != binding["shard_id"] or mapping.get("row_index") != row_index:
+                            raise QwenFullBatchRunnerError("Qwen full Batch mapping order is invalid")
+                        unit_id, custom_id = mapping.get("unit_id"), mapping.get("custom_id")
+                        if (not isinstance(returned_row, Mapping) or not isinstance(unit_id, str) or not isinstance(custom_id, str) or unit_id in seen_ids or custom_id in seen_custom or dense_row.get("occurrence_index") != row_index or dense_row.get("unit_id") != unit_id or returned_row.get("custom_id") != custom_id):
+                            raise QwenFullBatchRunnerError("Qwen full Batch results are missing, duplicate, or unknown")
+                        seen_ids.add(unit_id)
+                        seen_custom.add(custom_id)
+                        vectors[position] = shard_vectors[row_index]
+                        rows_handle.write(canonical_json_bytes({"occurrence_index": position, "unit_id": unit_id}) + b"\n")
+                        position += 1
+                        row_count += 1
+                    if row_count != binding["request_count"]:
+                        raise QwenFullBatchRunnerError("Qwen full Batch shard row accounting is invalid")
+                if next(mapping_iter, None) is not None or position != expected_count:
+                    raise QwenFullBatchRunnerError("Qwen full Batch final result count is incomplete or duplicated")
+            rows_raw.flush()
+            os.fsync(rows_raw.fileno())
         vectors.flush()
+        os.replace(rows_temporary, rows_path)
     except Exception:
+        try:
+            if os.path.exists(rows_temporary):
+                os.unlink(rows_temporary)
+        except OSError:
+            pass
         del vectors
         raise
     del vectors
-    rows_body = gzip.compress(b"".join(row_lines), mtime=0)
-    atomic_write(final_root / "dense" / "artifacts" / "rows.jsonl.gz", rows_body)
     vector_descriptor = _sha_descriptor(vector_path)
+    rows_descriptor = _sha_descriptor(rows_path, row_count=expected_count)
     provenance = {
         "kind": "remote_provider",
         "transport_contract_version": QWEN_FULL_BATCH_RUNNER_SCHEMA_VERSION,
@@ -472,11 +567,12 @@ def merge_qwen_full_batch_results(packing_root: Path, run_root: Path) -> dict[st
         "row_count": expected_count,
         "artifacts": {
             "vectors": {"path": "artifacts/vectors.f32.npy", **vector_descriptor},
-            "rows": _artifact_descriptor("artifacts/rows.jsonl.gz", rows_body, expected_count),
+            "rows": {"path": "artifacts/rows.jsonl.gz", **rows_descriptor},
         },
     }
     manifest_body = canonical_json_bytes(dense_manifest)
     atomic_write(final_root / "dense" / "metadata" / "manifest.json", manifest_body)
     result = {"schema_version": QWEN_FULL_BATCH_RUNNER_SCHEMA_VERSION, "status": "materialized", "row_count": expected_count, "dense_manifest": _artifact_descriptor("dense/metadata/manifest.json", manifest_body), "shard_provenance": provenance["shards"]}
     atomic_write(final_root / "metadata" / "full_materialization.json", canonical_json_bytes(result))
+    merge_marker.unlink(missing_ok=True)
     return result

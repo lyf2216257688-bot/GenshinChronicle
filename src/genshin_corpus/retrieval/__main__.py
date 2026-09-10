@@ -14,7 +14,7 @@ from .qwen_embedding import (
     QwenSynchronousPreflightConfig,
     run_qwen_dashscope_synchronous_preflight,
 )
-from .qwen_full_batch_runner import qwen_full_batch_dry_run
+from .qwen_full_batch_runner import qwen_full_batch_disk_preflight, qwen_full_batch_dry_run
 
 
 def _qwen_dashscope_main(argv: list[str]) -> int:
@@ -53,6 +53,18 @@ def _qwen_full_batch_dry_run_main(argv: list[str]) -> int:
     return 0
 
 
+def _qwen_full_batch_disk_preflight_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Report Qwen full Batch disk needs without provider access")
+    parser.add_argument("--packing-root", required=True, type=Path)
+    parser.add_argument("--run-root", type=Path)
+    parser.add_argument("--target-path", type=Path)
+    parser.add_argument("--safety-margin-bytes", type=int)
+    args = parser.parse_args(argv)
+    kwargs = {} if args.safety_margin_bytes is None else {"safety_margin_bytes": args.safety_margin_bytes}
+    print(canonical_json_bytes(qwen_full_batch_disk_preflight(args.packing_root, args.run_root, target_path=args.target_path, **kwargs)).decode("utf-8"))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import sys
 
@@ -61,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
         return _qwen_dashscope_main(argv[1:])
     if argv and argv[0] == "qwen-full-batch-dry-run":
         return _qwen_full_batch_dry_run_main(argv[1:])
+    if argv and argv[0] == "qwen-full-batch-disk-preflight":
+        return _qwen_full_batch_disk_preflight_main(argv[1:])
     parser = argparse.ArgumentParser(description="Read-only profile of one accepted Canonical run")
     parser.add_argument("--manifest", required=True, type=Path, help="Canonical run metadata/manifest.json")
     parser.add_argument("--output", type=Path, help="Optional aggregate JSON output path; Canonical data is never written")

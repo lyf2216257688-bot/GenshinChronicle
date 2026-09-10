@@ -446,27 +446,20 @@ list-price proxy is CNY `16.84045275`–`67.361811`; CNY 50 cannot yet be
 confidently classified as sufficient or insufficient from this deliberately
 broad proxy alone.
 
-The full-corpus Qwen Batch runner is **IMPLEMENTED / OFFLINE-TESTED /
-ACTUAL-REVIEW PASS**, and its immutable prepared-packing binding repair is
-**ACTUAL-REVIEW PASS**. Before submit, resume, merge, or an existing-run
-dry-run, it revalidates the current packing against the prepared paid-run
-binding: packing-manifest SHA-256 and byte count; packing identity; Retrieval
-Unit build identity and count; mapping descriptor; and the complete ordered
-11-shard descriptor list (shard index, ID, path, request count, byte count, and
-SHA-256). Packing drift fails closed before any provider/client call and never
-automatically re-prepares. One independent lifecycle remains bound to each
-shard; existing batch IDs are resumed rather than recreated; ambiguous or
-terminal shard failure stops later work; materialized shards are preserved; and
-final merge remains gated on all 535,802 results plus the reviewed
-2048-dimensional, finite, float32/L2-normalized, deterministic-order checks.
-The provider-free dry-run is read-only. No full-corpus shard has been uploaded
-and no full-corpus Batch job has been created. The sole immediate next action
-is repository checkpoint of this reviewed full-Batch runner work unit. After
-that checkpoint, the explicit paid Beijing run authorization is limited to the
-existing 11 finalized shards, exactly 535,802 accepted Retrieval Units, model
-`qwen3.7-text-embedding`, and 2048-dimensional dense Batch embeddings; it does
-not include 70Q query-vector generation, a BGE-vs-Qwen retrieval benchmark,
-production Dense adoption/switch, or unrelated provider work.
+The authorized Beijing Qwen3.7 full Batch execution is now complete for all
+11 existing shards: 11/11 jobs completed, 0 terminal failures, and 0 error
+files. Provider output files are ready for local download/materialization with
+an observed combined JSONL size of `23634784581` bytes (approximately 22.012
+GiB). Local full download has **NOT STARTED**, and the final full Qwen Dense
+artifact has **NOT BEEN MATERIALIZED**. The bounded streaming download,
+line-by-line validation/materialization, memmap merge, and interrupted-download
+recovery repair are **ACTUAL-REVIEW PASS**. The actual existing-run-root
+dry-run observed 11 existing `created` shards, 0 `not_submitted`, 0 failed,
+`new_batch_jobs_next_submit=0`, and `provider_api_calls=0`. Existing `batch_id`
+values remain the sole provider-job identities; no new or replacement Batch
+jobs are authorized. The sole immediate next action is repository checkpoint
+of this reviewed repair before executing the already-authorized download and
+materialization of the 11 existing outputs.
 
 ## Historical A1 Status
 
