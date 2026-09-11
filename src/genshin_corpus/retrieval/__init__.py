@@ -64,6 +64,7 @@ from .evidence_assembly import (
 )
 from .candidate_retrieval import (
     CANDIDATE_SCHEMA_VERSION,
+    DEFAULT_QWEN_DENSE_MANIFEST,
     DENSE_INDEX_SCHEMA_VERSION,
     LEXICAL_INDEX_SCHEMA_VERSION,
     RRF_FUSION_VERSION,
@@ -77,6 +78,9 @@ from .candidate_retrieval import (
     hybrid_candidates,
     lexical_candidates,
     retrieve_candidates,
+    retrieve_qwen_candidates,
+    retrieve_qwen_candidates_for_query,
+    validate_accepted_qwen_dense_manifest,
 )
 from .production_materialization import (
     PINNED_BGE_SMALL_MODEL_SHA256,
@@ -100,6 +104,7 @@ from .qwen_embedding import (
     QwenEmbeddingResponse,
     QwenEmbeddingTransport,
     QwenEmbeddingTransportError,
+    encode_qwen_query,
     QwenSynchronousPreflightConfig,
     run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
@@ -209,6 +214,7 @@ __all__ = [
     "render_evidence_packet",
     "write_evidence_packet",
     "CANDIDATE_SCHEMA_VERSION",
+    "DEFAULT_QWEN_DENSE_MANIFEST",
     "DENSE_INDEX_SCHEMA_VERSION",
     "LEXICAL_INDEX_SCHEMA_VERSION",
     "RRF_FUSION_VERSION",
@@ -222,6 +228,9 @@ __all__ = [
     "hybrid_candidates",
     "lexical_candidates",
     "retrieve_candidates",
+    "retrieve_qwen_candidates",
+    "retrieve_qwen_candidates_for_query",
+    "validate_accepted_qwen_dense_manifest",
     "PINNED_BGE_SMALL_MODEL_SHA256",
     "ProductionMaterializationError",
     "materialize_production",
@@ -241,6 +250,7 @@ __all__ = [
     "QwenEmbeddingResponse",
     "QwenEmbeddingTransport",
     "QwenEmbeddingTransportError",
+    "encode_qwen_query",
     "QwenSynchronousPreflightConfig",
     "run_qwen_dashscope_synchronous_preflight",
     "run_qwen_synchronous_preflight",

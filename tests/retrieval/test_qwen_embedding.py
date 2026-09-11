@@ -14,7 +14,7 @@ from urllib.error import HTTPError, URLError
 import numpy as np
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes
-from genshin_corpus.retrieval.candidate_retrieval import dense_candidates
+from genshin_corpus.retrieval.candidate_retrieval import dense_candidates, qwen_candidates_from_loaded
 from genshin_corpus.retrieval.qwen_embedding import (
     QWEN_EMBEDDING_DIMENSION,
     QWEN_EMBEDDING_MODEL_ID,
@@ -26,6 +26,7 @@ from genshin_corpus.retrieval.qwen_embedding import (
     QwenEmbeddingResponse,
     QwenEmbeddingTransportError,
     QwenSynchronousPreflightConfig,
+    encode_qwen_query,
     run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
@@ -656,6 +657,54 @@ class DashScopeQwenEmbeddingTransportTests(unittest.TestCase):
         finally:
             if root.exists():
                 shutil.rmtree(root)
+
+    def test_encode_qwen_query_uses_fixed_query_contract_once(self) -> None:
+        vector = [1.0] * QWEN_EMBEDDING_DIMENSION
+        response = QwenEmbeddingResponse(
+            vectors=[vector],
+            raw_response_bytes=b"{}",
+            returned_model=QWEN_EMBEDDING_MODEL_ID,
+            returned_role=QWEN_QUERY_ROLE,
+        )
+        transport = _FakeTransport([response])
+        encoded, request, returned = encode_qwen_query(transport, "任意生产查询")
+        self.assertEqual(len(transport.requests), 1)
+        self.assertEqual(request.role, QWEN_QUERY_ROLE)
+        self.assertEqual(request.dimension, QWEN_EMBEDDING_DIMENSION)
+        self.assertEqual(request.output, "dense")
+        self.assertIsNone(request.custom_query_instruction)
+        self.assertIs(returned, response)
+        self.assertEqual(encoded.shape, (QWEN_EMBEDDING_DIMENSION,))
+        self.assertAlmostEqual(float(np.linalg.norm(encoded)), 1.0, places=6)
+
+    def test_loaded_qwen_candidates_use_one_request_and_scope_query_provenance(self) -> None:
+        vector = [1.0] * QWEN_EMBEDDING_DIMENSION
+        transport = _FakeTransport([
+            QwenEmbeddingResponse(
+                vectors=[vector],
+                raw_response_bytes=b"{}",
+                returned_model=QWEN_EMBEDDING_MODEL_ID,
+                returned_role=QWEN_QUERY_ROLE,
+            )
+        ])
+
+        class _LoadedRetriever:
+            def candidates_for_query(self, query, query_vector, *, instruction, top_k=20, rrf_k=60):
+                self.args = (query, query_vector, instruction, top_k, rrf_k)
+                return {
+                    "lexical": [{"unit_id": "lex", "rank": 1, "retrieval": {"mode": "lexical"}}],
+                    "dense": [{"unit_id": "den", "rank": 1, "retrieval": {"mode": "dense"}}],
+                    "hybrid": [{"unit_id": "hyb", "rank": 1, "retrieval": {"mode": "hybrid"}}],
+                }
+
+        retriever = _LoadedRetriever()
+        candidates = qwen_candidates_from_loaded(retriever, "任意问题", transport)
+        self.assertEqual(len(transport.requests), 1)
+        self.assertIsNone(retriever.args[2])
+        self.assertNotIn("query_request_identity", candidates["lexical"][0]["retrieval"])
+        for mode in ("dense", "hybrid"):
+            self.assertEqual(candidates[mode][0]["retrieval"]["query_returned_model"], QWEN_EMBEDDING_MODEL_ID)
+            self.assertEqual(candidates[mode][0]["retrieval"]["query_returned_role"], QWEN_QUERY_ROLE)
 
 
 if __name__ == "__main__":

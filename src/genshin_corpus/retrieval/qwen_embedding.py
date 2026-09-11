@@ -573,6 +573,28 @@ def _validate_response(
     return values / norms[:, None]
 
 
+def encode_qwen_query(
+    transport: QwenEmbeddingTransport,
+    query: str,
+) -> tuple[Any, QwenEmbeddingRequest, QwenEmbeddingResponse]:
+    """Encode one arbitrary production query through the fixed Qwen seam.
+
+    The caller owns occurrence-level audit persistence. This helper performs
+    only the fixed request construction and fail-closed response validation.
+    """
+
+    if not callable(getattr(transport, "embed", None)):
+        raise QwenEmbeddingPreflightError("Qwen query transport lacks the embed method")
+    if not isinstance(query, str) or not query.strip():
+        raise QwenEmbeddingPreflightError("Qwen query text must be a non-empty string")
+    request = QwenEmbeddingRequest(role=QWEN_QUERY_ROLE, texts=(query,))
+    response = transport.embed(request)
+    if not isinstance(response, QwenEmbeddingResponse):
+        raise QwenEmbeddingPreflightError("Qwen query transport returned an unexpected response type")
+    values = _validate_response(response, request, _transport_secret_values(transport))
+    return values[0], request, response
+
+
 def _issued_attempt_record(request: QwenEmbeddingRequest, number: int) -> dict[str, Any]:
     """Create the durable record that must exist before transport invocation."""
 

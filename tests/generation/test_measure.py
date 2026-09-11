@@ -22,7 +22,11 @@ from genshin_corpus.generation.measure import (
     _assemble_question_packets,
     write_question_packets,
 )
-from genshin_corpus.retrieval.candidate_retrieval import CandidateBundle, DEFAULT_DENSE_MODEL_REVISION
+from genshin_corpus.retrieval.candidate_retrieval import (
+    CandidateBundle,
+    DEFAULT_DENSE_MODEL_REVISION,
+    DEFAULT_QWEN_DENSE_MANIFEST,
+)
 
 
 class _FakeTransport:
@@ -59,6 +63,9 @@ class M1MeasureTests(unittest.TestCase):
     def tearDown(self) -> None:
         if self.root.exists():
             shutil.rmtree(self.root)
+
+    def test_default_baseline_binds_accepted_qwen_artifact(self) -> None:
+        self.assertEqual(M1Baseline().dense_manifest, DEFAULT_QWEN_DENSE_MANIFEST)
 
     def _write_baseline_manifest(self, path: Path, value: dict) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,6 +298,67 @@ class M1MeasureTests(unittest.TestCase):
             self.assertEqual(kwargs["instruction"], "为这个句子生成表示以用于检索相关文章：")
             if mode in {"dense", "hybrid"}:
                 self.assertEqual(kwargs["query_vector"], [1.0, 0.0])
+
+    def test_qwen_default_uses_one_loaded_retriever_without_bge_model(self) -> None:
+        manifest = json.loads(self.baseline.dense_manifest.read_text(encoding="utf-8"))
+        manifest.update({
+            "model_name": "qwen3.7-text-embedding",
+            "model_revision": None,
+            "model_sha256": None,
+            "embedding_dimension": 2048,
+            "instruction": None,
+            "artifacts": {"vectors": {"sha256": "q" * 64}, "rows": {"sha256": "r" * 64}},
+        })
+        self.baseline.dense_manifest.write_bytes(canonical_json_bytes(manifest))
+        self.baseline = M1Baseline(
+            root=self.baseline.root,
+            model_dir=self.baseline.model_dir,
+            runtime_root=self.baseline.runtime_root,
+            qwen_transport=object(),
+        )
+        questions = self._write_questions([
+            {"question_id": f"q{index:02d}", "question": f"问题 {index}"}
+            for index in range(1, 7)
+        ])
+        retriever = type(
+            "LoadedRetriever",
+            (),
+            {
+                "lexical_manifest": {"retrieval_unit_build_identity": "ru-build"},
+                "dense_manifest": manifest,
+            },
+        )()
+        loaded_calls = []
+        qwen_calls = []
+
+        def fake_qwen(loaded, query, transport, **kwargs):
+            loaded_calls.append(loaded)
+            qwen_calls.append(query)
+            return {
+                mode: [{"unit_id": "u1", "rank": 1, "retrieval": {"mode": mode}}]
+                for mode in ("lexical", "dense", "hybrid")
+            }
+
+        def fake_assemble(manifest_path, candidates, *, config, retrieval_audit):
+            return self._packet(retrieval_audit["query_id"], retrieval_audit["mode"])
+
+        with patch("genshin_corpus.generation.measure.validate_accepted_qwen_dense_manifest"), patch("genshin_corpus.generation.measure.load_dense_query_model") as load_model, patch("genshin_corpus.generation.measure.load_batch_candidate_retriever", return_value=retriever) as load_batch, patch("genshin_corpus.generation.measure.qwen_candidates_from_loaded", side_effect=fake_qwen), patch("genshin_corpus.generation.measure.assemble_evidence_packet", side_effect=fake_assemble):
+            run_m1_measure(
+                questions,
+                self.root / "qwen-run",
+                baseline=self.baseline,
+                environment={"BAILIAN_BASE_URL": "https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"},
+                transport_factory=lambda config, environment: _FakeTransport(),
+            )
+        load_model.assert_not_called()
+        load_batch.assert_called_once_with(
+            self.baseline.lexical_manifest,
+            self.baseline.dense_manifest,
+            accepted_qwen=True,
+        )
+        self.assertEqual(len(loaded_calls), 6)
+        self.assertEqual(qwen_calls, [f"问题 {index}" for index in range(1, 7)])
+        self.assertEqual(len({id(item) for item in loaded_calls}), 1)
 
     def test_m2_preparation_separates_review_only_fields_from_runtime_input(self) -> None:
         source = self._write_m2_source()

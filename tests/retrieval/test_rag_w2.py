@@ -21,6 +21,8 @@ from genshin_corpus.retrieval.candidate_retrieval import (
     hybrid_candidates,
     lexical_candidates,
     retrieve_candidates,
+    _load_dense,
+    validate_accepted_qwen_dense_manifest,
 )
 from genshin_corpus.retrieval.evidence_assembly import assemble_evidence_packet, EvidenceAssemblyConfig
 
@@ -63,6 +65,36 @@ class RagW2Tests(unittest.TestCase):
         dm2 = build_dense_index(self.ru_manifest, self.root/"dense2", model_dir=self.root, vectors=np.array([[1,0],[0,1],[1,0]], dtype=np.float32), instruction="different")
         self.assertEqual(dm["arm_build_identity"], dm2["arm_build_identity"])
         self.assertEqual(lm["retrieval_unit_build_identity"], dm["retrieval_unit_build_identity"])
+
+    def test_mmap_is_explicitly_qwen_scoped_and_bge_loader_stays_detached(self):
+        lm = build_lexical_index(self.ru_manifest, self.root / "lex-mmap")
+        dm = build_dense_index(
+            self.ru_manifest,
+            self.root / "dense-mmap",
+            model_dir=self.root,
+            vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32),
+        )
+        dense_path = self.root / "dense-mmap" / "metadata" / "manifest.json"
+        with patch("numpy.load", wraps=np.load) as load:
+            _load_dense(dense_path)
+        self.assertNotEqual(load.call_args.kwargs.get("mmap_mode"), "r")
+
+        with patch(
+            "genshin_corpus.retrieval.candidate_retrieval.validate_accepted_qwen_dense_manifest",
+            return_value=dm,
+        ), patch("numpy.load", wraps=np.load) as load:
+            load_batch_candidate_retriever(
+                self.root / "lex-mmap" / "metadata" / "manifest.json",
+                dense_path,
+                accepted_qwen=True,
+            )
+        self.assertEqual(load.call_args.kwargs.get("mmap_mode"), "r")
+
+    def test_accepted_qwen_artifact_mismatch_fails_closed(self):
+        bad_manifest = self.root / "bad-qwen-manifest.json"
+        bad_manifest.write_bytes(canonical_json_bytes({"status": "complete"}))
+        with self.assertRaisesRegex(CandidateRetrievalError, "manifest SHA-256"):
+            validate_accepted_qwen_dense_manifest(bad_manifest)
 
     def test_lexical_dense_rrf_and_assembly_handoff(self):
         lm = build_lexical_index(self.ru_manifest, self.root/"lex")

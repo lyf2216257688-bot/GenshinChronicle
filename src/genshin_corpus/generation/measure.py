@@ -29,6 +29,11 @@ from genshin_corpus.retrieval.candidate_retrieval import (
     load_batch_candidate_retriever,
     load_dense_query_model,
     retrieve_candidates,
+    DEFAULT_QWEN_DENSE_MANIFEST,
+    validate_accepted_qwen_dense_manifest,
+    retrieve_qwen_candidates,
+    retrieve_qwen_candidates_for_query,
+    qwen_candidates_from_loaded,
 )
 from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
@@ -49,6 +54,12 @@ from .generation import (
     project_generation_request,
     workspace_from_bailian_base_url,
     write_generation_result,
+)
+from genshin_corpus.retrieval.qwen_embedding import (
+    DashScopeQwenEmbeddingConfig,
+    DashScopeQwenEmbeddingTransport,
+    QwenEmbeddingTransport,
+    encode_qwen_query,
 )
 
 
@@ -123,6 +134,8 @@ class M1Baseline:
     root: Path = DEFAULT_M1_BASELINE_ROOT
     model_dir: Path = DEFAULT_M1_MODEL_DIR
     runtime_root: Path = DEFAULT_M1_RUNTIME_ROOT
+    qwen_dense_manifest: Path = DEFAULT_QWEN_DENSE_MANIFEST
+    qwen_transport: QwenEmbeddingTransport | None = None
 
     @property
     def retrieval_unit_manifest(self) -> Path:
@@ -134,7 +147,26 @@ class M1Baseline:
 
     @property
     def dense_manifest(self) -> Path:
-        return self.root / "dense" / "metadata" / "manifest.json"
+        if self.root != DEFAULT_M1_BASELINE_ROOT:
+            return self.root / "dense" / "metadata" / "manifest.json"
+        return Path(self.qwen_dense_manifest)
+
+
+def _qwen_transport_from_environment(values: Mapping[str, str]) -> QwenEmbeddingTransport:
+    endpoint = values.get("DASHSCOPE_QWEN_EMBEDDING_ENDPOINT")
+    workspace = values.get("DASHSCOPE_QWEN_WORKSPACE")
+    region = values.get("DASHSCOPE_QWEN_REGION", "cn-beijing")
+    if not endpoint or not workspace:
+        raise M1MeasureError(
+            "Qwen synchronous query embedding requires DASHSCOPE_QWEN_EMBEDDING_ENDPOINT and DASHSCOPE_QWEN_WORKSPACE"
+        )
+    try:
+        return DashScopeQwenEmbeddingTransport.from_environment(
+            DashScopeQwenEmbeddingConfig(region=region, workspace=workspace, endpoint=endpoint),
+            environment=values,
+        )
+    except Exception as exc:
+        raise M1MeasureError("Qwen synchronous query transport is unavailable") from exc
 
 
 def _read_json_object(path: Path, label: str) -> Mapping[str, Any]:
@@ -318,6 +350,17 @@ def _baseline_metadata(baseline: M1Baseline) -> dict[str, Any]:
         raise M1MeasureError("M1 lexical manifest is not bound to the Retrieval Unit build")
     if dense.get("retrieval_unit_build_identity") != ru_identity:
         raise M1MeasureError("M1 Dense manifest is not bound to the Retrieval Unit build")
+    if dense.get("model_name") == "qwen3.7-text-embedding":
+        validate_accepted_qwen_dense_manifest(baseline.dense_manifest)
+        return {
+            "retrieval_unit_build_identity": ru_identity,
+            "lexical_build_identity": lexical.get("arm_build_identity"),
+            "dense_build_identity": dense.get("arm_build_identity"),
+            "dense_model": dense.get("model_name"),
+            "dense_embedding_dimension": dense.get("embedding_dimension"),
+            "dense_vectors_sha256": dense.get("artifacts", {}).get("vectors", {}).get("sha256"),
+            "dense_rows_sha256": dense.get("artifacts", {}).get("rows", {}).get("sha256"),
+        }
     if dense.get("model_revision") != DEFAULT_DENSE_MODEL_REVISION:
         raise M1MeasureError("M1 Dense model revision does not match the pinned baseline")
     model_file = baseline.model_dir / "model.safetensors"
@@ -354,6 +397,10 @@ def _dense_runtime_path(runtime_root: Path):
 def _probe_dense_query_runtime(baseline: M1Baseline, dense_metadata: Mapping[str, Any]) -> dict[str, Any]:
     """Exercise the same local query encoder used by Dense retrieval."""
 
+    if dense_metadata.get("model_name") == "qwen3.7-text-embedding":
+        if baseline.qwen_transport is None:
+            return {"provider": "qwen", "execution": "requires_synchronous_query_embedding", "provider_attempts_issued": 0}
+        return {"provider": "qwen", "execution": "injected_transport", "embedding_dimension": 2048}
     runtime_root = Path(baseline.runtime_root)
     if not runtime_root.is_dir():
         raise M1MeasureError("M1 Dense runtime root is unavailable")
@@ -487,6 +534,21 @@ def _candidates_for_question(
         if batch_retriever is not None
         else _read_json_object(baseline.dense_manifest, "M1 Dense manifest")
     )
+    if dense_manifest.get("model_name") == "qwen3.7-text-embedding":
+        if baseline.qwen_transport is None:
+            raise M1MeasureError("Qwen synchronous query transport is required")
+        if batch_retriever is not None:
+            return qwen_candidates_from_loaded(
+                batch_retriever,
+                question.question,
+                baseline.qwen_transport,
+            )
+        return retrieve_qwen_candidates_for_query(
+            lexical_manifest_path=baseline.lexical_manifest,
+            dense_manifest_path=baseline.dense_manifest,
+            query=question.question,
+            transport=baseline.qwen_transport,
+        )
     instruction = dense_manifest.get("instruction")
     if not isinstance(instruction, str):
         raise M1MeasureError("M1 Dense manifest lacks a valid query instruction")
@@ -648,6 +710,14 @@ def _run_measure(
         raise FileExistsError(f"{measure_label} output root already exists; refusing to rerun or overwrite occurrences")
     questions = question_loader(runtime_input)
     values = os.environ if environment is None else environment
+    if _read_json_object(baseline.dense_manifest, "Dense manifest").get("model_name") == "qwen3.7-text-embedding" and baseline.qwen_transport is None:
+        baseline = M1Baseline(
+            root=baseline.root,
+            model_dir=baseline.model_dir,
+            runtime_root=baseline.runtime_root,
+            qwen_dense_manifest=baseline.qwen_dense_manifest,
+            qwen_transport=_qwen_transport_from_environment(values),
+        )
     endpoint = values.get("BAILIAN_BASE_URL")
     if not isinstance(endpoint, str) or not endpoint:
         raise GenerationConfigurationError(f"BAILIAN_BASE_URL must be set before {measure_label} execution")
@@ -676,13 +746,24 @@ def _run_measure(
     # Recheck the pinned artifact immediately before constructing the batch encoder.
     preparation_started = perf_counter() if capture_execution_timing else None
     _baseline_metadata(baseline)
+    dense_is_qwen = _read_json_object(baseline.dense_manifest, "Dense manifest").get("model_name") == "qwen3.7-text-embedding"
+    effective_batch_retrieval = use_batch_retrieval or dense_is_qwen
     with _dense_runtime_path(baseline.runtime_root):
-        dense_model = load_dense_query_model(baseline.model_dir)
-        batch_retriever = (
-            load_batch_candidate_retriever(baseline.lexical_manifest, baseline.dense_manifest)
-            if use_batch_retrieval
-            else None
-        )
+        dense_model = None if dense_is_qwen else load_dense_query_model(baseline.model_dir)
+        if effective_batch_retrieval:
+            if dense_is_qwen:
+                batch_retriever = load_batch_candidate_retriever(
+                    baseline.lexical_manifest,
+                    baseline.dense_manifest,
+                    accepted_qwen=True,
+                )
+            else:
+                batch_retriever = load_batch_candidate_retriever(
+                    baseline.lexical_manifest,
+                    baseline.dense_manifest,
+                )
+        else:
+            batch_retriever = None
         prepared_context = (
             prepare_evidence_assembly_context(baseline.retrieval_unit_manifest)
             if use_batch_retrieval
@@ -697,7 +778,7 @@ def _run_measure(
         for question in questions:
             if attempts_issued >= provider_attempt_budget:
                 raise M1MeasureError(f"{measure_label} provider-attempt budget exhausted before the next question")
-            if use_batch_retrieval:
+            if effective_batch_retrieval:
                 retrieval_started = perf_counter()
                 candidates_by_mode = _candidates_for_question(
                     question,

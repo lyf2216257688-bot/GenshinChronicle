@@ -12,7 +12,7 @@ end-to-end baseline is implemented, materialized, and measured. Phase 01 Raw,
 Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
-**Current engineering work unit: none authorized.** Historical W7/Frozen48 and
+**Current engineering work unit: P04-DENSE-QWEN-ADOPT-01.** Historical W7/Frozen48 and
 W1 benchmark-production routes remain auditable but are stopped/superseded as
 governing paths for the post-W7 RAG baseline.
 
@@ -23,9 +23,16 @@ governing paths for the post-W7 RAG baseline.
   provider-neutral Generation contracts are implemented. The production
   Retrieval-to-Packet baseline has been materialized from the accepted
   16,437-record Canonical corpus (535,802 Retrieval Units).
-- **Production Dense is `BAAI/bge-small-zh-v1.5`.** It remains the current
-  production Dense arm; a comparison or challenger artifact does not switch
-  it.
+- **Production Dense is the accepted Qwen `qwen3.7-text-embedding` artifact**
+  at 2048 dimensions, dense-only, FP32/L2, 535,802 rows, arm identity
+  `be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922`, vector
+  SHA-256 `4d6337822459ede93f18d5384e37cbbbef4363b830a5e705d788864dc02dfb8a`,
+  rows SHA-256 `54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701`,
+  manifest SHA-256 `6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5`,
+  and RU build identity
+  `49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998`.
+  The matrix is reused in place and loaded with read-only mmap. BGE remains a
+  retained historical/control implementation, not a production fallback.
 - **Formal Deferred-Footprint-Charge is the production-facing Evidence
   Assembly default.** Production materialization calls
   `assemble_deferred_footprint_charge_packet`. Historical v1 is the
@@ -47,10 +54,11 @@ governing paths for the post-W7 RAG baseline.
   are not semantic quality, a retrieval winner, or production-Dense-adoption
   evidence. Exact historical identities and counts are in the Phase 04
   checkpoint register.
-- Qwen3.7 Dense is a **challenger**. Accepted full-corpus and Q001-Q070 query
-  vector artifacts exist at the fixed 2048-dimensional dense-only operating
-  point. This proves materialization/provenance for the challenger, not
-  production superiority or adoption.
+- The accepted Qwen3.7 full-corpus and Q001-Q070 query vector artifacts were
+  previously evaluated as a **challenger checkpoint** at the fixed
+  2048-dimensional dense-only operating point. Those historical results prove
+  materialization/provenance; the current production adoption is recorded
+  above and does not reinterpret the historical comparison as a quality claim.
 - A later dual blind Packet-semantic review is decision-relevant technical-lead
   evidence. Its accepted summary, hashes, and claim boundary are owned by the
   Phase 04 checkpoint register; original reviewer artifact bytes remain
@@ -75,9 +83,14 @@ governing paths for the post-W7 RAG baseline.
 
 ## Current authorization boundary
 
+Arbitrary Dense/Hybrid queries use the existing Qwen synchronous query seam
+(`role=query`, dimension 2048, dense-only, no custom instruction), one request
+per query. Missing credentials, provider/transport failures, or
+artifact/provenance mismatches fail closed; there is no BGE fallback.
+
 The first runnable RAG baseline is an implemented and measured baseline, not a
-technology freeze. Formal Deferred-Footprint-Charge adoption authorizes no
-new provider call, Generation execution, Retrieval replay, Dense rebuild,
+  technology freeze. Qwen Dense adoption authorizes no new Generation
+  execution, Retrieval replay, Dense rebuild,
 budget change, candidate-boundary adoption, reranker, or architecture
 optimization. W7 amendments govern only their completed W7 lineage; the W1
 benchmark contract governs only its historical benchmark path.

@@ -25,12 +25,14 @@ Those are different layers and must not be collapsed into one schema.
 Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
 **CLOSED**. Phase 04's first end-to-end RAG baseline is implemented,
 materialized, and measured over the accepted 16,437-record OBC `zh-cn`
-Canonical snapshot. It includes Retrieval Units, BM25, local BGE Dense, RRF
+Canonical snapshot. It includes Retrieval Units, BM25, accepted Qwen Dense,
+RRF
 Hybrid, deterministic Evidence Assembly, Evidence Packets, and
 provider-neutral Generation contracts.
 
-Read `docs/current-phase.md` for the sole current production/default, Dense
-challenger, reranker, attribution, authorization, and immediate-next status.
+Read `docs/current-phase.md` for the sole current production/default Dense,
+historical challenger, reranker, attribution, authorization, and immediate-next
+status.
 
 Start here:
 

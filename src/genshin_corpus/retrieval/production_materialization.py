@@ -19,10 +19,15 @@ from typing import Any
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.candidate_retrieval import (
+    DEFAULT_QWEN_DENSE_MANIFEST,
     DEFAULT_DENSE_MODEL_REVISION,
     build_dense_index,
     build_lexical_index,
     retrieve_candidates,
+    retrieve_qwen_candidates,
+    retrieve_qwen_candidates_for_query,
+    load_batch_candidate_retriever,
+    qwen_candidates_from_loaded,
 )
 from genshin_corpus.retrieval.evidence_assembly import (
     EvidenceAssemblyConfig,
@@ -149,7 +154,7 @@ def _materialize(
     canonical_manifest_path: Path,
     output_root: Path,
     *,
-    model_dir: Path,
+    model_dir: Path | None,
     queries: Sequence[Mapping[str, Any]],
     ru_config: RetrievalUnitBuildConfig | None = None,
     assembly_config: EvidenceAssemblyConfig | None = None,
@@ -158,6 +163,8 @@ def _materialize(
     expected_model_sha256: str = PINNED_BGE_SMALL_MODEL_SHA256,
     dense_vectors_for_test: Any | None = None,
     runtime_root: Path | None = None,
+    qwen_dense_manifest_path: Path | None = None,
+    qwen_transport: Any | None = None,
 ) -> dict[str, Any]:
     """Build one fresh production-shaped artifact tree and real query packets.
 
@@ -166,16 +173,31 @@ def _materialize(
 
     canonical_manifest_path = Path(canonical_manifest_path)
     output_root = Path(output_root)
-    model_dir = Path(model_dir)
+    model_dir = Path(model_dir) if model_dir is not None else Path(".")
     query_rows = _validate_query_rows(queries)
     _assert_new_output_root(output_root)
-    preflight = preflight_production_inputs(
-        canonical_manifest_path,
-        model_dir,
-        expected_model_sha256=expected_model_sha256,
-        runtime_root=runtime_root,
-        require_dense_runtime=dense_vectors_for_test is None,
-    )
+    if qwen_dense_manifest_path is None:
+        preflight = preflight_production_inputs(
+            canonical_manifest_path,
+            model_dir,
+            expected_model_sha256=expected_model_sha256,
+            runtime_root=runtime_root,
+            require_dense_runtime=dense_vectors_for_test is None,
+        )
+    else:
+        try:
+            profile = profile_canonical_run(Path(canonical_manifest_path), top_n=1)
+        except Exception as exc:
+            raise ProductionMaterializationError("Canonical production preflight failed") from exc
+        preflight = {
+            "canonical_manifest_path": str(canonical_manifest_path),
+            "canonical_run_id": profile["observation_scope"].get("canonical_run_id"),
+            "canonical_status": profile["observation_scope"].get("manifest_status"),
+            "canonical_record_count": profile["observation_scope"].get("manifest_accounted_record_count"),
+            "dense_manifest_path": str(qwen_dense_manifest_path),
+            "dense_model": "qwen3.7-text-embedding",
+            "embedding_dimension": 2048,
+        }
 
     ru_root = output_root / "ru"
     lexical_root = output_root / "lexical"
@@ -189,30 +211,59 @@ def _materialize(
         raise ProductionMaterializationError("W1 manifest changed during reload")
 
     lexical_manifest = build_lexical_index(ru_manifest_path, lexical_root)
-    dense_manifest = build_dense_index(
-        ru_manifest_path,
-        dense_root,
-        model_dir=model_dir,
-        vectors=dense_vectors_for_test,
-    )
+    if qwen_dense_manifest_path is None:
+        dense_manifest = build_dense_index(
+            ru_manifest_path,
+            dense_root,
+            model_dir=model_dir,
+            vectors=dense_vectors_for_test,
+        )
+        dense_manifest_path = dense_root / "metadata" / "manifest.json"
+        retrieval_for_mode = lambda mode, text: retrieve_candidates(
+            mode,
+            lexical_manifest_path=lexical_root / "metadata" / "manifest.json",
+            dense_manifest_path=dense_manifest_path,
+            model_dir=model_dir,
+            query=text,
+            top_k=top_k,
+            rrf_k=rrf_k,
+        )
+    else:
+        dense_manifest_path = Path(qwen_dense_manifest_path)
+        if qwen_transport is None:
+            raise ProductionMaterializationError("Qwen synchronous query transport is required")
+        qwen_batch_retriever = load_batch_candidate_retriever(
+            lexical_root / "metadata" / "manifest.json",
+            dense_manifest_path,
+            accepted_qwen=True,
+        )
+        dense_manifest = qwen_batch_retriever.dense_manifest
+        retrieval_for_mode = None
     if lexical_manifest.get("retrieval_unit_build_identity") != ru_manifest["build_identity"]:
         raise ProductionMaterializationError("lexical artifact is not bound to the W1 RU build")
     if dense_manifest.get("retrieval_unit_build_identity") != ru_manifest["build_identity"]:
         raise ProductionMaterializationError("Dense artifact is not bound to the W1 RU build")
 
+    if qwen_dense_manifest_path is None:
+        qwen_batch_retriever = None
     packets: list[dict[str, Any]] = []
     for query in query_rows:
         query_id, text = query["query_id"], query["query"]
-        for mode in ("lexical", "dense", "hybrid"):
-            candidates = retrieve_candidates(
-                mode,
-                lexical_manifest_path=lexical_root / "metadata" / "manifest.json",
-                dense_manifest_path=dense_root / "metadata" / "manifest.json",
-                model_dir=model_dir,
-                query=text,
+        qwen_candidates = None
+        if qwen_batch_retriever is not None:
+            qwen_candidates = qwen_candidates_from_loaded(
+                qwen_batch_retriever,
+                text,
+                qwen_transport,
                 top_k=top_k,
                 rrf_k=rrf_k,
             )
+        for mode in ("lexical", "dense", "hybrid"):
+            if qwen_candidates is not None:
+                candidates = qwen_candidates[mode]
+            else:
+                assert retrieval_for_mode is not None
+                candidates = retrieval_for_mode(mode, text)
             packet = assemble_deferred_footprint_charge_packet(
                 ru_manifest_path,
                 candidates,
@@ -235,7 +286,7 @@ def _materialize(
         "output_root": str(output_root),
         "ru": {"manifest_path": str(ru_manifest_path), "build_identity": ru_manifest["build_identity"], "row_count": len(units)},
         "lexical": {"manifest_path": str(lexical_root / "metadata" / "manifest.json"), "build_identity": lexical_manifest["arm_build_identity"]},
-        "dense": {"manifest_path": str(dense_root / "metadata" / "manifest.json"), "build_identity": dense_manifest["arm_build_identity"]},
+        "dense": {"manifest_path": str(dense_manifest_path), "build_identity": dense_manifest["arm_build_identity"]},
         "packets": packets,
     }
 
@@ -244,7 +295,7 @@ def materialize_production(
     canonical_manifest_path: Path,
     output_root: Path,
     *,
-    model_dir: Path,
+    model_dir: Path | None = None,
     queries: Sequence[Mapping[str, Any]],
     ru_config: RetrievalUnitBuildConfig | None = None,
     assembly_config: EvidenceAssemblyConfig | None = None,
@@ -252,8 +303,31 @@ def materialize_production(
     rrf_k: int = 60,
     expected_model_sha256: str = PINNED_BGE_SMALL_MODEL_SHA256,
     runtime_root: Path | None = None,
+    qwen_dense_manifest_path: Path = DEFAULT_QWEN_DENSE_MANIFEST,
+    qwen_transport: Any | None = None,
 ) -> dict[str, Any]:
-    """Production surface; always builds Dense vectors from the local model."""
+    """Production surface using the accepted Qwen Dense artifact in place."""
+
+    if runtime_root is not None and not Path(runtime_root).is_dir():
+        raise ProductionMaterializationError("Dense runtime root is unavailable")
+    qwen_dense_manifest_path = Path(qwen_dense_manifest_path)
+    if qwen_transport is None:
+        from genshin_corpus.retrieval.qwen_embedding import (
+            DashScopeQwenEmbeddingConfig,
+            DashScopeQwenEmbeddingTransport,
+        )
+        import os
+
+        endpoint = os.environ.get("DASHSCOPE_QWEN_EMBEDDING_ENDPOINT")
+        region = os.environ.get("DASHSCOPE_QWEN_REGION", "cn-beijing")
+        workspace = os.environ.get("DASHSCOPE_QWEN_WORKSPACE")
+        if not endpoint or not workspace:
+            raise ProductionMaterializationError(
+                "Qwen synchronous query embedding requires DASHSCOPE_QWEN_EMBEDDING_ENDPOINT and DASHSCOPE_QWEN_WORKSPACE"
+            )
+        qwen_transport = DashScopeQwenEmbeddingTransport.from_environment(
+            DashScopeQwenEmbeddingConfig(region=region, workspace=workspace, endpoint=endpoint)
+        )
 
     return _materialize(
         canonical_manifest_path,
@@ -266,6 +340,8 @@ def materialize_production(
         rrf_k=rrf_k,
         expected_model_sha256=expected_model_sha256,
         runtime_root=runtime_root or Path(".local/w6-runtime"),
+        qwen_dense_manifest_path=qwen_dense_manifest_path,
+        qwen_transport=qwen_transport,
     )
 
 
@@ -311,7 +387,7 @@ def _parse_query(value: str) -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Materialize the accepted W1+W2 production RAG baseline")
     parser.add_argument("--canonical-manifest", required=True, type=Path)
-    parser.add_argument("--model-dir", required=True, type=Path)
+    parser.add_argument("--model-dir", type=Path, help="Retained BGE fixture/control path; not used by Qwen production Dense")
     parser.add_argument("--runtime-root", type=Path, default=Path(".local/w6-runtime"))
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--query", action="append", required=True, type=_parse_query, help="JSON object with query_id and query; repeatable")

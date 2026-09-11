@@ -31,6 +31,17 @@ DENSE_INDEX_SCHEMA_VERSION = "phase04-rag-w2-dense-index-0.1"
 CANDIDATE_SCHEMA_VERSION = "phase04-rag-w2-candidate-0.1"
 RRF_FUSION_VERSION = "phase04-rag-w2-rrf-0.1"
 DEFAULT_DENSE_MODEL_REVISION = "7999e1d3359715c523056ef9478215996d62a620"
+DEFAULT_QWEN_DENSE_MANIFEST = Path(
+    ".local/p04-qwen-full-batch-beijing-20260909/final/dense/metadata/manifest.json"
+)
+ACCEPTED_QWEN_DENSE_MODEL = "qwen3.7-text-embedding"
+ACCEPTED_QWEN_DENSE_DIMENSION = 2048
+ACCEPTED_QWEN_DENSE_ROWS = 535802
+ACCEPTED_QWEN_DENSE_ARM_BUILD_IDENTITY = "be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922"
+ACCEPTED_QWEN_DENSE_VECTORS_SHA256 = "4d6337822459ede93f18d5384e37cbbbef4363b830a5e705d788864dc02dfb8a"
+ACCEPTED_QWEN_DENSE_ROWS_SHA256 = "54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701"
+ACCEPTED_QWEN_DENSE_MANIFEST_SHA256 = "6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5"
+ACCEPTED_QWEN_RU_BUILD_IDENTITY = "49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998"
 
 
 class CandidateRetrievalError(ValueError):
@@ -373,7 +384,12 @@ def build_dense_index(
     return manifest
 
 
-def _load_dense(path: Path) -> tuple[Mapping[str, Any], Any, list[Mapping[str, Any]]]:
+def _load_dense(
+    path: Path,
+    *,
+    use_mmap: bool = False,
+    artifacts_already_validated: bool = False,
+) -> tuple[Mapping[str, Any], Any, list[Mapping[str, Any]]]:
     manifest = _mapping(json.loads(Path(path).read_text(encoding="utf-8")), "Dense manifest")
     if manifest.get("status") != "complete" or manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION:
         raise CandidateRetrievalError("Dense manifest is not complete")
@@ -381,10 +397,20 @@ def _load_dense(path: Path) -> tuple[Mapping[str, Any], Any, list[Mapping[str, A
     artifacts = _mapping(manifest.get("artifacts"), "Dense artifacts")
     vectors_path = Path(path).parent.parent / str(_mapping(artifacts.get("vectors"), "vectors descriptor")["path"])
     rows_path = Path(path).parent.parent / str(_mapping(artifacts.get("rows"), "rows descriptor")["path"])
-    vectors_body, rows_body = vectors_path.read_bytes(), rows_path.read_bytes()
-    if sha256(vectors_body).hexdigest() != _mapping(artifacts["vectors"], "vectors descriptor").get("sha256") or sha256(rows_body).hexdigest() != _mapping(artifacts["rows"], "rows descriptor").get("sha256"):
+    vectors_descriptor = _mapping(artifacts["vectors"], "vectors descriptor")
+    rows_descriptor = _mapping(artifacts["rows"], "rows descriptor")
+    if not artifacts_already_validated and (
+        _sha256_path(vectors_path) != vectors_descriptor.get("sha256")
+        or _sha256_path(rows_path) != rows_descriptor.get("sha256")
+    ):
         raise CandidateRetrievalError("Dense artifact SHA-256 mismatch")
-    vectors = np.load(BytesIO(vectors_body), allow_pickle=False)
+    try:
+        if use_mmap:
+            vectors = np.load(vectors_path, allow_pickle=False, mmap_mode="r")
+        else:
+            vectors = np.load(BytesIO(vectors_path.read_bytes()), allow_pickle=False)
+    except (OSError, ValueError) as exc:
+        raise CandidateRetrievalError("Dense vector artifact is unreadable") from exc
     rows = _read_gzip_jsonl(rows_path)
     if vectors.ndim != 2 or vectors.dtype != np.dtype("float32"):
         raise CandidateRetrievalError("Dense vector dtype/shape contract is invalid")
@@ -404,6 +430,59 @@ def _load_dense(path: Path) -> tuple[Mapping[str, Any], Any, list[Mapping[str, A
             raise CandidateRetrievalError("Dense row mapping is invalid or non-deterministic")
         seen.add(row["unit_id"])
     return manifest, vectors, rows
+
+
+def _sha256_path(path: Path) -> str:
+    digest = sha256()
+    try:
+        with Path(path).open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+    except OSError as exc:
+        raise CandidateRetrievalError(f"Dense artifact is unreadable: {path}") from exc
+    return digest.hexdigest()
+
+
+def validate_accepted_qwen_dense_manifest(path: Path) -> Mapping[str, Any]:
+    """Validate the immutable accepted Qwen corpus artifact binding."""
+
+    manifest_path = Path(path)
+    try:
+        manifest_body = manifest_path.read_bytes()
+        manifest = _mapping(json.loads(manifest_body.decode("utf-8")), "Qwen Dense manifest")
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CandidateRetrievalError("Qwen Dense manifest is unreadable") from exc
+    if sha256(manifest_body).hexdigest() != ACCEPTED_QWEN_DENSE_MANIFEST_SHA256:
+        raise CandidateRetrievalError("Qwen Dense manifest SHA-256 does not match accepted binding")
+    artifacts = _mapping(manifest.get("artifacts"), "Qwen Dense artifacts")
+    vectors = _mapping(artifacts.get("vectors"), "Qwen vectors descriptor")
+    rows = _mapping(artifacts.get("rows"), "Qwen rows descriptor")
+    if (
+        manifest.get("status") != "complete"
+        or manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION
+        or manifest.get("arm") != "dense"
+        or manifest.get("model_name") != ACCEPTED_QWEN_DENSE_MODEL
+        or manifest.get("model_revision") is not None
+        or manifest.get("model_sha256") is not None
+        or manifest.get("embedding_dimension") != ACCEPTED_QWEN_DENSE_DIMENSION
+        or manifest.get("dtype") != "float32"
+        or manifest.get("normalization") != "L2"
+        or manifest.get("instruction") is not None
+        or manifest.get("arm_build_identity") != ACCEPTED_QWEN_DENSE_ARM_BUILD_IDENTITY
+        or manifest.get("retrieval_unit_build_identity") != ACCEPTED_QWEN_RU_BUILD_IDENTITY
+        or manifest.get("row_count") != ACCEPTED_QWEN_DENSE_ROWS
+        or vectors.get("sha256") != ACCEPTED_QWEN_DENSE_VECTORS_SHA256
+        or rows.get("sha256") != ACCEPTED_QWEN_DENSE_ROWS_SHA256
+        or vectors.get("byte_count") <= 0
+        or rows.get("row_count") != ACCEPTED_QWEN_DENSE_ROWS
+    ):
+        raise CandidateRetrievalError("Qwen Dense manifest does not match accepted binding")
+    root = manifest_path.parent.parent
+    if _sha256_path(root / str(vectors.get("path"))) != ACCEPTED_QWEN_DENSE_VECTORS_SHA256:
+        raise CandidateRetrievalError("Qwen Dense vectors SHA-256 does not match accepted binding")
+    if _sha256_path(root / str(rows.get("path"))) != ACCEPTED_QWEN_DENSE_ROWS_SHA256:
+        raise CandidateRetrievalError("Qwen Dense rows SHA-256 does not match accepted binding")
+    return manifest
 
 
 def dense_candidates(dense_manifest_path: Path, query_vector: Any, *, top_k: int = 20, query_instruction: str | None = None) -> list[dict[str, Any]]:
@@ -515,6 +594,39 @@ def dense_candidates_local(
     return dense_candidates(dense_manifest_path, vector, top_k=top_k, query_instruction=instruction)
 
 
+def dense_candidates_qwen(
+    dense_manifest_path: Path,
+    query: str,
+    transport: Any,
+    *,
+    top_k: int = 20,
+) -> list[dict[str, Any]]:
+    """Retrieve against the accepted Qwen corpus using one synchronous query call."""
+
+    validate_accepted_qwen_dense_manifest(Path(dense_manifest_path))
+    from .qwen_embedding import encode_qwen_query
+
+    query_vector, request, response = encode_qwen_query(transport, query)
+    manifest, vectors, indexed_rows = _load_dense(
+        Path(dense_manifest_path),
+        use_mmap=True,
+        artifacts_already_validated=True,
+    )
+    rows = _dense_candidates_from_loaded(
+        manifest,
+        vectors,
+        indexed_rows,
+        query_vector,
+        top_k=top_k,
+        query_instruction=None,
+    )
+    for row in rows:
+        row["retrieval"]["query_request_identity"] = request.request_identity
+        row["retrieval"]["query_returned_model"] = response.returned_model
+        row["retrieval"]["query_returned_role"] = response.returned_role
+    return rows
+
+
 def hybrid_candidates(lexical: Sequence[Mapping[str, Any]], dense: Sequence[Mapping[str, Any]], *, lexical_build_identity: str, dense_build_identity: str, top_k: int = 20, rrf_k: int = 60) -> list[dict[str, Any]]:
     top_k, rrf_k = _positive_int(top_k, "top_k"), _positive_int(rrf_k, "rrf_k")
     components: dict[str, dict[str, Any]] = {}
@@ -554,7 +666,7 @@ class BatchCandidateRetriever:
         query: str,
         query_vector: Any,
         *,
-        instruction: str,
+        instruction: str | None,
         top_k: int = 20,
         k1: float = 1.2,
         b: float = 0.75,
@@ -597,11 +709,20 @@ class BatchCandidateRetriever:
 def load_batch_candidate_retriever(
     lexical_manifest_path: Path,
     dense_manifest_path: Path,
+    *,
+    accepted_qwen: bool = False,
 ) -> BatchCandidateRetriever:
     """Load and fully validate both existing production indexes once per batch."""
 
     lexical_manifest, lexical_rows = _load_lexical(Path(lexical_manifest_path))
-    dense_manifest, dense_vectors, dense_rows = _load_dense(Path(dense_manifest_path))
+    dense_path = Path(dense_manifest_path)
+    if accepted_qwen:
+        validate_accepted_qwen_dense_manifest(dense_path)
+    dense_manifest, dense_vectors, dense_rows = _load_dense(
+        dense_path,
+        use_mmap=accepted_qwen,
+        artifacts_already_validated=accepted_qwen,
+    )
     return BatchCandidateRetriever(
         lexical_manifest=lexical_manifest,
         lexical_rows=lexical_rows,
@@ -642,3 +763,112 @@ def retrieve_candidates(mode: str, *, lexical_manifest_path: Path | None = None,
         dense_manifest, _, _ = _load_dense(Path(dense_manifest_path))
         return hybrid_candidates(lexical_rows, dense_rows, lexical_build_identity=str(lexical_manifest["arm_build_identity"]), dense_build_identity=str(dense_manifest["arm_build_identity"]), top_k=top_k, rrf_k=rrf_k)
     raise CandidateRetrievalError(f"unknown retrieval mode: {mode}")
+
+
+def retrieve_qwen_candidates(
+    mode: str,
+    *,
+    lexical_manifest_path: Path | None = None,
+    dense_manifest_path: Path = DEFAULT_QWEN_DENSE_MANIFEST,
+    query: str,
+    transport: Any,
+    top_k: int = 20,
+    rrf_k: int = 60,
+) -> list[dict[str, Any]]:
+    """Production-facing Qwen Dense/Hybrid retrieval; BGE path is untouched."""
+
+    if mode not in {"dense", "hybrid"}:
+        return retrieve_candidates(mode, lexical_manifest_path=lexical_manifest_path, query=query, top_k=top_k, rrf_k=rrf_k)
+    if mode == "dense":
+        return dense_candidates_qwen(dense_manifest_path, query, transport, top_k=top_k)
+    if lexical_manifest_path is None:
+        raise CandidateRetrievalError("lexical manifest is required")
+    lexical = lexical_candidates(lexical_manifest_path, query, top_k=top_k)
+    dense = dense_candidates_qwen(dense_manifest_path, query, transport, top_k=top_k)
+    lexical_manifest, _ = _load_lexical(Path(lexical_manifest_path))
+    dense_manifest = validate_accepted_qwen_dense_manifest(Path(dense_manifest_path))
+    return hybrid_candidates(
+        lexical,
+        dense,
+        lexical_build_identity=str(lexical_manifest["arm_build_identity"]),
+        dense_build_identity=str(dense_manifest["arm_build_identity"]),
+        top_k=top_k,
+        rrf_k=rrf_k,
+    )
+
+
+def retrieve_qwen_candidates_for_query(
+    *,
+    lexical_manifest_path: Path,
+    dense_manifest_path: Path = DEFAULT_QWEN_DENSE_MANIFEST,
+    query: str,
+    transport: Any,
+    top_k: int = 20,
+    rrf_k: int = 60,
+) -> dict[str, list[dict[str, Any]]]:
+    """Compute lexical, Qwen Dense, and Hybrid windows with one Qwen call."""
+
+    dense_manifest = validate_accepted_qwen_dense_manifest(Path(dense_manifest_path))
+    from .qwen_embedding import encode_qwen_query
+
+    query_vector, request, response = encode_qwen_query(transport, query)
+    lexical = lexical_candidates(lexical_manifest_path, query, top_k=top_k)
+    _, vectors, dense_rows = _load_dense(
+        Path(dense_manifest_path),
+        use_mmap=True,
+        artifacts_already_validated=True,
+    )
+    dense = _dense_candidates_from_loaded(
+        dense_manifest,
+        vectors,
+        dense_rows,
+        query_vector,
+        top_k=top_k,
+        query_instruction=None,
+    )
+    for row in dense:
+        row["retrieval"]["query_request_identity"] = request.request_identity
+        row["retrieval"]["query_returned_model"] = response.returned_model
+        row["retrieval"]["query_returned_role"] = response.returned_role
+    lexical_manifest, _ = _load_lexical(Path(lexical_manifest_path))
+    hybrid = hybrid_candidates(
+        lexical,
+        dense,
+        lexical_build_identity=str(lexical_manifest["arm_build_identity"]),
+        dense_build_identity=str(dense_manifest["arm_build_identity"]),
+        top_k=top_k,
+        rrf_k=rrf_k,
+    )
+    return {"lexical": lexical, "dense": dense, "hybrid": hybrid}
+
+
+def qwen_candidates_from_loaded(
+    retriever: BatchCandidateRetriever,
+    query: str,
+    transport: Any,
+    *,
+    instruction: str | None = None,
+    top_k: int = 20,
+    rrf_k: int = 60,
+) -> dict[str, list[dict[str, Any]]]:
+    """Use one validated Dense state and one Qwen request for all three modes."""
+
+    from .qwen_embedding import encode_qwen_query
+
+    query_vector, request, response = encode_qwen_query(transport, query)
+    candidates = retriever.candidates_for_query(
+        query,
+        query_vector,
+        instruction=instruction,
+        top_k=top_k,
+        rrf_k=rrf_k,
+    )
+    for mode in ("dense", "hybrid"):
+        rows = candidates[mode]
+        for row in rows:
+            retrieval = row.get("retrieval")
+            if isinstance(retrieval, dict):
+                retrieval["query_request_identity"] = request.request_identity
+                retrieval["query_returned_model"] = response.returned_model
+                retrieval["query_returned_role"] = response.returned_role
+    return candidates
