@@ -1,21 +1,20 @@
 # Current Phase
 
 `docs/current-phase.md` is the sole authority for present project state,
-production/default behavior, and authorization. Historical checkpoint detail is
-preserved in `docs/research/phase-04/p04-rag-historical-checkpoint-register.md`.
+production/default behavior, and authorization. The compact Phase 04 checkpoint
+index is `docs/research/phase-04/p04-rag-historical-checkpoint-register.md`;
+its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
 **Phase 04 - First End-to-End RAG (post-W7 direction reset).** The first
 end-to-end baseline is implemented, materialized, and measured. Phase 01 Raw,
 Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
-remains `zh-CN` MiHoYo OBC.
+remains `zh-cn` MiHoYo OBC.
 
-**Current engineering work unit: none authorized.** This documentation-only
-authority audit changes neither technical authorization nor production
-behavior. Historical W7/Frozen48 and W1 benchmark-production routes remain
-auditable but are stopped/superseded as governing paths for the post-W7 RAG
-baseline.
+**Current engineering work unit: none authorized.** Historical W7/Frozen48 and
+W1 benchmark-production routes remain auditable but are stopped/superseded as
+governing paths for the post-W7 RAG baseline.
 
 ## Current production baseline
 
@@ -61,8 +60,9 @@ baseline.
   directional Qwen signal with overall Packet-semantic utility highly similar
   to BGE. It establishes neither clear superiority nor a production Dense
   switch.
-- The current 14Q both-insufficient root-cause attribution artifact is
-  **PARTIAL / NOT ACCEPTED, pending correction**. Its `0/14 strict
+- The current 14Q both-insufficient root-cause attribution is a
+  **non-authoritative local diagnostic, PARTIAL / NOT ACCEPTED, pending
+  correction and independent re-review**. Its `0/14 strict
   rerank-relevant` conclusion does not reconcile the existing Q046
   ranking-boundary signal and later Formal Deferred-Footprint-Charge evidence
   that both verified Q046 decisive carrier occurrences can be mechanically
@@ -96,8 +96,9 @@ optimization route.
 - Formal Deferred-Footprint-Charge historical experiment: `docs/research/phase-04/p04-a1-3-deferred-footprint-charge.md`
 - W1-W6 historical benchmark and experiment facts: `docs/research/phase-04/`
 - W7 historical authority: `docs/phases/phase-04-w7-unit3b-*.md`
-- Consolidated Phase 04 checkpoint chronology and artifact identities:
-  `docs/research/phase-04/p04-rag-historical-checkpoint-register.md`
+- Compact Phase 04 checkpoint index and artifact identities:
+  `docs/research/phase-04/p04-rag-historical-checkpoint-register.md` (the
+  detailed chronology is lookup-only in its linked archive)
 
 All new work must read this file, the applicable Phase 04 contract, and the
 relevant evidence owner before it changes scope or status.

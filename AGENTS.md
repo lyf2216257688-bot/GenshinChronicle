@@ -10,7 +10,7 @@ AI Semantic / Knowledge layers are explicitly deferred until real corpus data an
 
 ## Active scope
 
-`docs/current-phase.md` is the sole source of truth for the active phase,
+`docs/current-phase.md` is the sole current-state documentation authority for the active phase,
 current authorization, production/default behavior, and immediate next action.
 This file owns durable repository-wide engineering and layer-boundary
 instructions rather than duplicating current project status.
@@ -40,7 +40,7 @@ semantics, or semantic equivalence.
 Raw/Collector constraints below remain binding whenever Raw acquisition or Collector behavior is touched, even though Phase 01 is closed.
 
 - Raw API responses are immutable evidence: do not rewrite, normalize, prune, or overwrite them.
-- `zh-cn` is the current target, but locale must remain a configuration value rather than a permanent single-language assumption.
+- Locale must remain configurable and must not be hard-coded; current production locale/source are owned by `docs/current-phase.md`.
 - Discover from official structures: channel tree -> channel listings -> content inventory -> detail responses.
 - Do not brute-force candidate content identifiers (including historically observed `content_id` values).
 - Treat the stable retrievable content key as evidence-driven: it must come from a contract verified and promoted into the current Phase specification. Phase 01 currently uses the verified `content_id` contract; do not treat that as a permanent assumption about future API versions.
@@ -50,7 +50,12 @@ Raw/Collector constraints below remain binding whenever Raw acquisition or Colle
 - Do not bypass access controls, anti-bot protections, 403/429 responses, or other site protections.
 - API contracts must be evidence-driven. Never invent endpoints, required headers, or schemas from assumptions.
 - Never commit cookies, authorization material, or unredacted browser cURL containing secrets. Put sensitive local samples under `.local/`.
-- Evidence Packet convenience must not cause loss of structure, provenance, traceability, recall, ranking, context quality, or other information needed for final RAG quality.
+- Evidence Packet convenience must not cause corruption of structure, provenance,
+  traceability, or other information required by an upstream contract. It may
+  perform deterministic query-time ranking, finite-budget admission, and
+  candidate truncation only when the operating-point policy records the
+  disposition in an auditable form; silent evidence destruction and invented semantics are
+  not permitted.
 
 ## Deferred and separately authorized layers
 
@@ -67,8 +72,11 @@ do **not** prematurely implement or freeze:
 - knowledge graph / semantic layer
 - UI
 
-Unknown or unsupported structures must be preserved rather than guessed or
-silently discarded in every derived layer.
+Source/upstream evidence remains preserved and auditable by its owner; each
+derived layer follows its explicit contract. Unsupported or non-indexable
+material may be skipped only through explicit audited, fail-closed handling.
+Never guess unsupported semantics or silently discard material whose contract
+requires accounting.
 
 Future directories or abstractions should not be created merely because they appear in the long-term architecture.
 
@@ -87,6 +95,11 @@ Future directories or abstractions should not be created merely because they app
   qualify its historical checkpoint and current relation instead of erasing the
   past. `docs/current-phase.md` is a current-state record, not an append-only
   chronology.
+- `docs/current-phase.md` is the sole current-state documentation authority;
+  committed source and configuration define executable behavior, and tests
+  verify that behavior and its contracts. If executable behavior and current
+  documentation materially disagree, fail closed on the affected conclusion
+  and surface the inconsistency.
 - Maintain README, roadmap, architecture overview, project structure, and the
   data README only when their owned facts change. Change this file only for
   durable repository-wide rules; use ADRs only for costly or hard-to-reverse

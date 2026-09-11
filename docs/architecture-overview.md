@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Build a reliable official-text foundation first. More ambitious semantic research features are optional future layers, not Phase 01 requirements.
+Build a reliable official-text foundation. More ambitious semantic research
+features are optional layers, not requirements of the foundational phases.
 
 ## Long-term pipeline
 
@@ -17,7 +18,9 @@ SOURCE / RAW
 ### 1. Source / Raw
 Answers: **What did we obtain, from which official source, and when?**
 
-Likely concepts later include source system, source item, source version, raw payload, crawl run, and crawl observation. These are architectural concepts, not a request to implement a database now.
+Architectural concepts include source system, source item, source version, raw
+payload, crawl run, and crawl observation. These are concepts, not a request to
+implement a database now.
 
 Raw is evidence and reprocessing input. It is not the normal application query layer.
 
@@ -46,7 +49,10 @@ Representation may be normalized through explicit deterministic rules;
 meaning, wording, provenance, and semantic equivalence must not be silently
 corrected or inferred.
 
-Current corpus policy: maintain one active Chinese Canonical corpus rather than duplicate Chinese passages for every source. The architecture must still allow future locales.
+The architecture supports additional sources and locales while preserving
+source-specific lineage. It establishes no cross-source semantic identity,
+deduplication, or equivalence policy; any such behavior requires an explicit
+contract.
 
 ### 4. Derived Retrieval / RAG
 Full-text and vector representations are rebuildable derivatives. Retrieval
@@ -62,7 +68,7 @@ RAG answers are query results. They must not automatically become Canonical fact
 
 - Source/API organization != game-content organization != research interpretation.
 - Raw evidence remains reproducible and auditable.
-- Later artifacts must be traceable back to Raw.
+- Derived artifacts must be traceable back to Raw.
 - Unknown structures are recorded, not silently dropped.
 - Deterministic work belongs in code; semantic interpretation should not be disguised as deterministic parsing.
 - Long-term extensibility is preserved without implementing future layers prematurely.
@@ -77,7 +83,13 @@ Parsed-run dependencies.
 
 ## RAG-first product principle
 
-GenshinChronicle's final product goal is high-quality RAG. Evidence Packets provide a free/manual path and an auditable evidence-output layer, but must not drive lossy upstream choices. Parsed, Canonical, and retrieval design must preserve or improve retrieval quality, recall, ranking, context quality, structural information, provenance, and traceability back to Raw. Evidence Packet convenience is never a reason to discard information needed by future RAG.
+GenshinChronicle's final product goal is high-quality RAG. Evidence Packets
+provide a free/manual path and an auditable evidence-output layer, but must not
+irreversibly destroy upstream structural, provenance, or audit evidence merely
+for Packet convenience. Deterministic query-time ranking, Top-K, finite-budget
+admission, and audited omission are permitted operating-point behavior when
+their disposition is explicit and auditable; they are not claims of improved
+recall, ranking, or context quality.
 
 ## Current implementation boundary
 

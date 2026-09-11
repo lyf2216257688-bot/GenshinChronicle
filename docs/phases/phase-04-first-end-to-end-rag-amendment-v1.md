@@ -13,6 +13,11 @@
 > authorization owner. Its later production/default, challenger, and
 > Generation decisions supersede any current-looking plan-time wording below.
 
+> Sections 1-15 preserve the historical Plan-time contract. Their `must` and
+> `should` language describes that plan, not an outstanding task or current
+> runtime input; verify completed behavior from committed source and
+> `docs/current-phase.md`.
+
 ## 1. Why this amendment exists
 
 Phase 04 W1–W7 produced useful retrieval and benchmark-construction evidence, but the project spent too much
@@ -395,16 +400,18 @@ This is lightweight reproducibility, not a return to W7-style benchmark governan
 
 ## 13. First end-to-end evaluation
 
-The user will manually extract approximately 70 human-authored Genshin knowledge questions from:
+The historical Plan called for manual extraction of approximately 70
+human-authored Genshin knowledge questions from:
 
 ```text
 BV1dMBLYTEwt
 BV1RpiMBKEQo
 ```
 
-The first version does not require a new complex benchmark-production protocol or exhaustive gold-evidence annotation.
+At Plan time, the first version did not require a new complex benchmark-production
+protocol or exhaustive gold-evidence annotation.
 
-Minimum question input:
+Historical Plan-time question schema:
 
 ```text
 question_id
@@ -412,7 +419,13 @@ question
 expected_answer
 ```
 
-The RAG evaluation flow should make it practical to inspect:
+The implemented M2 runtime accepted only `question_id` and `question`. The
+reference/expected answer and human review were review-only sidecars and must
+not be supplied to Retrieval, Evidence Assembly, Evidence Packets, Generation,
+or request identity merely because `expected_answer` appears in this historical
+schema.
+
+The planned RAG evaluation flow was to make it practical to inspect:
 
 ```text
 BM25 evidence
@@ -423,14 +436,14 @@ generated answer
 citations
 ```
 
-The user will manually review:
+The historical review plan was:
 
 ```text
 Evidence = PASS / PARTIAL / FAIL
 Answer   = PASS / PARTIAL / FAIL
 ```
 
-Failed cases may then be attributed as needed:
+Failed cases were to be attributed as needed:
 
 ```text
 R = Retrieval
@@ -503,9 +516,9 @@ Principle:
 
 ---
 
-## 16. Completed first implementation boundary
+## 16. Historical implementation boundary
 
-The reviewed Plan was approved and **P04-RAG-W1** implemented the first
+At the historical closure of this Plan, **P04-RAG-W1** implemented the first
 bounded layer below candidate retrieval:
 
 ```text
@@ -528,13 +541,14 @@ retrieval audit metadata while W1 RU/Assembly remain provenance authority.
 No production-scale corpus build, benchmark production, or GenerationProvider
 was run in W2.
 
-The completed Plan answered the following from the live repository:
+At that historical closure, the Plan answered the following from the live
+repository:
 
-Its central question is:
+Its central question was:
 
 > **How should the current real Canonical data be transformed into Retrieval Units, and how should context be restored in the simplest deterministic Evidence Assembly design?**
 
-The Plan must explicitly answer:
+The Plan was required to answer:
 
 1. What the current Canonical structures/addresses actually provide.
 2. Which Canonical structures should become Retrieval Units for each major content type.
@@ -551,6 +565,13 @@ The Plan must explicitly answer:
 
 Later work must retain the same Canonical provenance and deterministic
 assembly invariants, and requires its own scoped authorization.
+
+Historical model, provider, default, and first-version execution instructions
+above are not current runtime authority. The explicitly stated durable
+principles of provenance, layer separation, provider neutrality, and
+deterministic/auditable boundaries remain contract guidance; current
+implementation, adoption, and defaults are owned by `docs/current-phase.md`
+and committed source/configuration.
 
 ---
 

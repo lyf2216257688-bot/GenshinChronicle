@@ -9,8 +9,9 @@
 ## Purpose and scope
 
 This addendum closes the post-incident authority gap for classifying an
-otherwise-valid persisted Attempt 1 quality/pair-consistency `REJECT`. It
-governs future Unit3B repair, re-authorization, retry, and exposure only. It
+otherwise-valid persisted Attempt 1 quality/pair-consistency `REJECT`. Within
+an explicitly re-authorized future run of the historical W7 lineage, it governs
+Unit3B repair, re-authorization, retry, and exposure only. It
 does not change semantic criteria, quality criteria, C1 criteria, feedback
 projection, retry limit, queue rules, quotas, selection, or scientific
 outcomes.
@@ -18,17 +19,18 @@ outcomes.
 ## Status and effectiveness
 
 - Decision status: **TECHNICAL-LEAD APPROVED**.
-- Repository authority status: **EFFECTIVE / FROZEN only at the first accepted
-  authority checkpoint that commits this addendum**.
+- Repository authority status: **EFFECTIVE / FROZEN at accepted checkpoint
+  `46fb3aa`** (the first checkpoint committing this addendum).
 
-Repository effectiveness begins only after actual technical-lead docs review
-and an accepted checkpoint commit.
+This historical addendum became repository-effective and frozen at accepted
+checkpoint `46fb3aa`, after the technical-lead documentation review.
 
 ## Historical non-retroactivity
 
 This addendum does not rewrite the frozen authority that governed the failed
-execution. It applies only to future Unit3B repair, re-authorization, and
-retry after becoming repository-effective.
+execution. It could apply only to future Unit3B repair, re-authorization, and
+retry after explicit re-authorization of the historical W7 lineage and after
+becoming repository-effective.
 
 ## Normative material-quality retry rule
 
@@ -76,7 +78,7 @@ and wiring remain **NOT IMPLEMENTED / BLOCKED PENDING IMPLEMENTATION GATE**.
 
 ## Future implementation gate
 
-The later repair may add only the minimum persisted representation and wiring
+If W7 repair is explicitly re-authorized, it may add only the minimum persisted representation and wiring
 needed to carry the authorized disposition through the sanctioned workflow,
 reuse existing identity/integrity validation, and fail closed on absent or
 ambiguous state. It must not invent new scientific criteria or infer

@@ -51,9 +51,10 @@ Later production/default and challenger decisions are recorded only in
   choices, not permanent winners.
 - W6 Dense evidence is closed for that pilot only; its follow-up boundaries do
   not supersede post-W7 Phase 04 authority.
-- No Phase 03 Retrieval integration blocker is currently known. Observation
-  local IDs, heterogeneous values, incomplete roles, and dialogue uncertainty
-  are Retrieval concerns to handle in rebuildable derivatives.
+- At the completed P04-W1 checkpoint, no Phase 03 Retrieval integration blocker
+  was known. Observation-local IDs, heterogeneous values, incomplete roles, and
+  dialogue uncertainty were Retrieval concerns to handle in rebuildable
+  derivatives.
 
 ## Historical P04-W1 deliverables and acceptance
 

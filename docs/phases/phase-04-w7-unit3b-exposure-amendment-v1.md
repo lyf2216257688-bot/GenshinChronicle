@@ -8,16 +8,17 @@
 ## Purpose and scope
 
 This addendum records the post-incident authority for Unit3B candidate-body
-exposure ordering and the sanctioned application boundary. It governs future
-Unit3B repair, re-authorization, and retry only. It does not change semantic,
+exposure ordering and the sanctioned application boundary. Within an explicitly
+re-authorized future run of the historical W7 lineage, it governs Unit3B repair,
+re-authorization, and retry only. It does not change semantic,
 quality, C1, feedback, retry-limit, queue, quota, selection, or scientific
-outcome criteria.
+outcome criteria. It does not itself authorize or restart W7.
 
 ## Status and effectiveness
 
 - Decision status: **TECHNICAL-LEAD APPROVED**.
-- Repository authority status: **EFFECTIVE / FROZEN only at the first accepted
-  authority checkpoint that commits this addendum**.
+- Repository authority status: **EFFECTIVE / FROZEN at accepted checkpoint
+  `2f78e85`** (the first checkpoint committing this addendum).
 
 This document is not repository-effective before that checkpoint and its actual
 technical-lead diff review.
@@ -31,9 +32,13 @@ non-retroactive.
 
 ## Exposure readiness and terminality
 
-The authoritative rule for future runs is:
+For any explicitly re-authorized future run of this historical W7 lineage, the
+following exposure rule is mandatory:
 
 `candidate N full lifecycle terminal -> candidate N+1 body may be exposed`
+
+All terminality, exposure, and fail-closed requirements below are binding only
+for that explicitly re-authorized run.
 
 Readiness is derived only from validated persisted state. `TERMINAL` is an
 exposure-readiness/lifecycle state, not a scientific outcome, selection status,
@@ -79,12 +84,12 @@ No Attempt 3 exists. The exact ACCEPT terminal states are therefore:
 
 ## Sanctioned application exposure boundary
 
-The production semantic-facing path must mechanically derive the current
-candidate from validated persisted state and expose exactly one authorized body.
-It must refuse future candidates, caller-selected arbitrary candidate/index
-requests, and batch/enumeration/multi-candidate requests. Semantic-facing code
-must not receive a full-pack `records` interface, full-pack store capability, or
-pack iterator.
+If the historical W7 lineage is explicitly re-authorized, the sanctioned
+semantic-facing path must derive the current candidate from validated persisted
+state and expose exactly one authorized body. It must refuse future candidates,
+caller-selected arbitrary candidate/index requests, and
+batch/enumeration/multi-candidate requests. Semantic-facing code must not receive
+a full-pack `records` interface, full-pack store capability, or pack iterator.
 
 ## Trusted executor and W7 non-goals
 
@@ -101,9 +106,11 @@ frameworks, or equivalent sandbox infrastructure.
 
 ## Violation and BLOCKED behavior
 
-Unauthorized exposure through the sanctioned path, including a future candidate,
-caller-selected index, multi-candidate request, or invalid/ambiguous/tampered
-persisted state, must mechanically fail closed. Direct pack access that bypasses
+If the historical W7 lineage is explicitly re-authorized, unauthorized exposure
+through that sanctioned path, including a future candidate, caller-selected
+index, multi-candidate request, or invalid/ambiguous/tampered persisted state,
+must mechanically fail closed.
+Direct pack access that bypasses
 the sanctioned path is not claimed to be mechanically prevented or detected at
 the OS/filesystem level; if observed, it invalidates the run and is `BLOCKED`
 under the trusted-executor procedure. Identity/configuration drift is also
@@ -111,7 +118,7 @@ under the trusted-executor procedure. Identity/configuration drift is also
 
 ## Repair acceptance requirements
 
-Later repair must preserve B-0 persistence/write-order behavior and add synthetic
+If W7 repair is explicitly re-authorized, it must preserve B-0 persistence/write-order behavior and add synthetic
 regressions proving: current candidate allowed; future candidate refused;
 caller-selected candidate/index refused; batch/enumeration refused; exact
 post-transition advancement; and deterministic resume. Each negative test must
@@ -119,7 +126,7 @@ isolate one exposure invariant and fail for that intended reason.
 
 ## Future ZERO-EXPOSURE preflight
 
-Before any retry, mechanically verify: authorized source/checkpoint identity;
+Before any explicitly re-authorized W7 retry, mechanically verify: authorized source/checkpoint identity;
 accepted A-2 manifest/pack identity and binding; authorized fresh/resume runtime
 state; approved exposure-controller implementation/configuration identity; and
 persisted position/readiness consistency. Proof that the trusted executor lacks

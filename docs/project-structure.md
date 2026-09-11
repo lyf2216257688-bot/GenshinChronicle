@@ -27,8 +27,9 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Unit and representation
   builders, deterministic BM25/local Dense/RRF candidate retrieval,
   deterministic Evidence Assembly and Evidence Packets, production
-  materialization, comparison/parity tools, and isolated Qwen Dense challenger
-  tooling. It owns rebuildable local artifacts, not a serving system or a
+  materialization, comparison/parity tools, and isolated Dense
+  challenger/comparison tooling. It owns rebuildable local artifacts, not a
+  serving system or a
   permanent technology winner.
 - `src/genshin_corpus/generation/`: provider-neutral Generation contracts,
   generation-visible Evidence Packet projection, result/citation-integrity
