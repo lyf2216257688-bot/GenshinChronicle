@@ -1,5 +1,11 @@
 # P04-W2 — Derived Retrieval Representation + Lexical Baseline
 
+> Historical checkpoint / current relation: this note records the completed W2
+> experiment. Its technology non-selection and future-work wording apply to
+> that checkpoint; they do not override the implemented post-W7 RAG baseline.
+> Current production/default and authorization facts are in
+> `docs/current-phase.md`.
+
 This note records one deterministic offline experiment over accepted Canonical
 run `phase03-batch5b-p01eb-full-20260824`. All counts and metrics below are
 observations of that run and the deliberately small benchmark-v0 seed; they do

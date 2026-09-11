@@ -1,5 +1,10 @@
 # P04-W1 Retrieval Benchmark Contract
 
+> Historical checkpoint / current relation: this is the W1 benchmark contract
+> and seed-evaluation evidence owner. It is not the current product evaluation
+> authority after the post-W7 first end-to-end RAG direction reset; see
+> `docs/current-phase.md` for current status and authorization.
+
 Schema version: `phase04-benchmark-0.1`.
 
 The benchmark is an evaluation artifact, not a Canonical semantic layer. Its

@@ -1,5 +1,10 @@
 # P04-W7 Unit3B Exposure Authority Amendment v1
 
+> Historical checkpoint / current relation: this amendment remains the
+> auditable authority for the completed W7 Unit3B lineage only. W7/Frozen48
+> does not govern the post-W7 First End-to-End RAG path or its immediate next
+> gate; those are owned by `docs/current-phase.md`.
+
 ## Purpose and scope
 
 This addendum records the post-incident authority for Unit3B candidate-body

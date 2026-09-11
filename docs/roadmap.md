@@ -53,11 +53,16 @@ semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **architecture/design next; implementation tentative**
+Status: **active; first end-to-end baseline implemented and measured**
 
-Design Retrieval / Evidence Assembly from the accepted Canonical evidence.
-BM25, vector, hybrid retrieval, chunking, embeddings, reranking, and other
-technology choices remain unselected; implementation requires later approval.
+The first end-to-end baseline now includes rebuildable Retrieval Units,
+BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence
+Assembly, Evidence Packets, and provider-neutral Generation contracts.
+Production/default configuration, challenger status, and authorization remain
+intentionally outside this phase-level roadmap and are owned by
+`docs/current-phase.md`. The first implementation does not freeze a permanent
+retrieval winner, Dense model, reranker, vector database, or Generation
+provider.
 
 ## Later semantic layers
 

@@ -1,5 +1,10 @@
 # P04-W4 — Diagnostic Evidence Expansion + Retrieval-Family Decision Gate
 
+> Historical checkpoint / current relation: this note records the completed W4
+> diagnostic. Its mixed/UNKNOWN gate and non-authorization statements apply
+> only to that historical experiment, not the post-W7 first end-to-end RAG
+> path. See `docs/current-phase.md` for current authority.
+
 本次为测量性诊断，不改变 v0、v0.1、四个 r02 表示、分析器或 scorer。
 
 ## Benchmark and integrity

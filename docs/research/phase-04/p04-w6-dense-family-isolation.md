@@ -1,5 +1,10 @@
 # P04-W6 — Dense family-isolation pilot
 
+> Historical checkpoint / current relation: this note preserves the W6 pilot
+> result. Its lack of a pilot-level Dense winner and its follow-up boundary do
+> not supersede later production/default or challenger decisions; those current
+> facts are owned only by `docs/current-phase.md`.
+
 本实验固定既有 `contextualized_leaf` / r02 文档；W6 新增 pinned-model
 Dense document embeddings 与 row mapping，随后在 frozen benchmark-v0.3 上
 编码 query 并执行 exact-dot evaluation。Canonical、r02、benchmark-v0.3 均未修改。

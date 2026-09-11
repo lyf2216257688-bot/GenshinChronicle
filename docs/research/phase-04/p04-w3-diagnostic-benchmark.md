@@ -1,5 +1,10 @@
 # P04-W3 — Diagnostic Benchmark Expansion + Lexical Failure Isolation
 
+> Historical checkpoint / current relation: this note records the completed W3
+> diagnostic. Its decision gate and non-authorization statements apply only to
+> that historical experiment, not the post-W7 first end-to-end RAG path. See
+> `docs/current-phase.md` for current authority.
+
 本记录是一次只读诊断实验，依赖 Canonical run `phase03-batch5b-p01eb-full-20260824` 与未重建的 r02 Retrieval 表示 `p04-w2-phase03-batch5b-lexical-r02`。它不选择表示、分析器或生产检索技术。
 
 ## Benchmark

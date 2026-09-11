@@ -32,10 +32,15 @@ derived from accepted Parsed observations. Canonical data remains the evidence
 source for later Retrieval derivatives and must not be rewritten by Phase 04
 tools.
 
-## Retrieval experiment artifacts
+## Retrieval and RAG artifacts
 
-`data/retrieval/` is an ignored local destination for explicitly authorized,
-rebuildable Retrieval experiment artifacts. P04-W2 may store compact,
-manifested run-level derived-document artifacts and offline lexical experiment
-results; it does not create a production index, vector store, or serving
-infrastructure.
+`data/retrieval/` is an ignored local destination for authorized, rebuildable
+Phase 04 derivatives: Retrieval Unit builds, lexical/Dense indexes and row
+mappings, deterministic candidate and Evidence Packet materialization, and
+their manifests, ledgers, and provenance. It can hold the local production
+materialization baseline, but is not a serving-system, vector-database, or
+permanent source-of-truth contract.
+
+Experiment-specific, review-only, provider, or challenger evidence that is
+kept under `.local/` remains outside this data-root contract and must not be
+promoted to tracked data merely because it informs a later decision.

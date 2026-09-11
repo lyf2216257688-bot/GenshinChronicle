@@ -24,9 +24,12 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
   deterministic serialization, structural OBC projection, and the local
   Canonical run-storage/pipeline boundary.
-- `src/genshin_corpus/retrieval/`: Phase 04 corpus profiling, benchmark
-  contracts, rebuildable representation experiments, and an offline lexical
-  baseline; it contains no production retrieval engine or index.
+- `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Unit and representation
+  builders, deterministic BM25/local Dense/RRF candidate retrieval,
+  deterministic Evidence Assembly and Evidence Packets, production
+  materialization, comparison/parity tools, and isolated Qwen Dense challenger
+  tooling. It owns rebuildable local artifacts, not a serving system or a
+  permanent technology winner.
 - `src/genshin_corpus/generation/`: provider-neutral Generation contracts,
   generation-visible Evidence Packet projection, result/citation-integrity
   persistence, and explicitly scoped provider adapters. It consumes an
@@ -38,7 +41,8 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `tests/parser/`: deterministic Parsed contract, OBC adapter, and run-pipeline
   tests.
 - `tests/canonical/`: hand-built Canonical contract fixtures and focused tests.
-- `tests/retrieval/`: Phase 04 profiler and benchmark-contract focused tests.
+- `tests/retrieval/`: focused Phase 04 profiler, retrieval, Evidence Assembly,
+  materialization, comparison, and Qwen-tooling tests.
 - `tests/generation/`: focused offline Generation contract and injected
   transport-adapter tests; no test calls a remote Generation API.
 - `tests/fixtures/`: small sanitized source samples used by automated tests.
@@ -51,6 +55,6 @@ the immediate next action are owned by `docs/current-phase.md`.
   ignored by Git.
 
 `data/canonical/` is the ignored local output root for immutable Canonical run
-records and manifests. `data/retrieval/` is ignored and reserved for explicitly
-authorized rebuildable Retrieval experiment artifacts; P04-W1 does not create
-a production index or derived corpus.
+records and manifests. `data/retrieval/` is the ignored local root for
+authorized rebuildable Retrieval/RAG derivatives and materialization outputs;
+its detailed responsibilities are owned by `data/README.md`.

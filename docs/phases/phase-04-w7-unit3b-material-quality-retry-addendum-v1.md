@@ -1,5 +1,11 @@
 # P04-W7 Unit3B Material-Quality Retry Authority Addendum v1
 
+> Historical checkpoint / current relation: this addendum remains the
+> auditable authority for the completed W7 Unit3B lineage only. Its retry and
+> implementation-gate wording does not govern the post-W7 First End-to-End RAG
+> path; current status and authorization are owned by
+> `docs/current-phase.md`.
+
 ## Purpose and scope
 
 This addendum closes the post-incident authority gap for classifying an

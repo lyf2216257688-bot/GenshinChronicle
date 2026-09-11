@@ -1,13 +1,21 @@
 # P04 Evidence Admission Challenger — Deferred-Footprint-Charge Shadow
 
+> Historical checkpoint / current relation: this note preserves the accepted
+> 22Q shadow experiment and its then-valid non-adoption decision. Formal
+> Deferred-Footprint-Charge was later adopted as the production-facing Assembly
+> default through its formal API. That later adoption does not alter this
+> experiment's result, scope, or hashes; current production authority is
+> `docs/current-phase.md`.
+
 ## Status
 
 ACCEPTED / CHECKPOINTED as a diagnostic-only mechanical work unit at B0 =
 `12,000`. The deferred-footprint-charge shadow is mechanically supported on the
 accepted persisted 22Q EXPANDED candidate supply. Its confirmed
-shared-occurrence eligibility defect is repaired. Production/default adoption
-remains **NOT AUTHORIZED**; A1-2-1 v2 remains the accepted/current selector and
-A1-3 remains experimental/shadow.
+shared-occurrence eligibility defect is repaired. At this historical
+checkpoint, production/default adoption remained **NOT AUTHORIZED**;
+A1-2-1 v2 was the accepted/current selector and A1-3 remained
+experimental/shadow.
 
 ## Accepted artifacts
 

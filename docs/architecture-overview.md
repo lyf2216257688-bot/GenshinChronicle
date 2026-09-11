@@ -49,10 +49,12 @@ corrected or inferred.
 Current corpus policy: maintain one active Chinese Canonical corpus rather than duplicate Chinese passages for every source. The architecture must still allow future locales.
 
 ### 4. Derived Retrieval / RAG
-Full-text and vector representations are derived artifacts. A later Retrieval
-contract must derive citation/evidence identity from Canonical lineage rather
-than from embedding chunk identity. Retrieval passage/chunk design remains
-deferred.
+Full-text and vector representations are rebuildable derivatives. Retrieval
+and Evidence Assembly derive citation/evidence identity from Canonical lineage,
+not embedding chunk identity. Candidate retrieval and final Evidence Assembly
+remain distinct: top-k candidates are not automatically final RAG context.
+Evidence Packets are provider-neutral, deterministic evidence interfaces;
+Generation consumes them without owning retrieval or assembly policy.
 
 RAG answers are query results. They must not automatically become Canonical facts.
 
@@ -88,6 +90,10 @@ structural OBC projection, deterministic storage, and the separately reviewed
 traceable Canonical evidence, not semantic completeness, final dialogue
 semantics, cross-snapshot semantic identity/reuse, or Retrieval/RAG quality.
 
-Retrieval / Evidence Assembly architecture and design is the next stage.
-Retrieval schema design, technology selection, and implementation remain
-deferred until separately approved under the RAG-first principle above.
+Phase 04 implements the first end-to-end RAG baseline: versioned Retrieval
+Units, deterministic BM25/local Dense/RRF candidate retrieval, deterministic
+Evidence Assembly, Evidence Packets, and provider-neutral Generation
+contracts. Its current production/default configuration and authorization are
+owned by `docs/current-phase.md`; this architecture document does not select a
+permanent model, retrieval winner, provider, reranker, or serving
+infrastructure.

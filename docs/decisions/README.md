@@ -37,4 +37,7 @@ Date: YYYY-MM-DD
 
 ## Current policy
 
-During Phase 01, prefer evidence gathering and implementation over accumulating architecture decisions. API discoveries belong under `docs/research/phase-01/` until verified and promoted into the phase specification.
+Prefer evidence gathering and implementation over accumulating ADRs. API
+discoveries and scoped experiment results belong in the applicable research
+note until verified and promoted into a durable phase contract or an ADR when
+the decision is costly or hard to reverse.

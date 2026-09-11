@@ -1,5 +1,11 @@
 # P04-W5 — Benchmark Reliability & Coverage Expansion
 
+> Historical checkpoint / current relation: this note records the completed W5
+> benchmark-reliability work unit. Its non-authorization statements apply only
+> to that checkpoint and do not make the W1-W5 benchmark path the current
+> product-evaluation authority. See `docs/current-phase.md` for current
+> authority.
+
 本工作单元只扩展 benchmark annotation reliability 与 diagnostic coverage；不改变
 Canonical、r02 representation、Analyzer A/B 或 scorer，也不选择 Retrieval 技术路线。
 所有下列全量观察依赖 Canonical

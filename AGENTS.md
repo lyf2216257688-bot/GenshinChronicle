@@ -10,12 +10,12 @@ AI Semantic / Knowledge layers are explicitly deferred until real corpus data an
 
 ## Active scope
 
-`docs/current-phase.md` is the source of truth for the active phase, current
-authorization, and immediate next action. This file owns durable repository-
-wide engineering and layer-boundary instructions rather than duplicating the
-current project status.
+`docs/current-phase.md` is the sole source of truth for the active phase,
+current authorization, production/default behavior, and immediate next action.
+This file owns durable repository-wide engineering and layer-boundary
+instructions rather than duplicating current project status.
 
-Before changing code, read:
+Before changing implementation or documentation, read:
 
 1. `docs/current-phase.md`
 2. The specification for the current active phase, if it exists
@@ -52,17 +52,17 @@ Raw/Collector constraints below remain binding whenever Raw acquisition or Colle
 - Never commit cookies, authorization material, or unredacted browser cURL containing secrets. Put sensitive local samples under `.local/`.
 - Evidence Packet convenience must not cause loss of structure, provenance, traceability, recall, ranking, context quality, or other information needed for final RAG quality.
 
-## Deferred layers
+## Deferred and separately authorized layers
 
-Unless a future phase explicitly authorizes them, do **not** prematurely
-implement or freeze:
+Phase 04 Retrieval, Evidence Assembly, and provider-neutral Generation
+contracts exist. Do not treat that implementation as authority to freeze or
+expand adjacent layers. Unless the current phase explicitly authorizes them,
+do **not** prematurely implement or freeze:
 
 - Canonical entity or alias normalization
-- Retrieval-oriented passage/chunk design
-- embeddings or embedding text contracts
-- BM25 / vector / Hybrid retrieval
-- vector databases or rerankers
-- Retrieval/RAG implementation or prompt orchestration
+- a production Dense model switch or new embedding operating point
+- vector databases, ANN, or rerankers
+- Retrieval/RAG reruns, optimization, or prompt/provider expansion
 - AI semantic / claim extraction
 - knowledge graph / semantic layer
 - UI
@@ -72,6 +72,34 @@ silently discarded in every derived layer.
 
 Future directories or abstractions should not be created merely because they appear in the long-term architecture.
 
+## Documentation maintenance
+
+- One fact has one primary documentation owner. `docs/current-phase.md` owns
+  concise present state; phase specifications own durable phase contracts; and
+  research notes own scoped experiment and review facts.
+- When a cohesive work unit changes current phase/status, production/default
+  behavior, authorization/adoption, durable architecture, repository layout or
+  package responsibility, or data-root responsibility, identify and update
+  the affected owners in that same work unit. Do not edit unrelated documents
+  merely for symmetry.
+- Historical research results are not rewritten to match later outcomes. If a
+  historical current-looking statement becomes misleading after supersession,
+  qualify its historical checkpoint and current relation instead of erasing the
+  past. `docs/current-phase.md` is a current-state record, not an append-only
+  chronology.
+- Maintain README, roadmap, architecture overview, project structure, and the
+  data README only when their owned facts change. Change this file only for
+  durable repository-wide rules; use ADRs only for costly or hard-to-reverse
+  durable decisions. Repository documentation work does not itself authorize
+  changes to external migration, history, or collaboration documents.
+
+For relevant state-changing work, before declaring completion, search the
+affected tracked documentation for stale unqualified references to `current`,
+`next`, `immediate next`, `NOT AUTHORIZED`, `NOT STARTED`, accepted/current
+selectors, production/default behavior, current provider/model, and package or
+directory absence/implementation status. A historical statement may remain
+only when its scope is clear enough that it cannot override current authority.
+
 ## Engineering behavior
 - Prefer small, reviewable changes with clear acceptance criteria.
 - Separate observed facts from assumptions and historical leads.
@@ -79,4 +107,5 @@ Future directories or abstractions should not be created merely because they app
 - Tests should use small checked-in fixtures, never depend on the full local Raw corpus.
 - Generated datasets belong under `data/` and are not source code.
 - Before adding dependencies or infrastructure, justify why the active phase and current evidence require them.
-- Update `docs/current-phase.md` only when project status actually changes.
+- Update the relevant documentation owners when their owned facts actually
+  change, following the documentation-maintenance rule above.

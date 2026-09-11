@@ -1,10 +1,17 @@
 # Phase 04 Amendment — First End-to-End RAG v1
 
-> Status: **P04-RAG-W1 Retrieval Unit / deterministic Evidence Assembly core completed; subsequent retrieval and generation work remains separately authorized**
+> Status: **Historical first-end-to-end RAG v1 contract. P04-RAG-W1/W2 and
+> subsequent materialization, Generation, Assembly, and comparison work have
+> progressed beyond this plan-time status.**
 >
-> This document records the current engineering direction for the first runnable end-to-end RAG baseline.
+> This document records the durable first-runnable baseline contract and its
+> historical engineering direction.
 > It is **not** a final architecture freeze. The first version exists to make the complete system runnable,
 > collect real evidence, identify the actual bottleneck, and then iterate.
+>
+> **Current relation:** `docs/current-phase.md` is the sole current-state and
+> authorization owner. Its later production/default, challenger, and
+> Generation decisions supersede any current-looking plan-time wording below.
 
 ## 1. Why this amendment exists
 
@@ -88,7 +95,7 @@ BM25       Local Embedding   structural metadata
                 ↓
        GenerationProvider
                 ↓
-      first implementation: OpenAI
+      historical plan: OpenAI
                 ↓
         Answer + Citations
 ```
@@ -125,7 +132,7 @@ a real need.
 
 Embedding is retrieval infrastructure and must remain independent of the final answer-model provider.
 
-Current first-version direction:
+Historical plan-time candidate direction:
 
 ```text
 main local candidate = Qwen3-Embedding-0.6B
@@ -133,7 +140,11 @@ existing baseline    = bge-small-zh-v1.5
 fallback candidate   = bge-base-zh-v1.5
 ```
 
-The exact runtime choice remains subject to a small local smoke test and real retrieval/evidence quality.
+The exact runtime choice remained subject to a small local smoke test and real retrieval/evidence quality.
+
+Later operating/adoption decisions are recorded only in
+`docs/current-phase.md`; they do not retroactively rewrite this plan-time
+candidate list.
 
 The first version should not open a broad embedding-model tournament.
 
@@ -326,7 +337,9 @@ The architecture must use a generic:
 GenerationProvider
 ```
 
-The first implementation will use OpenAI.
+The original plan named OpenAI as a first implementation placeholder. The
+implemented scoped control/provider state is owned by `docs/current-phase.md`;
+the durable requirement is vendor independence.
 
 Do not freeze a long-term vendor list.
 Future product needs may add, remove, or replace providers.
@@ -543,7 +556,9 @@ assembly invariants, and requires its own scoped authorization.
 
 ## 17. Non-freeze statement
 
-Everything in this amendment should be interpreted as the current **first runnable baseline direction**.
+Everything in this amendment should be interpreted as the durable first
+runnable-baseline contract and its historical plan-time direction. It is not
+the current status record.
 
 The expected lifecycle is:
 
