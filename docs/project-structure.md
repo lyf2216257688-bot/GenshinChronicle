@@ -35,6 +35,12 @@ the immediate next action are owned by `docs/current-phase.md`.
   generation-visible Evidence Packet projection, result/citation-integrity
   persistence, and explicitly scoped provider adapters. It consumes an
   Evidence Packet but does not own Retrieval or Evidence Assembly policy.
+- `src/genshin_corpus/rag/`: the small provider-neutral single-question RAG
+  orchestration boundary. It owns prepared-state reuse and per-question
+  composition across Retrieval, optional reranking, Formal Deferred Assembly,
+  Evidence Packet handling, optional Generation, citation validation, and
+  structured audit/persistence results. It does not redefine the policies or
+  provider contracts owned by `retrieval/` and `generation/`.
 
 ## Tests and fixtures
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -501,6 +501,33 @@ def prepare_evidence_assembly_context(
         retrieval_unit_schema_version=build_manifest.get("retrieval_unit_schema_version"),
     )
     return context
+
+
+def retrieval_unit_texts(
+    prepared_context: PreparedAssemblyContext,
+    unit_ids: Iterable[str],
+) -> dict[str, str]:
+    """Return retrieval-visible text from an already prepared RU snapshot.
+
+    This is a read-only lookup for downstream provider-neutral composition. It
+    deliberately reuses the verified Assembly context instead of reloading the
+    RU artifact for every question.
+    """
+
+    state = _prepared_state(prepared_context)
+    requested = [str(unit_id) for unit_id in unit_ids]
+    if len(requested) != len(set(requested)):
+        raise EvidenceAssemblyError("retrieval_unit_texts requires unique unit IDs")
+    result: dict[str, str] = {}
+    for unit_id in requested:
+        unit = state.units_by_id.get(unit_id)
+        if unit is None:
+            raise EvidenceAssemblyError(f"candidate unit is absent from the prepared RU snapshot: {unit_id}")
+        text = unit.get("retrieval_visible_text")
+        if not isinstance(text, str) or not text:
+            raise EvidenceAssemblyError(f"candidate unit lacks retrieval_visible_text: {unit_id}")
+        result[unit_id] = text
+    return result
 
 
 def _expand_context(

@@ -59,6 +59,7 @@ from .evidence_assembly import (
     evidence_packet_json_bytes,
     evidence_packet_markdown,
     prepare_evidence_assembly_context,
+    retrieval_unit_texts,
     render_evidence_packet,
     write_evidence_packet,
 )
@@ -227,6 +228,7 @@ __all__ = [
     "evidence_packet_json_bytes",
     "evidence_packet_markdown",
     "prepare_evidence_assembly_context",
+    "retrieval_unit_texts",
     "render_evidence_packet",
     "write_evidence_packet",
     "CANDIDATE_SCHEMA_VERSION",

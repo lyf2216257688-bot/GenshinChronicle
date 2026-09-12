@@ -13,7 +13,7 @@ Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
 **Current engineering work unit: Single-Question End-to-End RAG Backend -
-Plan.** The
+CLOSED / PASS (implementation, actual review, and first live smoke).** The
 Qwen Dense production adoption is CLOSED / PASS at
 `9b0fff07693d336714e39082ffe91928f0b743d2`; the completed Qwen 16Q Failure
 Attribution actual review closes PASS WITH Q011 CORRECTION. Historical
@@ -48,7 +48,7 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
 - Generation remains provider-neutral. The implemented scoped control uses
   Alibaba Cloud Bailian/Qwen with the exact
   `qwen3.7-plus-2026-05-26` snapshot and `enable_thinking=false`; no new
-  Generation run is authorized by this status record.
+  Generation run or Generation configuration change is authorized by this status record.
 
 ## Decision-relevant evidence
 
@@ -155,6 +155,25 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   (run identity
   `201b5ffb5220da8f8ddc12c8c64b214908dbe169b94d9022acd94bb0a57a436b`).
 
+- The first arbitrary-question Single-Question RAG live smoke is **PASS**
+  after the backend actual source/test gate passed. Run identity is
+  `p04-single-rag-live-20260912-220153`, mode `generate_answer`, with exactly
+  one fresh Qwen query-embedding logical call and one Generation attempt.
+  Reranking was `disabled_by_explicit_config`; candidate depth was `20` and
+  RRF `k` was `60`. It used RU build identity
+  `49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998` and
+  accepted Qwen Dense build identity
+  `be3efd531bcf514148e9f2b3162dbaed99fe1ac0b5257121864dff6416525922`.
+  The Packet contained 45 evidence blocks and used 6,644 of 12,000 context
+  characters. Generation used `qwen3.7-plus-2026-05-26` and completed with
+  HTTP 200. Local citation validation passed for integrity and coverage, with
+  `semantic_faithfulness = not_evaluated`. Persisted Packet and Generation
+  artifacts matched the RAG result descriptors, and no credential leakage was
+  found. Observed stage latency was approximately embedding 0.315 s,
+  retrieval 16.20 s, assembly 0.035 s, Generation 9.45 s, total 26.0 s.
+  This single sample is operational evidence only: it does not authorize a
+  reranker production default, freeze tuning, or claim model superiority.
+
 ## Current authorization boundary
 
 Arbitrary Dense/Hybrid queries use the existing Qwen synchronous query seam
@@ -173,13 +192,22 @@ path.
 
 ## Immediate next gate
 
-**Single-Question End-to-End RAG Backend - Plan.** This is planning only and
-does not implement the backend or change production behavior. The intended
-future chain is: user question -> live query embedding -> BM25 + Dense -> RRF
-Hybrid -> wider candidate pool -> provider-neutral Reranker -> Formal Deferred
--> Evidence Packet -> provider-neutral Generation -> answer, citations, and
-audit/debug output. The accepted reranker result does not authorize a
-production default or freeze.
+**Next product work unit: lightweight Streamlit frontend over the accepted
+Single-Question RAG Backend.** The backend accepts an arbitrary question and
+performs a
+fresh Qwen query embedding, BM25 + Dense -> deterministic RRF Hybrid,
+optional explicitly selected provider-neutral reranking, Formal Deferred
+Assembly, and Evidence Packet production. It supports explicit
+`evidence_only` (Generation skipped; citation validation not applicable) and
+`generate_answer` (provider-neutral Generation plus citation validation)
+modes, with optional caller-selected base output directory persistence. The
+frontend must consume this backend result, offer `evidence_only` and
+`generate_answer` using the current Generation path, and must not call
+providers or implement Retrieval, reranking, Assembly, Generation, or
+citation validation itself. The default remains reranker-disabled; the
+accepted reranker result does not authorize a production default or freeze.
+Future real-use and failure evidence should drive any optimization, including
+latency work; this one-question latency sample is not an optimization target.
 
 Relevant deferred work includes Q050 focused candidate/retrieval coverage,
 Generation timeline understanding, Generation identity/role relation handling,
