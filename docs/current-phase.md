@@ -12,7 +12,8 @@ end-to-end baseline is implemented, materialized, and measured. Phase 01 Raw,
 Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
-**Current engineering work unit: P04 Qwen Candidate Depth Diagnostic.** The
+**Current engineering work unit: Single-Question End-to-End RAG Backend -
+Plan.** The
 Qwen Dense production adoption is CLOSED / PASS at
 `9b0fff07693d336714e39082ffe91928f0b743d2`; the completed Qwen 16Q Failure
 Attribution actual review closes PASS WITH Q011 CORRECTION. Historical
@@ -107,7 +108,52 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   carrier identities, deeper retrieval/query-recall failures, and mechanically
   established bounded candidate/ranking failures. Q011 and Q046 are positive
   downstream-survival controls when their verified evidence is supplied.
-  Reranker efficacy remains **UNKNOWN**.
+  At the earlier candidate-depth checkpoint, reranker efficacy was **UNKNOWN**;
+  that checkpoint is superseded by the accepted 70Q reranker evaluation below.
+
+- The accepted Qwen reranker 70Q composed evaluation is **PASS WITH BOUNDED
+  REGRESSIONS**. Q001-Q044 are bound to
+  `.local/p04-qwen-rerank-70q-20260912-r1` (run identity
+  `2e94eb3d12262cd1bddd824524a503f8127363345bb22c9b38dc85cb9b0c9d59`,
+  manifest SHA-256
+  `967b84357349188bb0aeac72b9cb4766e7c92196ef7b161b0dcf431a7430e205`),
+  and Q045-Q070 to
+  `.local/p04-qwen-rerank-70q-20260912-c1` (run identity
+  `663cd51f0fbfb4cb6268e947bc321b7c50fb08a51a29e0184280931bf641d505`,
+  manifest SHA-256
+  `effce4ef8a9f626bc161c733427b18230b5a162697bfdcc02cc11fadfeea7c90`,
+  comparison SHA-256
+  `a69b9d52128466ea18d2230602ac2e9748760f72550f9b090670cf8d39218a42`).
+  The composed view is 70/70 questions, with Generation succeeded 140/140,
+  citation coverage pass 140/140, and citation integrity pass 139/140.
+  The Q042 CONTROL citation-integrity failure remains accepted experimental
+  evidence. Provider accounting is 71 rerank calls and 142 Generation calls;
+  the three duplicated calls were only the Q045 persistence-defect rebuild.
+  The remaining correction allowance was not consumed. Reranker prompt usage
+  was 13,810,159 tokens and Generation total usage was 1,041,086 tokens.
+  The run reused accepted persisted Qwen query vectors and made zero fresh
+  embedding API calls.
+
+- The accepted project decision is reranker efficacy **PASS** with a
+  **CLEAR POSITIVE** answer-level effect. Qwen reranking remains in the
+  intended RAG technical path, but production default/freeze is **NOT
+  AUTHORIZED**. Another large reranker evaluation is not required before
+  product-chain work.
+
+- The accepted five-question anomaly attribution is bounded evidence, not a
+  new semantic verdict: Q045 and Q058 are Generation timeline-interpretation
+  cases after correct evidence reached the Packet; Q056 is Generation
+  role/relation confusion despite decisive Packet-visible evidence, with
+  competing 瓦萨克拉胡巴肯 evidence promoted by reranking; Q050 is mixed
+  candidate/retrieval coverage plus unsupported Generation completion, with
+  卡西奥多 outside current Top500 (not proven source absence) and no Assembly
+  defect established; Q068 is one real Formal Deferred finite-budget
+  admission regression, with reranking lowering the decisive anchor and
+  promoting competing identity evidence. One case does not authorize an
+  Assembly change. The read-only attribution artifact is
+  `.local/p04-qwen-rerank-anomaly-attribution-20260912-v3-145997aa55dd`
+  (run identity
+  `201b5ffb5220da8f8ddc12c8c64b214908dbe169b94d9022acd94bb0a57a436b`).
 
 ## Current authorization boundary
 
@@ -119,25 +165,29 @@ artifact/provenance mismatches fail closed; there is no BGE fallback.
 The first runnable RAG baseline is an implemented and measured baseline, not a
 technology freeze. The production chain remains unchanged:
 `lexical Top20 + Qwen Dense Top20 -> deterministic RRF60 -> Hybrid Top20 -> Formal Deferred`.
-No production parameter changed. W7 amendments govern only their completed W7
-lineage; the W1 benchmark contract governs only its historical benchmark path.
+The accepted reranker evaluation is a technical challenger result only; no
+production default, Retrieval parameter, Assembly behavior, Generation
+configuration, or freeze changed. W7 amendments govern only their completed
+W7 lineage; the W1 benchmark contract governs only its historical benchmark
+path.
 
 ## Immediate next gate
 
-**P04 Qwen Candidate Depth Diagnostic.** This is the unique next technical
-work unit and is an investigation, not an approved production change. It must
-test provider-free whether bounded wider candidate supply can expose the
-already verified ranking-boundary carriers for `Q005`, `Q011`, `Q045`, `Q046`,
-and `Q049`, then measure carrier exposure, ranking, and downstream
-finite-budget displacement. Only after that diagnostic may the project decide
-whether a reranker challenger is justified. Wider production TopK, reranking,
-new retrieval policy, Generation, and any Retrieval/Assembly operating-point
-change are not approved.
+**Single-Question End-to-End RAG Backend - Plan.** This is planning only and
+does not implement the backend or change production behavior. The intended
+future chain is: user question -> live query embedding -> BM25 + Dense -> RRF
+Hybrid -> wider candidate pool -> provider-neutral Reranker -> Formal Deferred
+-> Evidence Packet -> provider-neutral Generation -> answer, citations, and
+audit/debug output. The accepted reranker result does not authorize a
+production default or freeze.
 
-Relevant remaining UNKNOWNs are actual reranker efficacy, optimal candidate
-depth, semantic value of displaced evidence under wider supply, source/RU
-resolution for unresolved source/coverage questions, answer-level Generation
-impact, and the optimal future Retrieval/Assembly operating point.
+Relevant deferred work includes Q050 focused candidate/retrieval coverage,
+Generation timeline understanding, Generation identity/role relation handling,
+Q068 bounded Assembly-budget evidence, and later reranker token-cost
+optimization. Token optimization is deferred until after effectiveness
+validation and product-chain integration. The 70Q reranker run reused
+persisted Qwen query vectors; it did not exercise a fresh live embedding API
+request.
 
 ## Evidence owners
 

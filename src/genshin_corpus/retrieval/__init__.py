@@ -166,6 +166,22 @@ from .qwen_batch_packing import (
     run_qwen_full_corpus_batch_packing,
     verify_qwen_full_corpus_batch_packing,
 )
+from .reranking import (
+    RerankCandidate,
+    RerankRequest,
+    RerankScore,
+    RerankingError,
+    Reranker,
+    project_ranked_candidates,
+    stable_rank_scores,
+)
+from .qwen_rerank import (
+    DASHSCOPE_QWEN_RERANK_TRANSPORT_VERSION,
+    QWEN_RERANK_MODEL_ID,
+    DashScopeQwenRerankConfig,
+    DashScopeQwenRerankTransport,
+    QwenRerankTransportError,
+)
 
 __all__ = [
     "BENCHMARK_SCHEMA_VERSION",
@@ -301,6 +317,18 @@ __all__ = [
     "pack_qwen_batch_units",
     "run_qwen_full_corpus_batch_packing",
     "verify_qwen_full_corpus_batch_packing",
+    "RerankCandidate",
+    "RerankRequest",
+    "RerankScore",
+    "RerankingError",
+    "Reranker",
+    "project_ranked_candidates",
+    "stable_rank_scores",
+    "DASHSCOPE_QWEN_RERANK_TRANSPORT_VERSION",
+    "QWEN_RERANK_MODEL_ID",
+    "DashScopeQwenRerankConfig",
+    "DashScopeQwenRerankTransport",
+    "QwenRerankTransportError",
     "resolve_benchmark_locations",
     "validate_benchmark",
 ]
