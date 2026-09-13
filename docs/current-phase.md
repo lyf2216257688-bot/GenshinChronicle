@@ -13,8 +13,10 @@ Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
 **Current engineering work unit: Single-Question End-to-End RAG Backend -
-CLOSED / PASS (implementation, actual review, and first live smoke).** The
-Qwen Dense production adoption is CLOSED / PASS at
+CLOSED / PASS (implementation, actual review, and first live smoke); P04
+Lightweight Streamlit Frontend - CLOSED / PASS (implementation, actual source
+review, focused regressions, and local runtime gates).** The Qwen Dense
+production adoption is CLOSED / PASS at
 `9b0fff07693d336714e39082ffe91928f0b743d2`; the completed Qwen 16Q Failure
 Attribution actual review closes PASS WITH Q011 CORRECTION. Historical
 W7/Frozen48 and W1 benchmark-production routes remain auditable but are
@@ -174,6 +176,23 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   This single sample is operational evidence only: it does not authorize a
   reranker production default, freeze tuning, or claim model superiority.
 
+- The P04 Lightweight Streamlit Frontend actual source/test gate is **PASS**.
+  Focused and affected regressions passed with 59 tests; `py_compile` and
+  `git diff --check` passed. Streamlit `1.63.0` was installed in the intended
+  Windows runtime, and the required `st.cache_resource` `scope`, `validate`,
+  and `on_release` APIs were verified present. Accepted RU, lexical, and Qwen
+  Dense artifact paths were present. Provider-free Streamlit AppTest startup
+  completed with zero exceptions; actual localhost startup on port `8501`
+  passed; and a real session-scoped lifecycle probe passed with every created
+  resource receiving a matching release callback. The frontend remains a thin
+  consumer of the existing single-question backend: no Retrieval, Assembly,
+  Generation, reranker, citation, or persistence policy changed; no model or
+  artifact selector was added; and the reranker default remains disabled. No
+  provider/API call or real RAG question was executed during these gates.
+  This status update authorizes no real Generation/provider run.
+  Streamlit process-shutdown cleanup remains limited by its documented
+  lifecycle semantics; no stronger guarantee is claimed.
+
 ## Current authorization boundary
 
 Arbitrary Dense/Hybrid queries use the existing Qwen synchronous query seam
@@ -192,22 +211,15 @@ path.
 
 ## Immediate next gate
 
-**Next product work unit: lightweight Streamlit frontend over the accepted
-Single-Question RAG Backend.** The backend accepts an arbitrary question and
-performs a
-fresh Qwen query embedding, BM25 + Dense -> deterministic RRF Hybrid,
-optional explicitly selected provider-neutral reranking, Formal Deferred
-Assembly, and Evidence Packet production. It supports explicit
-`evidence_only` (Generation skipped; citation validation not applicable) and
-`generate_answer` (provider-neutral Generation plus citation validation)
-modes, with optional caller-selected base output directory persistence. The
-frontend must consume this backend result, offer `evidence_only` and
-`generate_answer` using the current Generation path, and must not call
-providers or implement Retrieval, reranking, Assembly, Generation, or
-citation validation itself. The default remains reranker-disabled; the
-accepted reranker result does not authorize a production default or freeze.
-Future real-use and failure evidence should drive any optimization, including
-latency work; this one-question latency sample is not an optimization target.
+**Next product work unit: real manual Streamlit usage with open-ended
+questions for failure, quality, and latency collection, subject to separate
+provider/live-run authorization.** This work may exercise the existing
+frontend and backend product chain only after that authorization. It must
+preserve `evidence_only` and `generate_answer` boundaries, the current
+reranker-disabled default, accepted artifact provenance, and the existing
+Retrieval / Assembly / Generation operating points. It must not be inferred
+from the frontend runtime gates above, which made no provider/API call and ran
+no real RAG question.
 
 Relevant deferred work includes Q050 focused candidate/retrieval coverage,
 Generation timeline understanding, Generation identity/role relation handling,

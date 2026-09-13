@@ -41,6 +41,12 @@ the immediate next action are owned by `docs/current-phase.md`.
   Evidence Packet handling, optional Generation, citation validation, and
   structured audit/persistence results. It does not redefine the policies or
   provider contracts owned by `retrieval/` and `generation/`.
+- `src/genshin_corpus/rag/config.py`: stable production RAG artifact-path
+  configuration, separate from M1/M2 measurement runners and without
+  Retrieval, Assembly, model, or reranker policy.
+- `src/genshin_corpus/ui/`: thin local Streamlit presentation and submit-time
+  wiring over the `rag/` backend boundary. It owns no Retrieval, Assembly,
+  Generation, citation, or persistence logic.
 
 ## Tests and fixtures
 
@@ -52,6 +58,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   materialization, comparison, and Qwen-tooling tests.
 - `tests/generation/`: focused offline Generation contract and injected
   transport-adapter tests; no test calls a remote Generation API.
+- `tests/ui/`: provider-free lifecycle, configuration-gating, path, and
+  bounded-result tests for the Streamlit presentation layer.
 - `tests/fixtures/`: small sanitized source samples used by automated tests.
 
 ## Data directories

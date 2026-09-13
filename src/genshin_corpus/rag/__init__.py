@@ -7,6 +7,11 @@ from .backend import (
     prepare_rag_state,
     run_single_question,
 )
+from .config import (
+    DEFAULT_PRODUCTION_QWEN_DENSE_MANIFEST,
+    DEFAULT_PRODUCTION_RAG_ROOT,
+    ProductionRagArtifactPaths,
+)
 
 __all__ = [
     "PreparedRagState",
@@ -14,4 +19,7 @@ __all__ = [
     "RagBackendPreparationError",
     "prepare_rag_state",
     "run_single_question",
+    "DEFAULT_PRODUCTION_QWEN_DENSE_MANIFEST",
+    "DEFAULT_PRODUCTION_RAG_ROOT",
+    "ProductionRagArtifactPaths",
 ]

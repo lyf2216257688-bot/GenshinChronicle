@@ -73,7 +73,9 @@ src/
     ├── parser/
     ├── canonical/
     ├── retrieval/
-    └── generation/
+    ├── generation/
+    ├── rag/
+    └── ui/
 
 data/
 ├── README.md
@@ -85,6 +87,7 @@ tests/
 ├── canonical/
 ├── retrieval/
 ├── generation/
+├── ui/
 └── fixtures/
     └── mihoyo_obc/
 ```
@@ -97,6 +100,20 @@ materialization, comparison, and Dense challenger/comparison tooling.
 contains provider-neutral Generation contracts and the scoped Bailian/Qwen
 control path. `data/canonical/` and `data/retrieval/` are ignored local
 generated-data roots; the latter is not a serving-system contract.
+
+The local Streamlit frontend is an optional presentation layer over the
+single-question RAG backend. Install `requirements-ui.txt`, expose `src` on
+`PYTHONPATH`, and run:
+
+```powershell
+python -m pip install -r requirements-ui.txt
+$env:PYTHONPATH = (Resolve-Path src)
+python -m streamlit run src/genshin_corpus/ui/streamlit_app.py
+```
+
+The app reads provider credentials from the existing runtime environment only
+when a question is submitted. `evidence_only` requires the Qwen query
+embedding environment but does not inspect Generation credentials.
 
 ## Data and secrets
 

@@ -61,6 +61,7 @@ from genshin_corpus.retrieval.qwen_embedding import (
     QwenEmbeddingTransport,
     encode_qwen_query,
 )
+from genshin_corpus.rag.config import DEFAULT_PRODUCTION_RAG_ROOT
 
 
 M1_SCHEMA_VERSION = "p04-rag-m1-0.1"
@@ -81,9 +82,7 @@ _M2_REVIEWED_SECTION = re.compile(
 )
 
 DEFAULT_M1_ACCEPTED_INPUT = Path(".local/p04-rag-m1/questions.accepted.jsonl")
-DEFAULT_M1_BASELINE_ROOT = Path(
-    "data/retrieval/p04-rag-production/phase03-batch5b-p01eb-full-20260824-pm02"
-)
+DEFAULT_M1_BASELINE_ROOT = DEFAULT_PRODUCTION_RAG_ROOT
 DEFAULT_M1_MODEL_DIR = Path(".local/w6-models/bge-small-zh-v1.5-7999e1d")
 DEFAULT_M1_RUNTIME_ROOT = Path(".local/w6-runtime")
 DEFAULT_M2_RUNTIME_INPUT = Path(".local/p04-rag-m2/questions.runtime.jsonl")
