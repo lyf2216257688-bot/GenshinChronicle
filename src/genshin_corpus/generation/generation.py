@@ -40,6 +40,7 @@ GENERATION_RESULT_SCHEMA_VERSION = "phase04-generation-result-0.1"
 GENERATION_PROVIDER_ID_BAILIAN = "alibaba_cloud_bailian_model_studio"
 BASELINE_QWEN_MODEL_ID = "qwen3.7-plus-2026-05-26"
 EXACT_SNAPSHOT_POLICY = "exact_snapshot_required"
+REQUESTED_ALIAS_POLICY = "requested_alias"
 SEMANTIC_FAITHFULNESS_NOT_EVALUATED = "not_evaluated"
 _EXACT_QWEN_SNAPSHOT = re.compile(r"^qwen[0-9.]+-[a-z]+-[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _EVIDENCE_ID = re.compile(r"^E[0-9]{2,}$")
@@ -469,6 +470,7 @@ class BailianControlConfig:
     model_id: str = BASELINE_QWEN_MODEL_ID
     model_reference_policy: str = EXACT_SNAPSHOT_POLICY
     enable_thinking: bool = False
+    thinking_budget: int | None = None
     temperature: float = 0.0
     max_output_tokens: int = 1024
     timeout_seconds: float = 30.0
@@ -483,14 +485,24 @@ class BailianControlConfig:
                 raise GenerationConfigurationError(f"Bailian {name} must be a non-empty string")
         if not isinstance(self.endpoint, str) or not self.endpoint.startswith("https://"):
             raise GenerationConfigurationError("Bailian endpoint must be an explicit HTTPS URL")
-        if self.model_reference_policy != EXACT_SNAPSHOT_POLICY:
-            raise GenerationConfigurationError("Bailian baseline requires exact_snapshot_required model policy")
-        if not isinstance(self.model_id, str) or not _EXACT_QWEN_SNAPSHOT.fullmatch(self.model_id):
-            raise GenerationConfigurationError("Bailian baseline requires an exact dated Qwen model ID, not an alias")
-        if self.model_id != BASELINE_QWEN_MODEL_ID:
-            raise GenerationConfigurationError("Bailian control baseline model must be qwen3.7-plus-2026-05-26")
+        if self.model_reference_policy == EXACT_SNAPSHOT_POLICY:
+            if not isinstance(self.model_id, str) or not _EXACT_QWEN_SNAPSHOT.fullmatch(self.model_id):
+                raise GenerationConfigurationError("Bailian baseline requires an exact dated Qwen model ID, not an alias")
+            if self.model_id != BASELINE_QWEN_MODEL_ID:
+                raise GenerationConfigurationError("Bailian control baseline model must be qwen3.7-plus-2026-05-26")
+        elif self.model_reference_policy == REQUESTED_ALIAS_POLICY:
+            if not isinstance(self.model_id, str) or not re.fullmatch(r"qwen[0-9.]+-[a-z0-9-]+", self.model_id):
+                raise GenerationConfigurationError("Bailian requested alias must be a safe Qwen model alias")
+        else:
+            raise GenerationConfigurationError("unsupported Bailian model reference policy")
         if not isinstance(self.enable_thinking, bool):
             raise GenerationConfigurationError("enable_thinking must be explicit boolean configuration")
+        if self.thinking_budget is not None and (
+            not isinstance(self.thinking_budget, int)
+            or isinstance(self.thinking_budget, bool)
+            or self.thinking_budget <= 0
+        ):
+            raise GenerationConfigurationError("thinking_budget must be null or a positive integer")
         if not isinstance(self.temperature, (int, float)) or isinstance(self.temperature, bool) or not math.isfinite(float(self.temperature)) or self.temperature < 0:
             raise GenerationConfigurationError("temperature must be a finite non-negative number")
         if not isinstance(self.max_output_tokens, int) or isinstance(self.max_output_tokens, bool) or self.max_output_tokens <= 0:
@@ -503,7 +515,7 @@ class BailianControlConfig:
             raise GenerationConfigurationError("retry_backoff_seconds must be a finite non-negative number")
 
     def output_affecting_projection(self) -> dict[str, Any]:
-        return {
+        projection = {
             "provider_id": GENERATION_PROVIDER_ID_BAILIAN,
             "region": self.region,
             "endpoint": self.endpoint,
@@ -514,6 +526,9 @@ class BailianControlConfig:
             "temperature": float(self.temperature),
             "max_output_tokens": self.max_output_tokens,
         }
+        if self.thinking_budget is not None:
+            projection["thinking_budget"] = self.thinking_budget
+        return projection
 
     @property
     def execution_config_identity(self) -> str:
@@ -721,15 +736,20 @@ class BailianOpenAICompatibleTransport:
         if not isinstance(model, str) or not isinstance(messages, list) or not isinstance(parameters, Mapping):
             raise GenerationContractError("Bailian adapter payload is invalid for OpenAI-compatible transport")
         enable_thinking = parameters.get("enable_thinking")
+        thinking_budget = parameters.get("thinking_budget")
         temperature = parameters.get("temperature")
         max_output_tokens = parameters.get("max_output_tokens")
         if not isinstance(enable_thinking, bool):
             raise GenerationContractError("Bailian enable_thinking must be a boolean")
+        if thinking_budget is not None and (
+            not isinstance(thinking_budget, int) or isinstance(thinking_budget, bool) or thinking_budget <= 0
+        ):
+            raise GenerationContractError("Bailian thinking_budget must be null or a positive integer")
         if not isinstance(temperature, (int, float)) or isinstance(temperature, bool):
             raise GenerationContractError("Bailian temperature must be numeric")
         if not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool):
             raise GenerationContractError("Bailian max_output_tokens must be an integer")
-        return {
+        wire = {
             "model": model,
             "messages": messages,
             "temperature": float(temperature),
@@ -737,6 +757,9 @@ class BailianOpenAICompatibleTransport:
             "enable_thinking": enable_thinking,
             "stream": False,
         }
+        if thinking_budget is not None:
+            wire["thinking_budget"] = thinking_budget
+        return wire
 
     def invoke(self, payload: Mapping[str, Any], *, timeout_seconds: float) -> BailianTransportResponse:
         wire = self.wire_payload(payload)
@@ -822,9 +845,16 @@ class BailianGenerationProvider:
         self._transport = transport
         self._occurrence_factory = occurrence_factory or (lambda: str(uuid4()))
         self._clock = clock or _utc_now
+        self._provider_network_calls = 0
         # Tests may inject a no-op sleeper.  The production default must honor
         # configured retry delays rather than turning them into no-ops.
         self._sleeper = sleeper or time.sleep
+
+    @property
+    def provider_network_calls(self) -> int:
+        """Count transport invocations for the current provider instance."""
+
+        return self._provider_network_calls
 
     @staticmethod
     def _messages(request: GenerationRequest) -> list[dict[str, str]]:
@@ -841,14 +871,17 @@ class BailianGenerationProvider:
     def invocation_payload(self, request: GenerationRequest) -> dict[str, Any]:
         """A testable adapter mapping, not a live HTTP request implementation."""
 
+        generation_parameters: dict[str, Any] = {
+            "enable_thinking": self._config.enable_thinking,
+            "temperature": float(self._config.temperature),
+            "max_output_tokens": self._config.max_output_tokens,
+        }
+        if self._config.thinking_budget is not None:
+            generation_parameters["thinking_budget"] = self._config.thinking_budget
         return {
             "model": self._config.model_id,
             "messages": self._messages(request),
-            "generation_parameters": {
-                "enable_thinking": self._config.enable_thinking,
-                "temperature": float(self._config.temperature),
-                "max_output_tokens": self._config.max_output_tokens,
-            },
+            "generation_parameters": generation_parameters,
             "workspace": self._config.workspace,
         }
 
@@ -902,6 +935,7 @@ class BailianGenerationProvider:
         payload = self.invocation_payload(request)
         for attempt in range(1, self._config.max_attempts + 1):
             try:
+                self._provider_network_calls += 1
                 response = self._transport.invoke(payload, timeout_seconds=float(self._config.timeout_seconds))
             except TimeoutError:
                 # This is a local execution timeout rather than a provider

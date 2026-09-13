@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 
 from genshin_corpus.generation.generation import (
     BASELINE_QWEN_MODEL_ID,
+    REQUESTED_ALIAS_POLICY,
     BailianControlConfig,
     BailianGenerationProvider,
     BailianOpenAICompatibleTransport,
@@ -169,6 +170,38 @@ class GenerationTests(unittest.TestCase):
             first.provider_audit["generation_occurrence"]["occurrence_id"],
             second.provider_audit["generation_occurrence"]["occurrence_id"],
         )
+
+    def test_optional_thinking_budget_affects_identity_and_transport_count(self) -> None:
+        challenger = BailianControlConfig(
+            region="cn-beijing",
+            endpoint="https://workspace.example.invalid",
+            workspace="workspace-a",
+            model_id="qwen3.8-max",
+            model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True,
+            thinking_budget=4096,
+            max_output_tokens=2048,
+            max_attempts=1,
+        )
+        changed_budget = BailianControlConfig(
+            region="cn-beijing",
+            endpoint="https://workspace.example.invalid",
+            workspace="workspace-a",
+            model_id="qwen3.8-max",
+            model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True,
+            thinking_budget=2048,
+            max_output_tokens=2048,
+            max_attempts=1,
+        )
+        self.assertIn("thinking_budget", challenger.output_affecting_projection())
+        self.assertNotEqual(challenger.execution_config_identity, changed_budget.execution_config_identity)
+        self.assertNotIn("thinking_budget", self.config.output_affecting_projection())
+        provider, transport = self._provider([BailianTransportResponse("回答 [E01]")])
+        self.assertEqual(provider.provider_network_calls, 0)
+        provider.generate(self.request)
+        self.assertEqual(len(transport.payloads), 1)
+        self.assertEqual(provider.provider_network_calls, 1)
 
     def test_control_adapter_maps_multi_evidence_without_claiming_synthesis_quality(self) -> None:
         provider, transport = self._provider([BailianTransportResponse("综合来说，阿贝多在蒙德活动。[E01][E02]", provider_request_id="req-1", usage={"output_tokens": 12})])
@@ -419,12 +452,52 @@ class BailianLiveTransportTests(unittest.TestCase):
         self.assertEqual(body["enable_thinking"], False)
         self.assertEqual(body["max_tokens"], 1024)
         self.assertFalse(body["stream"])
+        self.assertNotIn("thinking_budget", body)
         self.assertNotIn("workspace", body)
         self.assertNotIn("generation_parameters", body)
         self.assertEqual(response.provider_request_id, "request-1")
         self.assertEqual(response.finish_reason, "stop")
         self.assertEqual(response.usage, {"prompt_tokens": 12, "completion_tokens": 3})
         self.assertNotIn("test-secret", body.__repr__())
+
+    def test_optional_thinking_budget_is_sent_only_when_configured(self) -> None:
+        config = BailianControlConfig(
+            region="cn-beijing",
+            endpoint="https://workspace-a.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            workspace="workspace-a",
+            model_id="qwen3.8-max",
+            model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True,
+            thinking_budget=4096,
+            temperature=0,
+            max_output_tokens=2048,
+            max_attempts=1,
+        )
+        payload = {
+            "model": config.model_id,
+            "messages": [{"role": "user", "content": "问题"}],
+            "generation_parameters": {
+                "enable_thinking": config.enable_thinking,
+                "thinking_budget": config.thinking_budget,
+                "temperature": config.temperature,
+                "max_output_tokens": config.max_output_tokens,
+            },
+            "workspace": config.workspace,
+        }
+        opener = _FakeOpener([_FakeResponse({
+            "id": "request-thinking",
+            "choices": [{"message": {"content": "回答 [E01]", "reasoning_content": "not retained"}}],
+        })])
+        transport = BailianOpenAICompatibleTransport(config, "test-secret", opener=opener)
+        response = transport.invoke(payload, timeout_seconds=2.5)
+        body = json.loads(opener.requests[0].data.decode("utf-8"))  # type: ignore[attr-defined]
+        self.assertEqual(body["model"], "qwen3.8-max")
+        self.assertEqual(body["temperature"], 0.0)
+        self.assertTrue(body["enable_thinking"])
+        self.assertEqual(body["thinking_budget"], 4096)
+        self.assertEqual(body["max_tokens"], 2048)
+        self.assertFalse(body["stream"])
+        self.assertEqual(response.answer_text, "回答 [E01]")
 
     def test_endpoint_and_credential_boundary_fail_closed_before_environment_read(self) -> None:
         bad = BailianControlConfig(

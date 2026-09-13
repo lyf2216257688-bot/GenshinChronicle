@@ -15,7 +15,8 @@ remains `zh-cn` MiHoYo OBC.
 **Current engineering work unit: Single-Question End-to-End RAG Backend -
 CLOSED / PASS (implementation, actual review, and first live smoke); P04
 Lightweight Streamlit Frontend - CLOSED / PASS (implementation, actual source
-review, focused regressions, and local runtime gates).** The Qwen Dense
+review, focused regressions, and local runtime gates); Generation instruction
+v0.2 targeted challenger - CLOSED / bounded actual live review.** The Qwen Dense
 production adoption is CLOSED / PASS at
 `9b0fff07693d336714e39082ffe91928f0b743d2`; the completed Qwen 16Q Failure
 Attribution actual review closes PASS WITH Q011 CORRECTION. Historical
@@ -50,7 +51,10 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
 - Generation remains provider-neutral. The implemented scoped control uses
   Alibaba Cloud Bailian/Qwen with the exact
   `qwen3.7-plus-2026-05-26` snapshot and `enable_thinking=false`; no new
-  Generation run or Generation configuration change is authorized by this status record.
+  Generation production/default change is authorized by this status record.
+  The completed instruction-only v0.2 challenger used the requested-alias
+  `qwen3.8-max` configuration on the two frozen fused Packets and is retained
+  as bounded experiment evidence only; production v0.1 remains unchanged.
 
 ## Decision-relevant evidence
 
@@ -188,8 +192,9 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
 
 - The accepted five-question anomaly attribution is bounded evidence, not a
   new semantic verdict: Q045 and Q058 are Generation timeline-interpretation
-  cases after correct evidence reached the Packet; Q056 is Generation
-  role/relation confusion despite decisive Packet-visible evidence, with
+  cases after correct evidence reached the Packet; Q056 was historically
+  classified as Generation role/relation confusion despite decisive
+  Packet-visible evidence, but is now suspended as question-confounded, with
   competing 瓦萨克拉胡巴肯 evidence promoted by reranking; Q050 is mixed
   candidate/retrieval coverage plus unsupported Generation completion, with
   卡西奥多 outside current Top500 (not proven source absence) and no Assembly
@@ -219,6 +224,23 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   retrieval 16.20 s, assembly 0.035 s, Generation 9.45 s, total 26.0 s.
   This single sample is operational evidence only: it does not authorize a
   reranker production default, freeze tuning, or claim model superiority.
+
+- The Generation instruction v0.2 targeted challenger is **CLOSED / BOUNDED
+  EVIDENCE**. The provider-free preflight and actual source/artifact review
+  were accepted, and the completed live root
+  `.local/p04-qwen38-max-instruction-v02-live-b781d095f595446c81fd83f673b473ae`
+  finished with process exit `0`, status `complete`, exactly two Generation
+  calls and two provider attempts, and truthful `provider_network_calls = 2`.
+  It preserved the frozen fused Packet hashes and the v0.1 execution-config
+  identity. Q068 produced the targeted positive answer `明晨之镜` and is
+  retained as targeted evidence. Q056 is **SUSPENDED / QUESTION-CONFOUNDED**:
+  its wording combines the roles of initially accepting phlogiston and
+  bringing it to Natlan humans, and an external blind cross-model check showed
+  the same directional confusion. It is not a clean model or instruction gate,
+  does not authorize v0.3 prompting, and does not trigger Retrieval, Assembly,
+  or knowledge-graph changes. The paid authorization for this challenger is
+  consumed. This result does not promote v0.2 or qwen3.8-max to a production
+  default or establish a model winner.
 
 - The P04 Lightweight Streamlit Frontend actual source/test gate is **PASS**.
   Focused and affected regressions passed with 59 tests; `py_compile` and
@@ -255,22 +277,20 @@ path.
 
 ## Immediate next gate
 
-**Next technical work unit: answer-level semantic retention / regression
-validation for fused rerank.** It should use known reranker-improvement cases,
-Q056/Q068 regression cases, and a small number of equivalent controls to test
-whether fused rerank preserves accepted pure-rerank answer-level gains while
-reducing bounded regressions. This is a later evaluation boundary: it does not
-authorize provider calls in this status update, a production candidate-depth
-selection, or enabling the reranker by default. The current production chain,
-reranker-disabled default, accepted artifact provenance, Retrieval / Assembly /
-Generation operating points, and `evidence_only` / `generate_answer`
-boundaries remain unchanged.
+**Next technical work unit: real open-ended manual product use and failure
+collection.** Resume the Backend / Streamlit product workflow with real manual
+questions, collect recurring failures, and perform the smallest attribution
+across data, Retrieval, Assembly, Generation, and latency before authorizing
+any optimization. The current production chain, production v0.1 instruction,
+reranker-disabled default, candidate depth, Assembly/Packet contract, and
+Generation operating points remain unchanged. The v0.2 challenger is closed;
+no further targeted prompt iteration or qwen3.8-max promotion is authorized by
+this status record.
 
-The existing Streamlit manual-usage work remains a separate future product
-workflow. Q050 focused candidate/retrieval coverage, Generation timeline
-understanding, Generation identity/role relation handling, and reranker
-token-cost optimization remain deferred. Token optimization is deferred until
-after fused effectiveness validation and product-chain integration.
+Q050 focused candidate/retrieval coverage, Generation timeline understanding,
+Generation identity/role relation handling, and reranker token-cost
+optimization remain deferred. Token optimization is deferred until repeated
+real product failures justify it.
 
 Known non-blocking maintenance: `tests.retrieval.test_deferred_api_parity`
 currently reports one source-byte baseline error because the current accepted
