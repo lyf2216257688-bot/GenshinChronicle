@@ -142,6 +142,50 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   AUTHORIZED**. Another large reranker evaluation is not required before
   product-chain work.
 
+- The P04 Rerank Regression Guard / Rank-Fusion Challenger is **ACTUAL-GATE
+  PASS** as a provider-free historical replay only. It makes no production or
+  default change and makes no semantic/generalization claim. Its fixed
+  experimental policy is
+  `0.35/(60+hybrid_rank) + 0.65/(60+rerank_rank)`, over the historical
+  Top500 pool, producing fused Top20 input for unchanged Formal
+  Deferred-Footprint-Charge with B0 = `12,000` and per-block = `3,000`.
+  These are experimental operating points, not production defaults or proven
+  optimums. The repaired replay is bound to run identity
+  `54f6b75763b0f24e6c605760bf133cfe26b02a6b587a5dd6163fe7b0d6c6e3b6`,
+  manifest SHA-256
+  `8241c5e3194a5964ab7b3bac0ad801f293ffacc8fd8de7197836fae50889368`,
+  comparison SHA-256
+  `a0bc7f29321ccdbedd0e02b541c50f0686820b1b872c9b16c036d543cb5d58e0`,
+  aggregate SHA-256
+  `86ade87f17e0711d385055d8646866ed387590c5e5ffdf256fbb4ebc60b5a04c`,
+  and 70 rows. Rerank, network, embedding, and Generation calls were all
+  zero. Identity repair binds the effective replay artifacts and challenger
+  source/config identity; it did not change algorithm output: repaired versus
+  pre-repair control, pure-rerank, and fused Packet SHA parity is 70/70 for
+  each arm. Accepted control and pure-rerank Packet reconstruction parity is
+  also 70/70.
+
+- Known positive-retention gates are **PASS** for Q005, Q011, Q045, Q046, and
+  Q049. The Q049 deep rescue remains Hybrid rank 388 -> rerank rank 1 -> fused
+  rank 6 and Packet-visible. The Q068 mechanical regression guard is
+  **PASS**: the decisive anchor is Hybrid rank 2 -> rerank rank 14 -> fused
+  rank 1 and Packet-visible; the competing unit is fused rank 16 and is not
+  Packet-visible. Q056 remains a diagnostic/non-loss case: decisive evidence
+  rerank rank 4 -> fused rank 2 and visible, competing evidence rerank rank 1
+  -> fused rank 6 and visible, with rank-gap change `+7`; Generation semantic
+  correctness remains **NOT EVALUATED**.
+
+- The 70Q mechanical churn summary is bounded evidence: fused versus pure
+  rerank Top20 overlap is min `9`, median `15`, mean
+  `15.214285714285714`, max `19`; fused versus Hybrid Top20 overlap is min
+  `2`, median `9.5`, mean `9.357142857142858`, max `17`; Packet-visible
+  displacement versus pure rerank is min `1`, median `5.5`, mean
+  `5.828571428571428`, max `19`. All 70 fused Packets differ mechanically
+  from both pure-rerank and control. These measurements do not establish
+  semantic superiority, optimal weights, production Top500, production
+  candidate depth, a reranker default, or Generation improvement. Q050 and
+  Q058 remain `failure_family_out_of_fusion_verdict`.
+
 - The accepted five-question anomaly attribution is bounded evidence, not a
   new semantic verdict: Q045 and Q058 are Generation timeline-interpretation
   cases after correct evidence reached the Packet; Q056 is Generation
@@ -211,23 +255,29 @@ path.
 
 ## Immediate next gate
 
-**Next product work unit: real manual Streamlit usage with open-ended
-questions for failure, quality, and latency collection, subject to separate
-provider/live-run authorization.** This work may exercise the existing
-frontend and backend product chain only after that authorization. It must
-preserve `evidence_only` and `generate_answer` boundaries, the current
-reranker-disabled default, accepted artifact provenance, and the existing
-Retrieval / Assembly / Generation operating points. It must not be inferred
-from the frontend runtime gates above, which made no provider/API call and ran
-no real RAG question.
+**Next technical work unit: answer-level semantic retention / regression
+validation for fused rerank.** It should use known reranker-improvement cases,
+Q056/Q068 regression cases, and a small number of equivalent controls to test
+whether fused rerank preserves accepted pure-rerank answer-level gains while
+reducing bounded regressions. This is a later evaluation boundary: it does not
+authorize provider calls in this status update, a production candidate-depth
+selection, or enabling the reranker by default. The current production chain,
+reranker-disabled default, accepted artifact provenance, Retrieval / Assembly /
+Generation operating points, and `evidence_only` / `generate_answer`
+boundaries remain unchanged.
 
-Relevant deferred work includes Q050 focused candidate/retrieval coverage,
-Generation timeline understanding, Generation identity/role relation handling,
-Q068 bounded Assembly-budget evidence, and later reranker token-cost
-optimization. Token optimization is deferred until after effectiveness
-validation and product-chain integration. The 70Q reranker run reused
-persisted Qwen query vectors; it did not exercise a fresh live embedding API
-request.
+The existing Streamlit manual-usage work remains a separate future product
+workflow. Q050 focused candidate/retrieval coverage, Generation timeline
+understanding, Generation identity/role relation handling, and reranker
+token-cost optimization remain deferred. Token optimization is deferred until
+after fused effectiveness validation and product-chain integration.
+
+Known non-blocking maintenance: `tests.retrieval.test_deferred_api_parity`
+currently reports one source-byte baseline error because the current accepted
+`evidence_assembly.py` is not byte-equivalent to that historical Gate-A
+baseline. This was not introduced by the rank-fusion work unit, which did not
+modify Assembly. It requires a separate accepted-baseline review and is not
+repaired or updated here.
 
 ## Evidence owners
 
