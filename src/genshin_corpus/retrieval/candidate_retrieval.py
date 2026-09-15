@@ -15,7 +15,9 @@ from hashlib import sha256
 from io import BytesIO
 import gzip
 import json
+import math
 from pathlib import Path
+from time import perf_counter
 from types import MappingProxyType
 from typing import Any, Callable
 
@@ -27,6 +29,9 @@ from .retrieval_units import load_retrieval_units
 
 
 LEXICAL_INDEX_SCHEMA_VERSION = "phase04-rag-w2-lexical-index-0.1"
+FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION = "phase04-rag-w2-field-aware-lexical-index-0.1"
+FIELD_AWARE_LEXICAL_PROJECTION_VERSION = "phase04-rag-w2-field-aware-lexical-projection-0.1"
+FIELD_AWARE_LEXICAL_SCORER_VERSION = "phase04-bm25f-style-0.1"
 DENSE_INDEX_SCHEMA_VERSION = "phase04-rag-w2-dense-index-0.1"
 CANDIDATE_SCHEMA_VERSION = "phase04-rag-w2-candidate-0.1"
 RRF_FUSION_VERSION = "phase04-rag-w2-rrf-0.1"
@@ -42,6 +47,20 @@ ACCEPTED_QWEN_DENSE_VECTORS_SHA256 = "4d6337822459ede93f18d5384e37cbbbef4363b830
 ACCEPTED_QWEN_DENSE_ROWS_SHA256 = "54590bc5a198ad65301cf6e274c9c0931b48288015596760f5d3b7d12caee701"
 ACCEPTED_QWEN_DENSE_MANIFEST_SHA256 = "6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5"
 ACCEPTED_QWEN_RU_BUILD_IDENTITY = "49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998"
+
+FIELD_AWARE_LEXICAL_FIELDS = (
+    "record_title",
+    "section_name",
+    "speaker",
+    "retrieval_visible_text",
+)
+FIELD_AWARE_LEXICAL_ROW_ORDER_POLICY = "W1 manifest source_order then unit_id"
+DEFAULT_FIELD_AWARE_LEXICAL_WEIGHTS = MappingProxyType({
+    "record_title": 2.0,
+    "section_name": 1.25,
+    "speaker": 1.5,
+    "retrieval_visible_text": 1.0,
+})
 
 
 class CandidateRetrievalError(ValueError):
@@ -184,8 +203,59 @@ def _ru_rows(units: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [{"unit_id": str(unit["unit_id"]), "text": str(unit["retrieval_visible_text"])} for unit in units]
 
 
+def _unit_field_text(unit: Mapping[str, Any], field: str) -> str:
+    """Project only observed, human-readable RU fields for lexical ranking."""
+
+    if field == "retrieval_visible_text":
+        value = unit.get("retrieval_visible_text")
+        return value.strip() if isinstance(value, str) else ""
+    source = unit.get("source")
+    context = source.get("record_context") if isinstance(source, Mapping) else None
+    if field == "record_title":
+        value = context.get("record_title") if isinstance(context, Mapping) else None
+        return value.strip() if isinstance(value, str) else ""
+    if field == "section_name":
+        value = context.get("section_name") if isinstance(context, Mapping) else None
+        return value.strip() if isinstance(value, str) else ""
+    if field == "speaker":
+        structure = unit.get("structure")
+        dialogue = structure.get("dialogue") if isinstance(structure, Mapping) else None
+        value = dialogue.get("speaker") if isinstance(dialogue, Mapping) else None
+        return value.strip() if isinstance(value, str) else ""
+    raise CandidateRetrievalError(f"unsupported field-aware lexical field: {field}")
+
+
+def _field_rows(units: Sequence[Mapping[str, Any]], analyzer: Callable[[str], list[str]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for unit in units:
+        fields: dict[str, dict[str, Any]] = {}
+        for field in FIELD_AWARE_LEXICAL_FIELDS:
+            tokens = Counter(analyzer(_unit_field_text(unit, field)))
+            fields[field] = {"length": sum(tokens.values()), "tf": dict(sorted(tokens.items()))}
+        rows.append({"unit_id": str(unit["unit_id"]), "fields": fields})
+    return rows
+
+
 def _arm_identity(payload: Mapping[str, Any]) -> str:
     return sha256_json(dict(payload))
+
+
+def _field_aware_lexical_arm_identity(retrieval_unit_build_identity: str) -> str:
+    return _arm_identity({
+        "schema_version": FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION,
+        "projection_version": FIELD_AWARE_LEXICAL_PROJECTION_VERSION,
+        "ru_build_identity": retrieval_unit_build_identity,
+        "fields": list(FIELD_AWARE_LEXICAL_FIELDS),
+        "analyzer_version": LEXICAL_ANALYZER_VERSION,
+        "row_order_policy": FIELD_AWARE_LEXICAL_ROW_ORDER_POLICY,
+    })
+
+
+def _validate_field_aware_analyzer(analyzer: Callable[[str], list[str]], analyzer_version: str) -> None:
+    if analyzer is not analyze or analyzer_version != LEXICAL_ANALYZER_VERSION:
+        raise CandidateRetrievalError(
+            "field-aware lexical path requires the canonical analyze implementation and version"
+        )
 
 
 def _document_frequencies(rows: Sequence[Mapping[str, Any]], terms: Sequence[str] | None = None) -> dict[str, int]:
@@ -241,9 +311,47 @@ def build_lexical_index(
     return manifest
 
 
+def build_field_aware_lexical_index(
+    retrieval_unit_manifest_path: Path,
+    output_root: Path,
+    *,
+    analyzer: Callable[[str], list[str]] = analyze,
+    analyzer_version: str = LEXICAL_ANALYZER_VERSION,
+) -> dict[str, Any]:
+    """Build a versioned field-aware derivative without changing RU identity."""
+
+    _validate_field_aware_analyzer(analyzer, analyzer_version)
+    ru_manifest, units = _validate_ru_manifest(Path(retrieval_unit_manifest_path))
+    rows = _field_rows(units, analyzer)
+    index_body = _gzip_jsonl(rows)
+    identity = _field_aware_lexical_arm_identity(str(ru_manifest["build_identity"]))
+    output_root = Path(output_root)
+    artifact_rel = "artifacts/field_aware_lexical_index.jsonl.gz"
+    manifest = {
+        "schema_version": FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION,
+        "projection_version": FIELD_AWARE_LEXICAL_PROJECTION_VERSION,
+        "status": "complete",
+        "arm": "lexical",
+        "arm_build_identity": identity,
+        "retrieval_unit_build_identity": ru_manifest["build_identity"],
+        "fields": list(FIELD_AWARE_LEXICAL_FIELDS),
+        "analyzer_version": analyzer_version,
+        "scorer_version": FIELD_AWARE_LEXICAL_SCORER_VERSION,
+        "row_order_policy": FIELD_AWARE_LEXICAL_ROW_ORDER_POLICY,
+        "row_count": len(rows),
+        "artifacts": {"index": _descriptor(artifact_rel, index_body, len(rows))},
+    }
+    atomic_write(output_root / artifact_rel, index_body)
+    atomic_write(output_root / "metadata" / "manifest.json", canonical_json_bytes(manifest))
+    return manifest
+
+
 def _load_lexical(path: Path) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
     manifest = _mapping(json.loads(Path(path).read_text(encoding="utf-8")), "lexical manifest")
-    if manifest.get("status") != "complete" or manifest.get("schema_version") != LEXICAL_INDEX_SCHEMA_VERSION:
+    if manifest.get("status") != "complete" or manifest.get("schema_version") not in {
+        LEXICAL_INDEX_SCHEMA_VERSION,
+        FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION,
+    }:
         raise CandidateRetrievalError("lexical manifest is not complete")
     artifact = _mapping(_mapping(manifest.get("artifacts"), "lexical artifacts").get("index"), "lexical index descriptor")
     body_path = Path(path).parent.parent / str(artifact["path"])
@@ -253,6 +361,49 @@ def _load_lexical(path: Path) -> tuple[Mapping[str, Any], list[Mapping[str, Any]
     rows = _read_gzip_jsonl(body_path)
     if artifact.get("row_count") != len(rows):
         raise CandidateRetrievalError("lexical index row accounting mismatch")
+    if manifest.get("schema_version") == FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION:
+        if (
+            tuple(manifest.get("fields", ())) != FIELD_AWARE_LEXICAL_FIELDS
+            or manifest.get("projection_version") != FIELD_AWARE_LEXICAL_PROJECTION_VERSION
+        ):
+            raise CandidateRetrievalError("field-aware lexical field projection binding mismatch")
+        if manifest.get("row_count") != len(rows) or any(
+            not isinstance(manifest.get(key), str) or not manifest[key]
+            for key in ("arm_build_identity", "retrieval_unit_build_identity", "analyzer_version", "scorer_version")
+        ):
+            raise CandidateRetrievalError("field-aware lexical manifest binding is incomplete")
+        if (
+            manifest.get("analyzer_version") != LEXICAL_ANALYZER_VERSION
+            or manifest.get("scorer_version") not in {LEXICAL_SCORER_VERSION, FIELD_AWARE_LEXICAL_SCORER_VERSION}
+        ):
+            raise CandidateRetrievalError("field-aware lexical implementation version binding mismatch")
+        if manifest.get("row_order_policy") != FIELD_AWARE_LEXICAL_ROW_ORDER_POLICY:
+            raise CandidateRetrievalError("field-aware lexical row-order binding mismatch")
+        if manifest.get("arm_build_identity") != _field_aware_lexical_arm_identity(
+            str(manifest["retrieval_unit_build_identity"])
+        ):
+            raise CandidateRetrievalError("field-aware lexical arm identity is inconsistent with its build inputs")
+        seen_ids: set[str] = set()
+        for index, row in enumerate(rows, 1):
+            fields = row.get("fields")
+            unit_id = row.get("unit_id")
+            if not isinstance(unit_id, str) or not unit_id or unit_id in seen_ids:
+                raise CandidateRetrievalError(f"field-aware lexical row {index} has invalid unit identity")
+            seen_ids.add(unit_id)
+            if not isinstance(fields, Mapping) or tuple(sorted(fields)) != tuple(sorted(FIELD_AWARE_LEXICAL_FIELDS)):
+                raise CandidateRetrievalError(f"field-aware lexical row {index} has invalid field projection")
+            for field in FIELD_AWARE_LEXICAL_FIELDS:
+                statistics = fields[field]
+                if not isinstance(statistics, Mapping) or not isinstance(statistics.get("length"), int) or isinstance(statistics.get("length"), bool) or statistics["length"] < 0:
+                    raise CandidateRetrievalError(f"field-aware lexical row {index} has invalid {field} length")
+                tf = statistics.get("tf")
+                if (
+                    not isinstance(tf, Mapping)
+                    or any(not isinstance(token, str) or not token for token in tf)
+                    or any(not isinstance(count, int) or isinstance(count, bool) or count < 0 for count in tf.values())
+                    or sum(tf.values()) != statistics["length"]
+                ):
+                    raise CandidateRetrievalError(f"field-aware lexical row {index} has invalid {field} term frequencies")
     return manifest, rows
 
 
@@ -264,12 +415,17 @@ def lexical_candidates(
     k1: float = 1.2,
     b: float = 0.75,
     analyzer: Callable[[str], list[str]] = analyze,
+    field_weights: Mapping[str, float] = DEFAULT_FIELD_AWARE_LEXICAL_WEIGHTS,
 ) -> list[dict[str, Any]]:
     top_k = _positive_int(top_k, "top_k")
     k1, b = _finite_float(k1, "k1"), _finite_float(b, "b")
     if k1 < 0 or not 0 <= b <= 1:
         raise CandidateRetrievalError("invalid BM25 parameters")
     manifest, rows = _load_lexical(Path(lexical_manifest_path))
+    if manifest.get("schema_version") == FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION:
+        return _field_aware_lexical_candidates_from_loaded(
+            manifest, rows, query, top_k=top_k, k1=k1, b=b, analyzer=analyzer, field_weights=field_weights
+        )
     return _lexical_candidates_from_loaded(manifest, rows, query, top_k=top_k, k1=k1, b=b, analyzer=analyzer)
 
 
@@ -309,6 +465,126 @@ def _lexical_candidates_from_loaded(
         {"unit_id": unit_id, "rank": rank, "retrieval": {"mode": "lexical", "score": score, "arm_build_identity": manifest["arm_build_identity"], "query_config_identity": query_identity}}
         for rank, (score, unit_id) in enumerate(scored[:top_k], 1)
     ]
+
+
+def _field_aware_lexical_candidates_from_loaded(
+    manifest: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    query: str,
+    *,
+    top_k: int,
+    k1: float,
+    b: float,
+    analyzer: Callable[[str], list[str]],
+    field_weights: Mapping[str, float],
+) -> list[dict[str, Any]]:
+    _validate_field_aware_analyzer(analyzer, str(manifest.get("analyzer_version")))
+    terms = Counter(analyzer(str(query)))
+    if not terms:
+        return []
+    if not isinstance(field_weights, Mapping) or set(field_weights) != set(FIELD_AWARE_LEXICAL_FIELDS):
+        raise CandidateRetrievalError("field-aware lexical weights must name exactly the indexed fields")
+    weights: dict[str, float] = {}
+    for field in FIELD_AWARE_LEXICAL_FIELDS:
+        value = field_weights.get(field, 0.0)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)) or value < 0:
+            raise CandidateRetrievalError(f"invalid field-aware lexical weight: {field}")
+        weights[field] = float(value)
+    if not any(weights.values()):
+        raise CandidateRetrievalError("at least one field-aware lexical weight must be positive")
+
+    field_lengths: dict[str, list[int]] = {field: [] for field in FIELD_AWARE_LEXICAL_FIELDS}
+    corpus_df: dict[str, int] = {}
+    for row in rows:
+        fields = _mapping(row.get("fields"), "field-aware lexical row fields")
+        row_terms: set[str] = set()
+        for field in FIELD_AWARE_LEXICAL_FIELDS:
+            value = _mapping(fields.get(field), f"field-aware lexical {field} statistics")
+            tf = _mapping(value.get("tf"), f"field-aware lexical {field}.tf")
+            field_lengths[field].append(int(value.get("length", 0)))
+            row_terms.update(token for token in terms if int(tf.get(token, 0)) > 0)
+        for token in row_terms:
+            corpus_df[token] = corpus_df.get(token, 0) + 1
+    averages = {field: (sum(lengths) / len(lengths) if lengths else 0.0) for field, lengths in field_lengths.items()}
+    scored: list[tuple[float, tuple[tuple[Any, ...], ...], str]] = []
+    for row in rows:
+        fields = _mapping(row.get("fields"), "field-aware lexical row fields")
+        score = 0.0
+        for token, query_frequency in terms.items():
+            normalized_tf = 0.0
+            for field in FIELD_AWARE_LEXICAL_FIELDS:
+                if not weights[field]:
+                    continue
+                value = _mapping(fields.get(field), f"field-aware lexical {field} statistics")
+                tf = _mapping(value.get("tf"), f"field-aware lexical {field}.tf")
+                frequency = int(tf.get(token, 0))
+                if not frequency:
+                    continue
+                length = int(value.get("length", 0))
+                average = averages[field]
+                normalization = 1 - b + b * (length / average if average else 0.0)
+                normalized_tf += weights[field] * frequency / normalization
+            if normalized_tf:
+                document_frequency = corpus_df.get(token, 0)
+                idf = math.log(1 + (len(rows) - document_frequency + 0.5) / (document_frequency + 0.5))
+                score += query_frequency * idf * ((normalized_tf * (k1 + 1)) / (normalized_tf + k1))
+        if score > 0:
+            scored.append((score, (), str(row["unit_id"])))
+    scored.sort(key=lambda item: (-item[0], item[1], item[2]))
+    query_identity = sha256_json({
+        "projection_version": FIELD_AWARE_LEXICAL_PROJECTION_VERSION,
+        "analyzer_version": manifest.get("analyzer_version"),
+        "scorer_version": FIELD_AWARE_LEXICAL_SCORER_VERSION,
+        "k1": k1,
+        "b": b,
+        "field_weights": {field: weights[field] for field in FIELD_AWARE_LEXICAL_FIELDS},
+        "top_k": top_k,
+    })
+    return [
+        {
+            "unit_id": unit_id,
+            "rank": rank,
+            "retrieval": {
+                "mode": "lexical",
+                "projection": "field_aware",
+                "score": score,
+                "arm_build_identity": manifest["arm_build_identity"],
+                "query_config_identity": query_identity,
+            },
+        }
+        for rank, (score, _, unit_id) in enumerate(scored[:top_k], 1)
+    ]
+
+
+def field_aware_lexical_candidates(
+    lexical_manifest_path: Path,
+    query: str,
+    *,
+    top_k: int = 20,
+    k1: float = 1.2,
+    b: float = 0.75,
+    analyzer: Callable[[str], list[str]] = analyze,
+    field_weights: Mapping[str, float] = DEFAULT_FIELD_AWARE_LEXICAL_WEIGHTS,
+) -> list[dict[str, Any]]:
+    """Score a field-aware lexical artifact with query-time-only parameters."""
+
+    top_k = _positive_int(top_k, "top_k")
+    k1, b = _finite_float(k1, "k1"), _finite_float(b, "b")
+    if k1 < 0 or not 0 <= b <= 1:
+        raise CandidateRetrievalError("invalid BM25 parameters")
+    manifest, rows = _load_lexical(Path(lexical_manifest_path))
+    if manifest.get("schema_version") != FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION:
+        raise CandidateRetrievalError("field-aware lexical candidates require a field-aware index")
+    return _field_aware_lexical_candidates_from_loaded(
+        manifest,
+        rows,
+        query,
+        top_k=top_k,
+        k1=k1,
+        b=b,
+        analyzer=analyzer,
+        field_weights=field_weights,
+    )
 
 
 def _dense_metadata_identity(metadata: Mapping[str, Any]) -> str:
@@ -668,25 +944,45 @@ class BatchCandidateRetriever:
         *,
         instruction: str | None,
         top_k: int = 20,
+        candidate_supply_depth: int | None = None,
         k1: float = 1.2,
         b: float = 0.75,
+        field_weights: Mapping[str, float] = DEFAULT_FIELD_AWARE_LEXICAL_WEIGHTS,
         rrf_k: int = 60,
+        telemetry: dict[str, float] | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         """Compute each arm once and fuse those exact rows with existing RRF."""
 
+        if candidate_supply_depth is not None:
+            candidate_supply_depth = _positive_int(candidate_supply_depth, "candidate_supply_depth")
+            if top_k != 20 and top_k != candidate_supply_depth:
+                raise CandidateRetrievalError("top_k and candidate_supply_depth disagree")
+            top_k = candidate_supply_depth
         top_k = _positive_int(top_k, "top_k")
         k1, b = _finite_float(k1, "k1"), _finite_float(b, "b")
         if k1 < 0 or not 0 <= b <= 1:
             raise CandidateRetrievalError("invalid BM25 parameters")
-        lexical = _lexical_candidates_from_loaded(
-            self.lexical_manifest,
-            self.lexical_rows,
-            query,
-            top_k=top_k,
-            k1=k1,
-            b=b,
-            analyzer=analyze,
+        lexical_builder = (
+            _field_aware_lexical_candidates_from_loaded
+            if self.lexical_manifest.get("schema_version") == FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION
+            else _lexical_candidates_from_loaded
         )
+        lexical_kwargs = {
+            "manifest": self.lexical_manifest,
+            "rows": self.lexical_rows,
+            "query": query,
+            "top_k": top_k,
+            "k1": k1,
+            "b": b,
+            "analyzer": analyze,
+        }
+        if lexical_builder is _field_aware_lexical_candidates_from_loaded:
+            lexical_kwargs["field_weights"] = field_weights
+        started = perf_counter()
+        lexical = lexical_builder(**lexical_kwargs)
+        if telemetry is not None:
+            telemetry["lexical"] = perf_counter() - started
+        started = perf_counter()
         dense = _dense_candidates_from_loaded(
             self.dense_manifest,
             self.dense_vectors,
@@ -695,6 +991,9 @@ class BatchCandidateRetriever:
             top_k=top_k,
             query_instruction=instruction,
         )
+        if telemetry is not None:
+            telemetry["dense"] = perf_counter() - started
+        started = perf_counter()
         hybrid = hybrid_candidates(
             lexical,
             dense,
@@ -703,6 +1002,8 @@ class BatchCandidateRetriever:
             top_k=top_k,
             rrf_k=rrf_k,
         )
+        if telemetry is not None:
+            telemetry["fusion"] = perf_counter() - started
         return {"lexical": lexical, "dense": dense, "hybrid": hybrid}
 
 
@@ -732,7 +1033,13 @@ def load_batch_candidate_retriever(
     )
 
 
-def retrieve_candidates(mode: str, *, lexical_manifest_path: Path | None = None, dense_manifest_path: Path | None = None, model_dir: Path | None = None, query: str = "", query_vector: Any | None = None, instruction: str = "为这个句子生成表示以用于检索相关文章：", top_k: int = 20, rrf_k: int = 60) -> list[dict[str, Any]]:
+def retrieve_candidates(mode: str, *, lexical_manifest_path: Path | None = None, dense_manifest_path: Path | None = None, model_dir: Path | None = None, query: str = "", query_vector: Any | None = None, instruction: str = "为这个句子生成表示以用于检索相关文章：", top_k: int = 20, candidate_supply_depth: int | None = None, rrf_k: int = 60) -> list[dict[str, Any]]:
+    if candidate_supply_depth is not None:
+        candidate_supply_depth = _positive_int(candidate_supply_depth, "candidate_supply_depth")
+        if top_k != 20 and top_k != candidate_supply_depth:
+            raise CandidateRetrievalError("top_k and candidate_supply_depth disagree")
+        top_k = candidate_supply_depth
+    top_k = _positive_int(top_k, "top_k")
     if mode == "lexical":
         if lexical_manifest_path is None:
             raise CandidateRetrievalError("lexical manifest is required")
@@ -773,10 +1080,17 @@ def retrieve_qwen_candidates(
     query: str,
     transport: Any,
     top_k: int = 20,
+    candidate_supply_depth: int | None = None,
     rrf_k: int = 60,
 ) -> list[dict[str, Any]]:
     """Production-facing Qwen Dense/Hybrid retrieval; BGE path is untouched."""
 
+    if candidate_supply_depth is not None:
+        candidate_supply_depth = _positive_int(candidate_supply_depth, "candidate_supply_depth")
+        if top_k != 20 and top_k != candidate_supply_depth:
+            raise CandidateRetrievalError("top_k and candidate_supply_depth disagree")
+        top_k = candidate_supply_depth
+    top_k = _positive_int(top_k, "top_k")
     if mode not in {"dense", "hybrid"}:
         return retrieve_candidates(mode, lexical_manifest_path=lexical_manifest_path, query=query, top_k=top_k, rrf_k=rrf_k)
     if mode == "dense":
@@ -804,10 +1118,17 @@ def retrieve_qwen_candidates_for_query(
     query: str,
     transport: Any,
     top_k: int = 20,
+    candidate_supply_depth: int | None = None,
     rrf_k: int = 60,
 ) -> dict[str, list[dict[str, Any]]]:
     """Compute lexical, Qwen Dense, and Hybrid windows with one Qwen call."""
 
+    if candidate_supply_depth is not None:
+        candidate_supply_depth = _positive_int(candidate_supply_depth, "candidate_supply_depth")
+        if top_k != 20 and top_k != candidate_supply_depth:
+            raise CandidateRetrievalError("top_k and candidate_supply_depth disagree")
+        top_k = candidate_supply_depth
+    top_k = _positive_int(top_k, "top_k")
     dense_manifest = validate_accepted_qwen_dense_manifest(Path(dense_manifest_path))
     from .qwen_embedding import encode_qwen_query
 
@@ -849,10 +1170,17 @@ def qwen_candidates_from_loaded(
     *,
     instruction: str | None = None,
     top_k: int = 20,
+    candidate_supply_depth: int | None = None,
     rrf_k: int = 60,
 ) -> dict[str, list[dict[str, Any]]]:
     """Use one validated Dense state and one Qwen request for all three modes."""
 
+    if candidate_supply_depth is not None:
+        candidate_supply_depth = _positive_int(candidate_supply_depth, "candidate_supply_depth")
+        if top_k != 20 and top_k != candidate_supply_depth:
+            raise CandidateRetrievalError("top_k and candidate_supply_depth disagree")
+        top_k = candidate_supply_depth
+    top_k = _positive_int(top_k, "top_k")
     from .qwen_embedding import encode_qwen_query
 
     query_vector, request, response = encode_qwen_query(transport, query)

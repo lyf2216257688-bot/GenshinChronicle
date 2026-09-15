@@ -13,12 +13,16 @@ from genshin_corpus.retrieval.candidate_retrieval import (
     CandidateBundle,
     CandidateRetrievalError,
     build_dense_index,
+    build_field_aware_lexical_index,
     build_lexical_index,
     dense_candidates,
     dense_candidates_local,
     load_batch_candidate_retriever,
     _document_frequencies,
     hybrid_candidates,
+    field_aware_lexical_candidates,
+    FIELD_AWARE_LEXICAL_SCORER_VERSION,
+    _field_aware_lexical_candidates_from_loaded,
     lexical_candidates,
     retrieve_candidates,
     _load_dense,
@@ -65,6 +69,191 @@ class RagW2Tests(unittest.TestCase):
         dm2 = build_dense_index(self.ru_manifest, self.root/"dense2", model_dir=self.root, vectors=np.array([[1,0],[0,1],[1,0]], dtype=np.float32), instruction="different")
         self.assertEqual(dm["arm_build_identity"], dm2["arm_build_identity"])
         self.assertEqual(lm["retrieval_unit_build_identity"], dm["retrieval_unit_build_identity"])
+
+    def test_field_aware_projection_uses_human_fields_and_preserves_missing_speaker(self):
+        units_path = self.root / "ru/artifacts/retrieval_units.jsonl.gz"
+        with gzip.open(units_path, "rt", encoding="utf-8") as handle:
+            units = [json.loads(line) for line in handle if line.strip()]
+        units[0]["source"]["record_context"] = {"record_title": "炼金术", "section_name": "角色故事", "source_component_id": "ignored"}
+        units[1]["source"]["record_context"] = {"record_title": "璃月港", "section_name": "地点故事", "source_component_id": "阿贝多"}
+        units[2]["source"]["record_context"] = {"record_title": "阿贝多", "section_name": "角色故事"}
+        units[2]["structure"] = {"dialogue": {"speaker": "阿贝多"}}
+        body = gzip.compress(b"".join(canonical_json_bytes(unit) + b"\n" for unit in units), mtime=0)
+        units_path.write_bytes(body)
+        manifest = json.loads(self.ru_manifest.read_text(encoding="utf-8"))
+        manifest["artifacts"]["retrieval_units"].update({"sha256": hashlib.sha256(body).hexdigest(), "byte_count": len(body)})
+        self.ru_manifest.write_bytes(canonical_json_bytes(manifest))
+
+        field_manifest = build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        self.assertEqual(field_manifest["fields"], ["record_title", "section_name", "speaker", "retrieval_visible_text"])
+        with gzip.open(self.root / "field-lex/artifacts/field_aware_lexical_index.jsonl.gz", "rt", encoding="utf-8") as handle:
+            rows = [json.loads(line) for line in handle if line.strip()]
+        self.assertEqual(rows[0]["fields"]["record_title"]["tf"], {"炼": 1, "金": 1, "术": 1})
+        self.assertEqual(rows[0]["fields"]["speaker"]["length"], 0)
+        self.assertEqual(rows[2]["fields"]["speaker"]["tf"], {"阿": 1, "贝": 1, "多": 1})
+        candidates = field_aware_lexical_candidates(self.root / "field-lex/metadata/manifest.json", "阿贝多", top_k=3)
+        self.assertEqual(candidates[0]["unit_id"], "u2")
+        self.assertNotIn("u1", [row["unit_id"] for row in candidates])
+        self.assertEqual(candidates[0]["retrieval"]["projection"], "field_aware")
+
+    def test_field_aware_build_identity_excludes_query_scoring_operating_point(self):
+        first = build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex-a")
+        second = build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex-b")
+        self.assertEqual(first["arm_build_identity"], second["arm_build_identity"])
+        path = self.root / "field-lex-a/metadata/manifest.json"
+        default = field_aware_lexical_candidates(path, "阿贝多", top_k=3, field_weights={field: 1.0 for field in first["fields"]})
+        weighted = field_aware_lexical_candidates(path, "阿贝多", top_k=3, field_weights={"record_title": 3.0, "section_name": 1.0, "speaker": 1.0, "retrieval_visible_text": 1.0})
+        self.assertNotEqual(default[0]["retrieval"]["query_config_identity"], weighted[0]["retrieval"]["query_config_identity"])
+        self.assertEqual(first["arm_build_identity"], json.loads(path.read_text(encoding="utf-8"))["arm_build_identity"])
+
+    def test_field_aware_analyzer_behavior_is_bound_to_canonical_identity(self):
+        with self.assertRaisesRegex(CandidateRetrievalError, "canonical analyze"):
+            build_field_aware_lexical_index(
+                self.ru_manifest,
+                self.root / "field-lex-custom-build",
+                analyzer=lambda text: list(text),
+            )
+        build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        with self.assertRaisesRegex(CandidateRetrievalError, "canonical analyze"):
+            field_aware_lexical_candidates(
+                self.root / "field-lex/metadata/manifest.json",
+                "阿贝多",
+                analyzer=lambda text: list(text),
+            )
+
+    def test_field_aware_arm_identity_is_self_consistent(self):
+        build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        path = self.root / "field-lex/metadata/manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["arm_build_identity"] = "tampered-arm-identity"
+        path.write_bytes(canonical_json_bytes(manifest))
+        with self.assertRaisesRegex(CandidateRetrievalError, "arm identity"):
+            field_aware_lexical_candidates(path, "阿贝多")
+
+    def test_field_aware_query_identity_is_config_only(self):
+        build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        path = self.root / "field-lex/metadata/manifest.json"
+        first = field_aware_lexical_candidates(path, "阿贝多", top_k=3)
+        second = field_aware_lexical_candidates(path, "璃月港", top_k=3)
+        self.assertNotEqual([row["unit_id"] for row in first], [row["unit_id"] for row in second])
+        self.assertEqual(
+            first[0]["retrieval"]["query_config_identity"],
+            second[0]["retrieval"]["query_config_identity"],
+        )
+
+    def test_field_aware_text_only_matches_legacy_lexical_control(self):
+        legacy = build_lexical_index(self.ru_manifest, self.root / "lexical-control")
+        field = build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        control_weights = {name: 0.0 for name in field["fields"]}
+        control_weights["retrieval_visible_text"] = 1.0
+        legacy_rows = lexical_candidates(self.root / "lexical-control/metadata/manifest.json", "阿贝多", top_k=3)
+        field_rows = field_aware_lexical_candidates(
+            self.root / "field-lex/metadata/manifest.json",
+            "阿贝多",
+            top_k=3,
+            field_weights=control_weights,
+        )
+        self.assertEqual(
+            [(row["unit_id"], row["rank"]) for row in legacy_rows],
+            [(row["unit_id"], row["rank"]) for row in field_rows],
+        )
+        for legacy_row, field_row in zip(legacy_rows, field_rows):
+            self.assertAlmostEqual(legacy_row["retrieval"]["score"], field_row["retrieval"]["score"])
+
+    def test_field_aware_scorer_uses_one_idf_and_combined_normalized_tf(self):
+        rows = [
+            {"unit_id": "title", "fields": {
+                "record_title": {"length": 1, "tf": {"甲": 1}},
+                "section_name": {"length": 0, "tf": {}},
+                "speaker": {"length": 0, "tf": {}},
+                "retrieval_visible_text": {"length": 0, "tf": {}},
+            }},
+            {"unit_id": "text", "fields": {
+                "record_title": {"length": 0, "tf": {}},
+                "section_name": {"length": 0, "tf": {}},
+                "speaker": {"length": 0, "tf": {}},
+                "retrieval_visible_text": {"length": 1, "tf": {"甲": 1}},
+            }},
+        ]
+        manifest = {
+            "analyzer_version": "phase04-cjk-unigram-ascii-token-0.1",
+            "arm_build_identity": "fixture",
+        }
+        result = _field_aware_lexical_candidates_from_loaded(
+            manifest, rows, "甲", top_k=2, k1=1.2, b=0.75,
+            analyzer=__import__("genshin_corpus.retrieval.lexical", fromlist=["analyze"]).analyze,
+            field_weights={"record_title": 2.0, "section_name": 1.25, "speaker": 1.5, "retrieval_visible_text": 1.0},
+        )
+        idf = __import__("math").log(1 + (2 - 2 + 0.5) / (2 + 0.5))
+        normalized_title = 2.0 / (1 - 0.75 + 0.75 * (1 / 0.5))
+        expected_title = idf * ((normalized_title * 2.2) / (normalized_title + 1.2))
+        self.assertEqual(result[0]["unit_id"], "title")
+        self.assertAlmostEqual(result[0]["retrieval"]["score"], expected_title)
+        self.assertAlmostEqual(result[1]["retrieval"]["score"], idf * ((1 / 1.75 * 2.2) / (1 / 1.75 + 1.2)))
+        self.assertEqual(result[0]["retrieval"]["query_config_identity"], result[1]["retrieval"]["query_config_identity"])
+
+    def test_field_aware_manifest_records_bm25f_scorer_version(self):
+        build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        manifest = json.loads((self.root / "field-lex/metadata/manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["scorer_version"], FIELD_AWARE_LEXICAL_SCORER_VERSION)
+
+    def test_batch_candidate_supply_depth_reaches_both_arms_and_rrf(self):
+        build_lexical_index(self.ru_manifest, self.root / "lex")
+        build_dense_index(self.ru_manifest, self.root / "dense", model_dir=self.root, vectors=np.array([[1, 0], [0, 1], [1, 0]], dtype=np.float32))
+        batch = load_batch_candidate_retriever(self.root / "lex/metadata/manifest.json", self.root / "dense/metadata/manifest.json")
+        result = batch.candidates_for_query("阿贝多", np.array([1, 0], dtype=np.float32), instruction="指令", candidate_supply_depth=3)
+        self.assertEqual([len(result[mode]) for mode in ("lexical", "dense", "hybrid")], [2, 3, 3])
+        self.assertEqual(result["hybrid"][-1]["rank"], 3)
+
+    def test_batch_candidate_supply_depth_over_20_survives_rrf(self):
+        units_path = self.root / "ru/artifacts/retrieval_units.jsonl.gz"
+        with gzip.open(units_path, "rt", encoding="utf-8") as handle:
+            units = [json.loads(line) for line in handle if line.strip()]
+        expanded = []
+        for index in range(25):
+            unit = dict(units[index % 3])
+            unit["unit_id"] = f"u{index}"
+            unit["retrieval_visible_text"] = "阿贝多"
+            unit["source_order"] = [0, 0, 0, index]
+            expanded.append(unit)
+        body = gzip.compress(b"".join(canonical_json_bytes(unit) + b"\n" for unit in expanded), mtime=0)
+        units_path.write_bytes(body)
+        manifest = json.loads(self.ru_manifest.read_text(encoding="utf-8"))
+        manifest["artifacts"]["retrieval_units"].update({
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "byte_count": len(body),
+            "row_count": len(expanded),
+        })
+        self.ru_manifest.write_bytes(canonical_json_bytes(manifest))
+
+        build_lexical_index(self.ru_manifest, self.root / "lex")
+        build_dense_index(
+            self.ru_manifest,
+            self.root / "dense",
+            model_dir=self.root,
+            vectors=np.tile(np.array([[1, 0]], dtype=np.float32), (25, 1)),
+        )
+        batch = load_batch_candidate_retriever(
+            self.root / "lex/metadata/manifest.json",
+            self.root / "dense/metadata/manifest.json",
+        )
+        result = batch.candidates_for_query(
+            "阿贝多",
+            np.array([1, 0], dtype=np.float32),
+            instruction="指令",
+            candidate_supply_depth=21,
+        )
+        self.assertEqual([len(result[mode]) for mode in ("lexical", "dense", "hybrid")], [21, 21, 21])
+        self.assertEqual(result["hybrid"][-1]["rank"], 21)
+
+    def test_field_aware_manifest_binding_fails_closed(self):
+        build_field_aware_lexical_index(self.ru_manifest, self.root / "field-lex")
+        path = self.root / "field-lex/metadata/manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["fields"] = ["record_title"]
+        path.write_bytes(canonical_json_bytes(manifest))
+        with self.assertRaisesRegex(CandidateRetrievalError, "field projection"):
+            field_aware_lexical_candidates(path, "阿贝多")
 
     def test_mmap_is_explicitly_qwen_scoped_and_bge_loader_stays_detached(self):
         lm = build_lexical_index(self.ru_manifest, self.root / "lex-mmap")
