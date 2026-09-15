@@ -12,6 +12,14 @@ DEFAULT_PRODUCTION_RAG_ROOT = Path(
     "data/retrieval/p04-rag-production/phase03-batch5b-p01eb-full-20260824-pm02"
 )
 DEFAULT_PRODUCTION_QWEN_DENSE_MANIFEST = DEFAULT_QWEN_DENSE_MANIFEST
+DEFAULT_PRODUCTION_FIELD_AWARE_LEXICAL_MANIFEST = Path(
+    ".local/p04-block-a-closure-20260914-r2/field-aware-lexical/metadata/manifest.json"
+)
+DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE = "ws-gdq9z4ufdb87egio"
+DEFAULT_PRODUCTION_QWEN_RERANK_ENDPOINT = (
+    "https://ws-gdq9z4ufdb87egio.cn-beijing.maas.aliyuncs.com/"
+    "api/v1/services/rerank/text-rerank/text-rerank"
+)
 
 
 @dataclass(frozen=True)
@@ -27,6 +35,8 @@ class ProductionRagArtifactPaths:
 
     @property
     def lexical_manifest_path(self) -> Path:
+        if self.root == DEFAULT_PRODUCTION_RAG_ROOT:
+            return DEFAULT_PRODUCTION_FIELD_AWARE_LEXICAL_MANIFEST
         return self.root / "lexical" / "metadata" / "manifest.json"
 
     @property

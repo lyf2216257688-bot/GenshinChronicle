@@ -23,11 +23,20 @@ from genshin_corpus.rag.backend import (
     prepare_rag_state,
     run_single_question,
 )
-from genshin_corpus.rag.config import ProductionRagArtifactPaths
+from genshin_corpus.rag.config import (
+    DEFAULT_PRODUCTION_QWEN_RERANK_ENDPOINT,
+    DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE,
+    ProductionRagArtifactPaths,
+)
 from genshin_corpus.retrieval.qwen_embedding import (
     DashScopeQwenEmbeddingConfig,
     DashScopeQwenEmbeddingTransport,
     QwenEmbeddingTransport,
+)
+from genshin_corpus.retrieval.qwen_rerank import (
+    DashScopeQwenRerankConfig,
+    DashScopeQwenRerankTransport,
+    QWEN_RERANK_MODEL_ID,
 )
 
 
@@ -187,6 +196,23 @@ def build_generation_provider(environment: Mapping[str, str] | None = None) -> G
         raise UiConfigurationError("Generation provider is unavailable") from exc
 
 
+def build_reranker(environment: Mapping[str, str] | None = None) -> DashScopeQwenRerankTransport:
+    """Build the accepted online Qwen reranker; failure is configuration-fatal."""
+
+    values = os.environ if environment is None else environment
+    endpoint = values.get("DASHSCOPE_QWEN_RERANK_ENDPOINT", DEFAULT_PRODUCTION_QWEN_RERANK_ENDPOINT)
+    workspace = values.get("DASHSCOPE_QWEN_RERANK_WORKSPACE", DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE)
+    region = values.get("DASHSCOPE_QWEN_RERANK_REGION", "cn-beijing")
+    try:
+        config = DashScopeQwenRerankConfig(region=region, endpoint=endpoint, workspace=workspace)
+        transport = DashScopeQwenRerankTransport.from_environment(config, environment=values)
+    except Exception as exc:
+        raise UiConfigurationError(
+            f"{QWEN_RERANK_MODEL_ID} reranker is unavailable"
+        ) from exc
+    return transport
+
+
 def execute_query(
     prepared_state: PreparedRagState,
     query: UiQuery,
@@ -201,6 +227,7 @@ def execute_query(
         raise UiConfigurationError("question must be a non-empty string")
     resolved_output_root = resolve_output_root(query.output_root)
     embedding_transport = build_embedding_transport(environment)
+    reranker = build_reranker(environment)
     generation_provider = (
         build_generation_provider(environment)
         if query.execution_mode == "generate_answer"
@@ -211,7 +238,8 @@ def execute_query(
         query.question_text,
         embedding_transport=embedding_transport,
         generation_provider=generation_provider,
-        config=SingleQuestionBackendConfig(reranker_enabled=False),
+        config=SingleQuestionBackendConfig(),
+        reranker=reranker,
         execution_mode=query.execution_mode,
         output_root=resolved_output_root,
     )

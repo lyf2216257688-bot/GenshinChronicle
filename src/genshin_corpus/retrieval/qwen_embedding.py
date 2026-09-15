@@ -140,6 +140,19 @@ class QwenEmbeddingTransportError(Exception):
         self.provider_request_id = provider_request_id
 
 
+def project_qwen_query(query: str) -> str:
+    """Return the initial vNext semantic query projection unchanged.
+
+    The accepted Qwen query-vector artifacts were materialized from the exact
+    caller query. Keeping this projection identity-preserving avoids changing
+    the effective Dense request or silently reusing vectors for another input.
+    """
+
+    if not isinstance(query, str) or not query.strip():
+        raise QwenEmbeddingPreflightError("Qwen query text must be a non-empty string")
+    return query
+
+
 class QwenEmbeddingTransport(Protocol):
     """Qwen-only semantic seam. It intentionally does not specify wire details."""
 
@@ -585,9 +598,8 @@ def encode_qwen_query(
 
     if not callable(getattr(transport, "embed", None)):
         raise QwenEmbeddingPreflightError("Qwen query transport lacks the embed method")
-    if not isinstance(query, str) or not query.strip():
-        raise QwenEmbeddingPreflightError("Qwen query text must be a non-empty string")
-    request = QwenEmbeddingRequest(role=QWEN_QUERY_ROLE, texts=(query,))
+    projected_query = project_qwen_query(query)
+    request = QwenEmbeddingRequest(role=QWEN_QUERY_ROLE, texts=(projected_query,))
     response = transport.embed(request)
     if not isinstance(response, QwenEmbeddingResponse):
         raise QwenEmbeddingPreflightError("Qwen query transport returned an unexpected response type")

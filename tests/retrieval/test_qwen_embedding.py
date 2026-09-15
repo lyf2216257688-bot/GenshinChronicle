@@ -27,6 +27,7 @@ from genshin_corpus.retrieval.qwen_embedding import (
     QwenEmbeddingTransportError,
     QwenSynchronousPreflightConfig,
     encode_qwen_query,
+    project_qwen_query,
     run_qwen_dashscope_synchronous_preflight,
     run_qwen_synchronous_preflight,
 )
@@ -197,6 +198,14 @@ class QwenEmbeddingPreflightTests(unittest.TestCase):
             QwenEmbeddingRequest(role="query", texts=("问题",), model_id="other")
         with self.assertRaisesRegex(QwenEmbeddingPreflightError, "instruction"):
             QwenEmbeddingRequest(role="query", texts=("问题",), custom_query_instruction="prefix")  # type: ignore[arg-type]
+
+    def test_initial_query_projection_is_identity_preserving(self) -> None:
+        query = "  阿贝多的故事  "
+        transport = _FakeTransport([self._response("query", 1)])
+        _, request, _ = encode_qwen_query(transport, query)
+        self.assertEqual(project_qwen_query(query), query)
+        self.assertEqual(request.texts, (query,))
+        self.assertIsNone(request.custom_query_instruction)
 
     def test_returned_model_role_dimension_and_row_binding_fail_closed(self) -> None:
         cases = [

@@ -18,6 +18,7 @@ from genshin_corpus.ui.runtime import (
     UiConfigurationError,
     UiQuery,
     build_embedding_transport,
+    build_reranker,
     execute_query,
     production_artifact_paths,
     release_prepared_state,
@@ -32,6 +33,8 @@ class UiRuntimeTests(TestCase):
         paths = production_artifact_paths()
         self.assertIsInstance(paths, ProductionRagArtifactPaths)
         self.assertEqual(paths.root, DEFAULT_PRODUCTION_RAG_ROOT)
+        self.assertIn("field-aware-lexical", str(paths.lexical_manifest_path))
+        self.assertNotIn("data\\retrieval\\p04-rag-production", str(paths.lexical_manifest_path))
         self.assertNotIn("generation.measure", production_artifact_paths.__module__)
         self.assertEqual(len(paths.resolved_key()), 3)
 
@@ -62,9 +65,23 @@ class UiRuntimeTests(TestCase):
         with self.assertRaisesRegex(UiConfigurationError, "Qwen query embedding"):
             build_embedding_transport({})
 
+    def test_production_reranker_builds_accepted_online_model_without_fallback(self) -> None:
+        with patch("genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment", return_value=object()) as build:
+            result = build_reranker({"DASHSCOPE_API_KEY": "test-key"})
+        self.assertIsNotNone(result)
+        config = build.call_args.args[0]
+        self.assertEqual(config.workspace, "ws-gdq9z4ufdb87egio")
+        self.assertEqual(config.identity_projection()["model"], "qwen3.7-text-rerank")
+
+    def test_missing_reranker_credential_fails_closed_without_local_fallback(self) -> None:
+        with self.assertRaisesRegex(UiConfigurationError, "qwen3.7-text-rerank"):
+            build_reranker({})
+
     def test_evidence_only_does_not_construct_generation_provider(self) -> None:
         query = UiQuery("问题", "evidence_only", Path("output"))
         with patch("genshin_corpus.ui.runtime.build_embedding_transport", return_value=object()), patch(
+            "genshin_corpus.ui.runtime.build_reranker", return_value=object()
+        ), patch(
             "genshin_corpus.ui.runtime.build_generation_provider"
         ) as build_generation, patch(
             "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}
@@ -73,11 +90,16 @@ class UiRuntimeTests(TestCase):
         self.assertEqual(result["status"], "succeeded")
         build_generation.assert_not_called()
         self.assertIsNone(run.call_args.kwargs["generation_provider"])
+        self.assertTrue(run.call_args.kwargs["config"].reranker_enabled)
+        self.assertEqual(run.call_args.kwargs["config"].candidate_supply_depth, 500)
+        self.assertIsNotNone(run.call_args.kwargs["reranker"])
 
     def test_generate_answer_constructs_generation_provider_only_for_generate_mode(self) -> None:
         query = UiQuery("问题", "generate_answer", Path("output"))
         provider = object()
         with patch("genshin_corpus.ui.runtime.build_embedding_transport", return_value=object()), patch(
+            "genshin_corpus.ui.runtime.build_reranker", return_value=object()
+        ), patch(
             "genshin_corpus.ui.runtime.build_generation_provider", return_value=provider
         ) as build_generation, patch(
             "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}

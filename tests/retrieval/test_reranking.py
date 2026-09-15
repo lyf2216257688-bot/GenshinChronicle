@@ -5,7 +5,17 @@ import unittest
 from unittest.mock import patch
 
 from genshin_corpus.retrieval.qwen_rerank import DashScopeQwenRerankConfig, DashScopeQwenRerankTransport, QwenRerankTransportError
-from genshin_corpus.retrieval.reranking import RerankCandidate, RerankRequest, RerankScore, RerankingError, project_ranked_candidates, stable_rank_scores
+from genshin_corpus.retrieval.reranking import (
+    RankFusionConfig,
+    RerankCandidate,
+    RerankRequest,
+    RerankScore,
+    RerankingError,
+    fuse_ranked_candidates,
+    project_ranked_candidates,
+    project_reranker_text,
+    stable_rank_scores,
+)
 
 
 class _Response:
@@ -71,6 +81,46 @@ class RerankingTests(unittest.TestCase):
     def test_missing_or_duplicate_identity_is_rejected(self):
         with self.assertRaises(RerankingError):
             stable_rank_scores(_request(), [RerankScore("u1", 1, 1.0, 0), RerankScore("u1", 1, 0.9, 0), RerankScore("u3", 3, 0.8, 0)])
+
+    def test_reranker_projection_is_deterministic_and_bounded(self):
+        fields = {
+            "record_title": "  标题 ",
+            "section_name": "章节",
+            "speaker": "派蒙",
+            "retrieval_visible_text": "正文" * 20,
+        }
+        first = project_reranker_text(fields, max_chars=32)
+        second = project_reranker_text(fields, max_chars=32)
+        self.assertEqual(first, second)
+        self.assertEqual(first[1]["projected_char_count"], 32)
+        self.assertTrue(first[1]["truncated"])
+        self.assertIsNone(first[1]["token_estimate"])
+        self.assertEqual(first[1]["identity"], second[1]["identity"])
+
+    def test_reranker_projection_requires_main_text_and_tolerates_missing_optional_fields(self):
+        text, audit = project_reranker_text({"retrieval_visible_text": "正文"})
+        self.assertEqual(text, "Text: 正文")
+        self.assertEqual(audit["truncated"], False)
+        with self.assertRaises(RerankingError):
+            project_reranker_text({"record_title": "标题"})
+        with self.assertRaises(RerankingError):
+            project_reranker_text({"retrieval_visible_text": "  \n\t"})
+
+    def test_rank_fusion_uses_actual_ranks_and_deterministic_ties(self):
+        hybrid = [
+            {"unit_id": "u1", "rank": 1, "retrieval": {"mode": "hybrid"}},
+            {"unit_id": "u2", "rank": 2, "retrieval": {"mode": "hybrid"}},
+        ]
+        reranked = [
+            {"unit_id": "u2", "rank": 1, "original_hybrid_rank": 2, "rerank_rank": 1, "rerank_score": 9.0},
+            {"unit_id": "u1", "rank": 2, "original_hybrid_rank": 1, "rerank_rank": 2, "rerank_score": 8.0},
+        ]
+        result = fuse_ranked_candidates(hybrid, reranked, config=RankFusionConfig())
+        self.assertEqual([row["unit_id"] for row in result], ["u2", "u1"])
+        self.assertAlmostEqual(result[0]["fusion_score"], 0.35 / 62 + 0.65 / 61)
+        self.assertEqual(result[0]["retrieval"]["fusion"]["config_identity"], RankFusionConfig().identity)
+        partial = fuse_ranked_candidates(hybrid, reranked[:1])
+        self.assertEqual([row["unit_id"] for row in partial], ["u2"])
 
 
 if __name__ == "__main__":

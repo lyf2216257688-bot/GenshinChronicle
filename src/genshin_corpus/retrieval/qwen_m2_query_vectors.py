@@ -40,10 +40,28 @@ from .qwen_embedding import (
 QWEN_M2_QUERY_VECTORS_SCHEMA_VERSION = "phase04-rag-qwen37-m2-query-vectors-0.1"
 QWEN_M2_QUERY_VECTOR_COUNT = 70
 QWEN_M2_QUERY_MAX_BATCH_SIZE = 20
+ACCEPTED_QWEN_M2_QUERY_ARTIFACT_IDENTITY = "a286fc34c643800cf5ba9d8071ce78be9938fa2f64507fa0ab828b71eeea3732"
+ACCEPTED_QWEN_M2_QUERY_VECTORS_SHA256 = "40eb1b2558aa8a7a44b98a09867a038ef4730670a75b3b14f1f161cda309a8bf"
 
 
 class QwenM2QueryVectorsError(ValueError):
     """Raised when the dedicated 70Q query-vector run cannot safely proceed."""
+
+
+@dataclass(frozen=True)
+class AcceptedQwenQueryVector:
+    """One accepted Q001-Q070 vector with its immutable request binding."""
+
+    question_id: str
+    question: str
+    question_identity: str
+    vector: Any
+    row_index: int
+    request_identity: str
+    artifact_identity: str
+    vectors_sha256: str
+    manifest_sha256: str
+    configuration: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -654,3 +672,54 @@ def load_qwen_m2_query_vectors(output_root: Path) -> tuple[list[dict[str, Any]],
     vectors = np.load(output_root / artifacts["vectors"]["path"], allow_pickle=False)
     rows = [json.loads(line) for line in (output_root / artifacts["question_rows"]["path"]).read_text(encoding="utf-8").splitlines()]
     return rows, vectors, manifest
+
+
+def load_accepted_qwen_query_vectors(output_root: Path) -> tuple[AcceptedQwenQueryVector, ...]:
+    """Load the accepted identity-preserving Q001-Q070 query bindings."""
+
+    output_root = Path(output_root)
+    rows, vectors, manifest = load_qwen_m2_query_vectors(output_root)
+    manifest_path = output_root / "metadata" / "manifest.json"
+    manifest_sha256 = sha256(manifest_path.read_bytes()).hexdigest()
+    artifacts = manifest.get("artifacts")
+    vector_descriptor = artifacts.get("vectors") if isinstance(artifacts, Mapping) else None
+    if (
+        manifest.get("artifact_identity") != ACCEPTED_QWEN_M2_QUERY_ARTIFACT_IDENTITY
+        or not isinstance(vector_descriptor, Mapping)
+        or vector_descriptor.get("sha256") != ACCEPTED_QWEN_M2_QUERY_VECTORS_SHA256
+        or manifest.get("configuration") != QwenM2QueryVectorConfig(
+            runtime_input=Path("accepted-runtime-input")
+        ).identity_projection()
+        or len(rows) != QWEN_M2_QUERY_VECTOR_COUNT
+    ):
+        raise QwenM2QueryVectorsError("accepted Qwen query-vector artifact binding mismatch")
+    expected_batches = manifest.get("batches")
+    if not isinstance(expected_batches, list):
+        raise QwenM2QueryVectorsError("accepted Qwen query-vector batches are missing")
+    bindings: list[AcceptedQwenQueryVector] = []
+    for row_index, row in enumerate(rows):
+        if not isinstance(row, Mapping) or row.get("row_index") != row_index:
+            raise QwenM2QueryVectorsError("accepted Qwen query-vector row binding is invalid")
+        batch_index = row_index // QWEN_M2_QUERY_MAX_BATCH_SIZE
+        batch = expected_batches[batch_index] if batch_index < len(expected_batches) else None
+        if (
+            not isinstance(batch, Mapping)
+            or row.get("question_id") not in batch.get("question_ids", [])
+            or not isinstance(batch.get("request_identity"), str)
+        ):
+            raise QwenM2QueryVectorsError("accepted Qwen query-vector request binding is invalid")
+        bindings.append(
+            AcceptedQwenQueryVector(
+                question_id=str(row["question_id"]),
+                question=str(row["question"]),
+                question_identity=str(row["question_identity"]),
+                vector=vectors[row_index],
+                row_index=row_index,
+                request_identity=str(batch["request_identity"]),
+                artifact_identity=str(manifest["artifact_identity"]),
+                vectors_sha256=str(vector_descriptor["sha256"]),
+                manifest_sha256=manifest_sha256,
+                configuration=dict(manifest["configuration"]),
+            )
+        )
+    return tuple(bindings)
