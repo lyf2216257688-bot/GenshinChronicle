@@ -224,7 +224,7 @@ class GenerationTests(unittest.TestCase):
         unknown = validate_citations("回答 [E03]", self.request)
         self.assertEqual(unknown.integrity, "fail")
         self.assertEqual(unknown.coverage, "fail")
-        malformed = validate_citations("回答 [E1]", self.request)
+        malformed = validate_citations("回答 [E+1]", self.request)
         self.assertEqual(malformed.integrity, "fail")
         no_citation = validate_citations("没有引用", self.request)
         self.assertEqual(no_citation.integrity, "pass")
@@ -234,6 +234,48 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(empty_validation.coverage, "not_applicable")
         optional = project_generation_request(self.packet, question="可选引用", citation_policy=CitationCoveragePolicy(mode="optional", min_unique_evidence_ids=0))
         self.assertEqual(validate_citations("无引用", optional).coverage, "pass")
+
+    def test_numeric_zero_padding_normalization_is_narrow_and_audited(self) -> None:
+        packet = dict(self.packet)
+        packet["evidence"] = list(self.packet["evidence"]) + [{"evidence_id": "E05", "text": "证据"}]
+        request = project_generation_request(packet, question="问题", question_id="q-padding")
+
+        exact = validate_citations("回答 [E05]", request)
+        self.assertEqual(exact.integrity, "pass")
+        self.assertEqual(exact.citation_tokens, ("E05",))
+        self.assertEqual(exact.citation_normalizations, ())
+
+        raw_answer = "回答 [E5]"
+        normalized = validate_citations(raw_answer, request)
+        self.assertEqual(normalized.integrity, "pass")
+        self.assertEqual(normalized.coverage, "pass")
+        self.assertEqual(normalized.citation_tokens, ("E05",))
+        self.assertEqual(normalized.citation_normalizations, ({
+            "raw_token": "[E5]",
+            "raw_evidence_id": "E5",
+            "canonical_evidence_id": "E05",
+            "kind": "numeric_zero_padding",
+        },))
+        self.assertEqual(raw_answer, "回答 [E5]")
+
+        absent = validate_citations("回答 [E5]", self.request)
+        self.assertEqual(absent.integrity, "fail")
+        self.assertEqual(absent.reasons[0]["kind"], "malformed_citation_token")
+
+        unknown = validate_citations("回答 [E99]", request)
+        self.assertEqual(unknown.integrity, "fail")
+        self.assertEqual(unknown.reasons[0]["kind"], "unknown_evidence_id")
+
+        ambiguous_packet = dict(packet)
+        ambiguous_packet["evidence"] = list(packet["evidence"]) + [{"evidence_id": "E005", "text": "另一个证据"}]
+        ambiguous_request = project_generation_request(ambiguous_packet, question="问题", question_id="q-ambiguous")
+        ambiguous = validate_citations("回答 [E5]", ambiguous_request)
+        self.assertEqual(ambiguous.integrity, "fail")
+        self.assertEqual(ambiguous.reasons[0]["kind"], "ambiguous_citation_token")
+
+        malformed = validate_citations("回答 [E+5]", request)
+        self.assertEqual(malformed.integrity, "fail")
+        self.assertEqual(malformed.reasons[0]["kind"], "malformed_citation_token")
 
     def test_semantic_faithfulness_is_an_immutable_not_evaluated_contract_value(self) -> None:
         validation = validate_citations("回答 [E01]", self.request)

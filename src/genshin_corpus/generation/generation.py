@@ -306,6 +306,7 @@ class CitationValidation:
     integrity: str
     coverage: str
     reasons: tuple[Mapping[str, Any], ...]
+    citation_normalizations: tuple[Mapping[str, Any], ...] = ()
     @property
     def semantic_faithfulness(self) -> str:
         """Fixed absence-of-evaluation marker; G1 cannot set a semantic verdict."""
@@ -318,6 +319,7 @@ class CitationValidation:
             "citation_integrity": self.integrity,
             "citation_coverage": self.coverage,
             "validation_reasons": [dict(item) for item in self.reasons],
+            "citation_normalizations": [dict(item) for item in self.citation_normalizations],
             "semantic_faithfulness": SEMANTIC_FAITHFULNESS_NOT_EVALUATED,
         }
 
@@ -329,6 +331,7 @@ def validate_citations(answer_text: str, request: GenerationRequest) -> Citation
     valid_ids = {item.evidence_id for item in request.evidence}
     cited: list[str] = []
     reasons: list[dict[str, Any]] = []
+    normalizations: list[dict[str, Any]] = []
     position = 0
     while position < len(answer_text):
         start = answer_text.find("[", position)
@@ -346,6 +349,32 @@ def validate_citations(answer_text: str, request: GenerationRequest) -> Citation
         identifier = answer_text[position:end]
         position = end + 1
         if not _EVIDENCE_ID.fullmatch(identifier):
+            numeric_match = re.fullmatch(r"E([0-9]+)", identifier)
+            if numeric_match is not None:
+                numeric_index = int(numeric_match.group(1))
+                numeric_matches = sorted(
+                    item_id for item_id in valid_ids
+                    if _EVIDENCE_ID.fullmatch(item_id)
+                    and int(item_id[1:]) == numeric_index
+                )
+                if len(numeric_matches) == 1:
+                    canonical_id = numeric_matches[0]
+                    normalizations.append({
+                        "raw_token": token,
+                        "raw_evidence_id": identifier,
+                        "canonical_evidence_id": canonical_id,
+                        "kind": "numeric_zero_padding",
+                    })
+                    if canonical_id not in cited:
+                        cited.append(canonical_id)
+                    continue
+                if len(numeric_matches) > 1:
+                    reasons.append({
+                        "kind": "ambiguous_citation_token",
+                        "token": token,
+                        "candidate_evidence_ids": numeric_matches,
+                    })
+                    continue
             reasons.append({"kind": "malformed_citation_token", "token": token})
             continue
         if identifier not in valid_ids:
@@ -368,7 +397,7 @@ def validate_citations(answer_text: str, request: GenerationRequest) -> Citation
             "required_minimum": request.citation_policy.min_unique_evidence_ids,
             "actual_unique_evidence_ids": len(cited),
         })
-    return CitationValidation(tuple(cited), integrity, coverage, tuple(reasons))
+    return CitationValidation(tuple(cited), integrity, coverage, tuple(reasons), tuple(normalizations))
 
 
 @dataclass(frozen=True)
@@ -408,6 +437,7 @@ class GenerationResult:
             "citation_integrity": "not_applicable",
             "citation_coverage": "not_applicable",
             "validation_reasons": [],
+            "citation_normalizations": [],
             "semantic_faithfulness": SEMANTIC_FAITHFULNESS_NOT_EVALUATED,
         }
         return {
