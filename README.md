@@ -102,18 +102,25 @@ control path. `data/canonical/` and `data/retrieval/` are ignored local
 generated-data roots; the latter is not a serving-system contract.
 
 The local Streamlit frontend is an optional presentation layer over the
-single-question RAG backend. Install `requirements-ui.txt`, expose `src` on
-`PYTHONPATH`, and run:
+single-question RAG backend. The default local-BGE production path must use
+the validated Python 3.12 runtime at
+`D:\GenshinChronicle\.local\gte-reranker-runtime\Scripts\python.exe`, which
+contains Streamlit `1.63.0`. Expose `src` on `PYTHONPATH`, provide the pinned
+local BGE snapshot, leave the reranker selector unset, and run:
 
 ```powershell
-python -m pip install -r requirements-ui.txt
+$runtime = 'D:\GenshinChronicle\.local\gte-reranker-runtime\Scripts\python.exe'
 $env:PYTHONPATH = (Resolve-Path src)
-python -m streamlit run src/genshin_corpus/ui/streamlit_app.py
+$env:GENSHIN_BGE_RERANKER_MODEL_ROOT = 'D:\GenshinChronicle\.local\models\bge-reranker-v2-m3\953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e'
+Remove-Item Env:GENSHIN_RERANKER_BACKEND -ErrorAction SilentlyContinue
+& $runtime -m streamlit run src/genshin_corpus/ui/streamlit_app.py
 ```
 
 The app reads provider credentials from the existing runtime environment only
 when a question is submitted. `evidence_only` requires the Qwen query
-embedding environment but does not inspect Generation credentials.
+embedding environment but does not inspect Generation credentials. The online
+Qwen reranker is not part of the default path; select it explicitly with
+`GENSHIN_RERANKER_BACKEND=online_qwen` when its credentials are configured.
 
 ## Data and secrets
 

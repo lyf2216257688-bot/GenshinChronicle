@@ -13,8 +13,11 @@ Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
 **Current engineering work unit: P04 Block A Retrieval & Ranking vNext -
-FROZEN / ADOPTED (Diagnostic C field-aware lexical scorer and online Qwen
-reranker default ON); Single-Question End-to-End RAG Backend - CLOSED / PASS
+FROZEN / ADOPTED (Diagnostic C field-aware lexical scorer and local
+`BAAI/bge-reranker-v2-m3` reranker default ON; online Qwen explicit-only);
+default-local-BGE implementation and runtime closure CLOSED / PASS, pending
+Git/main integration;
+Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
 Streamlit Frontend - CLOSED / PASS (implementation, actual source review,
 focused regressions, and local runtime gates); Generation instruction v0.2
@@ -40,18 +43,27 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   manifest SHA-256 `6b4330e67cd7c4284a9e396d65ae6be8a43fc5fac26804a54f6840928b5937d5`,
   and RU build identity
   `49b48ee746716add0248fed388d10bd522a930efb582a0f5e827f66681ed8998`.
-  The matrix is reused in place and loaded with read-only mmap. BGE remains a
-  retained historical/control implementation, not a production fallback.
+  The matrix is reused in place and loaded with read-only mmap. BGE Dense
+  remains a retained historical/control implementation, not a production
+  fallback.
 - **Production lexical Retrieval uses Diagnostic C** at the accepted field-aware
   operating point: BM25 `k1=1.2`, `b=0.75`, fields
   `record_title/section_name/speaker/retrieval_visible_text`, weights
   `2.0/1.25/1.5/1.0`, and candidate supply depth `500`.
-- **Production reranking is enabled by default** with the accepted online
-  `qwen3.7-text-rerank` transport over the 500-candidate Hybrid window. The
-  default explicit disabled control retains Hybrid supply `500` and sends
-  Hybrid Top20 directly to Assembly; diagnostic depth overrides remain
-  available for tests. A configured reranker failure is fail-closed with no
-  local-model fallback.
+- **Production reranking defaults to the local**
+  `BAAI/bge-reranker-v2-m3` adapter over the 500-candidate Hybrid window. It
+  requires `GENSHIN_BGE_RERANKER_MODEL_ROOT` to name the revision-pinned local
+  snapshot; it never downloads a model. `GENSHIN_RERANKER_BACKEND=online_qwen`
+  is the explicit-only control for `qwen3.7-text-rerank`; unset resolves to
+  `local_bge`, and `off` retains Hybrid supply `500` and sends Hybrid Top20
+  directly to Assembly. A selected local or online reranker configuration,
+  load, transport, or execution failure is fail-closed with no local/online
+  fallback.
+  Its accepted production runtime is the existing historical
+  `.local/gte-reranker-runtime` environment: Python `3.12.10`, torch
+  `2.11.0+cu128`, transformers `4.39.1`, tokenizers `0.15.2`, CUDA available,
+  and Streamlit `1.63.0`. These BGE runtime pins remain exact; the historical
+  venv name is not a selector or a GTE production dependency.
   Rank-only fusion remains `0.35 Hybrid / 0.65 rerank`, denominator `60`,
   final top `20`, and the reranker projection cap is `6,000` characters.
 - Q015 is an accepted known bounded Retrieval/Ranking regression under C: its
@@ -157,11 +169,11 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   The run reused accepted persisted Qwen query vectors and made zero fresh
   embedding API calls.
 
-- The accepted project decision is reranker efficacy **PASS** with a
-  **CLEAR POSITIVE** answer-level effect. Qwen reranking is now adopted as the
-  production default in Block A. The local `Qwen3-Reranker-0.6B` remains a
-  dormant challenger; its quality/throughput comparison is the immediate next
-  gate. Block B has not started.
+- The accepted online-Qwen reranker evaluation established reranker efficacy
+  **PASS** with a **CLEAR POSITIVE** answer-level effect. Its historical
+  adoption checkpoint is retained, while the current production selector is
+  the local BGE adapter above. `Qwen3-Reranker-0.6B` is retired; Block B has
+  not started.
 
 - The P04 Rerank Regression Guard / Rank-Fusion Challenger is **ACTUAL-GATE
   PASS** as a provider-free historical replay only. It makes no production or
@@ -271,8 +283,8 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   consumer of the existing single-question backend: no Retrieval, Assembly,
   Generation, citation, or persistence policy changed; no model or artifact
   selector was added; and the reranker default was disabled at this historical
-  checkpoint. Block A adoption now supersedes that checkpoint with online
-  reranking enabled by default. No
+  checkpoint. Later Block A adoption superseded that checkpoint; the current
+  selector is recorded in the production baseline above. No
   provider/API call or real RAG question was executed during these gates.
   This status update authorizes no real Generation/provider run.
   Streamlit process-shutdown cleanup remains limited by its documented
@@ -283,21 +295,26 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
 Arbitrary Dense/Hybrid queries use the existing Qwen synchronous query seam
 (`role=query`, dimension 2048, dense-only, no custom instruction), one request
 per query. Missing credentials, provider/transport failures, or
-artifact/provenance mismatches fail closed; there is no BGE fallback.
+artifact/provenance mismatches fail closed; this concerns query embedding and
+does not select a reranker fallback.
 
 Block A Retrieval/Ranking vNext is frozen/adopted at the current operating
 point:
-`accepted Qwen query embedding -> Diagnostic C lexical + accepted Qwen Dense -> deterministic RRF Hybrid (500) -> online qwen3.7-text-rerank (500) -> rank-only fusion -> final 20 -> Formal Deferred`.
+`accepted Qwen query embedding -> Diagnostic C lexical + accepted Qwen Dense -> deterministic RRF Hybrid (500) -> local BAAI/bge-reranker-v2-m3 (500) -> rank-only fusion -> final 20 -> Formal Deferred`.
+`online_qwen` remains an explicit comparison/regression selector and `off`
+remains the accepted Hybrid Top20 control; neither permits a silent fallback.
 W7 amendments govern only their completed W7 lineage; the W1 benchmark contract
 governs only its historical benchmark path.
 
 ## Immediate next gate
 
-**Next technical work unit: local `Qwen3-Reranker-0.6B` quality/throughput
-comparison.** Keep the adopted online reranker and Diagnostic C chain fixed;
-the local model remains a dormant challenger with no automatic fallback or
-production substitution. Block B has not started. The v0.2 Generation
-challenger is closed and is not a production selector.
+**The default-local-BGE implementation and runtime closure are CLOSED / PASS.
+Block B has NOT started; the next technical work unit is Block B only after
+Git/main integration closure.** Keep the adopted Diagnostic C, accepted Qwen
+Dense, Hybrid, rank-fusion, final20, Formal Deferred, and Generation chain
+fixed. The local BGE and explicit online-Qwen controls permit no automatic
+fallback. The v0.2 Generation challenger is closed and is not a production
+selector.
 
 Q050 focused candidate/retrieval coverage, Generation timeline understanding,
 Generation identity/role relation handling, and reranker token-cost

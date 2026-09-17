@@ -44,6 +44,18 @@ class UiConfigurationError(ValueError):
     """Raised when submit-time UI configuration is unavailable or unsafe."""
 
 
+RERANKER_BACKEND_ENV = "GENSHIN_RERANKER_BACKEND"
+BGE_RERANKER_MODEL_ROOT_ENV = "GENSHIN_BGE_RERANKER_MODEL_ROOT"
+LOCAL_BGE_RERANKER_BACKEND = "local_bge"
+ONLINE_QWEN_RERANKER_BACKEND = "online_qwen"
+OFF_RERANKER_BACKEND = "off"
+_RERANKER_BACKENDS = frozenset({
+    LOCAL_BGE_RERANKER_BACKEND,
+    ONLINE_QWEN_RERANKER_BACKEND,
+    OFF_RERANKER_BACKEND,
+})
+
+
 @dataclass(frozen=True)
 class UiQuery:
     question_text: str
@@ -196,10 +208,48 @@ def build_generation_provider(environment: Mapping[str, str] | None = None) -> G
         raise UiConfigurationError("Generation provider is unavailable") from exc
 
 
-def build_reranker(environment: Mapping[str, str] | None = None) -> DashScopeQwenRerankTransport:
-    """Build the accepted online Qwen reranker; failure is configuration-fatal."""
+def resolve_reranker_backend(environment: Mapping[str, str] | None = None) -> str:
+    """Resolve the explicit reranker backend, defaulting only to local BGE."""
 
     values = os.environ if environment is None else environment
+    backend = values.get(RERANKER_BACKEND_ENV, LOCAL_BGE_RERANKER_BACKEND)
+    if backend not in _RERANKER_BACKENDS:
+        choices = ", ".join(sorted(_RERANKER_BACKENDS))
+        raise UiConfigurationError(f"{RERANKER_BACKEND_ENV} must be one of: {choices}")
+    return backend
+
+
+def _build_local_bge_reranker(values: Mapping[str, str]) -> Any:
+    """Construct BGE without importing its optional runtime before selection."""
+
+    model_root = values.get(BGE_RERANKER_MODEL_ROOT_ENV)
+    if not isinstance(model_root, str) or not model_root.strip():
+        raise UiConfigurationError(
+            f"{LOCAL_BGE_RERANKER_BACKEND} requires {BGE_RERANKER_MODEL_ROOT_ENV}"
+        )
+    try:
+        from genshin_corpus.retrieval.bge_reranker_v2_m3 import (
+            BgeRerankerV2M3,
+            BgeRerankerV2M3Config,
+        )
+
+        return BgeRerankerV2M3(BgeRerankerV2M3Config(Path(model_root)))
+    except UiConfigurationError:
+        raise
+    except Exception as exc:
+        raise UiConfigurationError("local BAAI/bge-reranker-v2-m3 reranker is unavailable") from exc
+
+
+def build_reranker(environment: Mapping[str, str] | None = None) -> Any | None:
+    """Build only the selected reranker; no local/online fallback is permitted."""
+
+    values = os.environ if environment is None else environment
+    backend = resolve_reranker_backend(values)
+    if backend == OFF_RERANKER_BACKEND:
+        return None
+    if backend == LOCAL_BGE_RERANKER_BACKEND:
+        return _build_local_bge_reranker(values)
+
     endpoint = values.get("DASHSCOPE_QWEN_RERANK_ENDPOINT", DEFAULT_PRODUCTION_QWEN_RERANK_ENDPOINT)
     workspace = values.get("DASHSCOPE_QWEN_RERANK_WORKSPACE", DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE)
     region = values.get("DASHSCOPE_QWEN_RERANK_REGION", "cn-beijing")
@@ -227,6 +277,7 @@ def execute_query(
         raise UiConfigurationError("question must be a non-empty string")
     resolved_output_root = resolve_output_root(query.output_root)
     embedding_transport = build_embedding_transport(environment)
+    reranker_backend = resolve_reranker_backend(environment)
     reranker = build_reranker(environment)
     generation_provider = (
         build_generation_provider(environment)
@@ -238,7 +289,7 @@ def execute_query(
         query.question_text,
         embedding_transport=embedding_transport,
         generation_provider=generation_provider,
-        config=SingleQuestionBackendConfig(),
+        config=SingleQuestionBackendConfig(reranker_enabled=reranker_backend != OFF_RERANKER_BACKEND),
         reranker=reranker,
         execution_mode=query.execution_mode,
         output_root=resolved_output_root,

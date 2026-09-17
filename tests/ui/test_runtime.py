@@ -17,6 +17,11 @@ from genshin_corpus.ui.runtime import (
     PreparedStateOwner,
     UiConfigurationError,
     UiQuery,
+    BGE_RERANKER_MODEL_ROOT_ENV,
+    LOCAL_BGE_RERANKER_BACKEND,
+    OFF_RERANKER_BACKEND,
+    ONLINE_QWEN_RERANKER_BACKEND,
+    RERANKER_BACKEND_ENV,
     build_embedding_transport,
     build_reranker,
     execute_query,
@@ -65,17 +70,72 @@ class UiRuntimeTests(TestCase):
         with self.assertRaisesRegex(UiConfigurationError, "Qwen query embedding"):
             build_embedding_transport({})
 
-    def test_production_reranker_builds_accepted_online_model_without_fallback(self) -> None:
+    def test_default_reranker_selects_local_bge_without_constructing_online_qwen(self) -> None:
+        values = {BGE_RERANKER_MODEL_ROOT_ENV: "C:/models/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"}
+        with patch("genshin_corpus.ui.runtime._build_local_bge_reranker", return_value=object()) as local, patch(
+            "genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment"
+        ) as online:
+            result = build_reranker(values)
+        self.assertIs(result, local.return_value)
+        local.assert_called_once_with(values)
+        online.assert_not_called()
+
+    def test_explicit_online_reranker_builds_accepted_model_without_local_fallback(self) -> None:
         with patch("genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment", return_value=object()) as build:
-            result = build_reranker({"DASHSCOPE_API_KEY": "test-key"})
+            result = build_reranker({
+                RERANKER_BACKEND_ENV: ONLINE_QWEN_RERANKER_BACKEND,
+                "DASHSCOPE_API_KEY": "test-key",
+            })
         self.assertIsNotNone(result)
         config = build.call_args.args[0]
         self.assertEqual(config.workspace, "ws-gdq9z4ufdb87egio")
         self.assertEqual(config.identity_projection()["model"], "qwen3.7-text-rerank")
 
-    def test_missing_reranker_credential_fails_closed_without_local_fallback(self) -> None:
-        with self.assertRaisesRegex(UiConfigurationError, "qwen3.7-text-rerank"):
-            build_reranker({})
+    def test_explicit_off_does_not_construct_any_reranker(self) -> None:
+        with patch("genshin_corpus.ui.runtime._build_local_bge_reranker") as local, patch(
+            "genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment"
+        ) as online:
+            self.assertIsNone(build_reranker({RERANKER_BACKEND_ENV: OFF_RERANKER_BACKEND}))
+        local.assert_not_called()
+        online.assert_not_called()
+
+    def test_invalid_reranker_selector_fails_clearly(self) -> None:
+        with self.assertRaisesRegex(UiConfigurationError, RERANKER_BACKEND_ENV):
+            build_reranker({RERANKER_BACKEND_ENV: "other"})
+
+    def test_missing_local_bge_configuration_fails_closed_without_online_fallback(self) -> None:
+        with patch("genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment") as online:
+            with self.assertRaisesRegex(UiConfigurationError, BGE_RERANKER_MODEL_ROOT_ENV):
+                build_reranker({})
+        online.assert_not_called()
+
+    def test_local_bge_construction_failure_fails_closed_without_online_fallback(self) -> None:
+        values = {BGE_RERANKER_MODEL_ROOT_ENV: "C:/models/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"}
+        with patch(
+            "genshin_corpus.ui.runtime._build_local_bge_reranker",
+            side_effect=UiConfigurationError("local BGE unavailable"),
+        ) as local, patch(
+            "genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment"
+        ) as online:
+            with self.assertRaisesRegex(UiConfigurationError, "local BGE unavailable"):
+                build_reranker(values)
+        local.assert_called_once_with(values)
+        online.assert_not_called()
+
+    def test_missing_online_reranker_credential_fails_closed_without_local_fallback(self) -> None:
+        with patch("genshin_corpus.ui.runtime._build_local_bge_reranker") as local:
+            with self.assertRaisesRegex(UiConfigurationError, "qwen3.7-text-rerank"):
+                build_reranker({RERANKER_BACKEND_ENV: ONLINE_QWEN_RERANKER_BACKEND})
+        local.assert_not_called()
+
+    def test_online_reranker_construction_failure_does_not_call_local_bge(self) -> None:
+        with patch("genshin_corpus.ui.runtime._build_local_bge_reranker") as local, patch(
+            "genshin_corpus.ui.runtime.DashScopeQwenRerankTransport.from_environment",
+            side_effect=RuntimeError("unavailable"),
+        ):
+            with self.assertRaisesRegex(UiConfigurationError, "qwen3.7-text-rerank"):
+                build_reranker({RERANKER_BACKEND_ENV: ONLINE_QWEN_RERANKER_BACKEND})
+        local.assert_not_called()
 
     def test_evidence_only_does_not_construct_generation_provider(self) -> None:
         query = UiQuery("问题", "evidence_only", Path("output"))
@@ -93,6 +153,21 @@ class UiRuntimeTests(TestCase):
         self.assertTrue(run.call_args.kwargs["config"].reranker_enabled)
         self.assertEqual(run.call_args.kwargs["config"].candidate_supply_depth, 500)
         self.assertIsNotNone(run.call_args.kwargs["reranker"])
+
+    def test_execute_query_off_preserves_existing_backend_off_control(self) -> None:
+        query = UiQuery("问题", "evidence_only", Path("output"))
+        environment = {RERANKER_BACKEND_ENV: OFF_RERANKER_BACKEND}
+        with patch("genshin_corpus.ui.runtime.build_embedding_transport", return_value=object()), patch(
+            "genshin_corpus.ui.runtime.build_reranker", return_value=None
+        ) as build, patch(
+            "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}
+        ) as run:
+            execute_query(object(), query, environment=environment)
+        build.assert_called_once_with(environment)
+        self.assertFalse(run.call_args.kwargs["config"].reranker_enabled)
+        self.assertEqual(run.call_args.kwargs["config"].candidate_supply_depth, 500)
+        self.assertEqual(run.call_args.kwargs["config"].final_top_n, 20)
+        self.assertIsNone(run.call_args.kwargs["reranker"])
 
     def test_generate_answer_constructs_generation_provider_only_for_generate_mode(self) -> None:
         query = UiQuery("问题", "generate_answer", Path("output"))
