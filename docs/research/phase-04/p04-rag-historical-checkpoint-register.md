@@ -124,6 +124,32 @@
   citation faithfulness, or hallucination improvement. Original reviewer
   artifact bytes remain external/untracked.
 
+### Late Block A closure and BGE operating policy
+
+- **GTE full70 terminal/recovery/provenance closure:** checkpoint `af5f69c`
+  recorded 70 rerank and 70 Generation attempts, 69 successes, and Q060 as a
+  `provider_error` with no retry. Recovery/provenance hardening closed
+  provider-free; this is terminal historical accounting, not work to resume.
+- **BGE full70 experiment:** historical branch `p04/bge-reranker-v2-m3` at
+  `26ae3d1` completed 70/70. The branch was intentionally not merged wholesale
+  into `main`.
+- **Three-local blind review:** r1 is INVALID because its blind package omitted
+  evidence text / truncated evidence. Corrected r2 was accepted on the common
+  68Q set and selected BGE as best among the three LOCAL rerankers. It is not
+  evidence that BGE exceeds online `qwen3.7-text-rerank`.
+- **Operating policy and effective implementation:** the user selected default
+  local BGE for cost and retained online Qwen as explicit-only. This is a
+  configurable operating point and current architecture direction, not a
+  correctness invariant. The provider-free implementation/runtime closure used
+  Python `3.12.10`, torch `2.11.0+cu128`, transformers `4.39.1`, tokenizers
+  `0.15.2`, Streamlit `1.63.0`, and CUDA `True`; AppTest, lazy selection, and
+  zero online-Qwen construction passed, with 53/53 affected tests under that
+  runtime.
+- **Main integration:** `c957e061b4f68ada08601bbbdc0f358430379668`
+  (`phase04: make local bge the default reranker`) integrated the default-local
+  BGE implementation after the historical branch was retained separately.
+  Current authority remains `docs/current-phase.md`.
+
 ## Historical lookup rule
 
 Use this index to locate the primary evidence owner, then consult the owner or

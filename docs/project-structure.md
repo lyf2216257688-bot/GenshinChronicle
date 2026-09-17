@@ -24,13 +24,14 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
   deterministic serialization, structural OBC projection, and the local
   Canonical run-storage/pipeline boundary.
-- `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Unit and representation
-  builders, deterministic BM25/local Dense/RRF candidate retrieval,
-  deterministic Evidence Assembly and Evidence Packets, production
-  materialization, comparison/parity tools, and isolated Dense
-  challenger/comparison tooling. It owns rebuildable local artifacts, not a
-  serving system or a
-  permanent technology winner.
+- `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Units; lexical, local
+  Dense, and deterministic candidate retrieval; reranking adapters/primitives
+  and rank fusion; Formal Deferred Evidence Assembly; and rebuildable local
+  materialization, comparison, parity, and bounded research tooling. The
+  existence of an experiment runner does not authorize its execution, and an
+  adapter's existence does not establish the current default. It owns no UI
+  lifecycle or Generation provider contract, is not a serving system, and does
+  not establish a permanent technology winner.
 - `src/genshin_corpus/generation/`: provider-neutral Generation contracts,
   generation-visible Evidence Packet projection, result/citation-integrity
   persistence, and explicitly scoped provider adapters. It consumes an

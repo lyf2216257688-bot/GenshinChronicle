@@ -12,16 +12,24 @@ end-to-end baseline is implemented, materialized, and measured. Phase 01 Raw,
 Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
 remains `zh-cn` MiHoYo OBC.
 
-**Current engineering work unit: P04 Block A Retrieval & Ranking vNext -
-FROZEN / ADOPTED (Diagnostic C field-aware lexical scorer and local
-`BAAI/bge-reranker-v2-m3` reranker default ON; online Qwen explicit-only);
-default-local-BGE implementation and runtime closure CLOSED / PASS, pending
-Git/main integration;
+**Current engineering state: P04 Block A Retrieval/Ranking - CLOSED /
+FROZEN / ADOPTED.** Diagnostic C field-aware lexical retrieval and the local
+`BAAI/bge-reranker-v2-m3` reranker are the adopted defaults; online
+`qwen3.7-text-rerank` is explicit-only. Default-BGE implementation and the
+validated Python 3.12 runtime closure are CLOSED / PASS. Main integration is
+CLOSED / PASS at
+`c957e061b4f68ada08601bbbdc0f358430379668`
+(`phase04: make local bge the default reranker`); subsequent worktree cleanup
+is CLOSED / PASS by later user-side Git/worktree evidence. The historical
+`p04/bge-reranker-v2-m3` full70 tooling at `26ae3d1` remains intentionally
+unmerged from `main`; it is historical evidence, not pending work. **Block B
+is NOT STARTED.**
+
 Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
 Streamlit Frontend - CLOSED / PASS (implementation, actual source review,
 focused regressions, and local runtime gates); Generation instruction v0.2
-targeted challenger - CLOSED / bounded actual live review.** The Qwen Dense
+targeted challenger - CLOSED / bounded actual live review. The Qwen Dense
 production adoption is CLOSED / PASS at
 `9b0fff07693d336714e39082ffe91928f0b743d2`; the completed Qwen 16Q Failure
 Attribution actual review closes PASS WITH Q011 CORRECTION. Historical
@@ -308,13 +316,18 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
-**The default-local-BGE implementation and runtime closure are CLOSED / PASS.
-Block B has NOT started; the next technical work unit is Block B only after
-Git/main integration closure.** Keep the adopted Diagnostic C, accepted Qwen
+**Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE
+implementation/runtime, main integration, and worktree cleanup are CLOSED /
+PASS. Block B is NOT STARTED.** The immediate next action is to begin its work
+unit by fresh-reading the live backend, Assembly, Generation, and current
+authority, then defining the smallest evidence-driven Context / Evidence /
+Answering work unit. Starting Block B does not reopen Block A scorer or
+reranker-parameter research. Keep the adopted Diagnostic C, accepted Qwen
 Dense, Hybrid, rank-fusion, final20, Formal Deferred, and Generation chain
 fixed. The local BGE and explicit online-Qwen controls permit no automatic
 fallback. The v0.2 Generation challenger is closed and is not a production
-selector.
+selector. No active or partial Block A provider/model run, or pending old Codex
+task, remains.
 
 Q050 focused candidate/retrieval coverage, Generation timeline understanding,
 Generation identity/role relation handling, and reranker token-cost

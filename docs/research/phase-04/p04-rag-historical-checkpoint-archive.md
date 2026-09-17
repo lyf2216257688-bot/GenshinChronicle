@@ -973,3 +973,40 @@ Closed Phase 02 and Phase 03 authority:
 
 Architecture/design work must also follow `docs/architecture-overview.md`,
 `AGENTS.md`, actual repository code/tests, and verified OBC evidence.
+
+## 2026-09-17 - Late Block A reranker closure and main integration
+
+This dated entry preserves the late-Block-A decision chain. It is historical
+chronology only; repository-effective current behavior and authorization remain
+owned by `docs/current-phase.md`.
+
+- **Experimental fact - GTE closure:** checkpoint `af5f69c` closed the GTE
+  full70 terminal/recovery/provenance record: 70 rerank attempts, 70 Generation
+  attempts, 69 successes, and Q060 `provider_error` with no retry. The
+  provider-free recovery/provenance hardening is closed; this does not authorize
+  another full70 run.
+- **Experimental fact - BGE full70:** the historical
+  `p04/bge-reranker-v2-m3` branch at `26ae3d1` completed 70/70. The branch was
+  deliberately retained as historical experiment tooling and was not merged
+  wholesale into `main`.
+- **Experimental fact - blind review correction:** three-local blind review r1
+  was INVALID because its blind package omitted evidence text / truncated
+  evidence. Corrected r2 was accepted on the common 68Q set, selecting BGE as
+  best among the three LOCAL rerankers. That local comparison is explicitly not
+  evidence that BGE is better than online `qwen3.7-text-rerank`.
+- **User operating decision:** cost drove the choice of local
+  `BAAI/bge-reranker-v2-m3` as the default and online Qwen as explicit-only.
+  This is a configurable operating point and current architecture direction,
+  not a correctness invariant or a model-quality proof.
+- **Repo-effective implementation and runtime closure:** implementation review
+  exposed a runtime mismatch, then the exact Python `3.12.10` environment
+  closed provider-free with torch `2.11.0+cu128`, transformers `4.39.1`,
+  tokenizers `0.15.2`, Streamlit `1.63.0`, and CUDA `True`. Provider-free
+  AppTest, lazy selector behavior, and zero online-Qwen construction passed;
+  53/53 affected tests passed under that runtime. The selected local or online
+  backend remains fail-closed, with no silent local/online fallback.
+- **Main integration:**
+  `c957e061b4f68ada08601bbbdc0f358430379668`
+  (`phase04: make local bge the default reranker`) integrated the default-local
+  BGE implementation into `main`. The separate historical experiment branch
+  remains out of `main`.
