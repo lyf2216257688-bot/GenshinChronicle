@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+import shutil
 import sys
-import tempfile
 import types
 import unittest
 from unittest.mock import patch
+from uuid import uuid4
 
 from genshin_corpus.retrieval.bge_reranker_v2_m3 import (
     BgeRerankerV2M3,
@@ -213,8 +214,10 @@ class BgeRerankerV2M3Tests(unittest.TestCase):
                 BgeRerankerV2M3Config(Path(MODEL_REVISION), **kwargs)
 
     def test_local_root_and_weight_hash_are_verified(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / MODEL_REVISION
+        temporary = Path(".local/bge-reranker-v2-m3-test-scratch") / uuid4().hex
+        temporary.mkdir(parents=True)
+        try:
+            root = temporary / MODEL_REVISION
             root.mkdir()
             weight = root / "model.safetensors"
             weight.write_bytes(b"pinned-test-weight")
@@ -228,6 +231,8 @@ class BgeRerankerV2M3Tests(unittest.TestCase):
                     verify_pinned_local_model(root)
             with self.assertRaisesRegex(BgeRerankerV2M3Error, "revision-named"):
                 verify_pinned_local_model(Path(temporary))
+        finally:
+            shutil.rmtree(temporary, ignore_errors=True)
 
     def test_runtime_versions_are_exact(self):
         torch_module = types.SimpleNamespace(__version__="2.11.0+cu128")
