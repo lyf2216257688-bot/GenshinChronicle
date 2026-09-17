@@ -230,7 +230,29 @@ class DeferredApiParityTests(unittest.TestCase):
     def test_later_head_is_allowed_when_gate_a_sources_are_unchanged(self) -> None:
         # The source binding must not invoke Git HEAD.  A later checkpoint can
         # therefore contain this runner without invalidating Gate-A semantics.
-        with patch.object(subprocess, "run", side_effect=AssertionError("HEAD must not be required")):
+        expected_gate_a_paths = {
+            "src/genshin_corpus/retrieval/evidence_assembly.py",
+            "src/genshin_corpus/retrieval/broader_admission_comparison.py",
+            "src/genshin_corpus/generation/generation.py",
+        }
+        self.assertEqual(set(parity.GATE_A_FORMAL_SOURCE_SHA256), expected_gate_a_paths)
+        original = parity._file_sha256
+        accepted_helper_hashes = {
+            parity._project_path(relative_path).resolve(): sha256
+            for relative_path, sha256 in parity.GATE_A_FORMAL_SOURCE_SHA256.items()
+        }
+
+        def historical_helper_hash(path: Path, label: str) -> str:
+            accepted_sha256 = accepted_helper_hashes.get(Path(path).resolve())
+            if accepted_sha256 is not None:
+                return accepted_sha256
+            if label.startswith("Gate-A source file:"):
+                raise AssertionError(f"unexpected Gate-A helper source requested: {path}")
+            return original(path, label)
+
+        with patch.object(subprocess, "run", side_effect=AssertionError("HEAD must not be required")), patch.object(
+            parity, "_file_sha256", side_effect=historical_helper_hash
+        ):
             bindings = parity._source_bindings()
         self.assertEqual(bindings["gate_a_formal_source_baseline"], parity.ACCEPTED_SOURCE_COMMIT)
         self.assertEqual(
@@ -238,6 +260,10 @@ class DeferredApiParityTests(unittest.TestCase):
             parity.GATE_A_FORMAL_SOURCE_SHA256,
         )
         self.assertEqual(len(bindings["parity_runner_source_sha256"]), 64)
+        self.assertEqual(
+            bindings["parity_runner_source_sha256"],
+            original(parity._project_path("src/genshin_corpus/retrieval/deferred_api_parity.py"), "parity runner source file"),
+        )
 
     def test_changed_gate_a_helper_source_fails_closed(self) -> None:
         original = parity._file_sha256

@@ -78,8 +78,11 @@
   manifest `77c69ceb461c0be2670f700e0e1058954306252ce363b85d328b16c75b730acc`,
   comparison manifest `151769a8f3c93d67dbf10d62a85662566d6aba8285d0d765f9b4392bd4a69e17`,
   and RU manifest `dc6bbd30cc6fbc83fa38132085fb8550f20322082467fe24aadcb4239ca78673`.
-  The source binds helper hashes and the parity-runner bytes; this register
-  does not claim unpersisted output bytes beyond those identities.
+  The helper and runner hashes belong to the accepted historical source snapshot
+  and parity-checkpoint lineage; later current-source evolution does not rewrite
+  those identities. Current source correctness is governed by current
+  behavioral/golden regression tests. This register does not claim unpersisted
+  output bytes beyond the accepted identities.
 - Current production-facing use of the formal API is interpreted only by
   `docs/current-phase.md`; the shadow remains historical evidence and is not a
   competing current selector.

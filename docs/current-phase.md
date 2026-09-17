@@ -334,12 +334,11 @@ Generation identity/role relation handling, and reranker token-cost
 optimization remain deferred. Token optimization is deferred until repeated
 real product failures justify it.
 
-Known non-blocking maintenance: `tests.retrieval.test_deferred_api_parity`
-currently reports one source-byte baseline error because the current accepted
-`evidence_assembly.py` is not byte-equivalent to that historical Gate-A
-baseline. This was not introduced by the rank-fusion work unit, which did not
-modify Assembly. It requires a separate accepted-baseline review and is not
-repaired or updated here.
+Resolved maintenance: `tests.retrieval.test_deferred_api_parity` received a
+historical test-binding repair. No new baseline or hash was accepted: historical
+Gate-A helper bytes remain immutable and bind the accepted reconstruction.
+Current Assembly correctness remains governed by current behavioral/golden
+regression tests. This does not reopen Block A or create a new work unit.
 
 ## Evidence owners
 
