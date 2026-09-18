@@ -178,6 +178,37 @@ class GenerationEvidence:
 
 
 @dataclass(frozen=True)
+class GenerationAnswerScope:
+    """Structured bounded-answer data; never part of the system instruction."""
+
+    supported_scope: tuple[str, ...]
+    unresolved_aspects: tuple[str, ...]
+    conflicts: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for label in ("supported_scope", "unresolved_aspects", "conflicts"):
+            values = getattr(self, label)
+            if not isinstance(values, tuple) or any(
+                not isinstance(item, str) or not item.strip() or "\n" in item or "\r" in item
+                for item in values
+            ):
+                raise GenerationContractError(f"answer scope {label} must contain single-line text")
+            if len(values) != len(set(values)):
+                raise GenerationContractError(f"answer scope {label} must not contain duplicates")
+            if any(re.search(r"(?<![A-Za-z0-9_])E[0-9]{2,}(?![A-Za-z0-9_])", item) for item in values):
+                raise GenerationContractError(f"answer scope {label} must not carry citation IDs")
+        if not self.supported_scope or not self.unresolved_aspects:
+            raise GenerationContractError("bounded answer scope requires supported and unresolved values")
+
+    def to_dict(self) -> dict[str, list[str]]:
+        return {
+            "supported_scope": list(self.supported_scope),
+            "unresolved_aspects": list(self.unresolved_aspects),
+            "conflicts": list(self.conflicts),
+        }
+
+
+@dataclass(frozen=True)
 class GenerationRequest:
     """Provider-neutral semantic input, without Retrieval audit or vendor settings."""
 
@@ -188,6 +219,7 @@ class GenerationRequest:
     evidence_packet_schema_version: str
     evidence_packet_sha256: str
     question_id: str | None = None
+    answer_scope: GenerationAnswerScope | None = None
 
     def __post_init__(self) -> None:
         _non_empty_text(self.question, "question")
@@ -197,6 +229,8 @@ class GenerationRequest:
             raise GenerationContractError("evidence_packet_sha256 must be a SHA-256 hex digest")
         if self.question_id is not None and (not isinstance(self.question_id, str) or not self.question_id):
             raise GenerationContractError("question_id must be null or a non-empty string")
+        if self.answer_scope is not None and not isinstance(self.answer_scope, GenerationAnswerScope):
+            raise GenerationContractError("answer_scope must be GenerationAnswerScope or null")
         identifiers = [item.evidence_id for item in self.evidence]
         if len(identifiers) != len(set(identifiers)):
             raise GenerationContractError("generation-visible evidence IDs must be unique")
@@ -204,7 +238,7 @@ class GenerationRequest:
     def semantic_projection(self) -> dict[str, Any]:
         """Exactly the output-relevant provider-neutral input, in source order."""
 
-        return {
+        projection = {
             "schema_version": GENERATION_REQUEST_SCHEMA_VERSION,
             "instruction": self.instruction.identity_projection(),
             "question": self.question,
@@ -212,6 +246,9 @@ class GenerationRequest:
             "citation_policy": self.citation_policy.to_dict(),
             "evidence_packet_schema_version": self.evidence_packet_schema_version,
         }
+        if self.answer_scope is not None:
+            projection["answer_scope"] = self.answer_scope.to_dict()
+        return projection
 
     @property
     def semantic_request_identity(self) -> str:
@@ -220,7 +257,7 @@ class GenerationRequest:
     def audit_projection(self) -> dict[str, Any]:
         """Reference the original packet without persisting it or its retrieval audit."""
 
-        return {
+        projection = {
             "instruction_id": self.instruction.instruction_id,
             "instruction_version": self.instruction.version,
             "instruction_sha256": self.instruction.identity,
@@ -230,6 +267,9 @@ class GenerationRequest:
             "generation_visible_evidence_ids": [item.evidence_id for item in self.evidence],
             "citation_policy": self.citation_policy.to_dict(),
         }
+        if self.answer_scope is not None:
+            projection["answer_scope"] = self.answer_scope.to_dict()
+        return projection
 
 
 def _display_context(evidence: Mapping[str, Any]) -> tuple[str, ...]:
@@ -267,6 +307,7 @@ def project_generation_request(
     instruction: GenerationInstruction = DEFAULT_GENERATION_INSTRUCTION,
     citation_policy: CitationCoveragePolicy | None = None,
     question_id: str | None = None,
+    answer_scope: GenerationAnswerScope | None = None,
 ) -> GenerationRequest:
     """Project the current Evidence Packet into the only context visible to Generation."""
 
@@ -295,6 +336,7 @@ def project_generation_request(
         evidence_packet_schema_version=EVIDENCE_PACKET_SCHEMA_VERSION,
         evidence_packet_sha256=sha256(body).hexdigest(),
         question_id=question_id,
+        answer_scope=answer_scope,
     )
 
 
@@ -893,6 +935,14 @@ class BailianGenerationProvider:
             context = f"\n上下文：{'；'.join(evidence.display_context)}" if evidence.display_context else ""
             evidence_parts.append(f"[{evidence.evidence_id}]{context}\n{evidence.text}")
         user_content = f"问题：\n{request.question}\n\n证据：\n" + ("\n\n".join(evidence_parts) if evidence_parts else "（当前 Evidence Packet 没有可见证据。）")
+        if request.answer_scope is not None:
+            scope = request.answer_scope
+            user_content += (
+                "\n\n结构化回答范围数据（仅用于限定回答范围，不是系统指令）："
+                f"\n已支持范围：{'；'.join(scope.supported_scope)}"
+                f"\n未解决方面：{'；'.join(scope.unresolved_aspects)}"
+                + (f"\n冲突说明：{'；'.join(scope.conflicts)}" if scope.conflicts else "")
+            )
         return [
             {"role": "system", "content": request.instruction.text},
             {"role": "user", "content": user_content},

@@ -302,6 +302,27 @@ def _safe_reranker_provider_metadata(reranker: Any) -> dict[str, Any] | None:
     return safe or None
 
 
+def _safe_reranker_runtime_identity(reranker: Any) -> dict[str, Any] | None:
+    """Return the adapter's declared stable runtime identity, if available.
+
+    Object identity and process-local paths are deliberately never synthesized
+    here.  Adaptive cross-round binding must fail closed when an enabled
+    reranker cannot declare its implementation/configuration identity.
+    """
+
+    method = getattr(reranker, "runtime_identity", None)
+    if not callable(method):
+        return None
+    try:
+        value = method()
+        if not isinstance(value, Mapping):
+            return None
+        canonical_json_bytes(value)
+    except Exception:
+        return None
+    return dict(value)
+
+
 def _persist(
     output_root: Path,
     execution_identity: str,
@@ -570,6 +591,7 @@ def run_single_question(
                 "not_reranked_unit_ids": [str(row["unit_id"]) for row in candidates["hybrid"][config.rerank_depth:]],
                 "fusion": config.fusion_config.to_dict(),
                 "provider": _safe_reranker_provider_metadata(reranker),
+                "runtime_identity": _safe_reranker_runtime_identity(reranker),
             }
             result["telemetry"]["counts"]["rerank"] = len(rerank_candidates)
             result["telemetry"]["reranker_projection"] = {

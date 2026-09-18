@@ -46,6 +46,9 @@ class _Reranker:
         self.calls = 0
         self.last_response_metadata = {"request_id": "rerank-1", "usage": {"total_tokens": 5}}
 
+    def runtime_identity(self):
+        return {"implementation": "test-reranker", "revision": "stable-a", "max_length": 8192}
+
     def rerank(self, request):
         from genshin_corpus.retrieval.reranking import RerankScore
 
@@ -429,6 +432,10 @@ class SingleQuestionBackendTests(unittest.TestCase):
         self.assertEqual(result["rerank_trace"]["rerank_depth"], 2)
         self.assertEqual(result["rerank_trace"]["final_top_n"], 2)
         self.assertEqual(result["rerank_trace"]["not_reranked_unit_ids"], ["u3"])
+        self.assertEqual(
+            result["rerank_trace"]["runtime_identity"],
+            {"implementation": "test-reranker", "revision": "stable-a", "max_length": 8192},
+        )
         self.assertEqual(result["telemetry"]["counts"]["rerank"], 2)
         self.assertEqual(result["telemetry"]["counts"]["final"], 2)
         self.assertEqual(result["telemetry"]["reranker_projection"]["candidate_count"], 2)

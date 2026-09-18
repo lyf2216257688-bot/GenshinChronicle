@@ -23,7 +23,10 @@ CLOSED / PASS at
 is CLOSED / PASS by later user-side Git/worktree evidence. The historical
 `p04/bge-reranker-v2-m3` full70 tooling at `26ae3d1` remains intentionally
 unmerged from `main`; it is historical evidence, not pending work. **Block B
-is NOT STARTED.**
+has completed its first provider-free bounded adaptive Evidence-orchestration
+kernel work unit. It is structural implementation evidence only: no assessment
+provider is implemented, no semantic improvement is established, and the
+kernel is not accepted or production-default.**
 
 Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
@@ -180,8 +183,36 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
 - The accepted online-Qwen reranker evaluation established reranker efficacy
   **PASS** with a **CLEAR POSITIVE** answer-level effect. Its historical
   adoption checkpoint is retained, while the current production selector is
-  the local BGE adapter above. `Qwen3-Reranker-0.6B` is retired; Block B has
-  not started.
+  the local BGE adapter above. `Qwen3-Reranker-0.6B` is retired. The later
+  provider-free Block B kernel does not reopen this decision.
+
+- The first Block B work unit implements an opt-in provider-neutral bounded
+  adaptive Evidence kernel under `src/genshin_corpus/rag/adaptive.py`. Round 0
+  preserves the exact original question and reuses the frozen Block A path in
+  evidence-only mode. The only experimental expansion is at most one
+  supplemental query and one supplemental round, followed by deterministic
+  one-slot candidate admission through unchanged Formal Deferred Assembly and
+  a mandatory final-Packet-bound reassessment before Generation. Cross-round
+  consolidation uses only authoritative `unit_id`; identical text never
+  collapses distinct occurrences, and ranks/scores remain query-local rather
+  than being fused across query texts. Static Retrieval/algorithm/Assembly
+  identities must match across rounds. Provider, identity, admission,
+  exhausted-budget, Generation, and citation failures stop explicitly with no
+  adaptive-path fallback to a round-0 answer.
+- The Block B assessment seam separates evidence condition, orchestration
+  action, and answer disposition with an enforced legal-state matrix. It
+  supports an auditable bounded-partial Generation request whose scope,
+  unresolved aspects, and conflicts remain structured data rather than dynamic
+  system instructions; the original user question is not rewritten. Enabled
+  rerankers contribute their declared stable runtime identity to cross-round
+  static binding, with missing identity failing closed for the adaptive path.
+  Final citations remain bound only to the final Packet. The work unit adds no
+  concrete assessment adapter and made no provider/model/network calls.
+  Provider-free validation passed 23 focused adaptive tests, including actual
+  Formal Deferred admission visibility success/failure fixtures and reranker
+  identity mismatch coverage; 134 affected existing backend,
+  Retrieval/Assembly, deferred-parity, Generation, and UI runtime tests also
+  passed. These results establish structural correctness only.
 
 - The P04 Rerank Regression Guard / Rank-Fusion Challenger is **ACTUAL-GATE
   PASS** as a provider-free historical replay only. It makes no production or
@@ -318,16 +349,23 @@ governs only its historical benchmark path.
 
 **Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE
 implementation/runtime, main integration, and worktree cleanup are CLOSED /
-PASS. Block B is NOT STARTED.** The immediate next action is to begin its work
-unit by fresh-reading the live backend, Assembly, Generation, and current
-authority, then defining the smallest evidence-driven Context / Evidence /
-Answering work unit. Starting Block B does not reopen Block A scorer or
-reranker-parameter research. Keep the adopted Diagnostic C, accepted Qwen
-Dense, Hybrid, rank-fusion, final20, Formal Deferred, and Generation chain
-fixed. The local BGE and explicit online-Qwen controls permit no automatic
-fallback. The v0.2 Generation challenger is closed and is not a production
-selector. No active or partial Block A provider/model run, or pending old Codex
-task, remains.
+PASS. Block B's first provider-free orchestration-kernel work unit is
+IMPLEMENTED / STRUCTURAL TEST PASS, but Block B is NOT ACCEPTED and is not a
+production/default path.** The immediate next action is the separately
+authorized targeted semantic gate for the frozen bounded operating point,
+using the historically bound diagnostics and controls from the approved plan.
+That gate must evaluate assessment quality, supplemental-query usefulness,
+bounded-partial behavior, admission outcomes, and answer/citation effects; it
+must not infer semantic improvement from structural tests. Until that gate is
+reviewed, do not add a concrete assessment provider, wire the kernel into the
+UI/default execution path, increase the one-query/one-round supplement bound,
+or widen the one-slot admission policy. This work does not reopen Block A
+scorer or reranker-parameter research. Keep the adopted Diagnostic C,
+accepted Qwen Dense, Hybrid, rank-fusion, final20, Formal Deferred, and
+Generation chain fixed. The local BGE and explicit online-Qwen controls permit
+no automatic fallback. The v0.2 Generation challenger is closed and is not a
+production selector. No active or partial Block A provider/model run, or
+pending old Codex task, remains.
 
 Q050 focused candidate/retrieval coverage, Generation timeline understanding,
 Generation identity/role relation handling, and reranker token-cost

@@ -20,6 +20,8 @@ from genshin_corpus.generation.generation import (
     GenerationConfigurationError,
     GenerationContractError,
     GenerationResult,
+    GenerationAnswerScope,
+    GenerationInstruction,
     CitationValidation,
     project_generation_request,
     run_bailian_control_smoke,
@@ -216,6 +218,32 @@ class GenerationTests(unittest.TestCase):
         self.assertIn("[E01]", payload["messages"][1]["content"])
         self.assertIn("[E02]", payload["messages"][1]["content"])
         self.assertNotIn("must-not-be-visible", json.dumps(payload, ensure_ascii=False))
+
+    def test_bounded_answer_scope_is_structured_user_data_and_keeps_question_exact(self) -> None:
+        scope = GenerationAnswerScope(
+            supported_scope=("已证实的时间段",),
+            unresolved_aspects=("更早时期缺少证据",),
+            conflicts=("两条记录的日期不一致",),
+        )
+        request = project_generation_request(
+            self.packet,
+            question="  原始问题？  ",
+            answer_scope=scope,
+            instruction=GenerationInstruction(
+                instruction_id="bounded_partial_evidence_grounded_answer",
+                version="phase04-block-b-0.1",
+                text="固定的有界部分回答规则。",
+            ),
+        )
+        provider, transport = self._provider([BailianTransportResponse("回答 [E01]")])
+        provider.generate(request)
+        messages = transport.payloads[0]["messages"]
+        self.assertEqual(messages[0]["content"], "固定的有界部分回答规则。")
+        self.assertNotIn("已证实的时间段", messages[0]["content"])
+        self.assertIn("结构化回答范围数据", messages[1]["content"])
+        self.assertIn("已证实的时间段", messages[1]["content"])
+        self.assertIn("更早时期缺少证据", messages[1]["content"])
+        self.assertEqual(request.question, "  原始问题？  ")
 
     def test_citation_validation_checks_only_current_packet_membership_and_coverage(self) -> None:
         valid = validate_citations("回答 [E02] [E01] [E02]", self.request)
