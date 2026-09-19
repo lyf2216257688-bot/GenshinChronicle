@@ -23,10 +23,11 @@ CLOSED / PASS at
 is CLOSED / PASS by later user-side Git/worktree evidence. The historical
 `p04/bge-reranker-v2-m3` full70 tooling at `26ae3d1` remains intentionally
 unmerged from `main`; it is historical evidence, not pending work. **Block B
-has completed its first provider-free bounded adaptive Evidence-orchestration
-kernel work unit. It is structural implementation evidence only: no assessment
-provider is implemented, no semantic improvement is established, and the
-kernel is not accepted or production-default.**
+provider-free bounded adaptive kernel = ACTUAL REVIEW PASS / structural only.
+The targeted Semantic Gate mechanics = ACTUAL REVIEW PASS, with no engineering
+blocker. No live/provider/network/paid semantic-gate evidence exists yet; Block
+B semantic improvement and adoption remain UNKNOWN,
+NOT ACCEPTED, and non-production.**
 
 Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
@@ -206,13 +207,15 @@ stopped/superseded as governing paths for the post-W7 RAG baseline.
   system instructions; the original user question is not rewritten. Enabled
   rerankers contribute their declared stable runtime identity to cross-round
   static binding, with missing identity failing closed for the adaptive path.
-  Final citations remain bound only to the final Packet. The work unit adds no
-  concrete assessment adapter and made no provider/model/network calls.
-  Provider-free validation passed 23 focused adaptive tests, including actual
+  Final citations remain bound only to the final Packet. The targeted-gate
+  work unit adds only the fixed, opt-in EvidenceAssessor adapter/parser and
+  review-package mechanics; it made no provider/model/network calls.
+  Provider-free validation passed focused adaptive and semantic-gate tests, including actual
   Formal Deferred admission visibility success/failure fixtures and reranker
   identity mismatch coverage; 134 affected existing backend,
   Retrieval/Assembly, deferred-parity, Generation, and UI runtime tests also
-  passed. These results establish structural correctness only.
+  passed. These results establish structural correctness only; they do not
+  establish semantic improvement or production adoption.
 
 - The P04 Rerank Regression Guard / Rank-Fusion Challenger is **ACTUAL-GATE
   PASS** as a provider-free historical replay only. It makes no production or
@@ -349,17 +352,21 @@ governs only its historical benchmark path.
 
 **Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE
 implementation/runtime, main integration, and worktree cleanup are CLOSED /
-PASS. Block B's first provider-free orchestration-kernel work unit is
-IMPLEMENTED / STRUCTURAL TEST PASS, but Block B is NOT ACCEPTED and is not a
-production/default path.** The immediate next action is the separately
-authorized targeted semantic gate for the frozen bounded operating point,
-using the historically bound diagnostics and controls from the approved plan.
-That gate must evaluate assessment quality, supplemental-query usefulness,
-bounded-partial behavior, admission outcomes, and answer/citation effects; it
-must not infer semantic improvement from structural tests. Until that gate is
-reviewed, do not add a concrete assessment provider, wire the kernel into the
-UI/default execution path, increase the one-query/one-round supplement bound,
-or widen the one-slot admission policy. This work does not reopen Block A
+PASS. Block B provider-free bounded adaptive kernel = ACTUAL REVIEW PASS /
+structural only. Targeted Semantic Gate mechanics = ACTUAL REVIEW PASS;
+engineering blocker = NONE. The frozen nine-case live semantic gate is READY
+FOR EXPLICIT USER AUTHORIZATION, but is not authorized or executed. No
+live/provider/network/paid semantic-gate evidence exists yet; Block B semantic
+improvement/adoption remains UNKNOWN / NOT ACCEPTED / non-production.** The
+next decision gate is explicit user authorization for the frozen nine-case live
+semantic run, followed by human/ChatGPT semantic review. That gate must
+evaluate assessment quality, supplemental-query usefulness, bounded-partial
+behavior, admission outcomes, and answer/citation effects; it must not infer
+semantic improvement from structural tests. Do not imply or authorize a 70Q
+run. Until explicit authorization, do not execute live assessment/Generation
+calls or wire the kernel into the UI/default execution path, increase the
+one-query/one-round supplement bound, or widen the one-slot admission policy.
+This work does not reopen Block A
 scorer or reranker-parameter research. Keep the adopted Diagnostic C,
 accepted Qwen Dense, Hybrid, rank-fusion, final20, Formal Deferred, and
 Generation chain fixed. The local BGE and explicit online-Qwen controls permit

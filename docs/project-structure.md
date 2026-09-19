@@ -41,9 +41,10 @@ the immediate next action are owned by `docs/current-phase.md`.
   composition across Retrieval, optional reranking, Formal Deferred Assembly,
   Evidence Packet handling, optional Generation, citation validation, and
   structured audit/persistence results. It also owns the opt-in provider-free
-  bounded adaptive Evidence kernel and assessment contracts; that kernel has
-  no concrete assessment provider and is not the production/default path. The
-  package does not redefine policies or provider contracts owned by
+  bounded adaptive Evidence kernel and assessment contracts, plus the narrow
+  opt-in targeted-gate assessor adapter/parser and review persistence seam;
+  these remain evaluation mechanics only and are not the production/default
+  path. The package does not redefine policies or provider contracts owned by
   `retrieval/` and `generation/`.
 - `src/genshin_corpus/rag/config.py`: stable production RAG artifact-path
   configuration, separate from M1/M2 measurement runners and without
