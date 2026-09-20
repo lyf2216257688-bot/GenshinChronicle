@@ -24,6 +24,7 @@ from genshin_corpus.generation.generation import (
     BailianTransport,
     BailianTransportError,
     BailianTransportResponse,
+    CitationValidation,
     REQUESTED_ALIAS_POLICY,
     BASELINE_QWEN_MODEL_ID,
     EXACT_SNAPSHOT_POLICY,
@@ -41,6 +42,7 @@ from .adaptive import (
     EvidenceAssessmentRequest,
     EvidenceAssessmentResult,
     bind_evidence_packet,
+    _project_round,
     FrozenBlockAEvidenceCapability,
     _partial_instruction,
     run_bounded_adaptive_question,
@@ -606,19 +608,32 @@ class BailianEvidenceAssessor:
 @dataclass(frozen=True)
 class SharedRound0Replay:
     question: str
-    execution_identity: str
+    adaptive_execution_identity: str
+    block_a_execution_identity: str
     backend_result: Mapping[str, Any]
     packet_sha256: str
     packet_binding: Mapping[str, Any]
     retrieval_request_identity: str
+    source_backend_result: Mapping[str, Any]
+    source_backend_sha256: str
 
     @classmethod
     def capture(cls, block_a: Any, *, question: str, execution_identity: str) -> "SharedRound0Replay":
-        result = block_a.run_round(query=question, round_index=0, request_identity=execution_identity)
+        round_identity = f"{execution_identity}.round0"
+        result = block_a.run_round(query=question, round_index=0, request_identity=round_identity)
+        return cls.from_result(result, question=question, adaptive_execution_identity=execution_identity)
+
+    @classmethod
+    def from_result(
+        cls, result: Mapping[str, Any], *, question: str, adaptive_execution_identity: str,
+        legacy_block_a_execution_identity: str | None = None,
+    ) -> "SharedRound0Replay":
+        round_identity = f"{adaptive_execution_identity}.round0"
+        expected_source_identity = legacy_block_a_execution_identity or round_identity
         if not isinstance(result, Mapping) or result.get("status") != "succeeded":
             raise AdaptiveContractError("round-0 capture failed")
         query = result.get("query")
-        if not isinstance(query, Mapping) or query.get("question_text") != question or query.get("execution_identity") != execution_identity:
+        if not isinstance(query, Mapping) or query.get("question_text") != question or query.get("execution_identity") != expected_source_identity:
             raise AdaptiveContractError("round-0 capture identity mismatch")
         packet = result.get("evidence_packet")
         binding = bind_evidence_packet(packet) if isinstance(packet, Mapping) else None
@@ -629,7 +644,12 @@ class SharedRound0Replay:
         retrieval_request_identity = embedding.get("request_identity") if isinstance(embedding, Mapping) else None
         if not isinstance(retrieval_request_identity, str) or not retrieval_request_identity:
             raise AdaptiveContractError("round-0 capture lacks retrieval request identity")
-        return cls(question, execution_identity, dict(result), binding.packet_sha256, binding.to_dict(), retrieval_request_identity)
+        source = dict(result)
+        projected = dict(source)
+        projected["query"] = {**query, "execution_identity": round_identity}
+        return cls(question, adaptive_execution_identity, expected_source_identity, projected,
+                   binding.packet_sha256, binding.to_dict(), retrieval_request_identity, source,
+                   sha256_json(source))
 
     def capability(self, delegate: Any) -> "ReplayBlockACapability":
         return ReplayBlockACapability(self, delegate)
@@ -637,10 +657,13 @@ class SharedRound0Replay:
     def to_dict(self) -> dict[str, Any]:
         return {
             "question": self.question,
-            "execution_identity": self.execution_identity,
+            "execution_identity": self.block_a_execution_identity,
+            "adaptive_execution_identity": self.adaptive_execution_identity,
+            "round0_request_identity": f"{self.adaptive_execution_identity}.round0",
             "packet_sha256": self.packet_sha256,
             "packet_binding": dict(self.packet_binding),
             "retrieval_request_identity": self.retrieval_request_identity,
+            "source_backend_sha256": self.source_backend_sha256,
         }
 
 
@@ -651,9 +674,19 @@ class ReplayBlockACapability:
 
     def run_round(self, *, query: str, round_index: int, request_identity: str) -> Mapping[str, Any]:
         if round_index == 0:
-            if query != self.replay.question or request_identity != self.replay.execution_identity:
+            if query != self.replay.question or request_identity != f"{self.replay.adaptive_execution_identity}.round0":
                 raise AdaptiveContractError("shared round-0 replay identity mismatch")
+            source = self.replay.source_backend_result
+            if (sha256_json(source) != self.replay.source_backend_sha256
+                    or source.get("query", {}).get("execution_identity") != self.replay.block_a_execution_identity
+                    or source.get("query", {}).get("question_text") != query
+                    or bind_evidence_packet(source.get("evidence_packet")).to_dict() != self.replay.packet_binding
+                    or bind_evidence_packet(self.replay.backend_result.get("evidence_packet")).to_dict() != self.replay.packet_binding
+                    or self.replay.backend_result.get("audit", {}).get("embedding", {}).get("request_identity") != self.replay.retrieval_request_identity):
+                raise AdaptiveContractError("shared round-0 source/Packet identity mismatch")
             return self.replay.backend_result
+        if round_index != 1 or request_identity != f"{self.replay.adaptive_execution_identity}.round1" or not isinstance(query, str) or not query.strip():
+            raise AdaptiveContractError("supplemental round identity mismatch")
         return self.delegate.run_round(query=query, round_index=round_index, request_identity=request_identity)
 
     def rebuild_packet(self, ranked_candidates: Sequence[Mapping[str, Any]], *, retrieval_audit: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -724,8 +757,8 @@ def persist_targeted_case_manifest(manifest: TargetedCaseManifest, output_path: 
 def persist_round0_replay(replay: SharedRound0Replay, output_root: Path, question_id: str) -> dict[str, Any]:
     root = Path(output_root) / "round0" / question_id
     root.mkdir(parents=True, exist_ok=True)
-    result_body = canonical_json_bytes(dict(replay.backend_result))
-    packet_body = canonical_json_bytes(replay.backend_result["evidence_packet"])
+    result_body = canonical_json_bytes(dict(replay.source_backend_result))
+    packet_body = canonical_json_bytes(replay.source_backend_result["evidence_packet"])
     _write_no_overwrite(root / "block_a_result.json", result_body)
     _write_no_overwrite(root / "evidence_packet.json", packet_body)
     descriptor = {
@@ -739,6 +772,133 @@ def persist_round0_replay(replay: SharedRound0Replay, output_root: Path, questio
     descriptor_body = canonical_json_bytes(descriptor)
     _write_no_overwrite(root / "round0_replay.json", descriptor_body)
     return descriptor
+
+
+PARENT_LIVE_ROOT = Path(".local/p04-targeted-semantic-gate-live-20260919-172106")
+PARENT_MANIFEST_IDENTITY = "9b070932497c039a6d1933d44979cdb60893e4a079d3f4f5bb25e7704e785f48"
+
+
+def _read_bound_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_object_pairs)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SemanticGateContractError(f"parent artifact is unreadable: {path}") from exc
+    if not isinstance(value, dict):
+        raise SemanticGateContractError(f"parent artifact must be an object: {path}")
+    return value
+
+
+def _require_parent(condition: bool, detail: str) -> None:
+    if not condition:
+        raise SemanticGateContractError(f"parent targeted-gate binding mismatch: {detail}")
+
+
+def _parent_artifact(path: Path, descriptor: Mapping[str, Any], expected_name: str) -> dict[str, Any]:
+    _require_parent(descriptor.get("path") == expected_name, f"{expected_name} descriptor path")
+    _require_parent(path.is_file() and _sha256_file(path) == descriptor.get("sha256"), f"{expected_name} SHA-256")
+    if "byte_count" in descriptor:
+        _require_parent(path.stat().st_size == descriptor["byte_count"], f"{expected_name} byte count")
+    return _read_bound_json(path)
+
+
+def _generation_from_parent(value: Mapping[str, Any], request: Any, config_identity: str) -> GenerationResult:
+    result = value.get("result")
+    audit = value.get("audit")
+    _require_parent(isinstance(result, Mapping) and isinstance(audit, Mapping), "baseline Generation shape")
+    _require_parent(result.get("execution_status") == "succeeded", "baseline Generation status")
+    _require_parent(audit.get("semantic_request_identity") == request.semantic_request_identity
+                    and audit.get("execution_config_identity") == config_identity
+                    and audit.get("request") == request.audit_projection(), "baseline Generation request/config")
+    validation = CitationValidation(
+        tuple(result["citation_tokens"]), result["citation_integrity"], result["citation_coverage"],
+        tuple(result["validation_reasons"]), tuple(result["citation_normalizations"]),
+    )
+    reconstructed = GenerationResult(
+        result["execution_status"], result["answer_text"], validation,
+        request.semantic_request_identity, config_identity, request.audit_projection(), audit["provider_execution"],
+    )
+    _require_parent(reconstructed.to_dict() == value, "baseline Generation occurrence bytes/validation")
+    return reconstructed
+
+
+def load_parent_targeted_gate(
+    repo_root: Path, parent_root: Path, frozen_runtime: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Validate all nine immutable parent occurrences without modifying the parent."""
+
+    repo = Path(repo_root).resolve()
+    root = Path(parent_root).resolve()
+    _require_parent(root == (repo / PARENT_LIVE_ROOT).resolve(), "exact parent root")
+    manifest = build_targeted_case_manifest(repo)
+    _require_parent(manifest.manifest_identity == PARENT_MANIFEST_IDENTITY, "frozen manifest identity")
+    manifest_path = root / "manifest" / "targeted_case_manifest.json"
+    manifest_body = canonical_json_bytes(manifest.to_dict())
+    _require_parent(manifest_path.is_file() and manifest_path.read_bytes() == manifest_body
+                    and sha256(manifest_body).hexdigest() == PARENT_MANIFEST_IDENTITY, "parent manifest bytes/hash")
+    loaded: dict[str, dict[str, Any]] = {}
+    for case in manifest.cases:
+        outer = f"p04-targeted-semantic-gate-live-20260919-{case.question_id.lower()}"
+        case_root = root / "cases" / outer
+        preflight_path = case_root / "preflight_started.json"
+        preflight = _read_bound_json(preflight_path)
+        expected_manifest_binding = {
+            "schema_version": TARGETED_CASE_MANIFEST_SCHEMA_VERSION,
+            "manifest_identity": PARENT_MANIFEST_IDENTITY,
+            "path": str(manifest_path),
+            "sha256": PARENT_MANIFEST_IDENTITY,
+        }
+        _require_parent(preflight.get("status") == "STARTED" and preflight.get("run_identity") == outer
+                        and preflight.get("case") == {"question_id": case.question_id, "question_identity": case.question_identity}
+                        and preflight.get("manifest_binding") == expected_manifest_binding
+                        and preflight.get("frozen_runtime") == frozen_runtime, f"{case.question_id} preflight")
+        package_path = case_root / "targeted_gate_review_package.json"
+        package = _read_bound_json(package_path)
+        _require_parent(package.get("case") == case.to_dict() and package.get("run_identity") == outer
+                        and package.get("manifest_binding") == expected_manifest_binding
+                        and package.get("frozen_runtime") == frozen_runtime, f"{case.question_id} case/package binding")
+        descriptor = _read_bound_json(case_root / "round0" / case.question_id / "round0_replay.json")
+        _require_parent(package.get("round0") == descriptor and descriptor.get("execution_identity") == f"{outer}-adaptive"
+                        and descriptor.get("question") == case.question, f"{case.question_id} round0 descriptor")
+        round_dir = case_root / "round0" / case.question_id
+        source = _parent_artifact(round_dir / "block_a_result.json", descriptor["artifacts"]["block_a_result"], "block_a_result.json")
+        packet = _parent_artifact(round_dir / "evidence_packet.json", descriptor["artifacts"]["evidence_packet"], "evidence_packet.json")
+        binding = bind_evidence_packet(packet)
+        _require_parent(source.get("evidence_packet") == packet
+                        and binding.to_dict() == descriptor.get("packet_binding")
+                        and binding.packet_sha256 == descriptor.get("packet_sha256"), f"{case.question_id} exact Packet binding")
+        projected = _project_round(source, expected_query=case.question, round_index=0,
+                                   expected_execution_identity=f"{outer}-adaptive")
+        _require_parent(projected.retrieval_request_identity == descriptor.get("retrieval_request_identity")
+                        and projected.static_identity["retrieval_unit_build_identity"] == frozen_runtime["block_a"]["retrieval_unit_build_identity"]
+                        and projected.static_identity["lexical_build_identity"] == frozen_runtime["block_a"]["lexical_build_identity"]
+                        and projected.static_identity["dense_build_identity"] == frozen_runtime["block_a"]["dense_build_identity"]
+                        and projected.static_identity["reranker_runtime_identity"] == frozen_runtime["block_a"]["reranker_runtime_identity"]
+                        and projected.static_identity["backend_config"] == frozen_runtime["block_a"]["backend_config"],
+                        f"{case.question_id} Block A static/retrieval identity")
+        request = project_generation_request(packet, question=case.question, question_id=case.question_id)
+        baseline = package.get("baseline")
+        _require_parent(isinstance(baseline, Mapping) and baseline.get("request") == request.audit_projection()
+                        and baseline.get("semantic_request_identity") == request.semantic_request_identity,
+                        f"{case.question_id} recomputed baseline request")
+        generation_path = case_root / "generation" / "baseline" / "generation_result.json"
+        generation_json = _parent_artifact(generation_path, baseline["artifact"], "generation_result.json")
+        generation = _generation_from_parent(generation_json, request, frozen_runtime["generation"]["execution_config_identity"])
+        _require_parent(baseline.get("generation_result") == generation_json, f"{case.question_id} baseline package occurrence")
+        loaded[case.question_id] = {
+            "case": case, "source": source, "packet": packet, "baseline": generation,
+            "round0_descriptor": descriptor,
+            "lineage": {
+                "parent_root": str(root), "parent_run_identity": outer,
+                "manifest_identity": PARENT_MANIFEST_IDENTITY,
+                "preflight": {"path": str(preflight_path), "sha256": _sha256_file(preflight_path)},
+                "review_package": {"path": str(package_path), "sha256": _sha256_file(package_path)},
+                "round0_result": {"path": str(round_dir / "block_a_result.json"), "sha256": _sha256_file(round_dir / "block_a_result.json")},
+                "packet": {"path": str(round_dir / "evidence_packet.json"), "sha256": _sha256_file(round_dir / "evidence_packet.json")},
+                "baseline": {"path": str(generation_path), "sha256": _sha256_file(generation_path)},
+            },
+        }
+    _require_parent(len(loaded) == 9, "complete nine-case parent")
+    return loaded
 
 
 def _mechanical_attribution(baseline_request: Any, baseline_result: GenerationResult, adaptive: Mapping[str, Any], replay: SharedRound0Replay) -> dict[str, Any]:
@@ -1005,6 +1165,7 @@ def run_targeted_gate_case(
     generation_provider: GenerationProvider,
     execution_identity: str,
     output_root: Path,
+    parent_root: Path | None = None,
 ) -> dict[str, Any]:
     """Execute one future case and persist a review package.
 
@@ -1029,6 +1190,9 @@ def run_targeted_gate_case(
     if selected_case is None or selected_case.to_dict() != case.to_dict():
         raise SemanticGateContractError("selected case is not bound to the persisted validated manifest")
     frozen_runtime = _validate_frozen_runtime_bindings(block_a, assessor, generation_provider)
+    parent = None
+    if parent_root is not None:
+        parent = load_parent_targeted_gate(Path(repo_root), Path(parent_root), frozen_runtime)[case.question_id]
     run_root = Path(output_root) / execution_identity
     output_base = Path(output_root)
     if output_base.exists() and not output_base.is_dir():
@@ -1053,24 +1217,48 @@ def run_targeted_gate_case(
         },
         "frozen_runtime": frozen_runtime,
     }
+    if parent is not None:
+        preflight["parent_lineage"] = parent["lineage"]
     _write_no_overwrite(run_root / "preflight_started.json", canonical_json_bytes(preflight))
     assessor_calls_before = getattr(assessor, "provider_network_calls", None)
     assessor_audits_before = len(getattr(assessor, "audit_history", ()))
-    replay = SharedRound0Replay.capture(block_a, question=case.question, execution_identity=f"{execution_identity}-adaptive")
-    round0_descriptor = persist_round0_replay(replay, run_root, case.question_id)
-    persisted_packet = json.loads((run_root / "round0" / case.question_id / "evidence_packet.json").read_text(encoding="utf-8"))
+    if parent is None:
+        replay = SharedRound0Replay.capture(block_a, question=case.question, execution_identity=f"{execution_identity}-adaptive")
+        round0_descriptor = persist_round0_replay(replay, run_root, case.question_id)
+        persisted_packet = json.loads((run_root / "round0" / case.question_id / "evidence_packet.json").read_text(encoding="utf-8"))
+    else:
+        replay = SharedRound0Replay.from_result(
+            parent["source"], question=case.question, adaptive_execution_identity=f"{execution_identity}-adaptive",
+            legacy_block_a_execution_identity=parent["round0_descriptor"]["execution_identity"],
+        )
+        round0_descriptor = {
+            "schema_version": "phase04-shared-round0-recovery-import-0.1",
+            **replay.to_dict(),
+            "parent_lineage": parent["lineage"],
+            "artifacts": {
+                "block_a_result": parent["lineage"]["round0_result"],
+                "evidence_packet": parent["lineage"]["packet"],
+            },
+        }
+        _write_no_overwrite(run_root / "round0_import.json", canonical_json_bytes(round0_descriptor))
+        persisted_packet = parent["packet"]
     persisted_binding = bind_evidence_packet(persisted_packet)
     if persisted_binding.packet_sha256 != replay.packet_sha256:
         raise SemanticGateContractError("persisted round-0 Packet identity drifted before replay")
-    replay = replace(
-        replay,
-        backend_result={**replay.backend_result, "evidence_packet": persisted_packet},
-    )
+    replay = replace(replay, backend_result={**replay.backend_result, "evidence_packet": persisted_packet})
     baseline_request = project_generation_request(dict(persisted_packet), question=case.question, question_id=case.question_id)
-    baseline_started = time.perf_counter()
-    baseline_result = generation_provider.generate(baseline_request)
-    baseline_wall_clock_ms = round((time.perf_counter() - baseline_started) * 1000, 3)
-    baseline_artifact = write_generation_result(run_root / "generation" / "baseline", baseline_result)
+    if parent is None:
+        baseline_started = time.perf_counter()
+        baseline_result = generation_provider.generate(baseline_request)
+        baseline_wall_clock_ms: float | str = round((time.perf_counter() - baseline_started) * 1000, 3)
+        baseline_artifact = write_generation_result(run_root / "generation" / "baseline", baseline_result)
+    else:
+        baseline_result = parent["baseline"]
+        baseline_wall_clock_ms = "parent_occurrence_reused"
+        baseline_artifact = {
+            **parent["lineage"]["baseline"],
+            "reused_parent_occurrence": True,
+        }
     reused: list[str] = []
     adaptive_provider = ReusingGenerationProvider(generation_provider, {baseline_request.semantic_request_identity: baseline_result}, reused)
     adaptive = run_bounded_adaptive_question(
@@ -1123,6 +1311,7 @@ def run_targeted_gate_case(
         },
         "assessor_binding": assessor_binding,
         "frozen_runtime": frozen_runtime,
+        "parent_lineage": parent["lineage"] if parent is not None else None,
         "round0": round0_descriptor,
         "baseline": {
             "request": baseline_request.audit_projection(),
@@ -1169,7 +1358,7 @@ def run_targeted_gate_case(
             "unsupported_answer_regression": "UNKNOWN",
         },
         "provider_calls": {
-            "round0_shared": "persisted_after_execution",
+            "round0_shared": "parent_occurrence_reused" if parent is not None else "persisted_after_execution",
             "assessor": assessor_case_calls,
             "assessor_audit": dict(assessor_audits[-1]) if assessor_audits else {},
             "assessor_attempts": assessor_audits,
@@ -1178,6 +1367,8 @@ def run_targeted_gate_case(
                 "baseline": {
                     **(_provider_execution_evidence(baseline_result) or {}),
                     "wall_clock_ms": baseline_wall_clock_ms,
+                    "reused_parent_occurrence": parent is not None,
+                    "current_run_provider_network_calls": 0 if parent is not None else _provider_execution_evidence(baseline_result)["provider_network_calls"],
                 },
                 "adaptive": list(adaptive_provider.call_audit),
                 "directive_only_round0": _provider_execution_evidence(directive_only_result),
@@ -1201,12 +1392,15 @@ __all__ = [
     "HISTORICAL_QWEN38_EXECUTION_CONFIG_IDENTITY",
     "PacketArtifactBinding",
     "PacketSourceIdentityBinding",
+    "PARENT_LIVE_ROOT",
+    "PARENT_MANIFEST_IDENTITY",
     "ReusingGenerationProvider",
     "SemanticGateContractError",
     "SharedRound0Replay",
     "TargetedCaseBinding",
     "TargetedCaseManifest",
     "build_targeted_case_manifest",
+    "load_parent_targeted_gate",
     "parse_assessment_response",
     "persist_targeted_case_manifest",
     "persist_round0_replay",

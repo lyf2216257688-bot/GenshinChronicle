@@ -15,8 +15,14 @@ from genshin_corpus.generation.generation import (
     project_generation_request,
 )
 from genshin_corpus.rag.adaptive import (
+    AdaptiveContractError,
+    AnswerDisposition,
     EvidenceAssessmentRequest,
+    EvidenceAssessmentResult,
+    EvidenceCondition,
+    OrchestrationAction,
     bind_evidence_packet,
+    run_bounded_adaptive_question,
 )
 from genshin_corpus.rag.semantic_gate import (
     ASSESSOR_ENDPOINT,
@@ -33,6 +39,7 @@ from genshin_corpus.rag.semantic_gate import (
     parse_assessment_response,
     persist_targeted_case_manifest,
     persist_round0_replay,
+    run_targeted_gate_case,
     _validate_frozen_runtime_bindings,
 )
 
@@ -98,6 +105,93 @@ class _Round0Capability:
             "audit": {"embedding": {"request_identity": "embedding-round-0"}},
             "evidence_packet": packet,
         }
+
+
+class _RealAdaptiveCapability(_Round0Capability):
+    """Minimal complete Block A-shaped capability for the real adaptive kernel."""
+
+    def __init__(self, supplemental_packet: dict | None = None) -> None:
+        super().__init__()
+        self.supplemental_packet = supplemental_packet or _packet("u2")
+        self.rounds: list[int] = []
+
+    def run_round(self, *, query: str, round_index: int, request_identity: str) -> dict:
+        self.rounds.append(round_index)
+        if round_index == 0:
+            result = super().run_round(query=query, round_index=round_index, request_identity=request_identity)
+            result["audit"].update({
+                "retrieval_unit_build_identity": "ru-build",
+                "lexical_build_identity": "lexical-build",
+                "dense_build_identity": "dense-build",
+                "config": {"final_top_n": 1, "reranker_enabled": False},
+            })
+            result["retrieval_trace"] = {"windows": {"hybrid": [{"unit_id": "u1", "rank": 1}]}}
+            result["rerank_trace"] = {"status": "disabled_by_explicit_config"}
+            result["telemetry"] = {"provider_call_counts": {"embedding": 1, "reranker": 0, "generation": 0}}
+            return result
+        packet = self.supplemental_packet
+        return {
+            "status": "succeeded",
+            "query": {"question_text": query, "execution_identity": request_identity},
+            "audit": {
+                "retrieval_unit_build_identity": "ru-build",
+                "lexical_build_identity": "lexical-build",
+                "dense_build_identity": "dense-build",
+                "config": {"final_top_n": 1, "reranker_enabled": False},
+                "embedding": {"request_identity": "embedding-round-1"},
+            },
+            "retrieval_trace": {"windows": {"hybrid": [{"unit_id": "u2", "rank": 1}]}},
+            "rerank_trace": {"status": "disabled_by_explicit_config"},
+            "telemetry": {"provider_call_counts": {"embedding": 1, "reranker": 0, "generation": 0}},
+            "evidence_packet": packet,
+        }
+
+    def rebuild_packet(self, ranked_candidates, *, retrieval_audit):
+        self.rebuild_candidates = [dict(row) for row in ranked_candidates]
+        self.rebuild_audit = dict(retrieval_audit)
+        return _packet("u2")
+
+
+class _RealAdaptiveAssessor:
+    def __init__(self, supplement: bool) -> None:
+        self.supplement = supplement
+        self.requests = []
+
+    def assess(self, request):
+        self.requests.append(request)
+        if self.supplement and len(self.requests) == 1:
+            return EvidenceAssessmentResult(
+                assessment_request_identity=request.request_identity,
+                condition=EvidenceCondition.INCOMPLETE,
+                action=OrchestrationAction.SUPPLEMENT_ONCE,
+                answer_disposition=AnswerDisposition.NONE,
+                missing_information=("missing fact",),
+                unresolved_aspects=("requires one bounded retrieval",),
+                supplemental_query="supplemental fact",
+            )
+        return EvidenceAssessmentResult(
+            assessment_request_identity=request.request_identity,
+            condition=EvidenceCondition.SUFFICIENT,
+            action=OrchestrationAction.ANSWER_NOW,
+            answer_disposition=AnswerDisposition.FULL,
+        )
+
+
+class _RealAdaptiveGeneration:
+    def __init__(self) -> None:
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        return GenerationResult(
+            execution_status="succeeded",
+            answer_text="answer [E01]",
+            citation_validation=CitationValidation(("E01",), "pass", "pass", ()),
+            semantic_request_identity=request.semantic_request_identity,
+            execution_config_identity="fake-generation-config",
+            request_audit=request.audit_projection(),
+            provider_audit={"attempts": []},
+        )
 
 
 class _PreflightCheckingRound0Capability(_Round0Capability):
@@ -275,11 +369,58 @@ class SemanticGateTests(unittest.TestCase):
         delegate = _Round0Capability()
         replay = SharedRound0Replay.capture(delegate, question="What happened?", execution_identity="gate-round0")
         capability = replay.capability(delegate)
-        first = capability.run_round(query="What happened?", round_index=0, request_identity="gate-round0")
-        second = capability.run_round(query="What happened?", round_index=0, request_identity="gate-round0")
+        first = capability.run_round(query="What happened?", round_index=0, request_identity="gate-round0.round0")
+        second = capability.run_round(query="What happened?", round_index=0, request_identity="gate-round0.round0")
         self.assertEqual(delegate.calls, 1)
         self.assertIs(first, second)
         self.assertEqual(replay.packet_sha256, bind_evidence_packet(first["evidence_packet"]).packet_sha256)
+
+    def test_real_adaptive_kernel_reuses_round0_and_reaches_assessor(self):
+        delegate = _RealAdaptiveCapability()
+        replay = SharedRound0Replay.capture(delegate, question="What happened?", execution_identity="gate-round0")
+        assessor = _RealAdaptiveAssessor(False)
+        generation = _RealAdaptiveGeneration()
+        result = run_bounded_adaptive_question(
+            "What happened?", block_a=replay.capability(delegate), assessor=assessor,
+            generation_provider=generation, execution_identity="gate-round0",
+        )
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(delegate.rounds, [0])
+        self.assertEqual(len(assessor.requests), 1)
+        self.assertEqual(len(generation.requests), 1)
+
+    def test_real_adaptive_kernel_supplement_only_delegates_round1(self):
+        delegate = _RealAdaptiveCapability()
+        replay = SharedRound0Replay.capture(delegate, question="What happened?", execution_identity="gate-round1")
+        assessor = _RealAdaptiveAssessor(True)
+        generation = _RealAdaptiveGeneration()
+        result = run_bounded_adaptive_question(
+            "What happened?", block_a=replay.capability(delegate), assessor=assessor,
+            generation_provider=generation, execution_identity="gate-round1",
+        )
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(delegate.rounds, [0, 1])
+        self.assertEqual([request.round_index for request in assessor.requests], [0, 1])
+
+    def test_replay_rejects_wrong_round_identity(self):
+        delegate = _Round0Capability()
+        replay = SharedRound0Replay.capture(delegate, question="What happened?", execution_identity="gate-round0")
+        with self.assertRaises(AdaptiveContractError):
+            replay.capability(delegate).run_round(
+                query="What happened?", round_index=0, request_identity="gate-round0"
+            )
+
+    def test_replay_fails_closed_on_wrong_question_round_and_captured_source(self):
+        delegate = _RealAdaptiveCapability()
+        replay = SharedRound0Replay.capture(delegate, question="What happened?", execution_identity="gate-bound")
+        capability = replay.capability(delegate)
+        with self.assertRaises(AdaptiveContractError):
+            capability.run_round(query="Different question", round_index=0, request_identity="gate-bound.round0")
+        with self.assertRaises(AdaptiveContractError):
+            capability.run_round(query="supplement", round_index=2, request_identity="gate-bound.round2")
+        replay.source_backend_result["audit"]["lexical_build_identity"] = "tampered-static"
+        with self.assertRaises(AdaptiveContractError):
+            capability.run_round(query="What happened?", round_index=0, request_identity="gate-bound.round0")
 
     def test_round0_persistence_is_hash_bound_and_conflict_safe(self):
         delegate = _Round0Capability()
@@ -290,6 +431,79 @@ class SemanticGateTests(unittest.TestCase):
             packet_path = Path(temp_root) / "round0" / "QTEST" / "evidence_packet.json"
             self.assertEqual(bind_evidence_packet(json.loads(packet_path.read_text(encoding="utf-8"))).packet_sha256, replay.packet_sha256)
             self.assertEqual(persist_round0_replay(replay, Path(temp_root), "QTEST"), descriptor)
+
+    def test_recovery_reuses_parent_round0_and_baseline_with_explicit_lineage(self):
+        import genshin_corpus.rag.semantic_gate as gate
+
+        manifest = build_targeted_case_manifest(Path("."))
+        case = manifest.cases[0]
+        delegate = _RealAdaptiveCapability()
+        source = delegate.run_round(
+            query=case.question, round_index=0, request_identity="parent-adaptive"
+        )
+        delegate.calls = 0
+        delegate.rounds.clear()
+        packet = source["evidence_packet"]
+        baseline_request = project_generation_request(
+            packet, question=case.question, question_id=case.question_id
+        )
+        baseline = GenerationResult(
+            execution_status="succeeded",
+            answer_text="answer [E01]",
+            citation_validation=CitationValidation(("E01",), "pass", "pass", ()),
+            semantic_request_identity=baseline_request.semantic_request_identity,
+            execution_config_identity="generation-config",
+            request_audit=baseline_request.audit_projection(),
+            provider_audit={"attempts": []},
+        )
+        lineage = {
+            "parent_root": "immutable-parent",
+            "parent_run_identity": "parent",
+            "manifest_identity": manifest.manifest_identity,
+            "preflight": {"path": "parent/preflight.json", "sha256": "1" * 64},
+            "review_package": {"path": "parent/package.json", "sha256": "2" * 64},
+            "round0_result": {"path": "parent/block_a_result.json", "sha256": "3" * 64},
+            "packet": {"path": "parent/evidence_packet.json", "sha256": "4" * 64},
+            "baseline": {"path": "parent/generation_result.json", "sha256": "5" * 64},
+        }
+        parent = {
+            case.question_id: {
+                "case": case,
+                "source": source,
+                "packet": packet,
+                "baseline": baseline,
+                "round0_descriptor": {"execution_identity": "parent-adaptive"},
+                "lineage": lineage,
+            }
+        }
+        with tempfile.TemporaryDirectory() as temp_root:
+            temp = Path(temp_root)
+            manifest_path = temp / "targeted_case_manifest.json"
+            persist_targeted_case_manifest(manifest, manifest_path)
+            with patch.object(gate, "_validate_frozen_runtime_bindings", return_value={"test": "frozen"}), \
+                 patch.object(gate, "load_parent_targeted_gate", return_value=parent):
+                package = run_targeted_gate_case(
+                    case,
+                    repo_root=Path("."),
+                    manifest_path=manifest_path,
+                    block_a=delegate,
+                    assessor=_RealAdaptiveAssessor(False),
+                    generation_provider=_GenerationDelegate(),
+                    execution_identity="recovery-case",
+                    output_root=temp / "runs",
+                    parent_root=Path("immutable-parent"),
+                )
+            run_root = temp / "runs" / "recovery-case"
+            self.assertTrue((run_root / "preflight_started.json").is_file())
+            self.assertTrue((run_root / "round0_import.json").is_file())
+            self.assertEqual(delegate.rounds, [])
+            self.assertEqual(delegate.calls, 0)
+            self.assertEqual(package["parent_lineage"], lineage)
+            self.assertTrue(package["baseline"]["artifact"]["reused_parent_occurrence"])
+            self.assertEqual(
+                package["provider_calls"]["generation_occurrences"]["baseline"]["current_run_provider_network_calls"],
+                0,
+            )
 
     def test_live_seam_requires_persisted_validated_manifest_before_block_a(self):
         from genshin_corpus.rag.semantic_gate import run_targeted_gate_case
