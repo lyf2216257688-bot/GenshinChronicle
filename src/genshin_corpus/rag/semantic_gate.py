@@ -72,13 +72,23 @@ from genshin_corpus.retrieval.qwen_embedding import (
 
 TARGETED_GATE_SCHEMA_VERSION = "phase04-targeted-semantic-gate-0.1"
 TARGETED_CASE_MANIFEST_SCHEMA_VERSION = "phase04-targeted-case-manifest-0.1"
-ASSESSOR_PROMPT_SCHEMA_VERSION = "phase04-evidence-assessor-prompt-0.1"
+ASSESSOR_PROMPT_SCHEMA_VERSION = "phase04-evidence-assessor-prompt-0.3"
 ASSESSOR_PROMPT_ID = "phase04-bounded-evidence-assessor"
-ASSESSOR_PROMPT_VERSION = "0.1"
+ASSESSOR_PROMPT_VERSION = "0.3"
 ASSESSOR_MODEL_ID = "qwen3.8-max"
 HISTORICAL_QWEN38_EXECUTION_CONFIG_IDENTITY = (
     "88aafe9aefb9b2b8869dbb522b2ccbd0104fca036d3a5c7a18ca094eca6e8a0d"
 )
+# The immutable first-run parent was created with the pre-contract prompt.
+# These identities are accepted only as historical lineage, never as current
+# assessor bindings.
+HISTORICAL_PARENT_ASSESSOR_PROMPT_IDENTITY = (
+    "e1998714f565a93d7f01542c18df197dd2d66e99048e99f91bf426530185bd51"
+)
+HISTORICAL_PARENT_ASSESSOR_EXECUTION_CONFIG_IDENTITY = (
+    "66e4868b4bcfdc4e9676dfda29460fb3a35f132187e1e6f926daeaa678522f77"
+)
+HISTORICAL_PARENT_ASSESSOR_SCHEMA_VERSION = "phase04-evidence-assessor-prompt-0.1"
 ASSESSOR_REGION = "cn-beijing"
 ASSESSOR_WORKSPACE = "ws-gdq9z4ufdb87egio"
 ASSESSOR_ENDPOINT = (
@@ -100,12 +110,33 @@ class EvidenceAssessorProviderError(RuntimeError):
 
 
 ASSESSOR_SYSTEM_PROMPT = (
-    "You are a strict evidence-condition assessor. Return exactly one JSON object, "
-    "with no Markdown and no extra keys. Classify only the supplied official evidence. "
-    "Use condition sufficient, incomplete, conflicting, or unable; action answer_now, "
-    "supplement_once, or stop; and answer_disposition full, bounded_partial, or none. "
-    "A supplement must contain one concrete short query. Never invent citations, "
-    "provenance, facts, or authority. Preserve the original question exactly."
+    "You are a strict evidence-condition assessor. Return exactly one raw JSON object "
+    "and no Markdown, prose, code fence, or other text. The object must contain exactly "
+    "nine keys, each exactly once, with no other keys: "
+    "assessment_request_identity (non-empty single-line string; copy the exact supplied request identity), "
+    "condition (string; one of sufficient, incomplete, conflicting, unable), "
+    "action (string; one of answer_now, supplement_once, stop), "
+    "answer_disposition (string; one of full, bounded_partial, none), "
+    "supported_scope (array of strings), unresolved_aspects (array of strings), "
+    "missing_information (array of strings), conflicts (array of strings), and "
+    "supplemental_query (string or null). Every array entry must be a unique, non-empty, "
+    "single-line string within its field. Classify only the supplied official evidence "
+    "and preserve the original question exactly. Legal condition rules: sufficient "
+    "requires missing_information and conflicts to be empty, cannot use supplement_once, "
+    "and when using answer_now requires answer_disposition full. incomplete requires "
+    "missing_information to be non-empty. conflicting requires conflicts to be non-empty. "
+    "unable requires action stop, answer_disposition none, and unresolved_aspects to be "
+    "non-empty. Legal action and disposition rules: answer_now requires answer_disposition "
+    "full or bounded_partial and supplemental_query null. incomplete or conflicting may "
+    "use answer_now only with bounded_partial. supplement_once requires incomplete or "
+    "conflicting, answer_disposition none, and one concrete non-empty single-line "
+    "supplemental_query different from both the original question and current query. stop "
+    "requires answer_disposition none and supplemental_query null. bounded_partial requires "
+    "incomplete or conflicting and requires both supported_scope and unresolved_aspects to "
+    "be non-empty. supported_scope must be empty unless answer_disposition is bounded_partial. "
+    "answer_disposition full requires unresolved_aspects to be empty. supported_scope, "
+    "unresolved_aspects, and conflicts must not contain Evidence Packet citation IDs. Never "
+    "invent provenance, facts, or authority."
 )
 
 
@@ -484,6 +515,7 @@ def parse_assessment_response(text: str, request: EvidenceAssessmentRequest) -> 
 class BailianEvidenceAssessor:
     config: BailianControlConfig
     transport: BailianTransport
+    response_artifact_root: Path | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (
@@ -514,9 +546,60 @@ class BailianEvidenceAssessor:
         self.last_audit: dict[str, Any] = {}
         self.audit_history: list[dict[str, Any]] = []
 
-    def _store_audit(self, audit: dict[str, Any]) -> None:
-        self.last_audit = audit
-        self.audit_history.append(dict(audit))
+    def bind_response_artifact_root(self, root: Path) -> None:
+        """Bind one no-overwrite case-local root for raw response evidence."""
+
+        path = Path(root)
+        if path.exists() and not path.is_dir():
+            raise SemanticGateContractError("assessor response artifact root is not a directory")
+        path.mkdir(parents=True, exist_ok=True)
+        self.response_artifact_root = path
+
+    def _store_audit(self, audit: dict[str, Any]) -> dict[str, Any]:
+        record = dict(audit)
+        self.last_audit = record
+        self.audit_history.append(record)
+        return record
+
+    def _response_evidence(
+        self,
+        request: EvidenceAssessmentRequest,
+        response: Any,
+        *,
+        wall_clock_ms: float,
+    ) -> dict[str, Any]:
+        raw_answer_text = response.answer_text if isinstance(response, BailianTransportResponse) and isinstance(response.answer_text, str) else None
+        usage = response.usage if isinstance(response, BailianTransportResponse) else None
+        provider_request_id = response.provider_request_id if isinstance(response, BailianTransportResponse) else None
+        finish_reason = response.finish_reason if isinstance(response, BailianTransportResponse) else None
+        return {
+            "schema_version": "phase04-evidence-assessor-response-0.1",
+            "request_identity": request.request_identity,
+            "execution_config_identity": self.execution_config_identity,
+            "provider_request_id": provider_request_id if isinstance(provider_request_id, str) else None,
+            "usage": dict(usage) if isinstance(usage, Mapping) else None,
+            "finish_reason": finish_reason if isinstance(finish_reason, str) else None,
+            "response_type": type(response).__name__,
+            "raw_answer_text": raw_answer_text,
+            "raw_answer_text_sha256": sha256(raw_answer_text.encode("utf-8")).hexdigest() if raw_answer_text is not None else None,
+            "attempt_count": 1,
+            "wall_clock_ms": round(wall_clock_ms * 1000.0, 3),
+        }
+
+    def _persist_response_evidence(self, evidence: Mapping[str, Any]) -> dict[str, Any] | None:
+        if self.response_artifact_root is None:
+            return None
+        path = self.response_artifact_root / f"response-{self.provider_network_calls:04d}.json"
+        body = canonical_json_bytes({
+            "schema_version": "phase04-evidence-assessor-response-artifact-0.1",
+            "response_evidence": dict(evidence),
+        })
+        _write_no_overwrite(path, body)
+        return {
+            "path": str(path),
+            "sha256": sha256(body).hexdigest(),
+            "byte_count": len(body),
+        }
 
     @property
     def prompt_identity(self) -> str:
@@ -563,44 +646,63 @@ class BailianEvidenceAssessor:
                 "attempt_count": 1,
                 "provider_network_calls": self.provider_network_calls,
                 "wall_clock_ms": round((time.perf_counter() - started) * 1000, 3),
+                "provider_error": {
+                    "category": type(exc).__name__,
+                    "code": exc.code if isinstance(exc, BailianTransportError) else type(exc).__name__,
+                    "status_code": exc.status_code if isinstance(exc, BailianTransportError) else None,
+                    "provider_request_id": exc.provider_request_id if isinstance(exc, BailianTransportError) else None,
+                },
+                "response_evidence": None,
                 "currency_cost": "UNKNOWN",
             })
             raise EvidenceAssessorProviderError("assessor provider call failed") from exc
+        response_evidence = self._response_evidence(
+            request,
+            response,
+            wall_clock_ms=time.perf_counter() - started,
+        )
+        response_artifact = self._persist_response_evidence(response_evidence)
+        if response_artifact is not None:
+            response_evidence["raw_response_artifact"] = response_artifact
+        received_audit = self._store_audit({
+            "status": "response_received",
+            "request_identity": request.request_identity,
+            "execution_config_identity": self.execution_config_identity,
+            "attempt_count": 1,
+            "provider_network_calls": self.provider_network_calls,
+            "response_evidence": response_evidence,
+            "currency_cost": "UNKNOWN",
+        })
         if not isinstance(response, BailianTransportResponse) or not isinstance(response.answer_text, str):
-            self._store_audit({
+            received_audit.update({
                 "status": "response_invalid",
-                "request_identity": request.request_identity,
-                "execution_config_identity": self.execution_config_identity,
-                "attempt_count": 1,
-                "provider_network_calls": self.provider_network_calls,
+                "parse_failure": {
+                    "category": "response_invalid",
+                    "code": "non_text_answer",
+                    "reason": "assessor provider response must expose string answer_text",
+                },
                 "wall_clock_ms": round((time.perf_counter() - started) * 1000, 3),
-                "currency_cost": "UNKNOWN",
             })
             raise EvidenceAssessorProviderError("assessor provider response is invalid")
         try:
             result = parse_assessment_response(response.answer_text, request)
         except SemanticGateContractError as exc:
-            self._store_audit({
+            received_audit.update({
                 "status": "response_invalid",
-                "request_identity": request.request_identity,
-                "execution_config_identity": self.execution_config_identity,
-                "attempt_count": 1,
-                "provider_network_calls": self.provider_network_calls,
+                "parse_failure": {
+                    "category": type(exc).__name__,
+                    "code": type(exc).__name__,
+                    "reason": str(exc),
+                },
                 "wall_clock_ms": round((time.perf_counter() - started) * 1000, 3),
-                "currency_cost": "UNKNOWN",
             })
             raise EvidenceAssessorProviderError("assessor response failed strict validation") from exc
-        self._store_audit({
+        received_audit.update({
             "status": "succeeded",
-            "request_identity": request.request_identity,
             "result_identity": result.result_identity,
-            "execution_config_identity": self.execution_config_identity,
             "provider_request_id": response.provider_request_id,
             "usage": dict(response.usage) if isinstance(response.usage, Mapping) else None,
-            "attempt_count": 1,
-            "provider_network_calls": self.provider_network_calls,
             "wall_clock_ms": round((time.perf_counter() - started) * 1000, 3),
-            "currency_cost": "UNKNOWN",
         })
         return result
 
@@ -835,6 +937,36 @@ def load_parent_targeted_gate(
     manifest_body = canonical_json_bytes(manifest.to_dict())
     _require_parent(manifest_path.is_file() and manifest_path.read_bytes() == manifest_body
                     and sha256(manifest_body).hexdigest() == PARENT_MANIFEST_IDENTITY, "parent manifest bytes/hash")
+
+    def parent_runtime_matches_current(parent_runtime: Any) -> bool:
+        """Keep immutable parent assessor identity as history, while rebinding current code."""
+
+        if not isinstance(parent_runtime, Mapping):
+            return False
+        if parent_runtime.get("block_a") != frozen_runtime.get("block_a"):
+            return False
+        if parent_runtime.get("generation") != frozen_runtime.get("generation"):
+            return False
+        historical = parent_runtime.get("assessor")
+        if not isinstance(historical, Mapping):
+            return False
+        required = {
+            "provider_type": "BailianEvidenceAssessor",
+            "model_id": ASSESSOR_MODEL_ID,
+            "model_reference_policy": REQUESTED_ALIAS_POLICY,
+            "region": ASSESSOR_REGION,
+            "workspace": ASSESSOR_WORKSPACE,
+            "endpoint": ASSESSOR_ENDPOINT,
+            "operating_point_schema_version": ASSESSOR_OPERATING_POINT_SCHEMA_VERSION,
+        }
+        if any(historical.get(key) != value for key, value in required.items()):
+            return False
+        return (
+            historical.get("prompt_identity") == HISTORICAL_PARENT_ASSESSOR_PROMPT_IDENTITY
+            and historical.get("schema_version") == HISTORICAL_PARENT_ASSESSOR_SCHEMA_VERSION
+            and historical.get("execution_config_identity") == HISTORICAL_PARENT_ASSESSOR_EXECUTION_CONFIG_IDENTITY
+        )
+
     loaded: dict[str, dict[str, Any]] = {}
     for case in manifest.cases:
         outer = f"p04-targeted-semantic-gate-live-20260919-{case.question_id.lower()}"
@@ -850,12 +982,12 @@ def load_parent_targeted_gate(
         _require_parent(preflight.get("status") == "STARTED" and preflight.get("run_identity") == outer
                         and preflight.get("case") == {"question_id": case.question_id, "question_identity": case.question_identity}
                         and preflight.get("manifest_binding") == expected_manifest_binding
-                        and preflight.get("frozen_runtime") == frozen_runtime, f"{case.question_id} preflight")
+                        and parent_runtime_matches_current(preflight.get("frozen_runtime")), f"{case.question_id} preflight")
         package_path = case_root / "targeted_gate_review_package.json"
         package = _read_bound_json(package_path)
         _require_parent(package.get("case") == case.to_dict() and package.get("run_identity") == outer
                         and package.get("manifest_binding") == expected_manifest_binding
-                        and package.get("frozen_runtime") == frozen_runtime, f"{case.question_id} case/package binding")
+                        and parent_runtime_matches_current(package.get("frozen_runtime")), f"{case.question_id} case/package binding")
         descriptor = _read_bound_json(case_root / "round0" / case.question_id / "round0_replay.json")
         _require_parent(package.get("round0") == descriptor and descriptor.get("execution_identity") == f"{outer}-adaptive"
                         and descriptor.get("question") == case.question, f"{case.question_id} round0 descriptor")
@@ -1220,6 +1352,8 @@ def run_targeted_gate_case(
     if parent is not None:
         preflight["parent_lineage"] = parent["lineage"]
     _write_no_overwrite(run_root / "preflight_started.json", canonical_json_bytes(preflight))
+    if isinstance(assessor, BailianEvidenceAssessor):
+        assessor.bind_response_artifact_root(run_root / "assessor")
     assessor_calls_before = getattr(assessor, "provider_network_calls", None)
     assessor_audits_before = len(getattr(assessor, "audit_history", ()))
     if parent is None:
@@ -1362,6 +1496,12 @@ def run_targeted_gate_case(
             "assessor": assessor_case_calls,
             "assessor_audit": dict(assessor_audits[-1]) if assessor_audits else {},
             "assessor_attempts": assessor_audits,
+            "assessor_response_artifacts": [
+                audit["response_evidence"]["raw_response_artifact"]
+                for audit in assessor_audits
+                if isinstance(audit.get("response_evidence"), Mapping)
+                and isinstance(audit["response_evidence"].get("raw_response_artifact"), Mapping)
+            ],
             "generation_reused_identities": list(reused),
             "generation_occurrences": {
                 "baseline": {

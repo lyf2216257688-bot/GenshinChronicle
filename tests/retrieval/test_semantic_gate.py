@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 import tempfile
 import unittest
@@ -31,6 +32,7 @@ from genshin_corpus.rag.semantic_gate import (
     ASSESSOR_WORKSPACE,
     HISTORICAL_QWEN38_EXECUTION_CONFIG_IDENTITY,
     BailianEvidenceAssessor,
+    EvidenceAssessorProviderError,
     SemanticGateContractError,
     SharedRound0Replay,
     ReusingGenerationProvider,
@@ -90,6 +92,21 @@ class _AssessorTransport:
             "supplemental_query": None,
         }
         return BailianTransportResponse(json.dumps(answer), provider_request_id="fake-assessor")
+
+
+class _RawAssessorTransport:
+    def __init__(self, answer_text: str) -> None:
+        self.answer_text = answer_text
+        self.calls = 0
+
+    def invoke(self, payload: dict, *, timeout_seconds: float) -> BailianTransportResponse:
+        self.calls += 1
+        return BailianTransportResponse(
+            self.answer_text,
+            provider_request_id="provider-request-1",
+            usage={"input_tokens": 11, "output_tokens": 5},
+            finish_reason="stop",
+        )
 
 
 class _Round0Capability:
@@ -364,6 +381,129 @@ class SemanticGateTests(unittest.TestCase):
             )
             with self.assertRaises(SemanticGateContractError):
                 BailianEvidenceAssessor(config, _AssessorTransport())
+
+    def test_assessor_prompt_publishes_exact_nine_field_contract(self):
+        assessor = BailianEvidenceAssessor(
+            BailianControlConfig(
+                region=ASSESSOR_REGION,
+                endpoint=ASSESSOR_ENDPOINT,
+                workspace=ASSESSOR_WORKSPACE,
+                model_id=ASSESSOR_MODEL_ID,
+                model_reference_policy=REQUESTED_ALIAS_POLICY,
+                enable_thinking=True,
+                thinking_budget=4096,
+                max_output_tokens=2048,
+                max_attempts=1,
+            ),
+            _AssessorTransport(),
+        )
+        payload = assessor.invocation_payload(_assessment_request())
+        system = payload["messages"][0]["content"]
+        for field in (
+            "assessment_request_identity", "condition", "action", "answer_disposition",
+            "supported_scope", "unresolved_aspects", "missing_information", "conflicts",
+            "supplemental_query",
+        ):
+            self.assertIn(field, system)
+        self.assertIn("exactly nine keys", system)
+        self.assertIn("each exactly once", system)
+        self.assertIn("no other keys", system)
+        self.assertIn("raw JSON object", system)
+        self.assertNotIn("contain exactly the object must contain exactly", system)
+        for rule in (
+            "assessment_request_identity (non-empty single-line string; copy the exact supplied request identity)",
+            "Every array entry must be a unique, non-empty, single-line string within its field",
+            "sufficient requires missing_information and conflicts to be empty",
+            "cannot use supplement_once",
+            "when using answer_now requires answer_disposition full",
+            "incomplete requires missing_information to be non-empty",
+            "conflicting requires conflicts to be non-empty",
+            "unable requires action stop, answer_disposition none, and unresolved_aspects to be non-empty",
+            "answer_now requires answer_disposition full or bounded_partial and supplemental_query null",
+            "incomplete or conflicting may use answer_now only with bounded_partial",
+            "supplement_once requires incomplete or conflicting, answer_disposition none",
+            "one concrete non-empty single-line supplemental_query",
+            "stop requires answer_disposition none and supplemental_query null",
+            "bounded_partial requires incomplete or conflicting",
+            "requires both supported_scope and unresolved_aspects to be non-empty",
+            "supported_scope must be empty unless answer_disposition is bounded_partial",
+            "answer_disposition full requires unresolved_aspects to be empty",
+            "supported_scope, unresolved_aspects, and conflicts must not contain Evidence Packet citation IDs",
+        ):
+            self.assertIn(rule, system)
+
+    def test_invalid_assessor_response_is_persisted_and_replayable_offline(self):
+        request = _assessment_request()
+        raw = "{\"assessment_request_identity\":\"wrong\"}"
+        transport = _RawAssessorTransport(raw)
+        config = BailianControlConfig(
+            region=ASSESSOR_REGION,
+            endpoint=ASSESSOR_ENDPOINT,
+            workspace=ASSESSOR_WORKSPACE,
+            model_id=ASSESSOR_MODEL_ID,
+            model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True,
+            thinking_budget=4096,
+            max_output_tokens=2048,
+            max_attempts=1,
+        )
+        with tempfile.TemporaryDirectory() as temp_root:
+            assessor = BailianEvidenceAssessor(config, transport)
+            assessor.bind_response_artifact_root(Path(temp_root))
+            with self.assertRaises(EvidenceAssessorProviderError):
+                assessor.assess(request)
+            self.assertEqual(transport.calls, 1)
+            audit = assessor.last_audit
+            evidence = audit["response_evidence"]
+            self.assertEqual(evidence["request_identity"], request.request_identity)
+            self.assertEqual(evidence["execution_config_identity"], assessor.execution_config_identity)
+            self.assertEqual(evidence["raw_answer_text"], raw)
+            self.assertEqual(evidence["raw_answer_text_sha256"], sha256(raw.encode("utf-8")).hexdigest())
+            self.assertEqual(audit["status"], "response_invalid")
+            self.assertIn("parse_failure", audit)
+            artifact = Path(evidence["raw_response_artifact"]["path"])
+            self.assertTrue(artifact.is_file())
+            persisted = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["response_evidence"]["raw_answer_text"], raw)
+            with self.assertRaises(SemanticGateContractError) as replay_error:
+                parse_assessment_response(raw, request)
+            self.assertEqual(str(replay_error.exception), audit["parse_failure"]["reason"])
+
+    def test_successful_assessor_response_retains_provider_evidence(self):
+        request = _assessment_request()
+        answer = {
+            "assessment_request_identity": request.request_identity,
+            "condition": "sufficient",
+            "action": "answer_now",
+            "answer_disposition": "full",
+            "supported_scope": [],
+            "unresolved_aspects": [],
+            "missing_information": [],
+            "conflicts": [],
+            "supplemental_query": None,
+        }
+        raw = json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
+        transport = _RawAssessorTransport(raw)
+        config = BailianControlConfig(
+            region=ASSESSOR_REGION,
+            endpoint=ASSESSOR_ENDPOINT,
+            workspace=ASSESSOR_WORKSPACE,
+            model_id=ASSESSOR_MODEL_ID,
+            model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True,
+            thinking_budget=4096,
+            max_output_tokens=2048,
+            max_attempts=1,
+        )
+        assessor = BailianEvidenceAssessor(config, transport)
+        assessor.assess(request)
+        evidence = assessor.last_audit["response_evidence"]
+        self.assertEqual(assessor.last_audit["status"], "succeeded")
+        self.assertEqual(evidence["provider_request_id"], "provider-request-1")
+        self.assertEqual(evidence["usage"], {"input_tokens": 11, "output_tokens": 5})
+        self.assertEqual(evidence["finish_reason"], "stop")
+        self.assertEqual(evidence["raw_answer_text_sha256"], sha256(raw.encode("utf-8")).hexdigest())
+        self.assertGreaterEqual(evidence["wall_clock_ms"], 0)
 
     def test_shared_round0_replay_calls_block_a_once(self):
         delegate = _Round0Capability()

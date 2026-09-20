@@ -31,14 +31,29 @@ persisted, but assessor and supplemental semantic evidence were not produced.
 The parent root
 `.local/p04-targeted-semantic-gate-live-20260919-172106` is immutable historical
 evidence. The replay identity root cause is confirmed and repaired. Replay and
-read-only recovery mechanics = ACTUAL REVIEW PASS; the nine parent round-0
-Block A/Packet artifacts and baseline Generation occurrences are accepted for
-read-only recovery reuse, with no engineering blocker for recovery mechanics.
-Recovery live execution is READY FOR EXPLICIT USER AUTHORIZATION, but is not
-authorized or executed. Any recovery must use a new unique run root with
-explicit parent lineage and must not repeat the parent round 0 or baseline
-Generation occurrences. Block B semantic improvement and adoption remain
-UNKNOWN, NOT ACCEPTED, and non-production.**
+read-only recovery mechanics = ACTUAL REVIEW PASS; parent recovery reuse was
+live-confirmed, and the nine parent round-0 Block A/Packet artifacts and
+baseline Generation occurrences are accepted for read-only recovery reuse,
+with no engineering blocker for recovery mechanics. Assessor output-contract
+repair = ACTUAL REVIEW PASS. Assessor failure-observability, raw-response
+persistence, and offline parser replay = ACTUAL REVIEW PASS. The current
+assessor prompt schema/version is `phase04-evidence-assessor-prompt-0.3` / `0.3`,
+with prompt identity
+`a8a0d8b544df10120cd2de126e5d1f6cc03fd364535da7cb6a12df781a7f2505`
+and execution-config identity
+`ee839f755e0bba7450ace072640c610bfb259e240bc614428505442daf33d50b`.
+Recovery attempt #1 stopped at Q011 on the old assessor contract after one
+consumed assessor occurrence; it produced no assessor or supplemental semantic
+evidence, and that occurrence is not retroactively accepted as semantic
+evidence. The stopped recovery root
+`.local/p04-targeted-semantic-gate-recovery-20260920-124155` is immutable
+mechanical-failure evidence. The engineering blocker for a new recovery
+execution is NONE. A new recovery live run is READY FOR EXPLICIT USER
+AUTHORIZATION, but is not authorized or executed. Any future recovery must use
+a new unique run root with explicit parent lineage, reuse rather than repeat
+the accepted parent round 0 and baseline Generation occurrences, and use the
+current v0.3 assessor identity. Block B semantic improvement and adoption
+remain UNKNOWN, NOT ACCEPTED, and non-production.**
 
 Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
@@ -368,19 +383,32 @@ structural only. The first authorized nine-case live attempt remains
 mechanically inconclusive and immutable historical/parent evidence: adaptive
 round 0 failed at the replay identity seam for all nine cases, while the nine
 shared round-0 Block A/Packet artifacts and baseline Generation occurrences
-were persisted. No assessor or supplemental semantic evidence was produced.
-The replay identity root cause is confirmed and repaired. Replay and recovery
-mechanics = ACTUAL REVIEW PASS; the nine parent round-0 and baseline
-occurrences are accepted for read-only recovery reuse, and the engineering
-blocker for recovery mechanics is NONE. Recovery live execution is READY FOR
-EXPLICIT USER AUTHORIZATION, but is not authorized or executed. A recovery run
-must use a new unique run root with explicit parent lineage and must not repeat
-the parent round 0 or baseline Generation occurrences. Block B semantic
-improvement/adoption remains UNKNOWN / NOT ACCEPTED / non-production.** The
-next decision gate is explicit authorization for that recovery execution,
-followed by human/ChatGPT semantic review. 70Q remains unauthorized and is not
-implied. Do not change Block A/defaults, the one-query/one-round bound, or the
-one-slot policy.
+were persisted. No assessor or supplemental semantic evidence was produced by
+that parent attempt. The replay identity root cause is confirmed and repaired.
+Replay and recovery mechanics = ACTUAL REVIEW PASS; parent recovery reuse was
+live-confirmed, the nine parent round-0 and baseline occurrences are accepted
+for read-only recovery reuse, and the engineering blocker for recovery
+mechanics is NONE. Assessor output-contract repair and assessor
+failure-observability/raw-response persistence/offline parser replay are
+ACTUAL REVIEW PASS. The current assessor prompt schema/version is
+`phase04-evidence-assessor-prompt-0.3` / `0.3`, with prompt identity
+`a8a0d8b544df10120cd2de126e5d1f6cc03fd364535da7cb6a12df781a7f2505`
+and execution-config identity
+`ee839f755e0bba7450ace072640c610bfb259e240bc614428505442daf33d50b`.
+Recovery attempt #1 stopped at Q011 on the old assessor contract after one
+consumed, non-semantic assessor occurrence. That occurrence is not
+retroactively accepted as semantic evidence. The recovery root
+`.local/p04-targeted-semantic-gate-recovery-20260920-124155` is immutable
+mechanical-failure evidence. The engineering blocker for a new recovery
+execution is NONE. A new recovery live run is READY FOR EXPLICIT USER
+AUTHORIZATION, but is not authorized or executed. It must use a new unique run
+root, reuse rather than repeat the accepted parent round 0 and baseline
+Generation occurrences, and use the current v0.3 assessor identity. Block B
+semantic improvement/adoption remains UNKNOWN / NOT ACCEPTED /
+non-production.** The next decision gate is explicit user authorization for
+that recovery execution, followed by human/ChatGPT semantic review. 70Q
+remains unauthorized and is not implied. Do not change Block A/defaults, the
+one-query/one-round bound, or the one-slot policy.
 This work does not reopen Block A
 scorer or reranker-parameter research. Keep the adopted Diagnostic C,
 accepted Qwen Dense, Hybrid, rank-fusion, final20, Formal Deferred, and
