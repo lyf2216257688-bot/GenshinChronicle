@@ -58,10 +58,18 @@ occurred after the violated stop boundary and are not semantic advancement
 evidence. All nine parent P0/Packet and baseline Generation occurrences were
 validated and reused with zero repeated parent work; fresh Generation was zero
 and the four observed adaptive occurrences were parent-baseline reuse. The
-execution-control, transport, and accounting repair is implemented and
-provider-free tested, but awaits ChatGPT/user actual review and checkpoint.
-Another recovery live run remains NOT AUTHORIZED. Block B semantic improvement
-and adoption remain UNKNOWN, NOT ACCEPTED, and non-production.**
+execution-control, transport, and accounting repair = ACTUAL REVIEW PASS.
+Tracked recovery batch stop propagation, producer to persisted current package
+to validator self-consistency, replay dual identity and parent-lineage
+validation, Bailian and Qwen embedding connection/protocol failure
+normalization, current-run accounting and accounting-completeness semantics,
+and adaptive/directive Generation occurrence attribution are all ACTUAL REVIEW
+PASS. The execution-control, transport, and accounting engineering blocker for
+a new recovery is NONE. No new recovery has been executed after this repair.
+Any future recovery requires a new unique output root, immutable-parent reuse,
+the current v0.3 assessor, and explicit user authorization; another recovery
+is NOT currently authorized. Block B semantic improvement and adoption remain
+UNKNOWN, NOT ACCEPTED, and non-production.**
 
 Single-Question End-to-End RAG Backend - CLOSED / PASS
 (implementation, actual review, and first live smoke); P04 Lightweight
@@ -395,9 +403,15 @@ were persisted. No assessor or supplemental semantic evidence was produced by
 that parent attempt. The replay identity root cause is confirmed and repaired.
 Replay and recovery mechanics = ACTUAL REVIEW PASS; parent recovery reuse was
 live-confirmed, and the nine parent round-0 and baseline occurrences are
-accepted for read-only recovery reuse. Assessor output-contract repair and assessor
-failure-observability/raw-response persistence/offline parser replay are
-ACTUAL REVIEW PASS. The current assessor prompt schema/version is
+accepted for read-only recovery reuse. Assessor output-contract repair and
+assessor failure-observability/raw-response persistence/offline parser replay
+are ACTUAL REVIEW PASS. Tracked recovery batch stop propagation, producer to
+persisted current package to validator self-consistency, replay dual identity
+and parent-lineage validation, Bailian and Qwen embedding connection/protocol
+failure normalization, current-run accounting and accounting-completeness
+semantics, and adaptive/directive Generation occurrence attribution are all
+ACTUAL REVIEW PASS. The execution-control, transport, and accounting
+engineering blocker for a new recovery is NONE. The current assessor prompt schema/version is
 `phase04-evidence-assessor-prompt-0.3` / `0.3`, with prompt identity
 `a8a0d8b544df10120cd2de126e5d1f6cc03fd364535da7cb6a12df781a7f2505`
 and execution-config identity
@@ -407,16 +421,13 @@ consumed, non-semantic assessor occurrence. That occurrence is not
 retroactively accepted as semantic evidence. The recovery root
 `.local/p04-targeted-semantic-gate-recovery-20260920-124155` is immutable
 mechanical-failure evidence. Recovery attempt #2 is the immutable diagnostic
-evidence recorded above. The execution-control/transport/accounting repair is
-implemented and provider-free tested but awaits ChatGPT/user actual review and
-checkpoint. Another recovery live run remains NOT AUTHORIZED. It must use a
-new unique run root, reuse rather than repeat the accepted parent round 0 and baseline
-Generation occurrences, and use the current v0.3 assessor identity. Block B
-semantic improvement/adoption remains
-UNKNOWN / NOT ACCEPTED / non-production. The next decision gate is actual
-review/checkpoint approval, followed by explicit authorization for a new
-recovery execution and then human/ChatGPT semantic review. 70Q remains
-unauthorized and is not implied. Do not change Block A/defaults, the
+evidence recorded above. No new recovery has been executed after this repair.
+Any future recovery must use a new unique run root, reuse rather than repeat
+the accepted parent round 0 and baseline Generation occurrences, use the
+current v0.3 assessor identity, and receive explicit user authorization.
+Another recovery live run remains NOT AUTHORIZED. Block B semantic
+improvement/adoption remains UNKNOWN / NOT ACCEPTED / non-production. 70Q
+remains unauthorized and is not implied. Do not change Block A/defaults, the
 one-query/one-round bound, or the one-slot policy.
 This work does not reopen Block A
 scorer or reranker-parameter research. Keep the adopted Diagnostic C,
