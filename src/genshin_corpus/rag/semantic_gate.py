@@ -70,8 +70,24 @@ from genshin_corpus.retrieval.qwen_embedding import (
 )
 
 
-TARGETED_GATE_SCHEMA_VERSION = "phase04-targeted-semantic-gate-0.1"
+TARGETED_GATE_SCHEMA_VERSION = "phase04-targeted-semantic-gate-0.2"
+HISTORICAL_TARGETED_GATE_SCHEMA_VERSION = "phase04-targeted-semantic-gate-0.1"
 TARGETED_CASE_MANIFEST_SCHEMA_VERSION = "phase04-targeted-case-manifest-0.1"
+TARGETED_RECOVERY_BATCH_SCHEMA_VERSION = "phase04-targeted-semantic-gate-recovery-batch-0.1"
+TARGETED_RECOVERY_BATCH_PREFLIGHT_SCHEMA_VERSION = "phase04-targeted-semantic-gate-recovery-preflight-0.1"
+TARGETED_CASE_ORDER = ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")
+TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY = sha256_json({
+    "schema_version": TARGETED_RECOVERY_BATCH_SCHEMA_VERSION,
+    "preflight_schema_version": TARGETED_RECOVERY_BATCH_PREFLIGHT_SCHEMA_VERSION,
+    "case_order": TARGETED_CASE_ORDER,
+})
+BOUNDED_STOP_REASONS = frozenset({
+    "no_new_occurrence",
+    "supplemental_occurrence_not_admitted",
+    "supplement_budget_exhausted",
+    "assessment_unable",
+    "unresolved_stop_disposition",
+})
 ASSESSOR_PROMPT_SCHEMA_VERSION = "phase04-evidence-assessor-prompt-0.3"
 ASSESSOR_PROMPT_ID = "phase04-bounded-evidence-assessor"
 ASSESSOR_PROMPT_VERSION = "0.3"
@@ -566,7 +582,7 @@ class BailianEvidenceAssessor:
         request: EvidenceAssessmentRequest,
         response: Any,
         *,
-        wall_clock_ms: float,
+        elapsed_seconds: float,
     ) -> dict[str, Any]:
         raw_answer_text = response.answer_text if isinstance(response, BailianTransportResponse) and isinstance(response.answer_text, str) else None
         usage = response.usage if isinstance(response, BailianTransportResponse) else None
@@ -583,7 +599,7 @@ class BailianEvidenceAssessor:
             "raw_answer_text": raw_answer_text,
             "raw_answer_text_sha256": sha256(raw_answer_text.encode("utf-8")).hexdigest() if raw_answer_text is not None else None,
             "attempt_count": 1,
-            "wall_clock_ms": round(wall_clock_ms * 1000.0, 3),
+            "wall_clock_ms": round(elapsed_seconds * 1000.0, 3),
         }
 
     def _persist_response_evidence(self, evidence: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -656,10 +672,30 @@ class BailianEvidenceAssessor:
                 "currency_cost": "UNKNOWN",
             })
             raise EvidenceAssessorProviderError("assessor provider call failed") from exc
+        except Exception as exc:
+            # An injected transport is an external boundary. Preserve one safe
+            # attempt record even when it violates the transport protocol.
+            self._store_audit({
+                "status": "provider_error",
+                "request_identity": request.request_identity,
+                "execution_config_identity": self.execution_config_identity,
+                "attempt_count": 1,
+                "provider_network_calls": self.provider_network_calls,
+                "wall_clock_ms": round((time.perf_counter() - started) * 1000, 3),
+                "provider_error": {
+                    "category": type(exc).__name__,
+                    "code": "UnexpectedTransportError",
+                    "status_code": None,
+                    "provider_request_id": None,
+                },
+                "response_evidence": None,
+                "currency_cost": "UNKNOWN",
+            })
+            raise EvidenceAssessorProviderError("assessor provider call failed") from exc
         response_evidence = self._response_evidence(
             request,
             response,
-            wall_clock_ms=time.perf_counter() - started,
+            elapsed_seconds=time.perf_counter() - started,
         )
         response_artifact = self._persist_response_evidence(response_evidence)
         if response_artifact is not None:
@@ -749,6 +785,24 @@ class SharedRound0Replay:
         source = dict(result)
         projected = dict(source)
         projected["query"] = {**query, "execution_identity": round_identity}
+        source_telemetry = source.get("telemetry")
+        if isinstance(source_telemetry, Mapping):
+            historical_counts = source_telemetry.get("provider_call_counts")
+            historical_counts = dict(historical_counts) if isinstance(historical_counts, Mapping) else {}
+            current_counts = {
+                str(key): 0
+                for key, value in historical_counts.items()
+                if isinstance(key, str) and isinstance(value, int) and not isinstance(value, bool)
+            }
+            projected["telemetry"] = {
+                **dict(source_telemetry),
+                "historical_source_telemetry": dict(source_telemetry),
+                "occurrence_reuse": {
+                    "reused": True,
+                    "source_provider_call_counts": historical_counts,
+                },
+                "provider_call_counts": current_counts,
+            }
         return cls(question, adaptive_execution_identity, expected_source_identity, projected,
                    binding.packet_sha256, binding.to_dict(), retrieval_request_identity, source,
                    sha256_json(source))
@@ -985,7 +1039,8 @@ def load_parent_targeted_gate(
                         and parent_runtime_matches_current(preflight.get("frozen_runtime")), f"{case.question_id} preflight")
         package_path = case_root / "targeted_gate_review_package.json"
         package = _read_bound_json(package_path)
-        _require_parent(package.get("case") == case.to_dict() and package.get("run_identity") == outer
+        _require_parent(package.get("schema_version") == HISTORICAL_TARGETED_GATE_SCHEMA_VERSION
+                        and package.get("case") == case.to_dict() and package.get("run_identity") == outer
                         and package.get("manifest_binding") == expected_manifest_binding
                         and parent_runtime_matches_current(package.get("frozen_runtime")), f"{case.question_id} case/package binding")
         descriptor = _read_bound_json(case_root / "round0" / case.question_id / "round0_replay.json")
@@ -1299,10 +1354,11 @@ def run_targeted_gate_case(
     output_root: Path,
     parent_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Execute one future case and persist a review package.
+    """Execute one future case and persist its review package.
 
-    This function is the only live seam.  It is never called during manifest
-    validation or provider-free tests.  It does not assign semantic PASS/FAIL.
+    This is the case-level primitive. Multi-case recovery must use
+    :func:`run_targeted_gate_recovery_batch`, which owns ordering and stop
+    semantics. This function does not assign semantic PASS/FAIL.
     """
 
     if not execution_identity or not re.fullmatch(r"[A-Za-z0-9._-]+", execution_identity):
@@ -1407,11 +1463,14 @@ def run_targeted_gate_case(
     directive_only_artifact = None
     adaptive_packet_sha = adaptive.get("final_packet_binding", {}).get("packet_sha256") if isinstance(adaptive.get("final_packet_binding"), Mapping) else None
     adaptive_generation = adaptive.get("generation") if isinstance(adaptive.get("generation"), Mapping) else {}
+    adaptive_generation_audits = list(adaptive_provider.call_audit)
+    directive_only_generation_audits: list[dict[str, Any]] = []
     if adaptive_packet_sha != replay.packet_sha256 and adaptive_generation.get("status") == "succeeded":
         directive_only_request = _directive_only_request(persisted_packet, case.question, case.question_id, adaptive)
         if directive_only_request is not None and directive_only_request.semantic_request_identity != baseline_request.semantic_request_identity:
             directive_only_result = adaptive_provider.generate(directive_only_request)
             directive_only_artifact = write_generation_result(run_root / "generation" / "directive_only_round0", directive_only_result)
+            directive_only_generation_audits = list(adaptive_provider.call_audit[len(adaptive_generation_audits):])
     adaptive_identity = adaptive.get("generation", {}).get("semantic_request_identity") if isinstance(adaptive.get("generation"), Mapping) else None
     same_request = adaptive_identity == baseline_request.semantic_request_identity
     assessor_config = getattr(assessor, "config", None)
@@ -1510,8 +1569,8 @@ def run_targeted_gate_case(
                     "reused_parent_occurrence": parent is not None,
                     "current_run_provider_network_calls": 0 if parent is not None else _provider_execution_evidence(baseline_result)["provider_network_calls"],
                 },
-                "adaptive": list(adaptive_provider.call_audit),
-                "directive_only_round0": _provider_execution_evidence(directive_only_result),
+                "adaptive": adaptive_generation_audits,
+                "directive_only_round0": directive_only_generation_audits,
             },
             "latency_ms": "UNKNOWN",
             "estimated_cost": "UNKNOWN",
@@ -1521,12 +1580,387 @@ def run_targeted_gate_case(
     return package
 
 
+def _fresh_generation_counts(package: Mapping[str, Any]) -> tuple[int, int]:
+    calls = 0
+    attempts = 0
+    provider_calls = package.get("provider_calls")
+    occurrences = provider_calls.get("generation_occurrences") if isinstance(provider_calls, Mapping) else None
+    if not isinstance(occurrences, Mapping):
+        return calls, attempts
+    for name in ("adaptive", "directive_only_round0"):
+        entries = occurrences.get(name)
+        if isinstance(entries, Mapping):
+            entries = [entries]
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, Mapping) or entry.get("reused") is True:
+                continue
+            if entry.get("provider_network_call") is True:
+                calls += 1
+            value = entry.get("attempt_count")
+            if isinstance(value, int) and not isinstance(value, bool):
+                attempts += value
+    return calls, attempts
+
+
+def _non_negative_int(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise SemanticGateContractError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _validate_current_recovery_package(
+    package: Mapping[str, Any], *, case: TargetedCaseBinding, case_identity: str,
+    manifest_binding: Mapping[str, Any], frozen_runtime: Mapping[str, Any],
+    parent_entry: Mapping[str, Any],
+) -> dict[str, int]:
+    """Validate current package binding and return its integer fresh accounting."""
+
+    if package.get("schema_version") != TARGETED_GATE_SCHEMA_VERSION:
+        raise SemanticGateContractError("current case package schema mismatch")
+    if package.get("case") != case.to_dict() or package.get("run_identity") != case_identity:
+        raise SemanticGateContractError("current case package case/run binding mismatch")
+    if package.get("manifest_binding") != dict(manifest_binding):
+        raise SemanticGateContractError("current case package manifest binding mismatch")
+    if package.get("frozen_runtime") != dict(frozen_runtime):
+        raise SemanticGateContractError("current case package frozen runtime mismatch")
+    assessor_binding = package.get("assessor_binding")
+    frozen_assessor = frozen_runtime.get("assessor") if isinstance(frozen_runtime, Mapping) else None
+    if not isinstance(assessor_binding, Mapping) or not isinstance(frozen_assessor, Mapping):
+        raise SemanticGateContractError("current case package assessor binding is missing")
+    expected_assessor_fields = {
+        "model_id": frozen_assessor.get("model_id"),
+        "model_reference_policy": frozen_assessor.get("model_reference_policy"),
+        "prompt_identity": frozen_assessor.get("prompt_identity"),
+        "prompt_version": ASSESSOR_PROMPT_VERSION,
+        "prompt_schema_version": frozen_assessor.get("schema_version"),
+        "execution_config_identity": frozen_assessor.get("execution_config_identity"),
+    }
+    for field, expected in expected_assessor_fields.items():
+        if assessor_binding.get(field) != expected:
+            raise SemanticGateContractError(f"current assessor binding mismatch: {field}")
+    expected_lineage = parent_entry.get("lineage")
+    if not isinstance(expected_lineage, Mapping) or package.get("parent_lineage") != dict(expected_lineage):
+        raise SemanticGateContractError("current case package parent lineage mismatch")
+
+    round0 = package.get("round0")
+    if not isinstance(round0, Mapping) or round0.get("schema_version") != "phase04-shared-round0-recovery-import-0.1":
+        raise SemanticGateContractError("current case package round0 is not a recovery import")
+    if round0.get("parent_lineage") != dict(expected_lineage) or round0.get("question") != case.question:
+        raise SemanticGateContractError("current case package round0 parent reuse binding mismatch")
+    expected_parent_round_identity = parent_entry.get("round0_descriptor", {}).get("execution_identity") if isinstance(parent_entry.get("round0_descriptor"), Mapping) else None
+    if round0.get("execution_identity") != expected_parent_round_identity:
+        raise SemanticGateContractError("current case package round0 parent Block A identity mismatch")
+    if round0.get("adaptive_execution_identity") != f"{case_identity}-adaptive":
+        raise SemanticGateContractError("current case package round0 adaptive identity mismatch")
+    if round0.get("round0_request_identity") != f"{case_identity}-adaptive.round0":
+        raise SemanticGateContractError("current case package round0 request identity mismatch")
+    artifacts = round0.get("artifacts")
+    if not isinstance(artifacts, Mapping) or artifacts.get("block_a_result") != expected_lineage.get("round0_result") or artifacts.get("evidence_packet") != expected_lineage.get("packet"):
+        raise SemanticGateContractError("current case package round0 artifact lineage mismatch")
+
+    baseline = package.get("baseline")
+    if not isinstance(baseline, Mapping):
+        raise SemanticGateContractError("current case package baseline is missing")
+    baseline_artifact = baseline.get("artifact")
+    baseline_occurrence = package.get("provider_calls", {}).get("generation_occurrences", {}).get("baseline") if isinstance(package.get("provider_calls"), Mapping) else None
+    expected_baseline = expected_lineage.get("baseline")
+    if not isinstance(baseline_artifact, Mapping) or baseline_artifact.get("reused_parent_occurrence") is not True or not isinstance(expected_baseline, Mapping):
+        raise SemanticGateContractError("baseline Generation is not marked as reused parent occurrence")
+    if {key: value for key, value in baseline_artifact.items() if key != "reused_parent_occurrence"} != dict(expected_baseline):
+        raise SemanticGateContractError("baseline Generation artifact lineage mismatch")
+    if not isinstance(baseline_occurrence, Mapping) or baseline_occurrence.get("reused_parent_occurrence") is not True:
+        raise SemanticGateContractError("baseline Generation accounting does not bind parent reuse")
+    if _non_negative_int(baseline_occurrence.get("current_run_provider_network_calls"), "baseline current_run_provider_network_calls") != 0:
+        raise SemanticGateContractError("reused baseline Generation has non-zero current-run calls")
+    if baseline.get("semantic_request_identity") != baseline_occurrence.get("semantic_request_identity"):
+        raise SemanticGateContractError("baseline semantic request identity mismatch")
+
+    adaptive = package.get("adaptive")
+    if not isinstance(adaptive, Mapping):
+        raise SemanticGateContractError("current case package adaptive result is missing")
+    call_counts = adaptive.get("call_counts")
+    if not isinstance(call_counts, Mapping):
+        raise SemanticGateContractError("adaptive call_counts is missing")
+    counts = {key: _non_negative_int(call_counts.get(key), f"adaptive.call_counts.{key}")
+              for key in ("assessment", "embedding", "reranker", "generation")}
+    if not isinstance(adaptive.get("rounds"), list):
+        raise SemanticGateContractError("adaptive rounds must be a list")
+
+    provider_calls = package.get("provider_calls")
+    if not isinstance(provider_calls, Mapping):
+        raise SemanticGateContractError("provider_calls is missing")
+    provider_assessor = _non_negative_int(provider_calls.get("assessor"), "provider_calls.assessor")
+    assessor_attempts = provider_calls.get("assessor_attempts")
+    if not isinstance(assessor_attempts, list):
+        raise SemanticGateContractError("provider_calls.assessor_attempts must be a list")
+    for index, attempt in enumerate(assessor_attempts):
+        if not isinstance(attempt, Mapping):
+            raise SemanticGateContractError(f"assessor attempt {index} is invalid")
+        _non_negative_int(attempt.get("attempt_count"), f"assessor attempt {index}.attempt_count")
+    assessor_attempt_total = sum(attempt["attempt_count"] for attempt in assessor_attempts)
+    if counts["assessment"] != provider_assessor or provider_assessor != assessor_attempt_total:
+        raise SemanticGateContractError("assessment/assessor attempt accounting mismatch")
+    occurrences = provider_calls.get("generation_occurrences")
+    if not isinstance(occurrences, Mapping):
+        raise SemanticGateContractError("generation occurrence ledger is missing")
+    generation_identity_sets: dict[str, set[str]] = {}
+    for name in ("adaptive", "directive_only_round0"):
+        entries = occurrences.get(name)
+        if not isinstance(entries, list):
+            raise SemanticGateContractError(f"generation occurrence ledger {name} must be a list")
+        if len(entries) > 1:
+            raise SemanticGateContractError(f"generation occurrence ledger {name} exceeds one-slot bound")
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, Mapping):
+                raise SemanticGateContractError(f"generation occurrence {name}[{index}] is invalid")
+            if not isinstance(entry.get("reused"), bool) or not isinstance(entry.get("provider_network_call"), bool):
+                raise SemanticGateContractError(f"generation occurrence {name}[{index}] reuse/network flags are invalid")
+            _non_negative_int(entry.get("attempt_count"), f"generation occurrence {name}[{index}].attempt_count")
+            identity = entry.get("semantic_request_identity")
+            if not isinstance(identity, str) or not identity:
+                raise SemanticGateContractError(f"generation occurrence {name}[{index}] lacks semantic identity")
+            if entry["reused"] and (entry["provider_network_call"] or entry["attempt_count"] != 0):
+                raise SemanticGateContractError(f"reused Generation occurrence {name}[{index}] has fresh accounting")
+            if not entry["reused"] and (not entry["provider_network_call"] or entry["attempt_count"] < 1):
+                raise SemanticGateContractError(f"fresh Generation occurrence {name}[{index}] lacks valid network accounting")
+            generation_identity_sets.setdefault(name, set()).add(identity)
+        if len(generation_identity_sets.get(name, set())) != len(entries):
+            raise SemanticGateContractError(f"generation occurrence ledger {name} has duplicate semantic identity")
+    if generation_identity_sets.get("adaptive", set()) & generation_identity_sets.get("directive_only_round0", set()):
+        raise SemanticGateContractError("adaptive and directive-only Generation ledgers overlap")
+
+    status = adaptive.get("status")
+    stopping_reason = adaptive.get("stopping_reason")
+    if status == "failed":
+        failure = adaptive.get("error")
+        if not isinstance(failure, Mapping) or not isinstance(failure.get("stage"), str) or not failure.get("stage") or not isinstance(failure.get("category"), str) or not failure.get("category"):
+            raise SemanticGateContractError("failed adaptive package lacks stage/category error metadata")
+    elif status not in {"succeeded", "stopped"}:
+        raise SemanticGateContractError("adaptive status is unknown")
+    if not isinstance(stopping_reason, str) or not stopping_reason:
+        raise SemanticGateContractError("adaptive stopping_reason is missing")
+    fresh_generation_calls, fresh_generation_attempts = _fresh_generation_counts(package)
+    if counts["generation"] != len(occurrences["adaptive"]):
+        raise SemanticGateContractError("adaptive Generation logical count does not match adaptive ledger")
+    return {
+        "assessor": provider_assessor,
+        "embedding": counts["embedding"],
+        "reranker": counts["reranker"],
+        "supplemental_block_a": sum(1 for item in adaptive["rounds"] if isinstance(item, Mapping) and item.get("round_index") == 1),
+        "generation": fresh_generation_calls,
+        "assessor_attempts": sum(item["attempt_count"] for item in assessor_attempts),
+        "generation_attempts": fresh_generation_attempts,
+    }
+
+
+def _batch_case_outcome(
+    *, case: TargetedCaseBinding, package_path: Path,
+    package_sha256: str | None, package: Mapping[str, Any] | None,
+    returned_package_match: bool, accounting: Mapping[str, int] | None = None,
+    error: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    adaptive = package.get("adaptive") if isinstance(package, Mapping) else None
+    status = adaptive.get("status") if isinstance(adaptive, Mapping) else None
+    stopping_reason = adaptive.get("stopping_reason") if isinstance(adaptive, Mapping) else None
+    mechanical_status = "mechanical_failure"
+    if returned_package_match and error is None and accounting is not None and status == "succeeded":
+        mechanical_status = "mechanically_complete"
+    elif returned_package_match and error is None and accounting is not None and status == "stopped" and stopping_reason in BOUNDED_STOP_REASONS:
+        mechanical_status = "bounded_stopped"
+    elif returned_package_match and error is None and accounting is not None and status == "failed":
+        failure = adaptive.get("error") if isinstance(adaptive, Mapping) else None
+        if isinstance(failure, Mapping) and isinstance(failure.get("stage"), str) and isinstance(failure.get("category"), str) and isinstance(stopping_reason, str):
+            mechanical_status = "failed"
+            error = {"stage": failure["stage"], "category": failure["category"], "stopping_reason": stopping_reason}
+        else:
+            mechanical_status = "mechanical_failure"
+            error = {"stage": "case_package_validation", "category": "MissingAdaptiveFailureMetadata", "stopping_reason": "package_validation_failure"}
+    elif error is None:
+        adaptive_error = adaptive.get("error") if isinstance(adaptive, Mapping) else None
+        error = {
+            "stage": adaptive_error.get("stage") if isinstance(adaptive_error, Mapping) else "case_package_validation",
+            "category": adaptive_error.get("category") if isinstance(adaptive_error, Mapping) else "UnknownAdaptiveStatus",
+            "stopping_reason": stopping_reason,
+        }
+    accounting_complete = accounting is not None
+    validated_accounting = dict(accounting) if accounting_complete else None
+    outcome_stopping_reason = (
+        error.get("stopping_reason") if isinstance(error, Mapping) and isinstance(error.get("stopping_reason"), str)
+        else stopping_reason if isinstance(stopping_reason, str) and stopping_reason
+        else "case_execution_failure"
+    )
+    return {
+        "schema_version": TARGETED_RECOVERY_BATCH_SCHEMA_VERSION,
+        "question_id": case.question_id,
+        "question_identity": case.question_identity,
+        "mechanical_status": mechanical_status,
+        "adaptive_status": status,
+        "stopping_reason": outcome_stopping_reason,
+        "package": {"path": str(package_path), "sha256": package_sha256, "returned_bytes_match_persisted": returned_package_match},
+        "accounting_status": "validated" if accounting_complete else "unavailable_unvalidated",
+        "fresh_provider_calls": ({key: validated_accounting[key] for key in ("assessor", "embedding", "reranker", "supplemental_block_a", "generation")} if accounting_complete else "UNKNOWN"),
+        "provider_attempts": {
+            "assessor": validated_accounting["assessor_attempts"],
+            "generation": validated_accounting["generation_attempts"],
+        } if accounting_complete else "UNKNOWN",
+        "error": dict(error) if isinstance(error, Mapping) else None,
+        "semantic_review": "UNKNOWN / REVIEW_REQUIRED",
+    }
+
+
+def run_targeted_gate_recovery_batch(
+    *, repo_root: Path, parent_root: Path, block_a: Any, assessor: Any,
+    generation_provider: GenerationProvider, execution_identity: str,
+    output_root: Path,
+) -> dict[str, Any]:
+    """Run the frozen nine-case recovery order with fail-closed stop control."""
+
+    if not isinstance(execution_identity, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", execution_identity):
+        raise SemanticGateContractError("batch execution identity is invalid")
+    repo = Path(repo_root)
+    manifest = build_targeted_case_manifest(repo)
+    if tuple(case.question_id for case in manifest.cases) != TARGETED_CASE_ORDER:
+        raise SemanticGateContractError("targeted case order is not the frozen nine-case order")
+    frozen_runtime = _validate_frozen_runtime_bindings(block_a, assessor, generation_provider)
+    parent = load_parent_targeted_gate(repo, Path(parent_root), frozen_runtime)
+    if tuple(parent) != TARGETED_CASE_ORDER:
+        raise SemanticGateContractError("parent reuse set is not the frozen nine-case order")
+
+    batch_root = Path(output_root) / execution_identity
+    if Path(output_root).exists() and not Path(output_root).is_dir():
+        raise NotADirectoryError(f"targeted recovery output root is not a directory: {output_root}")
+    Path(output_root).mkdir(parents=True, exist_ok=True)
+    if batch_root.exists():
+        raise FileExistsError(f"refusing to reuse targeted recovery batch root: {batch_root}")
+    batch_root.mkdir(parents=False, exist_ok=False)
+    manifest_path = batch_root / "manifest" / "targeted_case_manifest.json"
+    persist_targeted_case_manifest(manifest, manifest_path)
+    parent_lineage = {
+        "parent_root": str(Path(parent_root).resolve()),
+        "manifest_identity": manifest.manifest_identity,
+        "case_count": len(parent),
+        "cases": {question_id: value["lineage"] for question_id, value in parent.items()},
+    }
+    preflight = {
+        "schema_version": TARGETED_RECOVERY_BATCH_PREFLIGHT_SCHEMA_VERSION,
+        "batch_schema_identity": TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY,
+        "status": "STARTED",
+        "batch_identity": execution_identity,
+        "case_order": list(TARGETED_CASE_ORDER),
+        "manifest": {"path": str(manifest_path), "sha256": _sha256_file(manifest_path), "manifest_identity": manifest.manifest_identity},
+        "frozen_runtime": frozen_runtime,
+        "parent_lineage": parent_lineage,
+    }
+    _write_no_overwrite(batch_root / "batch_preflight_started.json", canonical_json_bytes(preflight))
+
+    outcomes_dir = batch_root / "case_outcomes"
+    outcomes_dir.mkdir()
+    processed: list[str] = []
+    for case in manifest.cases:
+        case_identity = f"{execution_identity}-{case.question_id.lower()}"
+        package_path = batch_root / "cases" / case_identity / "targeted_gate_review_package.json"
+        package: Mapping[str, Any] | None = None
+        package_sha: str | None = None
+        returned_match = False
+        error: dict[str, Any] | None = None
+        accounting: dict[str, int] | None = None
+        try:
+            returned = run_targeted_gate_case(case, repo_root=repo, manifest_path=manifest_path, block_a=block_a, assessor=assessor,
+                                              generation_provider=generation_provider, execution_identity=case_identity,
+                                              output_root=batch_root / "cases", parent_root=Path(parent_root))
+            if not isinstance(returned, Mapping):
+                raise SemanticGateContractError("case executor did not return a review package")
+            if not package_path.is_file():
+                raise SemanticGateContractError("case review package was not persisted")
+            package_bytes = package_path.read_bytes()
+            package_sha = sha256(package_bytes).hexdigest()
+            parsed = _read_bound_json(package_path)
+            returned_match = package_bytes == canonical_json_bytes(dict(returned)) and parsed == dict(returned)
+            if not returned_match:
+                raise SemanticGateContractError("returned and persisted case package bytes differ")
+            package = parsed
+            expected_manifest_binding = {
+                "schema_version": TARGETED_CASE_MANIFEST_SCHEMA_VERSION,
+                "manifest_identity": manifest.manifest_identity,
+                "path": str(manifest_path),
+                "sha256": _sha256_file(manifest_path),
+            }
+            accounting = _validate_current_recovery_package(
+                package, case=case, case_identity=case_identity,
+                manifest_binding=expected_manifest_binding, frozen_runtime=frozen_runtime,
+                parent_entry=parent[case.question_id],
+            )
+        except Exception as exc:
+            error = {
+                "stage": "case_execution" if package is None else "case_package_validation",
+                "category": type(exc).__name__,
+                "stopping_reason": "case_execution_failure" if package is None else "package_validation_failure",
+            }
+        outcome = _batch_case_outcome(case=case, package_path=package_path, package_sha256=package_sha,
+                                      package=package, returned_package_match=returned_match,
+                                      accounting=accounting, error=error)
+        _write_no_overwrite(outcomes_dir / f"{case.question_id}.json", canonical_json_bytes(outcome))
+        processed.append(case.question_id)
+        if outcome["mechanical_status"] in {"mechanical_failure", "failed"}:
+            break
+
+    persisted_outcomes = [_read_bound_json(outcomes_dir / f"{question_id}.json") for question_id in processed]
+    failed = [item for item in persisted_outcomes if item.get("mechanical_status") in {"mechanical_failure", "failed"}]
+    accounting_complete = all(item.get("accounting_status") == "validated" for item in persisted_outcomes)
+    validated_prefix = [item for item in persisted_outcomes if item.get("accounting_status") == "validated"]
+    summary = {
+        "schema_version": TARGETED_RECOVERY_BATCH_SCHEMA_VERSION,
+        "batch_schema_identity": TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY,
+        "status": "completed" if len(processed) == len(TARGETED_CASE_ORDER) and not failed else "failed",
+        "batch_identity": execution_identity,
+        "batch_root": str(batch_root),
+        "manifest_identity": manifest.manifest_identity,
+        "case_order": list(TARGETED_CASE_ORDER),
+        "physically_processed_cases": processed,
+        "mechanically_completed_cases": [item["question_id"] for item in persisted_outcomes if item.get("mechanical_status") == "mechanically_complete"],
+        "bounded_stopped_cases": [item["question_id"] for item in persisted_outcomes if item.get("mechanical_status") == "bounded_stopped"],
+        "failed_cases": [item["question_id"] for item in failed],
+        "first_failed_case": failed[0]["question_id"] if failed else None,
+        "unstarted_cases": list(TARGETED_CASE_ORDER[len(processed):]),
+        "first_failure": {
+            "stage": (failed[0].get("error") or {}).get("stage") if failed else None,
+            "category": (failed[0].get("error") or {}).get("category") if failed else None,
+            "stopping_reason": failed[0].get("stopping_reason") if failed else None,
+        },
+        "accounting_complete": accounting_complete,
+        "fresh_provider_calls": ({
+            key: sum(item["fresh_provider_calls"][key] for item in validated_prefix)
+            for key in ("assessor", "embedding", "reranker", "supplemental_block_a", "generation")
+        } if accounting_complete else "UNKNOWN"),
+        "provider_attempts": ({
+            key: sum(item["provider_attempts"][key] for item in validated_prefix)
+            for key in ("assessor", "generation")
+        } if accounting_complete else "UNKNOWN"),
+        "validated_accounting_prefix": {
+            "case_count": len(validated_prefix),
+            "fresh_provider_calls": {
+                key: sum(item["fresh_provider_calls"][key] for item in validated_prefix)
+                for key in ("assessor", "embedding", "reranker", "supplemental_block_a", "generation")
+            },
+        },
+        "case_outcomes": [str(outcomes_dir / f"{item['question_id']}.json") for item in persisted_outcomes],
+        "semantic_review": "UNKNOWN / REVIEW_REQUIRED",
+    }
+    _write_no_overwrite(batch_root / "targeted_gate_batch_summary.json", canonical_json_bytes(summary))
+    return summary
+
+
 __all__ = [
     "ArtifactBinding",
     "ASSESSOR_ENDPOINT",
     "ASSESSOR_OPERATING_POINT_SCHEMA_VERSION",
     "ASSESSOR_REGION",
     "ASSESSOR_WORKSPACE",
+    "TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY",
+    "TARGETED_RECOVERY_BATCH_SCHEMA_VERSION",
+    "TARGETED_CASE_ORDER",
     "BailianEvidenceAssessor",
     "EvidenceAssessorProviderError",
     "HISTORICAL_QWEN38_EXECUTION_CONFIG_IDENTITY",
@@ -1545,4 +1979,5 @@ __all__ = [
     "persist_targeted_case_manifest",
     "persist_round0_replay",
     "run_targeted_gate_case",
+    "run_targeted_gate_recovery_batch",
 ]

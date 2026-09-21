@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from http.client import RemoteDisconnected
 from pathlib import Path
 import shutil
 import unittest
@@ -618,6 +619,13 @@ class BailianLiveTransportTests(unittest.TestCase):
         with self.assertRaises(BailianTransportError) as caught:
             transport.invoke(self.payload, timeout_seconds=1)
         self.assertEqual((caught.exception.status_code, caught.exception.code), (None, "TransportConnectionError"))
+        transport = BailianOpenAICompatibleTransport(
+            self.config, "test-secret", opener=_FakeOpener([RemoteDisconnected("provider detail must not escape")])
+        )
+        with self.assertRaises(BailianTransportError) as caught:
+            transport.invoke(self.payload, timeout_seconds=1)
+        self.assertEqual((caught.exception.status_code, caught.exception.code), (None, "TransportConnectionError"))
+        self.assertNotIn("provider detail", repr(caught.exception))
 
     def test_malformed_success_is_response_invalid_not_provider_error(self) -> None:
         transport = BailianOpenAICompatibleTransport(self.config, "test-secret", opener=_FakeOpener([_FakeResponse(b"not json")]))

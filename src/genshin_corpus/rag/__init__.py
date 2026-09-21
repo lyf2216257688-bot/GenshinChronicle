@@ -38,6 +38,9 @@ from .semantic_gate import (
     ASSESSOR_OPERATING_POINT_SCHEMA_VERSION,
     ASSESSOR_REGION,
     ASSESSOR_WORKSPACE,
+    TARGETED_CASE_ORDER,
+    TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY,
+    TARGETED_RECOVERY_BATCH_SCHEMA_VERSION,
     ArtifactBinding,
     BailianEvidenceAssessor,
     EvidenceAssessorProviderError,
@@ -57,6 +60,7 @@ from .semantic_gate import (
     persist_targeted_case_manifest,
     persist_round0_replay,
     run_targeted_gate_case,
+    run_targeted_gate_recovery_batch,
 )
 
 __all__ = [
@@ -91,6 +95,9 @@ __all__ = [
     "ASSESSOR_OPERATING_POINT_SCHEMA_VERSION",
     "ASSESSOR_REGION",
     "ASSESSOR_WORKSPACE",
+    "TARGETED_CASE_ORDER",
+    "TARGETED_RECOVERY_BATCH_SCHEMA_IDENTITY",
+    "TARGETED_RECOVERY_BATCH_SCHEMA_VERSION",
     "ArtifactBinding",
     "BailianEvidenceAssessor",
     "EvidenceAssessorProviderError",
@@ -110,4 +117,5 @@ __all__ = [
     "persist_targeted_case_manifest",
     "persist_round0_replay",
     "run_targeted_gate_case",
+    "run_targeted_gate_recovery_batch",
 ]

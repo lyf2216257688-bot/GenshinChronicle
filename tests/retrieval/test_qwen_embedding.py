@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+from http.client import RemoteDisconnected
 from io import BytesIO
 import io
 import json
@@ -605,6 +606,12 @@ class DashScopeQwenEmbeddingTransportTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(QwenEmbeddingTransportError, "TransportConnectionError"):
             network.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
+
+        disconnected = DashScopeQwenEmbeddingTransport(
+            self._config(), "test-secret", opener=_FakeHttpOpener([RemoteDisconnected("provider detail must not escape")])
+        )
+        with self.assertRaisesRegex(QwenEmbeddingTransportError, "TransportConnectionError"):
+            disconnected.embed(QwenEmbeddingRequest(role="query", texts=("查询",)))
 
         unexpected = DashScopeQwenEmbeddingTransport(
             self._config(), "test-secret", opener=_FakeHttpOpener([RuntimeError("local HTTP failure")])

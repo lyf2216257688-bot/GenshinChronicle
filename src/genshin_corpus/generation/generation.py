@@ -20,6 +20,7 @@ import re
 import time
 from pathlib import Path
 from collections.abc import Callable, Mapping
+from http.client import HTTPException
 from typing import Any, Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
@@ -865,6 +866,12 @@ class BailianOpenAICompatibleTransport:
                 retry_after_seconds=_retry_after_seconds(error.headers),
             ) from None
         except URLError as error:
+            raise BailianTransportError(
+                status_code=None,
+                code="TransportConnectionError",
+                message="Bailian transport connection failed",
+            ) from None
+        except (ConnectionError, HTTPException):
             raise BailianTransportError(
                 status_code=None,
                 code="TransportConnectionError",

@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
+from http.client import HTTPException
 from io import BytesIO
 import gzip
 import json
@@ -433,6 +434,8 @@ class DashScopeQwenEmbeddingTransport:
                 provider_request_id=_dashscope_provider_request_id(error.headers, payload) if isinstance(payload, Mapping) else None,
             ) from None
         except URLError:
+            raise QwenEmbeddingTransportError("TransportConnectionError") from None
+        except (ConnectionError, HTTPException):
             raise QwenEmbeddingTransportError("TransportConnectionError") from None
         if response_status != 200:
             try:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -15,6 +16,7 @@ from genshin_corpus.generation.generation import (
     GenerationResult,
     project_generation_request,
 )
+from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.rag.adaptive import (
     AdaptiveContractError,
     AnswerDisposition,
@@ -24,6 +26,7 @@ from genshin_corpus.rag.adaptive import (
     OrchestrationAction,
     bind_evidence_packet,
     run_bounded_adaptive_question,
+    _partial_instruction,
 )
 from genshin_corpus.rag.semantic_gate import (
     ASSESSOR_ENDPOINT,
@@ -36,6 +39,9 @@ from genshin_corpus.rag.semantic_gate import (
     SemanticGateContractError,
     SharedRound0Replay,
     ReusingGenerationProvider,
+    ArtifactBinding,
+    TargetedCaseBinding,
+    TargetedCaseManifest,
     build_targeted_case_manifest,
     _directive_only_request,
     parse_assessment_response,
@@ -144,7 +150,8 @@ class _RealAdaptiveCapability(_Round0Capability):
             })
             result["retrieval_trace"] = {"windows": {"hybrid": [{"unit_id": "u1", "rank": 1}]}}
             result["rerank_trace"] = {"status": "disabled_by_explicit_config"}
-            result["telemetry"] = {"provider_call_counts": {"embedding": 1, "reranker": 0, "generation": 0}}
+            result["telemetry"] = {"provider_call_counts": {"embedding": 1, "reranker": 1, "generation": 0}}
+            result["rerank_trace"] = {"status": "executed_successfully", "runtime_identity": {"model": "frozen-bge"}, "after": [{"unit_id": "u1", "rank": 1}]}
             return result
         packet = self.supplemental_packet
         return {
@@ -158,8 +165,8 @@ class _RealAdaptiveCapability(_Round0Capability):
                 "embedding": {"request_identity": "embedding-round-1"},
             },
             "retrieval_trace": {"windows": {"hybrid": [{"unit_id": "u2", "rank": 1}]}},
-            "rerank_trace": {"status": "disabled_by_explicit_config"},
-            "telemetry": {"provider_call_counts": {"embedding": 1, "reranker": 0, "generation": 0}},
+            "rerank_trace": {"status": "executed_successfully", "runtime_identity": {"model": "frozen-bge"}, "after": [{"unit_id": "u2", "rank": 1}]},
+            "telemetry": {"provider_call_counts": {"embedding": 1, "reranker": 1, "generation": 0}},
             "evidence_packet": packet,
         }
 
@@ -249,6 +256,178 @@ class _GenerationSuccessDelegate:
 
 
 class SemanticGateTests(unittest.TestCase):
+    def _synthetic_gate_manifest(self):
+        cases = tuple(
+            TargetedCaseBinding(
+                question_id=question_id,
+                question=f"Question {question_id}",
+                question_identity=sha256_json({"question_id": question_id, "question": f"Question {question_id}"}),
+                historical_role="test",
+                classification="control_only",
+                source_artifacts=(), packet_artifacts=(), packet_source_identities=(),
+                primary_packet_path="test/packet.json",
+                source_identity_count=0, source_identity_sha256=sha256_json([]),
+            )
+            for question_id in ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")
+        )
+        return TargetedCaseManifest(cases, ArtifactBinding("runtime.json", "0" * 64, "runtime"))
+
+    def _valid_current_package(self, case, *, run_identity="batch-q011", status="succeeded", stopping_reason="answer_generated"):
+        lineage = {"parent_root": "parent", "round0_descriptor": {"execution_identity": "parent-adaptive"}, "round0_result": {"path": "parent/block.json", "sha256": "c" * 64}, "packet": {"path": "parent/packet.json", "sha256": "d" * 64}, "baseline": {"path": "parent/baseline.json", "sha256": "a" * 64}}
+        manifest_binding = {"schema_version": "phase04-targeted-case-manifest-0.1", "manifest_identity": "b" * 64, "path": "manifest.json", "sha256": "b" * 64}
+        runtime = {"frozen": True, "assessor": {"model_id": "qwen3.8-max", "model_reference_policy": "requested_alias", "prompt_identity": "p", "schema_version": "phase04-evidence-assessor-prompt-0.3", "execution_config_identity": "e"}}
+        package = {
+            "schema_version": "phase04-targeted-semantic-gate-0.2",
+            "case": case.to_dict(), "run_identity": run_identity,
+            "manifest_binding": manifest_binding, "frozen_runtime": runtime,
+            "parent_lineage": lineage,
+            "assessor_binding": {"model_id": "qwen3.8-max", "model_reference_policy": "requested_alias", "prompt_identity": "p", "prompt_version": "0.3", "prompt_schema_version": "phase04-evidence-assessor-prompt-0.3", "execution_config_identity": "e"},
+            "round0": {"schema_version": "phase04-shared-round0-recovery-import-0.1", "parent_lineage": lineage, "question": case.question, "execution_identity": "parent-adaptive", "adaptive_execution_identity": f"{run_identity}-adaptive", "round0_request_identity": f"{run_identity}-adaptive.round0", "artifacts": {"block_a_result": lineage["round0_result"], "evidence_packet": lineage["packet"]}},
+            "baseline": {"artifact": {"path": "parent/baseline.json", "sha256": "a" * 64, "reused_parent_occurrence": True}, "semantic_request_identity": "baseline"},
+            "adaptive": {"status": status, "stopping_reason": stopping_reason, "error": None, "call_counts": {"assessment": 1, "embedding": 0, "reranker": 0, "generation": 1}, "rounds": [{"round_index": 0}]},
+            "provider_calls": {
+                "assessor": 1, "assessor_attempts": [{"attempt_count": 1}],
+                "generation_occurrences": {
+                    "baseline": {"reused_parent_occurrence": True, "current_run_provider_network_calls": 0, "semantic_request_identity": "baseline"},
+                    "adaptive": [{"reused": True, "provider_network_call": False, "attempt_count": 0, "semantic_request_identity": "baseline"}],
+                    "directive_only_round0": [],
+                },
+            },
+        }
+        return package, manifest_binding, runtime, {"lineage": lineage, "round0_descriptor": {"execution_identity": "parent-adaptive"}}
+
+    def test_current_recovery_package_validator_binds_identity_reuse_and_integer_accounting(self):
+        import copy
+        import genshin_corpus.rag.semantic_gate as gate
+        case = self._synthetic_gate_manifest().cases[0]
+        package, manifest_binding, runtime, parent = self._valid_current_package(case)
+        accounting = gate._validate_current_recovery_package(package, case=case, case_identity="batch-q011", manifest_binding=manifest_binding, frozen_runtime=runtime, parent_entry=parent)
+        self.assertEqual(accounting, {"assessor": 1, "embedding": 0, "reranker": 0, "supplemental_block_a": 0, "generation": 0, "assessor_attempts": 1, "generation_attempts": 0})
+        mutations = (
+            ("schema", lambda value: value.update(schema_version="wrong")),
+            ("case", lambda value: value.update(case={})),
+            ("run", lambda value: value.update(run_identity="wrong")),
+            ("manifest", lambda value: value.update(manifest_binding={})),
+            ("collapsed_round_identity", lambda value: value["round0"].update(execution_identity="batch-q011-adaptive")),
+            ("wrong_adaptive_identity", lambda value: value["round0"].update(adaptive_execution_identity="parent-adaptive")),
+            ("round0_artifact_tamper", lambda value: value["round0"]["artifacts"].update(block_a_result={"path": "tampered", "sha256": "f" * 64})),
+            ("baseline_lineage_tamper", lambda value: value["baseline"]["artifact"].update(sha256="f" * 64)),
+            ("baseline_bool_calls", lambda value: value["provider_calls"]["generation_occurrences"]["baseline"].update(current_run_provider_network_calls=False)),
+            ("provider_calls", lambda value: value.pop("provider_calls")),
+            ("embedding_unknown", lambda value: value["adaptive"]["call_counts"].update(embedding="UNKNOWN")),
+            ("reranker_bool", lambda value: value["adaptive"]["call_counts"].update(reranker=False)),
+            ("assessor_unknown", lambda value: value["provider_calls"].update(assessor="UNKNOWN")),
+            ("assessment_disagreement", lambda value: value["adaptive"]["call_counts"].update(assessment=2)),
+            ("fake_adaptive_assessor_key", lambda value: (value["adaptive"]["call_counts"].pop("assessment"), value["adaptive"]["call_counts"].update(assessor=1))),
+            ("assessor_disagreement", lambda value: value["provider_calls"].update(assessor=2)),
+            ("attempt_disagreement", lambda value: value["provider_calls"].update(assessor_attempts=[{"attempt_count": 2}])),
+            ("generation_missing", lambda value: value["provider_calls"]["generation_occurrences"].pop("adaptive")),
+            ("fresh_zero_attempts", lambda value: value["provider_calls"]["generation_occurrences"]["adaptive"][0].update(reused=False, provider_network_call=True, attempt_count=0)),
+            ("duplicate_adaptive", lambda value: value["provider_calls"]["generation_occurrences"].update(adaptive=[value["provider_calls"]["generation_occurrences"]["adaptive"][0], value["provider_calls"]["generation_occurrences"]["adaptive"][0]])),
+            ("too_many_directive", lambda value: value["provider_calls"]["generation_occurrences"].update(directive_only_round0=[value["provider_calls"]["generation_occurrences"]["adaptive"][0], value["provider_calls"]["generation_occurrences"]["adaptive"][0]])),
+            ("ledger_overlap", lambda value: value["provider_calls"]["generation_occurrences"].update(directive_only_round0=[value["provider_calls"]["generation_occurrences"]["adaptive"][0]])),
+            ("generation_count_mismatch", lambda value: value["adaptive"]["call_counts"].update(generation=0)),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label):
+                changed = copy.deepcopy(package)
+                mutate(changed)
+                with self.assertRaises(SemanticGateContractError):
+                    gate._validate_current_recovery_package(changed, case=case, case_identity="batch-q011", manifest_binding=manifest_binding, frozen_runtime=runtime, parent_entry=parent)
+
+    def test_recovery_batch_stops_after_first_failed_case_and_records_unstarted_suffix(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        manifest = self._synthetic_gate_manifest()
+        invoked = []
+
+        def executor(case, **kwargs):
+            invoked.append(case.question_id)
+            package = {"adaptive": {"status": "failed", "stopping_reason": "assessment_provider_failure", "error": {"stage": "assessment", "category": "RemoteDisconnected"}, "call_counts": {}, "rounds": []}, "provider_calls": {"assessor": 0, "assessor_attempts": [], "generation_occurrences": {"baseline": {"reused_parent_occurrence": True, "current_run_provider_network_calls": 0}, "adaptive": [], "directive_only_round0": []}}}
+            path = Path(kwargs["output_root"]) / kwargs["execution_identity"] / "targeted_gate_review_package.json"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(canonical_json_bytes(package))
+            return package
+
+        accounting = {"assessor": 1, "embedding": 0, "reranker": 0, "supplemental_block_a": 0, "generation": 0, "assessor_attempts": 1, "generation_attempts": 0}
+        with tempfile.TemporaryDirectory() as root, patch.object(gate, "build_targeted_case_manifest", return_value=manifest), patch.object(gate, "_validate_frozen_runtime_bindings", return_value={"frozen": True}), patch.object(gate, "load_parent_targeted_gate", return_value={qid: {"lineage": {}} for qid in ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")}), patch.object(gate, "run_targeted_gate_case", side_effect=executor), patch.object(gate, "_validate_current_recovery_package", return_value=accounting):
+            summary = gate.run_targeted_gate_recovery_batch(repo_root=Path("."), parent_root=Path("synthetic-parent"), block_a=object(), assessor=object(), generation_provider=object(), execution_identity="batch-failed", output_root=Path(root))
+        self.assertEqual(invoked, ["Q011"])
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["first_failed_case"], "Q011")
+        self.assertEqual(summary["first_failure"], {"stage": "assessment", "category": "RemoteDisconnected", "stopping_reason": "assessment_provider_failure"})
+        self.assertTrue(summary["accounting_complete"])
+        self.assertEqual(summary["fresh_provider_calls"]["assessor"], 1)
+        self.assertEqual(summary["unstarted_cases"], ["Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068"])
+
+    def test_recovery_batch_bounded_stop_continues_and_all_valid_completes(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        manifest = self._synthetic_gate_manifest()
+        invoked = []
+
+        def executor(case, **kwargs):
+            invoked.append(case.question_id)
+            status, reason = ("stopped", "no_new_occurrence") if case.question_id == "Q011" else ("succeeded", "answer_generated")
+            package, _, _, _ = self._valid_current_package(case, run_identity=kwargs["execution_identity"], status=status, stopping_reason=reason)
+            manifest_path = Path(kwargs["manifest_path"])
+            package["manifest_binding"] = {"schema_version": "phase04-targeted-case-manifest-0.1", "manifest_identity": manifest.manifest_identity, "path": str(manifest_path), "sha256": sha256(manifest_path.read_bytes()).hexdigest()}
+            package["frozen_runtime"] = {"frozen": True}
+            package["parent_lineage"] = {}
+            package["round0"]["parent_lineage"] = {}
+            path = Path(kwargs["output_root"]) / kwargs["execution_identity"] / "targeted_gate_review_package.json"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(canonical_json_bytes(package))
+            return package
+
+        parents = {qid: {"lineage": {}} for qid in ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")}
+        accounting = {"assessor": 1, "embedding": 0, "reranker": 0, "supplemental_block_a": 0, "generation": 0, "assessor_attempts": 1, "generation_attempts": 0}
+        with tempfile.TemporaryDirectory() as root, patch.object(gate, "build_targeted_case_manifest", return_value=manifest), patch.object(gate, "_validate_frozen_runtime_bindings", return_value={"frozen": True}), patch.object(gate, "load_parent_targeted_gate", return_value=parents), patch.object(gate, "run_targeted_gate_case", side_effect=executor), patch.object(gate, "_validate_current_recovery_package", return_value=accounting):
+            summary = gate.run_targeted_gate_recovery_batch(repo_root=Path("."), parent_root=Path("synthetic-parent"), block_a=object(), assessor=object(), generation_provider=object(), execution_identity="batch-stopped", output_root=Path(root))
+        self.assertEqual(len(invoked), 9)
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(summary["bounded_stopped_cases"], ["Q011"])
+
+    def test_recovery_batch_classifies_persisted_package_and_unknown_status_fails_closed(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        manifest = self._synthetic_gate_manifest()
+        invoked = []
+
+        def executor(case, **kwargs):
+            invoked.append(case.question_id)
+            returned = {"adaptive": {"status": "succeeded", "stopping_reason": "answer_generated", "call_counts": {}, "rounds": []}, "provider_calls": {"assessor": 0, "assessor_attempts": [], "generation_occurrences": {"adaptive": [], "directive_only_round0": []}}}
+            persisted = dict(returned)
+            persisted["adaptive"] = {**persisted["adaptive"], "status": "mystery"}
+            path = Path(kwargs["output_root"]) / kwargs["execution_identity"] / "targeted_gate_review_package.json"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(canonical_json_bytes(persisted))
+            return returned
+
+        parents = {qid: {"lineage": {}} for qid in ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")}
+        with tempfile.TemporaryDirectory() as root, patch.object(gate, "build_targeted_case_manifest", return_value=manifest), patch.object(gate, "_validate_frozen_runtime_bindings", return_value={"frozen": True}), patch.object(gate, "load_parent_targeted_gate", return_value=parents), patch.object(gate, "run_targeted_gate_case", side_effect=executor):
+            summary = gate.run_targeted_gate_recovery_batch(repo_root=Path("."), parent_root=Path("synthetic-parent"), block_a=object(), assessor=object(), generation_provider=object(), execution_identity="batch-unknown", output_root=Path(root))
+        self.assertEqual(invoked, ["Q011"])
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["first_failed_case"], "Q011")
+        self.assertFalse(summary["accounting_complete"])
+        self.assertEqual(summary["fresh_provider_calls"], "UNKNOWN")
+        self.assertEqual(summary["provider_attempts"], "UNKNOWN")
+
+    def test_recovery_batch_executor_exception_has_deterministic_failure_record(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        manifest = self._synthetic_gate_manifest()
+        def executor(case, **kwargs):
+            raise RuntimeError("must not be persisted")
+        parents = {qid: {"lineage": {}} for qid in ("Q011", "Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068")}
+        with tempfile.TemporaryDirectory() as root, patch.object(gate, "build_targeted_case_manifest", return_value=manifest), patch.object(gate, "_validate_frozen_runtime_bindings", return_value={"frozen": True}), patch.object(gate, "load_parent_targeted_gate", return_value=parents), patch.object(gate, "run_targeted_gate_case", side_effect=executor):
+            summary = gate.run_targeted_gate_recovery_batch(repo_root=Path("."), parent_root=Path("synthetic-parent"), block_a=object(), assessor=object(), generation_provider=object(), execution_identity="batch-exception", output_root=Path(root))
+        self.assertEqual(summary["first_failure"], {"stage": "case_execution", "category": "RuntimeError", "stopping_reason": "case_execution_failure"})
+        self.assertEqual(summary["unstarted_cases"], ["Q015", "Q045", "Q049", "Q050", "Q052", "Q056", "Q058", "Q068"])
+        self.assertFalse(summary["accounting_complete"])
+        self.assertEqual(summary["fresh_provider_calls"], "UNKNOWN")
+
+    def test_recovery_batch_public_api_has_no_executor_injection_hook(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        self.assertNotIn("case_executor", inspect.signature(gate.run_targeted_gate_recovery_batch).parameters)
+
     def test_targeted_manifest_validates_exact_nine_cases_and_corrected_q056_binding(self):
         manifest = build_targeted_case_manifest(Path("."))
         self.assertEqual({case.question_id for case in manifest.cases}, {
@@ -528,6 +707,11 @@ class SemanticGateTests(unittest.TestCase):
         self.assertEqual(delegate.rounds, [0])
         self.assertEqual(len(assessor.requests), 1)
         self.assertEqual(len(generation.requests), 1)
+        self.assertEqual(result["call_counts"]["embedding"], 0)
+        self.assertEqual(result["call_counts"]["reranker"], 0)
+        telemetry = replay.backend_result["telemetry"]
+        self.assertEqual(telemetry["provider_call_counts"]["embedding"], 0)
+        self.assertEqual(telemetry["historical_source_telemetry"]["provider_call_counts"]["embedding"], 1)
 
     def test_real_adaptive_kernel_supplement_only_delegates_round1(self):
         delegate = _RealAdaptiveCapability()
@@ -541,6 +725,32 @@ class SemanticGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "succeeded")
         self.assertEqual(delegate.rounds, [0, 1])
         self.assertEqual([request.round_index for request in assessor.requests], [0, 1])
+        self.assertEqual(result["call_counts"]["embedding"], 1)
+        self.assertEqual(result["call_counts"]["reranker"], 1)
+
+    def test_assessor_unexpected_transport_exception_is_audited_without_response_artifact(self):
+        class _UnexpectedTransport:
+            def invoke(self, payload, *, timeout_seconds):
+                raise RuntimeError("secret provider detail")
+
+        config = BailianControlConfig(
+            region=ASSESSOR_REGION, endpoint=ASSESSOR_ENDPOINT, workspace=ASSESSOR_WORKSPACE,
+            model_id=ASSESSOR_MODEL_ID, model_reference_policy=REQUESTED_ALIAS_POLICY,
+            enable_thinking=True, thinking_budget=4096, max_output_tokens=2048, max_attempts=1,
+        )
+        with tempfile.TemporaryDirectory() as temp_root:
+            assessor = BailianEvidenceAssessor(config, _UnexpectedTransport())
+            assessor.bind_response_artifact_root(Path(temp_root))
+            with self.assertRaises(EvidenceAssessorProviderError):
+                assessor.assess(_assessment_request())
+            self.assertEqual(assessor.provider_network_calls, 1)
+            self.assertEqual(len(assessor.audit_history), 1)
+            audit = assessor.last_audit
+            self.assertEqual(audit["status"], "provider_error")
+            self.assertIsNone(audit["response_evidence"])
+            self.assertEqual(audit["provider_error"]["code"], "UnexpectedTransportError")
+            self.assertFalse(list(Path(temp_root).glob("response-*.json")))
+            self.assertNotIn("secret provider detail", json.dumps(audit))
 
     def test_replay_rejects_wrong_round_identity(self):
         delegate = _Round0Capability()
@@ -644,6 +854,31 @@ class SemanticGateTests(unittest.TestCase):
                 package["provider_calls"]["generation_occurrences"]["baseline"]["current_run_provider_network_calls"],
                 0,
             )
+
+    def test_real_case_producer_package_passes_current_recovery_validator(self):
+        import genshin_corpus.rag.semantic_gate as gate
+        manifest = build_targeted_case_manifest(Path("."))
+        case = manifest.cases[0]
+        delegate = _RealAdaptiveCapability()
+        source = delegate.run_round(query=case.question, round_index=0, request_identity="parent-adaptive")
+        packet = source["evidence_packet"]
+        baseline_request = project_generation_request(packet, question=case.question, question_id=case.question_id)
+        baseline = GenerationResult("succeeded", "answer [E01]", CitationValidation(("E01",), "pass", "pass", ()), baseline_request.semantic_request_identity, "generation-config", baseline_request.audit_projection(), {"attempts": []})
+        lineage = {"parent_root": "immutable-parent", "parent_run_identity": "parent", "manifest_identity": manifest.manifest_identity, "preflight": {"path": "parent/preflight.json", "sha256": "1" * 64}, "review_package": {"path": "parent/package.json", "sha256": "2" * 64}, "round0_result": {"path": "parent/block_a_result.json", "sha256": "3" * 64}, "packet": {"path": "parent/evidence_packet.json", "sha256": "4" * 64}, "baseline": {"path": "parent/generation_result.json", "sha256": "5" * 64}}
+        parent = {case.question_id: {"case": case, "source": source, "packet": packet, "baseline": baseline, "round0_descriptor": {"execution_identity": "parent-adaptive"}, "lineage": lineage}}
+        config = BailianControlConfig(region=ASSESSOR_REGION, endpoint=ASSESSOR_ENDPOINT, workspace=ASSESSOR_WORKSPACE, model_id=ASSESSOR_MODEL_ID, model_reference_policy=REQUESTED_ALIAS_POLICY, enable_thinking=True, thinking_budget=4096, max_output_tokens=2048, max_attempts=1)
+        assessor = BailianEvidenceAssessor(config, _AssessorTransport())
+        runtime = {"block_a": {"test": "block-a"}, "assessor": {"model_id": ASSESSOR_MODEL_ID, "model_reference_policy": REQUESTED_ALIAS_POLICY, "prompt_identity": assessor.prompt_identity, "schema_version": "phase04-evidence-assessor-prompt-0.3", "execution_config_identity": assessor.execution_config_identity}, "generation": {"test": "generation"}}
+        with tempfile.TemporaryDirectory() as temp_root:
+            temp = Path(temp_root)
+            manifest_path = temp / "targeted_case_manifest.json"
+            persist_targeted_case_manifest(manifest, manifest_path)
+            with patch.object(gate, "_validate_frozen_runtime_bindings", return_value=runtime), patch.object(gate, "load_parent_targeted_gate", return_value=parent):
+                package = run_targeted_gate_case(case, repo_root=Path("."), manifest_path=manifest_path, block_a=delegate, assessor=assessor, generation_provider=_GenerationDelegate(), execution_identity="producer-case", output_root=temp / "runs", parent_root=Path("immutable-parent"))
+            persisted = json.loads((temp / "runs" / "producer-case" / "targeted_gate_review_package.json").read_text(encoding="utf-8"))
+            self.assertEqual(package, persisted)
+            accounting = gate._validate_current_recovery_package(persisted, case=case, case_identity="producer-case", manifest_binding=persisted["manifest_binding"], frozen_runtime=runtime, parent_entry=parent[case.question_id])
+            self.assertEqual(accounting["assessor"], 1)
 
     def test_live_seam_requires_persisted_validated_manifest_before_block_a(self):
         from genshin_corpus.rag.semantic_gate import run_targeted_gate_case
@@ -793,6 +1028,27 @@ class SemanticGateTests(unittest.TestCase):
         actual = provider.generate(request)
         self.assertIs(actual, cached)
         self.assertEqual(reused, [request.semantic_request_identity])
+
+    def test_generation_occurrence_attribution_slices_adaptive_and_directive_ledgers(self):
+        baseline = project_generation_request(_packet(), question="What happened?", question_id="QTEST")
+        directive = project_generation_request(_packet(), question="What happened?", question_id="QTEST", instruction=_partial_instruction(EvidenceAssessmentResult(
+            assessment_request_identity="a" * 64, condition=EvidenceCondition.INCOMPLETE,
+            action=OrchestrationAction.ANSWER_NOW, answer_disposition=AnswerDisposition.BOUNDED_PARTIAL,
+            supported_scope=("supported",), unresolved_aspects=("unknown",), missing_information=("gap",), conflicts=(), supplemental_query=None,
+        )), answer_scope=None)
+        cached = GenerationResult("succeeded", "answer [E01]", CitationValidation(("E01",), "pass", "pass", ()), baseline.semantic_request_identity, "cfg", baseline.audit_projection(), {"attempts": []})
+        provider = ReusingGenerationProvider(_GenerationSuccessDelegate(), {baseline.semantic_request_identity: cached}, [])
+        provider.generate(baseline)
+        adaptive_audits = list(provider.call_audit)
+        provider.generate(directive)
+        directive_audits = list(provider.call_audit[len(adaptive_audits):])
+        self.assertEqual(len(adaptive_audits), 1)
+        self.assertEqual(len(directive_audits), 1)
+        self.assertIsNot(adaptive_audits[0], directive_audits[0])
+        self.assertEqual(adaptive_audits[0]["provider_network_call"], False)
+        self.assertEqual(adaptive_audits[0]["attempt_count"], 0)
+        self.assertEqual(directive_audits[0]["provider_network_call"], True)
+        self.assertEqual(sum(item["provider_network_call"] is True for item in adaptive_audits + directive_audits), 1)
 
     def test_directive_only_round0_request_preserves_bounded_directive(self):
         baseline = project_generation_request(_packet(), question="What happened?", question_id="QTEST")
