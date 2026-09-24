@@ -62,6 +62,21 @@ remain distinct: top-k candidates are not automatically final RAG context.
 Evidence Packets are provider-neutral, deterministic evidence interfaces;
 Generation consumes them without owning retrieval or assembly policy.
 
+### 5. Phase 05 Semantic Navigation Derivatives
+Phase 05 adds a rebuildable, source-bound semantic build lineage over
+Canonical-first inputs and verified Retrieval Unit locators. It produces two
+distinct non-authoritative views: a cross-record hierarchy for coarse-to-fine
+navigation and an event/relation graph for bounded lateral traversal. Source
+binding and semantic acceptance are separate states; binding to an RU or
+Canonical lineage does not prove semantic interpretation. Rejected,
+unsupported, ambiguous, or unaccepted items remain auditable and inactive.
+
+Phase 05 navigation may resolve candidates only through official Retrieval
+Units. Retrieval owns the deterministic candidate/admission primitive feeding
+the unchanged Formal Deferred Assembly; `rag/` owns online decisions and route
+lineage. The final Evidence Packet remains the only citation authority, and
+Generation does not consume semantic navigation traces.
+
 RAG answers are query results. They must not automatically become Canonical facts.
 
 ## Cross-layer invariants
@@ -109,3 +124,9 @@ contracts. Its current production/default configuration and authorization are
 owned by `docs/current-phase.md`; this architecture document does not select a
 permanent model, retrieval winner, provider, reranker, or serving
 infrastructure.
+
+Phase 05 does not alter the accepted Phase 04 Block A retrieval/ranking
+behavior, Evidence Packet authority, or Generation-visible request contract.
+Its provider-free first work unit proves only semantic-build/view and bounded
+navigation mechanics; it does not prove semantic extraction quality or answer
+improvement.

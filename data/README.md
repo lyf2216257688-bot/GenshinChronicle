@@ -35,11 +35,14 @@ tools.
 ## Retrieval and RAG artifacts
 
 `data/retrieval/` is an ignored local destination for authorized, rebuildable
-Phase 04 derivatives: Retrieval Unit builds, lexical/Dense indexes and row
-mappings, deterministic candidate and Evidence Packet materialization, and
-their manifests, ledgers, and provenance. It can hold the local production
-materialization baseline, but is not a serving-system, vector-database, or
-permanent source-of-truth contract.
+Phase 04 and Phase 05 derivatives: Retrieval Unit builds, lexical/Dense indexes
+and row mappings, source-bound semantic builds and distinct hierarchy/graph
+views, deterministic candidate and Evidence Packet materialization, and their
+manifests, ledgers, and provenance. Phase 05 semantic artifacts are navigation
+derivatives, not evidence authority; final citation authority remains the
+Evidence Packet resolved to official Retrieval Units and Canonical lineage.
+The root can hold the local production materialization baseline, but is not a
+serving-system, vector-database, or permanent source-of-truth contract.
 
 Experiment-specific, review-only, provider, or challenger evidence that is
 kept under `.local/` remains outside this data-root contract and must not be

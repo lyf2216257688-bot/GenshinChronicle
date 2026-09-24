@@ -7,10 +7,125 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
-**Phase 04 - First End-to-End RAG (post-W7 direction reset).** The first
-end-to-end baseline is implemented, materialized, and measured. Phase 01 Raw,
-Phase 02 Parsed, and Phase 03 Canonical are closed; the production corpus scope
-remains `zh-cn` MiHoYo OBC.
+**Phase 05 - Source-Bound Semantic Navigation (P05-W2 B JSON-object local
+contract canaries PASS; B v2 SDK three-model comparison stopped under its
+per-model gates after six requests; semantic quality not PASS; P05-W2-U1 and
+P05-W1 mechanical contracts PASS).** Phase 04 established
+the first complete end-to-end RAG baseline. Phase 01 Raw, Phase 02 Parsed,
+Phase 03 Canonical, and Phase 04 Block A are closed at their accepted
+boundaries; the production corpus scope remains `zh-cn` MiHoYo OBC.
+
+P05-W1 implementation is MECHANICAL CONTRACT PASS, with actual-review
+corrections applied for baseline-overlap navigation progress, admission/Packet
+visibility, hierarchy hop/node/edge/candidate bounds and route audit evidence,
+and deterministic build
+identity. Its checked-in
+fixture is a provider-free contract fixture, not a real Genshin story slice;
+real-story-slice acceptance remains OPEN. The approved P05-W2-U1 provider-free
+projection, source-unit profiling, bounded sample, semantic-output envelope,
+and identity/accounting contract is COMPLETE. The corrected immutable artifact
+root is `data/retrieval/p05-w2-u1-provider-free-20260922-r5` (semantic build
+identity `45520b23490a1c66289476c71dbe55c38cd206167342ebeb5894721055c59677`);
+the prior r3 root remains historical review evidence. The r5 build verifies the
+accepted 16,437-record Canonical run and accepted RU build with zero
+provider/API/network calls, an overlapping 42/30/18 bounded sample with 14
+high-risk and 4 matched-control challenger units, and all selected units
+resolved to RU bindings across every source segment. Its provider-facing
+projection is 436,490,276 bytes / 347,552,660 chars versus r3's
+476,617,877 bytes / 358,319,201 chars after removing duplicated rich-text
+lexical segment text while retaining structural paths and character counts.
+This is projection and cost-accounting evidence only; it does not claim
+semantic extraction quality. The implementation adds
+source-bound semantic-build identities, separate source-binding and semantic-
+acceptance states, inactive rejection accounting, distinct hierarchy and graph
+views, bounded navigation, and official-RU candidate resolution. It changes no
+Block A parameter, Evidence Packet authority, Generation-visible contract, or
+production/default selector.
+
+The first bounded Semantic Compiler comparison is provider-free preflight
+READY at `data/retrieval/p05-w2-live-preflight-20260923-r2`, identity
+`8601fb2e665fd5f1bc1b7a9ef35a871269e3ea00f0b9a23654656a0bb3838da0`.
+It derives from accepted U1 r5 through the deterministic r7 sample correction,
+which preserves semantic build identity while replacing two unsuitable
+aggregated controls and two oversized units before any provider result. The
+frozen paid set is exactly 30 Gemini units and an 18-unit DeepSeek subset with
+14 high-risk and 4 matched controls; all units are RU-bound and none is
+oversized or partial. The immutable preflight itself records zero provider/API/
+network/model activity. The
+first formal Gemini A, Gemini B, and DeepSeek canaries each executed exactly
+one attempt under `data/retrieval/p05-w2-live-canary-20260923-r1`; all three
+failed at the transport layer before schema/parser/source-binding validation.
+No automatic retry or fallback occurred, and the failed attempts and raw
+responses remain immutable evidence. These failures are not semantic-quality
+evidence. Token usage, charge, and billable status remain `UNKNOWN` for all
+three channels.
+
+The original strict JSON-Schema experiment is retained as immutable historical
+alternative A. Its frozen identities, formal ordinal-0 attempts, accounting,
+and raw evidence are not rewritten; no further A investment is current. The
+original provider-neutral B local-contract revision is
+`phase05-w2-b-json-object-0.1`, experiment identity
+`44a410016feec821f5ab80f40509deb94bb956f9d12331ad076e8c26227dc161`.
+Its prompt identity is
+`6e5f4140318937fff598c9d8a509891e95519883cd31779e855c70c2b2041a6d`,
+request-contract identity is
+`b802b77d802178525077af5ccd8250bbf88dc70b9e9bf27f5bba96e423993f2d`,
+and authoritative semantic-output schema identity remains
+`9848b1e07c09b64156497dddc7a1a244f6dd9d7c3d5455c8c0dd0fae380cf312`.
+B uses non-streaming OpenAI-compatible Chat Completions with
+`response_format.type=json_object`; it sends no strict `json_schema` and treats
+provider JSON mode only as output assistance. Correctness authority is the
+fail-closed local chain: durable raw response, assistant-content extraction,
+whole-content strict JSON parse, authoritative schema validation, and exact
+segment/source binding. Failed extraction, parse, schema, or binding retains
+raw evidence and can be replayed provider-free. `accepted_for_local_contract`
+means only that these mechanical gates passed; semantic correctness, curated
+acceptance, production Navi/KG eligibility, and Phase 05 adoption remain
+unassessed or blocked.
+
+B request/config identity remains separate from endpoint, provider, model,
+frozen semantic input/build, unit, and attempt identities. Runtime base URL,
+model, and credentials continue through the existing adapter/config boundary;
+credentials are excluded from artifacts and hashes. The local B zero-network
+preflight covers request serialization, synthetic response persistence, strict
+validation, terminal accounting semantics, and deterministic offline replay
+with zero formal attempts, provider calls, and network calls. The first
+TokenMetro Gemini B attempt at
+`data/retrieval/p05-w2-b-tokenmetro-gemini-canary-20260924-r1` consumed frozen
+Gemini ordinal 14 and stopped at HTTP 401 under the earlier key. The separately
+authorized one-shot r2 at
+`data/retrieval/p05-w2-b-tokenmetro-gemini-canary-20260924-r2` consumed the
+previously unattempted, fully RU-bound matched-control ordinal 16. It returned
+HTTP 200 and passed strict JSON parse, authoritative output schema, and
+source/segment binding; its terminal disposition is
+`accepted_for_local_contract`, reproduced by provider-free replay. The r2
+zero-network preflight is at
+`.local/p05-w2-b-tokenmetro-gemini-preflight-20260924-r2` and reports zero
+provider/network calls and zero formal attempts. The r2 formal run issued one
+provider request with no retry; its input/output usage is 1003/1099 tokens.
+These are mechanical contract results only. The three original strict-schema
+canary attempts and the B r1/r2 attempts remain immutable, separately counted
+evidence. A later bounded quality review froze Gemini ordinals 20, 21, and 6
+before new provider output, then issued one TokenMetro B request each for
+ordinals 20 and 21 under distinct immutable roots
+`data/retrieval/p05-w2-b-tokenmetro-gemini-quality-20260924-r1` and `-r2`.
+Both returned HTTP 200 and passed local JSON, schema, and binding gates with
+provider-free replay. Offline source review found material omission of the
+log's central event reversals in ordinal 20, and the investigator's tentative
+water-ecology relationships in ordinal 21; broad item/coverage bindings hid
+those gaps. The repeated extraction-granularity problem triggered the approved
+early stop. Ordinal 6 remains frozen but unattempted; no third call occurred.
+These mechanical passes do not establish semantic quality or production/default
+adoption.
+
+The valid targeted 9Q evidence is now current authority: mechanical execution
+PASS, `0/9` materially improved final answers, and Block B v0.1 production/
+default adoption remains blocked. Q045 is a navigation/action-selection
+failure candidate; Q015/Q050 are supplemental-admission/final-Packet-visibility
+failures; Q058 is an evidence-sufficient Generation failure. P05-W1 does not
+claim to repair Q058 or prove semantic extraction quality.
+
+### Historical Phase 04 checkpoint (retained for provenance)
 
 **Current engineering state: P04 Block A Retrieval/Ranking - CLOSED /
 FROZEN / ADOPTED.** Diagnostic C field-aware lexical retrieval and the local
@@ -392,6 +507,114 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
+**Phase 05 P05-W1 and P05-W2-U1 mechanical gates are PASS; the provider-free
+bounded live preflight is READY; B JSON-object implementation and three
+TokenMetro Gemini formal local-contract canaries are mechanically PASS. B v2
+prompt/contract provider-free validation is PASS; bounded semantic quality is
+not PASS. Prior formal attempts remain immutable.**
+The accepted mechanical scope is
+provider-free semantic-build/view materialization, source-binding and explicit
+fixture acceptance separation, rejection inactivity, bounded navigation,
+official-RU candidate resolution, Packet visibility, persistence/recovery, and
+unchanged Generation integration. Offline review of the two additional
+accepted-for-local-contract outputs exposed repeated omission of important
+navigational relationships despite complete mechanical segment coverage.
+No automatic semantic assertion correctness, corpus-scale hierarchy/graph quality, answer
+improvement, Q058 repair, production/default adoption, or real-story-slice
+acceptance is claimed.
+
+Block A remains CLOSED / FROZEN / ADOPTED with the accepted Diagnostic C,
+Qwen Dense, local BGE reranker, rank fusion, final20, Formal Deferred, and
+Generation chain unchanged. Navigation is opt-in and provider-neutral; a
+sufficient round-0 Packet answers through the existing path. A selected or
+required navigation failure is explicit and may only use an existing legal
+bounded-partial or stop disposition; it cannot become an unqualified full
+answer. No full-corpus semantic generation, 9Q/70Q rerun, model download, or
+new paid work is implied by this status. The original and subsequent B canary
+attempts are consumed and remain counted; Terra/Grok, retry, fallback,
+automatic escalation, and broader sample execution were outside those
+completed one-shot operating points.
+
+The provider-neutral B v2 prompt revision passed provider-free contract review
+and is frozen at
+`phase05-w2-b-json-object-prompt-0.2`, identity
+`25ebc483c5dfcfe9b3dc8ddd01001f75e98ff4c2b5327aa789a3af84a068003e`;
+its experiment revision is `phase05-w2-b-json-object-0.2`, identity
+`50f7219556771d8698bc5f85f464bd58d2bdd84c5bbea748178ad45db7255e98`.
+It requires material event turns and explicit relations, local item references,
+attribution/uncertainty/negation, and narrow segment binding. The B output
+schema and JSON-object request contract retain their identities. Provider-free
+review of immutable ordinal 16/20/21 inputs, focused tests, and offline
+Gemini/DeepSeek/GLM request-validation preflights passed with zero attempts,
+provider calls, or network calls; local reports are under
+`.local/p05-w2-b-v2-contract-validation-20260924-r1`. The reviewed output
+examples are contract fixtures, not model results or semantic acceptance.
+The authorized first three-model B v2 comparison stopped under its per-model
+failure gates at `data/retrieval/p05-w2-b-v2-three-model-20260924-r1`.
+Its fresh zero-network preflight bound Gemini, DeepSeek, and GLM to the same
+frozen ordinal 16/20/21 inputs, prompt, schema, local validator, and 8192-token
+output budget. Four of the nine maximum requests were issued, one per unit,
+with no retry: Gemini ordinal 16 returned HTTP 200 and passed JSON, schema,
+source binding, and local-reference gates (1617/1877 input/output tokens,
+9657.518 ms); Gemini ordinal 20 returned HTTP 200 with `finish_reason=length`
+and failed strict JSON parse (4084/8112 tokens, 41499.026 ms); DeepSeek and
+GLM ordinal 16 each returned HTTP 403 before local validation. The failed
+models' remaining requests were not issued. Raw responses, redacted requests,
+terminal attempt ledgers, and the side-by-side human review bundle are retained
+at that root. Provider billing/charge and currency are `UNKNOWN` from the
+available responses. The mechanical Gemini ordinal 16 pass is not semantic
+acceptance, and no three-model semantic-quality ranking is established. The
+earlier successful DeepSeek/GLM route probes used minimal OpenAI SDK requests;
+this comparison used the same TokenMetro endpoint/model through the direct
+HTTP adapter. Their 403s therefore cannot distinguish rejection of the full
+v2 request from a client-transport difference, and do not establish either
+model's structured-output stability.
+That r1 work unit authorized no additional requests or second-round optimization.
+The separately authorized SDK comparison at
+`data/retrieval/p05-w2-b-v2-sdk-three-model-20260924-r2` has benchmark identity
+`2f2a2a95c64920fac9ee54834f2bac57ac197c3ede0b9bf848599119fe7df237`.
+Its zero-network preflight bound the same ordinal 16/20/21 inputs, Prompt v2,
+schema, validator and source binding to the official OpenAI Python SDK on all
+three TokenMetro routes. The request body contained only `model`, `messages`,
+and `max_tokens=16384`; no JSON-object mode, stream, temperature, retry, or
+batching was added. Six of nine maximum requests were issued. Gemini passed
+the local mechanical contract at ordinals 16, 20 and 21. DeepSeek passed
+ordinal 16, then stopped at ordinal 20 with HTTP 200, `finish_reason=length`,
+16384 completion tokens and failed strict JSON parse. GLM stopped at ordinal
+16 after one HTTP 503 (`Service temporarily unavailable`), before local
+validation. DeepSeek/GLM remaining requests were not issued; neither failure
+is semantic-quality evidence. The per-ordinal review gates and human review
+bundle are retained in the r2 root. No winning model or production/default
+adoption follows from mechanical passes. Scoped evidence and accounting are in
+`docs/research/phase-05/p05-w2-v2-sdk-three-model-20260924.md`.
+This separately authorized work unit is complete; further paid requests and
+optimization require new authorization.
+For future Phase 05 TokenMetro Chat Completions execution, the formal default
+is the official `openai` Python SDK through `semantic-sdk-run` / the reusable
+SDK unit runner. The direct-HTTP `semantic-live-run` and earlier comparison
+runner require an explicit `--legacy-direct-http` selector for historical or
+diagnostic use; programmatic direct-HTTP live invocation is also opt-in.
+The verified local runtime currently exists at
+`.local/tokenmetro-openai-sdk-20260924` and imports `openai` 3.19.2 and
+`httpx` 0.28.1. `requirements-phase05-tokenmetro.txt` records the minimal
+rebuild dependency pins without credentials. SDK execution records a logical
+unit separately from each provider attempt; the current default is an initial
+request plus at most two
+bounded transient retries per invocation, with identity-checked resume and
+immutable attempt evidence. This is an engineering operating point, not a
+semantic acceptance or a new paid-run authorization. Prompt v2, output schema,
+and the prior r1/r2 evidence roots remain unchanged.
+`accepted_for_local_contract` does not by itself authorize active semantic
+views or production adoption. Any additional paid canary requires separate
+authorization, an unattempted frozen unit, historical attempt accounting, a new
+root, and a fresh zero-network preflight. A later prompt change also requires
+a new experiment/prompt identity. Broader semantic/live evaluation of P05-derived
+views and navigation remains later and is not implied.
+The real bounded Genshin story slice is an open acceptance dependency for that
+later evaluation/full Phase 05 closure, not a separate unapproved gate.
+
+### Historical Phase 04 recovery gate
+
 **Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE
 implementation/runtime, main integration, and worktree cleanup are CLOSED /
 PASS. Block B provider-free bounded adaptive kernel = ACTUAL REVIEW PASS /
@@ -450,6 +673,7 @@ regression tests. This does not reopen Block A or create a new work unit.
 
 ## Evidence owners
 
+- Durable Phase 05 boundary: `docs/phases/phase-05-source-bound-semantic-navigation.md`
 - Durable Phase 04 boundary: `docs/phases/phase-04-retrieval-evidence-assembly.md`
 - First end-to-end RAG contract and historical plan: `docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md`
 - Formal Deferred-Footprint-Charge historical experiment: `docs/research/phase-04/p04-a1-3-deferred-footprint-charge.md`

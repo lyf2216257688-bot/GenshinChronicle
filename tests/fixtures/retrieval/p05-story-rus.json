@@ -1,0 +1,34 @@
+[
+  {
+    "unit_id": "story-a-u1",
+    "retrieval_visible_text": "A trusted B",
+    "source": {
+      "canonical_address": {"record_id": "story-a", "section_ordinal": 0, "component_observation_key": "a", "component_ordinal": 0, "canonical_unit_ordinal": 0, "canonical_unit_kind": "rich_text", "parsed_json_pointer": "/a/0"},
+      "lineage": {"parsed_json_pointer": "/a/0", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "fixture", "artifact_kind": "details", "artifact_path": "story-a.json", "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+    }
+  },
+  {
+    "unit_id": "story-b-u2",
+    "retrieval_visible_text": "B helps C",
+    "source": {
+      "canonical_address": {"record_id": "story-b", "section_ordinal": 0, "component_observation_key": "b", "component_ordinal": 0, "canonical_unit_ordinal": 0, "canonical_unit_kind": "rich_text", "parsed_json_pointer": "/b/0"},
+      "lineage": {"parsed_json_pointer": "/b/0", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "fixture", "artifact_kind": "details", "artifact_path": "story-b.json", "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}
+    }
+  },
+  {
+    "unit_id": "story-c-u3",
+    "retrieval_visible_text": "C leads D",
+    "source": {
+      "canonical_address": {"record_id": "story-c", "section_ordinal": 0, "component_observation_key": "c", "component_ordinal": 0, "canonical_unit_ordinal": 0, "canonical_unit_kind": "rich_text", "parsed_json_pointer": "/c/0"},
+      "lineage": {"parsed_json_pointer": "/c/0", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "fixture", "artifact_kind": "details", "artifact_path": "story-c.json", "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}]}
+    }
+  },
+  {
+    "unit_id": "story-d-u4",
+    "retrieval_visible_text": "D returns to A",
+    "source": {
+      "canonical_address": {"record_id": "story-d", "section_ordinal": 0, "component_observation_key": "d", "component_ordinal": 0, "canonical_unit_ordinal": 0, "canonical_unit_kind": "rich_text", "parsed_json_pointer": "/d/0"},
+      "lineage": {"parsed_json_pointer": "/d/0", "evidence_scope": "direct_raw", "raw_refs": [{"source": "mihoyo_obc", "locale": "zh-cn", "run_id": "fixture", "artifact_kind": "details", "artifact_path": "story-d.json", "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}]}
+    }
+  }
+]

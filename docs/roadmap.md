@@ -64,6 +64,19 @@ intentionally outside this phase-level roadmap and are owned by
 retrieval winner, Dense model, reranker, vector database, or Generation
 provider.
 
+## Phase 05 — Source-Bound Semantic Navigation
+
+Status: **active; P05-W1 mechanical contracts PASS; real-story-slice acceptance OPEN**
+
+Phase 05 provides a versioned source-bound semantic build lineage, distinct
+hierarchy and event/relation graph views, and bounded provider-neutral
+navigation over official RU candidates. It preserves Phase 04 Block A,
+Evidence Packet authority, and the Generation-visible contract. P05-W1 proves
+only mechanical contracts and does not establish semantic extraction quality,
+corpus-scale view quality, answer improvement, or production/default adoption.
+
 ## Later semantic layers
 
-Entity resolution, Claims, Events, timelines, knowledge graphs, multilingual alignment, and other AI-semantic structures are not assumed requirements. Add only the smallest structure justified by real research failures after the corpus and RAG exist.
+Global entity resolution, Claims, timelines, multilingual alignment, and other
+AI-semantic structures beyond the bounded P05 contract remain conditional. Add
+only the smallest structure justified by later semantic/live evidence.

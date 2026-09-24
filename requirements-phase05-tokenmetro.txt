@@ -1,0 +1,3 @@
+# Phase 05 TokenMetro SDK transport; no credentials or provider configuration.
+openai==3.19.2
+httpx==0.28.1

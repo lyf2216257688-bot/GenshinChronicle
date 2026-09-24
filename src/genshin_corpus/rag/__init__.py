@@ -62,6 +62,17 @@ from .semantic_gate import (
     run_targeted_gate_case,
     run_targeted_gate_recovery_batch,
 )
+from .p05_navigation import (
+    HierarchyTrace,
+    NavigationDecision,
+    P05NavigationError,
+    P05NavigationResult,
+    P05_NAVIGATION_DECISION_SCHEMA_VERSION,
+    P05_NAVIGATION_RESULT_SCHEMA_VERSION,
+    parse_navigation_decision,
+    run_p05_navigation,
+    write_navigation_result,
+)
 
 __all__ = [
     "ADAPTIVE_RESULT_SCHEMA_VERSION",
@@ -118,4 +129,13 @@ __all__ = [
     "persist_round0_replay",
     "run_targeted_gate_case",
     "run_targeted_gate_recovery_batch",
+    "NavigationDecision",
+    "HierarchyTrace",
+    "P05NavigationError",
+    "P05NavigationResult",
+    "P05_NAVIGATION_DECISION_SCHEMA_VERSION",
+    "P05_NAVIGATION_RESULT_SCHEMA_VERSION",
+    "parse_navigation_decision",
+    "run_p05_navigation",
+    "write_navigation_result",
 ]
