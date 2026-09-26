@@ -11,6 +11,8 @@ from pathlib import Path
 import time
 from typing import Any, Callable, Mapping, Sequence
 
+import httpx
+
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
 
@@ -22,12 +24,133 @@ from .semantic_live_runner import (
     validate_b_v2_navigation_references,
 )
 from .semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter
-from .semantic_tokenmetro_profile import TOKENMETRO_BASE_URL, TOKENMETRO_MODEL_IDS, tokenmetro_model_id
+from .semantic_tokenmetro_profile import (
+    ROUTE_PROFILES,
+    TOKENMETRO_BASE_URL,
+    TOKENMETRO_MODEL_IDS,
+    route_profile,
+    tokenmetro_model_id,
+)
 
 
 BASE_URL = TOKENMETRO_BASE_URL
 TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRIES_HARD_CAP = 4
+
+
+def _chunk_mapping(chunk: Any) -> dict[str, Any]:
+    """Convert an SDK stream chunk to a secret-free JSON-compatible mapping."""
+
+    if isinstance(chunk, Mapping):
+        return dict(chunk)
+    dump = getattr(chunk, "model_dump", None)
+    if callable(dump):
+        value = dump()
+        return dict(value) if isinstance(value, Mapping) else {"value": value}
+    return {"value": str(chunk)}
+
+
+def _nested_mapping(value: Any) -> Mapping[str, Any] | None:
+    return value if isinstance(value, Mapping) else None
+
+
+def _normalize_usage(value: Any) -> dict[str, Any] | str:
+    """Expose common provider token fields while retaining UNKNOWN values."""
+
+    usage = _nested_mapping(value)
+    if usage is None:
+        return "UNKNOWN"
+    details_in = _nested_mapping(usage.get("prompt_tokens_details")) or _nested_mapping(usage.get("input_tokens_details")) or {}
+    details_out = _nested_mapping(usage.get("completion_tokens_details")) or _nested_mapping(usage.get("output_tokens_details")) or {}
+    result: dict[str, Any] = {}
+    for name, candidates in {
+        "input_tokens": (usage.get("prompt_tokens"), usage.get("input_tokens")),
+        "output_tokens": (usage.get("completion_tokens"), usage.get("output_tokens")),
+        "reasoning_tokens": (details_out.get("reasoning_tokens"), usage.get("reasoning_tokens")),
+        "cached_tokens": (details_in.get("cached_tokens"), usage.get("cached_tokens")),
+    }.items():
+        for candidate in candidates:
+            if candidate is not None:
+                result[name] = candidate
+                break
+    return result or "UNKNOWN"
+
+
+def _policy_403_pre_generation(raw: bytes | None, status: int | None, *, chunk_count: int,
+                               reasoning_chars: int, visible_chars: int, usage: Any,
+                               finish_reason: str | None) -> bool:
+    """Return true only for the exact, pre-generation policy rejection allowlist."""
+
+    if status != 403 or chunk_count or reasoning_chars or visible_chars or usage not in (None, "UNKNOWN") or finish_reason is not None or raw is None:
+        return False
+    try:
+        envelope = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(envelope, Mapping):
+        return False
+    if any(field in envelope for field in ("usage", "choices", "output", "finish_reason", "content")):
+        return False
+    error = _nested_mapping(envelope.get("error"))
+    if error is None:
+        return False
+    # The frozen TokenMetro 403 uses error.type with a null error.code.
+    code = error.get("code")
+    kind = error.get("type")
+    return bool(code == "content_policy_violation" or
+                ("code" in error and code is None and kind == "content_policy_violation"))
+
+
+def _stream_delta(choice: Mapping[str, Any]) -> tuple[str, str]:
+    delta = _nested_mapping(choice.get("delta")) or {}
+    visible = delta.get("content")
+    reasoning = delta.get("reasoning_content", delta.get("reasoning"))
+    return (visible if isinstance(visible, str) else "", reasoning if isinstance(reasoning, str) else "")
+
+
+def _stream_envelope(chunks: Sequence[Mapping[str, Any]], visible: str, reasoning: str,
+                     finish_reason: str | None, usage: Any) -> bytes:
+    """Build the same local Chat Completions envelope used by non-stream validation."""
+
+    identifier = next((value.get("id") for value in reversed(chunks) if isinstance(value.get("id"), str)), None)
+    choice: dict[str, Any] = {
+        "index": 0,
+        "finish_reason": finish_reason,
+        "message": {"role": "assistant", "content": visible},
+    }
+    if reasoning:
+        choice["message"]["reasoning_content"] = reasoning
+    envelope: dict[str, Any] = {"choices": [choice]}
+    if identifier is not None:
+        envelope["id"] = identifier
+    if isinstance(usage, Mapping):
+        envelope["usage"] = dict(usage)
+    return canonical_json_bytes(envelope)
+
+
+class _DoneTrackingStream(httpx.SyncByteStream):
+    """Pass SSE bytes through unchanged while observing the terminal marker."""
+
+    def __init__(self, source: Any) -> None:
+        self.source = source
+        self.saw_done = False
+        self.tail = b""
+
+    def __iter__(self):
+        for chunk in self.source:
+            self.observe(chunk)
+            yield chunk
+
+    def observe(self, chunk: bytes) -> None:
+        combined = self.tail + chunk
+        if b"\ndata: [DONE]\n" in b"\n" + combined or b"\ndata: [DONE]\r\n" in b"\n" + combined:
+            self.saw_done = True
+        self.tail = combined[-32:]
+
+    def close(self) -> None:
+        self.source.close()
+
+
 class _Parser:
     extract_content = OpenAIChatCompletionsAdapter.extract_content
     parse_content = OpenAIChatCompletionsAdapter.parse_content
@@ -49,7 +172,12 @@ def _write_once(path: Path, body: bytes) -> dict[str, Any]:
         raise ValueError(f"immutable artifact already exists: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, body)
-    root = path.parent if path.name == "manifest.json" else path.parents[3]
+    if path.name == "manifest.json":
+        root = path.parent
+    elif path.parent.name.startswith("attempt-") and path.parent.parent.name != "units" and path.parent.parent.parent.name != "units":
+        root = path.parent.parent
+    else:
+        root = path.parents[3]
     return {"path": str(path.relative_to(root)), "sha256": _sha(body), "byte_count": len(body)}
 
 
@@ -114,6 +242,15 @@ def _attempts(root: Path, unit_key: str, request_identity: str, run_identity: st
         if (terminal.get("attempt_number") != index or terminal.get("request_identity") != request_identity
                 or terminal.get("run_identity") != run_identity or terminal.get("unit_id") != unit_id):
             raise ValueError("attempt terminal identity changed")
+        if issued.get("route") is not None:
+            if (issued.get("route") != terminal.get("route")
+                    or issued.get("route_role") != terminal.get("route_role")
+                    or issued.get("route_config_identity") != terminal.get("route_config_identity")
+                    or issued.get("wire_request_identity") != terminal.get("wire_request_identity")):
+                raise ValueError("attempt route identity changed")
+            expected = ("tokenmetro", "primary") if index == 1 else ("jizhi", "fallback")
+            if (terminal.get("route"), terminal.get("route_role")) != expected:
+                raise ValueError("route attempt order is ambiguous")
         _verify_artifacts(root, terminal.get("artifacts", {}))
         if terminal.get("disposition") == "accepted_for_local_contract" and (
             terminal.get("http_status") != 200 or terminal.get("finish_reason") != "stop"
@@ -140,6 +277,13 @@ def run_sdk_units(
     api_key: str | None = None,
     transport: Any = None,
     sleep: Callable[[float], None] = time.sleep,
+    primary_route: str | None = None,
+    fallback_route: str | None = None,
+    stream: bool = False,
+    generation_parameters: Mapping[str, Any] | None = None,
+    environment: Mapping[str, str] | None = None,
+    route_api_keys: Mapping[str, str] | None = None,
+    route_transports: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute frozen units in order; retry budget is per invocation.
 
@@ -147,12 +291,29 @@ def run_sdk_units(
     and segment_ids. A terminal transient attempt can be resumed later; an
     unresolved issued attempt always requires manual accounting first.
     """
+    if primary_route is not None or fallback_route is not None:
+        if not stream or max_retries != 0:
+            raise ValueError("route-pair execution requires stream=True and max_retries=0")
+        keys = dict(route_api_keys or {})
+        if api_key is not None:
+            keys.setdefault("tokenmetro", api_key)
+        return run_sdk_route_pair(
+            root, units=units, prompt=prompt, prompt_identity=prompt_identity,
+            source_identity=source_identity, schema_identity=schema_identity,
+            model=model, primary_route=primary_route or "tokenmetro",
+            fallback_route=fallback_route or "jizhi", max_tokens=max_tokens,
+            timeout_seconds=timeout_seconds, generation_parameters=generation_parameters,
+            environment=environment, api_keys=keys, transports=route_transports or ({"tokenmetro": transport} if transport is not None else None),
+        )
+
     import httpx
     import openai
 
     if (type(max_retries) is not int or not 0 <= max_retries <= MAX_RETRIES_HARD_CAP
             or max_tokens <= 0 or backoff_cap_seconds < 0):
         raise ValueError("invalid SDK operating point")
+    if stream or generation_parameters or environment is not None or route_api_keys or route_transports:
+        raise ValueError("stream and route configuration require explicit route-pair mode")
     if schema_identity != SEMANTIC_OUTPUT_SCHEMA_IDENTITY:
         raise ValueError("authoritative schema identity changed")
     if not api_key:
@@ -356,6 +517,462 @@ def run_sdk_units(
     return checkpoint("complete", issued_now)
 
 
+def run_sdk_route_pair(
+    root: Path,
+    *,
+    units: Sequence[Mapping[str, Any]],
+    prompt: Mapping[str, Any],
+    prompt_identity: str,
+    source_identity: str | None = None,
+    schema_identity: str = SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+    model: str = "deepseek-v4.1-flash",
+    primary_route: str = "tokenmetro",
+    fallback_route: str = "jizhi",
+    max_tokens: int = 500000,
+    timeout_seconds: float = 300.0,
+    generation_parameters: Mapping[str, Any] | None = None,
+    environment: Mapping[str, str] | None = None,
+    api_keys: Mapping[str, str] | None = None,
+    transports: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run DeepSeek with one conservative TokenMetro -> Jizhi route pair.
+
+    This function intentionally has no retry loop.  A second provider attempt
+    is created only for the exact pre-generation TokenMetro policy response.
+    """
+
+    import httpx
+    import openai
+
+    if primary_route != "tokenmetro" or fallback_route != "jizhi":
+        raise ValueError("the production DeepSeek route pair is TokenMetro -> Jizhi")
+    if model != ROUTE_PROFILES[primary_route].model_id or model != ROUTE_PROFILES[fallback_route].model_id:
+        raise ValueError("route pair requires deepseek-v4.1-flash")
+    if (max_tokens <= 0 or timeout_seconds <= 0 or schema_identity != SEMANTIC_OUTPUT_SCHEMA_IDENTITY
+            or not isinstance(source_identity, str) or not source_identity or not prompt_identity):
+        raise ValueError("invalid route-pair operating point")
+    generation = dict(generation_parameters or {})
+    if set(generation) & {"model", "messages", "max_tokens", "stream"}:
+        raise ValueError("generation parameters cannot override the shared semantic request")
+    values = os.environ if environment is None else environment
+    profiles = {
+        route: route_profile(route, values, require_environment=True)
+        for route in (primary_route, fallback_route)
+    }
+    keys = dict(api_keys or {})
+    primary_key = keys.get(primary_route) or values.get(profiles[primary_route].api_key_env)
+    if not isinstance(primary_key, str) or not primary_key:
+        raise ValueError(f"{profiles[primary_route].api_key_env} is required")
+    secret_values = tuple(value for value in (primary_key, keys.get(fallback_route) or values.get(profiles[fallback_route].api_key_env))
+                          if isinstance(value, str) and value)
+    if any(secret in profile.base_url for secret in secret_values for profile in profiles.values()):
+        raise ValueError("route base URL contains a configured credential")
+
+    prepared: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for unit in units:
+        unit_id = str(unit["compilation_unit_id"])
+        payload = unit["payload"]
+        if unit_id in seen or not isinstance(payload, Mapping) or not isinstance(unit.get("segment_ids"), list):
+            raise ValueError("invalid or duplicate frozen unit")
+        seen.add(unit_id)
+        semantic_id = semantic_input_identity(payload)
+        if semantic_id != unit["semantic_input_identity"]:
+            raise ValueError("semantic input identity mismatch")
+        messages = [
+            {"role": "system", "content": canonical_json_bytes(prompt).decode("utf-8")},
+            {"role": "user", "content": canonical_json_bytes(payload).decode("utf-8")},
+        ]
+        body = {"model": model, "messages": messages, "max_tokens": max_tokens, "stream": True, **generation}
+        request_identity = sha256_json({
+            "source_identity": source_identity,
+            "prompt_identity": prompt_identity,
+            "schema_identity": schema_identity,
+            "compilation_unit_id": unit_id,
+            "semantic_input_identity": semantic_id,
+            "model": model,
+            "messages": messages,
+            "payload": payload,
+            "stream": True,
+            "max_tokens": max_tokens,
+            "generation_parameters": generation,
+        })
+        prepared.append({"unit_id": unit_id, "unit_key": _sha(unit_id.encode("utf-8")),
+                         "segment_ids": unit["segment_ids"], "body": body,
+                         "wire_request_identity": sha256_json(body),
+                         "request_identity": request_identity,
+                         "semantic_input_identity": semantic_id})
+
+    contract = {
+        "runner": "phase05-semantic-sdk-route-pair-0.1",
+        "transport": "official-openai-sdk-chat-completions",
+        "sdk_version": openai.__version__,
+        "primary_route": profiles[primary_route].safe_dict(),
+        "fallback_route": profiles[fallback_route].safe_dict(),
+        "model": model, "prompt_identity": prompt_identity,
+        "source_identity": source_identity, "prompt_sha256": sha256_json(prompt),
+        "schema_identity": schema_identity, "stream": True,
+        "max_tokens": max_tokens, "generation_parameters": generation,
+        "timeout_seconds": timeout_seconds, "automatic_retry": False,
+        "validator": "strict_json_schema_source_binding_v2_local_refs",
+        "units": [{key: row[key] for key in ("unit_id", "semantic_input_identity", "request_identity", "wire_request_identity", "segment_ids")}
+                  for row in prepared],
+    }
+    run_identity = sha256_json(contract)
+    root = Path(root)
+    manifest_path = root / "manifest.json"
+    manifest = {"identity": run_identity, "contract": contract}
+    if manifest_path.exists():
+        if _read(manifest_path) != manifest:
+            raise ValueError("resume semantic/request/runtime identity mismatch")
+    else:
+        if root.exists():
+            raise ValueError("new route-pair run root already exists")
+        root.mkdir(parents=True)
+        _json_once(manifest_path, manifest)
+
+    def history_for(unit: Mapping[str, Any]) -> list[dict[str, Any]]:
+        history = _attempts(root, unit["unit_key"], unit["request_identity"], run_identity, unit["unit_id"])
+        for row in history:
+            route = row.get("route")
+            profile = profiles.get(route)
+            if profile is None or row.get("route_config_identity") != profile.config_identity:
+                raise ValueError("attempt route configuration identity changed")
+            if row.get("wire_request_identity") != unit["wire_request_identity"]:
+                raise ValueError("attempt wire request identity changed")
+            artifacts = row.get("artifacts", {})
+            request_descriptor = artifacts.get("request")
+            wire_descriptor = artifacts.get("wire_request")
+            if not isinstance(request_descriptor, Mapping) or not isinstance(wire_descriptor, Mapping):
+                raise ValueError("route attempt lacks immutable request evidence")
+            request_bytes = (root / str(request_descriptor["path"])).read_bytes()
+            wire_bytes = (root / str(wire_descriptor["path"])).read_bytes()
+            if (json.loads(request_bytes) != unit["body"] or json.loads(wire_bytes) != unit["body"]):
+                raise ValueError("route attempt request differs from frozen logical request")
+            if row.get("disposition") == "primary_policy_403_pre_generation":
+                raw_descriptor = artifacts.get("response")
+                if not isinstance(raw_descriptor, Mapping):
+                    raise ValueError("policy fallback lacks a persisted primary response")
+                raw = (root / str(raw_descriptor["path"])).read_bytes()
+                if not _policy_403_pre_generation(
+                    raw, row.get("http_status"), chunk_count=row.get("stream_chunk_count", -1),
+                    reasoning_chars=row.get("reasoning_chars", -1), visible_chars=row.get("visible_chars", -1),
+                    usage=row.get("usage"), finish_reason=row.get("finish_reason"),
+                ) or row.get("fallback_eligible") is not True or row.get("stream_complete") is not False:
+                    raise ValueError("primary policy fallback evidence is invalid")
+        return history
+
+    def checkpoint(status: str, issued_now: int, blocked_unit: str | None = None) -> dict[str, Any]:
+        states: dict[str, str] = {}
+        route_history: dict[str, list[str]] = {}
+        counters = {
+            "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
+            "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
+            "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
+            "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
+        }
+        usage_by_route: dict[str, dict[str, Any]] = {
+            "tokenmetro": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                           "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+            "jizhi": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                      "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+        }
+        total = 0
+        for candidate in prepared:
+            history = history_for(candidate)
+            total += len(history)
+            route_history[candidate["unit_id"]] = [str(row.get("route")) for row in history]
+            for row in history:
+                route = row.get("route")
+                if route in usage_by_route:
+                    normalized = row.get("usage_normalized")
+                    if isinstance(normalized, Mapping):
+                        for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
+                            value = normalized.get(field)
+                            if isinstance(value, int):
+                                usage_by_route[route][field] += value
+                    else:
+                        usage_by_route[route]["unknown_usage_attempts"] += 1
+                    credit = row.get("billing", {}).get("reported_credit")
+                    if isinstance(credit, (int, float)):
+                        usage_by_route[route]["reported_credit"] += credit
+                    else:
+                        usage_by_route[route]["unknown_credit_attempts"] += 1
+                if route == "tokenmetro":
+                    counters["tokenmetro_attempts"] += 1
+                    if row.get("disposition") == "accepted_for_local_contract":
+                        counters["tokenmetro_successes"] += 1
+                        counters["accepted_primary"] += 1
+                    if row.get("disposition") == "primary_policy_403_pre_generation":
+                        counters["tokenmetro_policy_403"] += 1
+                elif route == "jizhi":
+                    counters["jizhi_fallback_issued"] += 1
+                    if row.get("disposition") == "accepted_for_local_contract":
+                        counters["jizhi_fallback_successes"] += 1
+                        counters["accepted_fallback"] += 1
+                    else:
+                        counters["jizhi_fallback_failures"] += 1
+                if row.get("execution_state") == "unknown":
+                    counters["stopped_indeterminate"] += 1
+            if not history:
+                states[candidate["unit_id"]] = "pending"
+            elif history[-1].get("disposition") == "accepted_for_local_contract":
+                states[candidate["unit_id"]] = "accepted"
+            elif history[-1].get("disposition") == "primary_policy_403_pre_generation" and len(history) == 1:
+                states[candidate["unit_id"]] = "fallback_pending"
+            else:
+                states[candidate["unit_id"]] = "blocked"
+        summary = {
+            "status": status, "run_identity": run_identity,
+            "logical_units": len(prepared), "accepted_units": sum(value == "accepted" for value in states.values()),
+            "provider_attempts_total": total, "provider_attempts_this_invocation": issued_now,
+            "unit_states": states, "route_history": route_history, "counters": counters,
+            "usage_by_route": usage_by_route,
+            "retry_policy": {"automatic_retry": False},
+        }
+        if blocked_unit is not None:
+            summary["blocked_unit"] = blocked_unit
+        summary["identity"] = sha256_json(summary)
+        atomic_write(root / "checkpoint.json", canonical_json_bytes(summary))
+        if status != "partial":
+            atomic_write(root / "terminal_summary.json", canonical_json_bytes(summary))
+        if _read(root / "checkpoint.json") != summary:
+            raise ValueError("route checkpoint persistence failed")
+        return summary
+
+    def verify_checkpoint(unit: Mapping[str, Any], history: Sequence[Mapping[str, Any]]) -> None:
+        saved = _read(root / "checkpoint.json")
+        identity = saved.pop("identity", None)
+        if (identity != sha256_json(saved)
+                or saved.get("run_identity") != run_identity
+                or saved.get("route_history", {}).get(unit["unit_id"]) != [row["route"] for row in history]):
+            raise ValueError("route checkpoint identity or history mismatch")
+
+    def run_attempt(unit: Mapping[str, Any], *, route: str, role: str, number: int) -> dict[str, Any]:
+        profile = profiles[route]
+        key = keys.get(route) or values.get(profile.api_key_env)
+        if not isinstance(key, str) or not key:
+            raise ValueError(f"{profile.api_key_env} is required before fallback invocation")
+        transport = (transports or {}).get(route)
+        body = canonical_json_bytes(unit["body"])
+        stem = root / "units" / unit["unit_key"] / f"attempt-{number:03d}"
+        if any(secret.encode("utf-8") in body for secret in secret_values):
+            raise ValueError("request body contains credential")
+        request_artifact = _write_once(stem / "request.json", body)
+        _json_once(stem / "issued.json", {
+            "run_identity": run_identity, "unit_id": unit["unit_id"],
+            "attempt_number": number, "request_identity": unit["request_identity"],
+            "wire_request_identity": unit["wire_request_identity"],
+            "route": route, "route_role": role, "route_config_identity": profile.config_identity,
+            "issued_at": _now(),
+        })
+        artifacts: dict[str, Any] = {"request": request_artifact}
+        chunks: list[dict[str, Any]] = []
+        raw: bytes | None = None
+        status: int | None = None
+        headers: dict[str, str] = {}
+        wire_count = 0
+        started = time.monotonic()
+        first_chunk_ms: float | None = None
+        first_visible_ms: float | None = None
+        visible_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        finish_reason: str | None = None
+        usage: Any = None
+        provider_id: str | None = None
+        stream_complete = False
+        done_tracker: _DoneTrackingStream | None = None
+        sdk_error_type: str | None = None
+        sdk_error_message: str | None = None
+
+        def on_request(request: httpx.Request) -> None:
+            nonlocal wire_count
+            wire_count += 1
+            if wire_count != 1 or json.loads(request.content) != unit["body"]:
+                raise ValueError("SDK wire request differs from frozen route-pair request")
+            if any(secret.encode("utf-8") in request.content for secret in secret_values):
+                raise ValueError("SDK wire request contains credential")
+            artifacts["wire_request"] = _write_once(stem / "wire_request.bin", request.content)
+            artifacts["request_metadata"] = _json_once(stem / "request_metadata.json", {
+                "method": request.method, "url": str(request.url),
+                "route": route, "headers": {name: request.headers[name] for name in ("accept", "content-type") if name in request.headers},
+            })
+
+        def on_response(response: httpx.Response) -> None:
+            nonlocal raw, status, headers, done_tracker
+            status = response.status_code
+            headers = {name: response.headers[name] for name in ("retry-after", "x-request-id", "content-type") if name in response.headers}
+            if status == 200:
+                done_tracker = _DoneTrackingStream(response.stream)
+                if response.is_stream_consumed:
+                    done_tracker.observe(response.content)
+                response.stream = done_tracker
+            else:
+                raw = response.read()
+                if any(secret.encode("utf-8") in raw for secret in secret_values):
+                    raise ValueError("raw response contains credential")
+                artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
+
+        try:
+            with httpx.Client(transport=transport, event_hooks={"request": [on_request], "response": [on_response]}) as http_client:
+                with openai.OpenAI(base_url=profile.base_url, api_key=key, max_retries=0,
+                                   timeout=timeout_seconds, http_client=http_client) as client:
+                    stream = client.chat.completions.create(**unit["body"])
+                    for chunk in stream:
+                        data = _chunk_mapping(chunk)
+                        if any(secret.encode("utf-8") in canonical_json_bytes(data) for secret in secret_values):
+                            raise ValueError("stream chunk contains credential")
+                        descriptor = _json_once(stem / f"chunk-{len(chunks) + 1:06d}.json", data)
+                        artifacts.setdefault("stream_chunks", []).append(descriptor)
+                        chunks.append(data)
+                        if first_chunk_ms is None:
+                            first_chunk_ms = round((time.monotonic() - started) * 1000, 3)
+                        identifier = data.get("id")
+                        if isinstance(identifier, str):
+                            provider_id = identifier
+                        chunk_usage = data.get("usage")
+                        if isinstance(chunk_usage, Mapping):
+                            usage = dict(chunk_usage)
+                        choices = data.get("choices")
+                        if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
+                            choice = choices[0]
+                            value, reasoning = _stream_delta(choice)
+                            if value:
+                                visible_parts.append(value)
+                                if first_visible_ms is None:
+                                    first_visible_ms = round((time.monotonic() - started) * 1000, 3)
+                            if reasoning:
+                                reasoning_parts.append(reasoning)
+                            if isinstance(choice.get("finish_reason"), str):
+                                finish_reason = choice["finish_reason"]
+                    # The SDK iterator may end cleanly on EOF even when the
+                    # provider never sent a terminal choice.  Treat that as
+                    # indeterminate rather than as a completed generation.
+                    stream_complete = finish_reason is not None and done_tracker is not None and done_tracker.saw_done
+        except (openai.APITimeoutError, openai.APIConnectionError) as exc:
+            sdk_error_type = type(exc).__name__
+            sdk_error_message = _redact(str(exc), secret_values)
+        except openai.APIStatusError as exc:
+            sdk_error_type = type(exc).__name__
+            sdk_error_message = _redact(str(exc), secret_values)
+            status = exc.status_code
+        except Exception as exc:
+            if wire_count != 1:
+                raise
+            sdk_error_type = type(exc).__name__
+            sdk_error_message = _redact(str(exc), secret_values)
+
+        if wire_count != 1 or "wire_request" not in artifacts:
+            raise ValueError("SDK attempt accounting is ambiguous")
+        if status is not None and status != 200 and "response" not in artifacts:
+            raise ValueError("HTTP error response was not durably persisted")
+        visible = "".join(visible_parts)
+        reasoning = "".join(reasoning_parts)
+        chunk_count = len(chunks)
+        if status == 200 and stream_complete and sdk_error_type is None:
+            raw = _stream_envelope(chunks, visible, reasoning, finish_reason, usage)
+            if any(secret.encode("utf-8") in raw for secret in secret_values):
+                raise ValueError("provider response echoed configured secret")
+            artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
+        elapsed = round((time.monotonic() - started) * 1000, 3)
+        disposition = "transport_failure"
+        execution_state = "unknown"
+        fallback_eligible = False
+        if status == 403 and sdk_error_type == "PermissionDeniedError" and _policy_403_pre_generation(raw, status, chunk_count=chunk_count,
+                                                        reasoning_chars=len(reasoning), visible_chars=len(visible),
+                                                        usage=usage, finish_reason=finish_reason):
+            disposition = "primary_policy_403_pre_generation" if role == "primary" else "fallback_terminal_failure"
+            execution_state = "not_started"
+            fallback_eligible = role == "primary" and route == "tokenmetro"
+        elif status == 200 and stream_complete and sdk_error_type is None:
+            execution_state = "complete"
+            if finish_reason == "length":
+                disposition = "output_budget_blocked"
+            elif finish_reason != "stop":
+                disposition = "stream_incomplete"
+                execution_state = "unknown"
+            else:
+                try:
+                    normalized, _content, _parsed, validation = _validate_raw_response(
+                        _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"])
+                    validate_b_v2_navigation_references(normalized)
+                    artifacts["canonical_output"] = _json_once(stem / "canonical_output.json", normalized)
+                    artifacts["validation"] = _json_once(stem / "validation.json", validation)
+                    disposition = "accepted_for_local_contract"
+                except SemanticResponseValidationError as exc:
+                    artifacts["validation"] = _json_once(stem / "validation.json", exc.diagnostics)
+                    disposition = "local_validation_failed"
+                except ValueError as exc:
+                    artifacts["validation"] = _json_once(stem / "validation.json", {"error": str(exc)})
+                    disposition = "local_validation_failed"
+        elif status is not None:
+            execution_state = "unknown"
+            disposition = "transport_failure"
+        if sdk_error_type is not None:
+            artifacts["sdk_error"] = _json_once(stem / "sdk_error.json", {
+                "type": sdk_error_type, "message": sdk_error_message, "http_status": status,
+            })
+        terminal = {
+            "run_identity": run_identity, "unit_id": unit["unit_id"], "attempt_number": number,
+            "request_identity": unit["request_identity"], "wire_request_identity": unit["wire_request_identity"],
+            "route": route, "route_role": role, "route_config_identity": profile.config_identity,
+            "model": model, "http_status": status, "sdk_error_type": sdk_error_type,
+            "finish_reason": finish_reason, "provider_request_id": provider_id,
+            "response_headers": headers, "usage": usage if usage is not None else "UNKNOWN",
+            "usage_normalized": _normalize_usage(usage),
+            "billing": {
+                "reported_credit": usage.get("credit", "UNKNOWN") if isinstance(usage, Mapping) else "UNKNOWN",
+                "currency": "UNKNOWN", "billable": "UNKNOWN",
+            },
+            "latency_ms": elapsed, "first_chunk_latency_ms": first_chunk_ms if first_chunk_ms is not None else "UNKNOWN",
+            "first_visible_latency_ms": first_visible_ms if first_visible_ms is not None else "UNKNOWN",
+            "stream_complete": stream_complete, "stream_chunk_count": chunk_count,
+            "reasoning_chars": len(reasoning), "visible_chars": len(visible),
+            "execution_state": execution_state, "fallback_eligible": fallback_eligible,
+            "fallback_decision": "eligible" if fallback_eligible else "not_eligible",
+            "disposition": disposition, "retry_classification": "terminal",
+            "automatic_retry": False, "artifacts": artifacts, "terminal_at": _now(),
+        }
+        if any(secret.encode("utf-8") in canonical_json_bytes(terminal) for secret in secret_values):
+            raise ValueError("terminal metadata contains credential")
+        _json_once(stem / "terminal.json", terminal)
+        return terminal
+
+    issued_now = 0
+    for unit in prepared:
+        history = history_for(unit)
+        if history:
+            verify_checkpoint(unit, history)
+        if history and history[-1].get("disposition") == "accepted_for_local_contract":
+            continue
+        if history and not (len(history) == 1 and history[-1].get("disposition") == "primary_policy_403_pre_generation"):
+            return checkpoint("blocked", issued_now, unit["unit_id"])
+        route = "jizhi" if history else "tokenmetro"
+        role = "fallback" if history else "primary"
+        if route == "jizhi" and not (keys.get(route) or values.get(profiles[route].api_key_env)):
+            return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
+        terminal = run_attempt(unit, route=route, role=role, number=len(history) + 1)
+        issued_now += 1
+        if terminal["disposition"] == "accepted_for_local_contract":
+            checkpoint("partial", issued_now)
+            continue
+        checkpoint("partial", issued_now, unit["unit_id"])
+        if terminal.get("fallback_eligible"):
+            verify_checkpoint(unit, [terminal])
+            if not (keys.get("jizhi") or values.get(profiles["jizhi"].api_key_env)):
+                return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
+            fallback = run_attempt(unit, route="jizhi", role="fallback", number=2)
+            issued_now += 1
+            if fallback["disposition"] == "accepted_for_local_contract":
+                checkpoint("partial", issued_now)
+                continue
+            return checkpoint("blocked", issued_now, unit["unit_id"])
+        if terminal.get("execution_state") == "unknown":
+            return checkpoint("stopped_unknown_execution", issued_now, unit["unit_id"])
+        return checkpoint("blocked", issued_now, unit["unit_id"])
+    return checkpoint("complete", issued_now)
+
+
 def frozen_preflight_units(preflight_root: Path, model: str, ordinals: Sequence[int] | None = None) -> list[dict[str, Any]]:
     """Load the accepted U1 sample with its source and payload integrity checks."""
     from .semantic_live_runner import (
@@ -396,6 +1013,209 @@ def frozen_preflight_units(preflight_root: Path, model: str, ordinals: Sequence[
     return result
 
 
+def run_sdk_route_canary(
+    root: Path,
+    *,
+    route: str,
+    units: Sequence[Mapping[str, Any]],
+    prompt: Mapping[str, Any],
+    prompt_identity: str,
+    source_identity: str | None = None,
+    schema_identity: str = SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+    model: str = "deepseek-v4.1-flash",
+    max_tokens: int = 500000,
+    timeout_seconds: float = 300.0,
+    environment: Mapping[str, str] | None = None,
+    transport: Any = None,
+) -> dict[str, Any]:
+    """Issue one explicit-route canary without automatic fallback or retry."""
+
+    if len(units) != 1 or route not in ROUTE_PROFILES:
+        raise ValueError("route canary requires one frozen unit and an explicit route")
+    import httpx
+    import openai
+
+    values = os.environ if environment is None else environment
+    profile = route_profile(route, values, require_environment=True)
+    key = values.get(profile.api_key_env)
+    if not isinstance(key, str) or not key or model != profile.model_id:
+        raise ValueError("route canary credential or DeepSeek model is invalid")
+    unit = units[0]
+    payload = unit["payload"]
+    if semantic_input_identity(payload) != unit["semantic_input_identity"]:
+        raise ValueError("semantic input identity mismatch")
+    if schema_identity != SEMANTIC_OUTPUT_SCHEMA_IDENTITY or max_tokens <= 0 or timeout_seconds <= 0:
+        raise ValueError("invalid route canary operating point")
+    body = {"model": model, "messages": [
+        {"role": "system", "content": canonical_json_bytes(prompt).decode("utf-8")},
+        {"role": "user", "content": canonical_json_bytes(payload).decode("utf-8")},
+    ], "max_tokens": max_tokens, "stream": True}
+    request_identity = sha256_json({
+        "source_identity": source_identity, "prompt_identity": prompt_identity,
+        "schema_identity": schema_identity, "compilation_unit_id": unit["compilation_unit_id"],
+        "semantic_input_identity": unit["semantic_input_identity"], "model": model,
+        "messages": body["messages"], "payload": payload,
+        "stream": True, "max_tokens": max_tokens, "generation_parameters": {},
+    })
+    root = Path(root)
+    if root.exists():
+        raise ValueError("route canary root already exists")
+    root.mkdir(parents=True)
+    manifest = {
+        "runner": "phase05-semantic-sdk-route-canary-0.1", "route": profile.safe_dict(),
+        "sdk_version": openai.__version__, "source_identity": source_identity,
+        "prompt_identity": prompt_identity, "prompt_sha256": sha256_json(prompt),
+        "schema_identity": schema_identity, "unit_id": unit["compilation_unit_id"],
+        "semantic_input_identity": unit["semantic_input_identity"],
+        "request_identity": request_identity, "wire_request_identity": sha256_json(body),
+        "max_tokens": max_tokens, "stream": True, "automatic_retry": False,
+    }
+    _json_once(root / "manifest.json", manifest)
+    stem = root / "attempt-001"
+    artifacts: dict[str, Any] = {"request": _json_once(stem / "request.json", body)}
+    _json_once(stem / "issued.json", {"request_identity": request_identity, "route": route, "issued_at": _now()})
+    chunks: list[dict[str, Any]] = []
+    raw_error: bytes | None = None
+    status: int | None = None
+    started = time.monotonic()
+    error_type: str | None = None
+    wire_count = 0
+    done_tracker: _DoneTrackingStream | None = None
+    first_chunk_ms: float | None = None
+    first_visible_ms: float | None = None
+
+    def on_request(request: httpx.Request) -> None:
+        nonlocal wire_count
+        wire_count += 1
+        if wire_count != 1 or json.loads(request.content) != body or key.encode() in request.content:
+            raise ValueError("canary SDK wire request differs from frozen request")
+        artifacts["wire_request"] = _write_once(stem / "wire_request.bin", request.content)
+
+    def on_response(response: httpx.Response) -> None:
+        nonlocal raw_error, status, done_tracker
+        status = response.status_code
+        if status == 200:
+            done_tracker = _DoneTrackingStream(response.stream)
+            if response.is_stream_consumed:
+                done_tracker.observe(response.content)
+            response.stream = done_tracker
+        else:
+            raw_error = response.read()
+            if key.encode() in raw_error:
+                raise ValueError("canary response contains credential")
+            artifacts["raw_error"] = _write_once(stem / "raw_error.bin", raw_error)
+
+    try:
+        with httpx.Client(transport=transport, event_hooks={"request": [on_request], "response": [on_response]}) as http_client:
+            with openai.OpenAI(base_url=profile.base_url, api_key=key, max_retries=0,
+                               timeout=timeout_seconds, http_client=http_client) as client:
+                for chunk in client.chat.completions.create(**body):
+                    data = _chunk_mapping(chunk)
+                    if key.encode() in canonical_json_bytes(data):
+                        raise ValueError("canary stream chunk contains credential")
+                    descriptor = _json_once(stem / f"chunk-{len(chunks) + 1:06d}.json", data)
+                    artifacts.setdefault("stream_chunks", []).append(descriptor)
+                    chunks.append(data)
+                    if first_chunk_ms is None:
+                        first_chunk_ms = round((time.monotonic() - started) * 1000, 3)
+                    choices = data.get("choices")
+                    if (first_visible_ms is None and isinstance(choices, list) and choices
+                            and isinstance(choices[0], Mapping) and _stream_delta(choices[0])[0]):
+                        first_visible_ms = round((time.monotonic() - started) * 1000, 3)
+    except Exception as exc:
+        error_type = type(exc).__name__
+    if wire_count != 1 or "wire_request" not in artifacts:
+        raise ValueError("canary SDK attempt accounting is ambiguous")
+    if status is not None and status != 200 and "raw_error" not in artifacts:
+        raise ValueError("canary HTTP error was not durably persisted")
+    visible: list[str] = []
+    reasoning: list[str] = []
+    finish_reason: str | None = None
+    usage: Any = None
+    for chunk in chunks:
+        choices = chunk.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
+            text, thought = _stream_delta(choices[0])
+            visible.append(text)
+            reasoning.append(thought)
+            if isinstance(choices[0].get("finish_reason"), str):
+                finish_reason = choices[0]["finish_reason"]
+        if isinstance(chunk.get("usage"), Mapping):
+            usage = chunk["usage"]
+    disposition = "transport_or_stream_failure"
+    if status == 200 and error_type is None and finish_reason == "stop" and done_tracker is not None and done_tracker.saw_done:
+        raw = _stream_envelope(chunks, "".join(visible), "".join(reasoning), finish_reason, usage)
+        if key.encode() in raw:
+            raise ValueError("canary response contains credential")
+        artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
+        try:
+            normalized, _content, _parsed, validation = _validate_raw_response(
+                _PARSER, raw, expected_segment_ids=unit["segment_ids"])
+            validate_b_v2_navigation_references(normalized)
+            artifacts["validation"] = _json_once(stem / "validation.json", validation)
+            artifacts["canonical_output"] = _json_once(stem / "canonical_output.json", normalized)
+            disposition = "accepted_for_local_contract"
+        except (SemanticResponseValidationError, ValueError) as exc:
+            artifacts["validation"] = _json_once(stem / "validation.json", {"error": str(exc)})
+            disposition = "local_validation_failed"
+    terminal = {
+        "route": route, "request_identity": request_identity, "http_status": status,
+        "sdk_error_type": error_type, "finish_reason": finish_reason,
+        "stream_complete": done_tracker is not None and done_tracker.saw_done and finish_reason is not None,
+        "stream_chunk_count": len(chunks), "visible_chars": len("".join(visible)),
+        "reasoning_chars": len("".join(reasoning)), "usage": usage if usage is not None else "UNKNOWN",
+        "usage_normalized": _normalize_usage(usage),
+        "latency_ms": round((time.monotonic() - started) * 1000, 3),
+        "first_chunk_latency_ms": first_chunk_ms if first_chunk_ms is not None else "UNKNOWN",
+        "first_visible_latency_ms": first_visible_ms if first_visible_ms is not None else "UNKNOWN",
+        "disposition": disposition, "artifacts": artifacts, "terminal_at": _now(),
+    }
+    _json_once(stem / "terminal.json", terminal)
+    return terminal
+
+
+def replay_sdk_route_attempt(root: Path, unit_id: str, attempt_number: int,
+                             expected_segment_ids: Sequence[str]) -> dict[str, Any]:
+    """Revalidate a preserved route-pair response without loading credentials or network."""
+
+    root = Path(root)
+    manifest = _read(root / "manifest.json")
+    contract = manifest.get("contract")
+    if not isinstance(contract, Mapping) or manifest.get("identity") != sha256_json(contract):
+        raise ValueError("route-pair manifest integrity mismatch")
+    if contract.get("runner") != "phase05-semantic-sdk-route-pair-0.1":
+        raise ValueError("not a route-pair evidence root")
+    matching = [row for row in contract.get("units", []) if row.get("unit_id") == unit_id]
+    if len(matching) != 1:
+        raise ValueError("unit is not in route-pair manifest")
+    unit = matching[0]
+    if list(expected_segment_ids) != unit.get("segment_ids"):
+        raise ValueError("replay segment binding differs from manifest")
+    stem = root / "units" / _sha(unit_id.encode("utf-8")) / f"attempt-{attempt_number:03d}"
+    issued = _read(stem / "issued.json")
+    terminal = _read(stem / "terminal.json")
+    if (issued.get("request_identity") != unit["request_identity"]
+            or terminal.get("request_identity") != unit["request_identity"]
+            or issued.get("route") != terminal.get("route")
+            or terminal.get("attempt_number") != attempt_number):
+        raise ValueError("route replay attempt identity mismatch")
+    artifacts = terminal.get("artifacts", {})
+    _verify_artifacts(root, artifacts)
+    if terminal.get("disposition") != "accepted_for_local_contract":
+        raise ValueError("route attempt has no accepted output to replay")
+    raw = (root / str(artifacts["response"]["path"])).read_bytes()
+    normalized, _content, _parsed, _validation = _validate_raw_response(
+        _PARSER, raw, expected_segment_ids=expected_segment_ids)
+    validate_b_v2_navigation_references(normalized)
+    if normalized != _read(root / str(artifacts["canonical_output"]["path"])):
+        raise ValueError("provider-free replay differs from accepted output")
+    return {
+        "status": "PASS", "route": terminal["route"], "unit_id": unit_id,
+        "attempt_number": attempt_number, "provider_calls_executed": 0,
+        "network_calls_executed": 0,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
@@ -406,15 +1226,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--ordinal", type=int, action="append")
     parser.add_argument("--max-tokens", type=int, default=16384)
     parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--primary-route", choices=("tokenmetro",), default=None)
+    parser.add_argument("--fallback-route", choices=("jizhi",), default=None)
+    parser.add_argument("--stream", action="store_true")
+    parser.add_argument("--route-canary", choices=("tokenmetro", "jizhi"), default=None)
     args = parser.parse_args(argv)
+    if args.route_canary is not None and (args.primary_route is not None or args.fallback_route is not None):
+        parser.error("choose either --route-canary or the route pair")
+    if args.stream and args.route_canary is None and args.primary_route is None and args.fallback_route is None:
+        parser.error("--stream requires --route-canary or explicit route-pair mode")
+    if args.primary_route is not None or args.fallback_route is not None:
+        parser.error("automatic paid route-pair execution remains pilot-gated; use one explicit --route-canary")
+    if args.route_canary is not None:
+        if args.model != "deepseek" or not args.stream or args.max_retries != 0 or len(args.ordinal or []) != 1:
+            parser.error("route canary requires DeepSeek, stream, zero retries, and one ordinal")
     from .semantic_live_runner import b_v2_experiment_contract
     experiment = b_v2_experiment_contract()
     units = frozen_preflight_units(args.preflight_root, args.model, args.ordinal)
-    result = run_sdk_units(args.run_root, model=tokenmetro_model_id(args.model), units=units,
-                           prompt=experiment.prompt_contract, prompt_identity=experiment.prompt_identity,
-                           source_identity="8601fb2e665fd5f1bc1b7a9ef35a871269e3ea00f0b9a23654656a0bb3838da0",
-                           max_tokens=args.max_tokens, max_retries=args.max_retries)
+    common = {
+        "model": tokenmetro_model_id(args.model), "units": units,
+        "prompt": experiment.prompt_contract, "prompt_identity": experiment.prompt_identity,
+        "source_identity": "8601fb2e665fd5f1bc1b7a9ef35a871269e3ea00f0b9a23654656a0bb3838da0",
+        "max_tokens": args.max_tokens,
+    }
+    if args.route_canary is not None:
+        result = run_sdk_route_canary(args.run_root, route=args.route_canary, **common)
+    else:
+        result = run_sdk_units(args.run_root, max_retries=args.max_retries,
+                               primary_route=args.primary_route, fallback_route=args.fallback_route,
+                               stream=args.stream, **common)
     print(canonical_json_bytes(result).decode("utf-8"))
+    if args.route_canary is not None:
+        return 0 if result["disposition"] == "accepted_for_local_contract" else 1
     return 0 if result["status"] == "complete" else 1
 
 

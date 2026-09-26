@@ -13,7 +13,14 @@ from genshin_corpus.retrieval.__main__ import _semantic_live_run_main
 from genshin_corpus.retrieval.semantic_compiler_u1 import SEMANTIC_OUTPUT_SCHEMA_VERSION, semantic_input_identity
 from genshin_corpus.retrieval.semantic_live_runner import ChannelConfig, SemanticProviderRequest, load_adapter, run_channel
 from genshin_corpus.retrieval.semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter, create_adapter
-from genshin_corpus.retrieval.semantic_sdk_runner import run_sdk_units
+from genshin_corpus.retrieval.semantic_sdk_runner import (
+    _policy_403_pre_generation,
+    replay_sdk_route_attempt,
+    run_sdk_route_canary,
+    run_sdk_route_pair,
+    run_sdk_units,
+)
+from genshin_corpus.retrieval.semantic_tokenmetro_profile import route_profile
 from genshin_corpus.retrieval.semantic_v2_comparison import run_one as legacy_comparison_run_one
 
 
@@ -161,6 +168,377 @@ class SdkRunnerTest(unittest.TestCase):
                                      allow_legacy_live=True).legacy_live_enabled)
         with self.assertRaisesRegex(ValueError, "explicit opt-in"):
             legacy_comparison_run_one(self.root, "gemini", 16)
+
+    def _route_environment(self):
+        return {
+            "TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
+            "JIZHI_BASE_URL": "https://jizhi.fixture/v1",
+            "TOKENMETRO_API_KEY": "tokenmetro-secret",
+            "JIZHI_API_KEY": "jizhi-secret",
+        }
+
+    def _stream_body(self, name="s1", *, reasoning="", finish="stop"):
+        content = {
+            "schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION,
+            "items": [],
+            "segment_coverage": [{"segment_id": name, "disposition": "covered", "reason": None}],
+        }
+        rows = [
+            {"id": "stream-fixture", "choices": [{"index": 0, "delta": {"role": "assistant", "reasoning_content": reasoning}, "finish_reason": None}]},
+            {"id": "stream-fixture", "choices": [{"index": 0, "delta": {"content": json.dumps(content)}, "finish_reason": None}]},
+            {"id": "stream-fixture", "choices": [{"index": 0, "delta": {}, "finish_reason": finish}]},
+            {"id": "stream-fixture", "choices": [], "usage": {"prompt_tokens": 3, "completion_tokens": 4}},
+        ]
+        return b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in rows) + b"data: [DONE]\n\n"
+
+    def test_route_profiles_use_runtime_urls_without_secrets(self):
+        environment = self._route_environment()
+        tokenmetro = route_profile("tokenmetro", environment, require_environment=True)
+        jizhi = route_profile("jizhi", environment, require_environment=True)
+        self.assertEqual(tokenmetro.base_url, environment["TOKENMETRO_BASE_URL"])
+        self.assertEqual(jizhi.base_url, environment["JIZHI_BASE_URL"])
+        self.assertEqual(tokenmetro.model_id, jizhi.model_id)
+        self.assertNotIn("secret", json.dumps(tokenmetro.safe_dict()))
+        with self.assertRaisesRegex(ValueError, "JIZHI_BASE_URL"):
+            route_profile("jizhi", {"JIZHI_API_KEY": "present"}, require_environment=True)
+        for bad_url in (
+            "https://user:pass@jizhi.fixture/v1",
+            "https://jizhi.fixture/v1?token=secret",
+            "https://jizhi.fixture/v1#secret",
+        ):
+            with self.subTest(bad_url=bad_url), self.assertRaises(ValueError):
+                route_profile("jizhi", {"JIZHI_BASE_URL": bad_url}, require_environment=True)
+
+    def test_route_pair_requires_primary_runtime_key_before_io(self):
+        environment = self._route_environment()
+        environment.pop("TOKENMETRO_API_KEY")
+        with self.assertRaisesRegex(ValueError, "TOKENMETRO_API_KEY"):
+            run_sdk_route_pair(
+                self.root, units=[unit("s1")], prompt={"version": "v2"},
+                prompt_identity="fixture-v2", source_identity="fixture-source",
+                environment=environment,
+            )
+
+    def test_observed_tokenmetro_policy_403_shape_is_allowlisted(self):
+        # The frozen ordinal21 response uses error.type and a null error.code.
+        raw = b'{"error":{"message":"fixture","type":"content_policy_violation","param":null,"code":null}}'
+        self.assertTrue(_policy_403_pre_generation(
+            raw, 403, chunk_count=0, reasoning_chars=0, visible_chars=0,
+            usage="UNKNOWN", finish_reason=None,
+        ))
+        self.assertFalse(_policy_403_pre_generation(
+            raw, 403, chunk_count=1, reasoning_chars=0, visible_chars=0,
+            usage="UNKNOWN", finish_reason=None,
+        ))
+        self.assertFalse(_policy_403_pre_generation(
+            b'{"error":{"type":"content_policy_violation"}}', 403,
+            chunk_count=0, reasoning_chars=0, visible_chars=0,
+            usage="UNKNOWN", finish_reason=None,
+        ))
+
+    def test_policy_403_creates_one_jizhi_fallback_with_same_logical_request(self):
+        environment = self._route_environment()
+        bodies = {}
+
+        def primary(request):
+            bodies["tokenmetro"] = json.loads(request.content)
+            return httpx.Response(403, json={"error": {"code": "content_policy_violation", "message": "fixture"}}, request=request)
+
+        def fallback(request):
+            bodies["jizhi"] = json.loads(request.content)
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"}, prompt_identity="fixture-v2",
+            source_identity="fixture-source", environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["route_history"]["s1"], ["tokenmetro", "jizhi"])
+        self.assertEqual(result["counters"]["tokenmetro_policy_403"], 1)
+        self.assertEqual(result["counters"]["accepted_fallback"], 1)
+        self.assertEqual(bodies["tokenmetro"], bodies["jizhi"])
+        attempts = self.attempt_dirs()
+        self.assertEqual(len(attempts), 2)
+        primary_terminal = json.loads((attempts[0] / "terminal.json").read_bytes())
+        fallback_terminal = json.loads((attempts[1] / "terminal.json").read_bytes())
+        self.assertEqual(primary_terminal["disposition"], "primary_policy_403_pre_generation")
+        self.assertEqual(fallback_terminal["disposition"], "accepted_for_local_contract")
+        chunk_descriptors = fallback_terminal["artifacts"]["stream_chunks"]
+        self.assertEqual(len(chunk_descriptors), fallback_terminal["stream_chunk_count"])
+        self.assertTrue(all((self.root / row["path"]).is_file() for row in chunk_descriptors))
+        replay = replay_sdk_route_attempt(self.root, "s1", 2, ["s1"])
+        self.assertEqual(replay["network_calls_executed"], 0)
+        self.assertEqual(replay["status"], "PASS")
+        persisted = b"".join(path.read_bytes() for path in self.root.rglob("*") if path.is_file())
+        self.assertNotIn(b"tokenmetro-secret", persisted)
+        self.assertNotIn(b"jizhi-secret", persisted)
+
+    def test_generic_403_does_not_fallback(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"message": "forbidden"}}, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"}, prompt_identity="fixture-v2",
+            source_identity="fixture-source", environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "stopped_unknown_execution")
+        self.assertEqual(called, ["tokenmetro"])
+        self.assertEqual(len(self.attempt_dirs()), 1)
+
+    def test_stream_incomplete_stops_without_fallback(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            body = b'data: ' + json.dumps({"id": "partial", "choices": [{"index": 0, "delta": {"reasoning_content": "partial", "content": "{"}, "finish_reason": None}]}).encode() + b"\n\n"
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"}, prompt_identity="fixture-v2",
+            source_identity="fixture-source", environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "stopped_unknown_execution")
+        self.assertEqual(called, ["tokenmetro"])
+        terminal = json.loads((self.attempt_dirs()[0] / "terminal.json").read_bytes())
+        self.assertEqual(terminal["execution_state"], "unknown")
+        self.assertFalse(terminal["stream_complete"])
+
+    def test_stream_chunks_are_immutable_before_next_network_segment(self):
+        environment = self._route_environment()
+        key = __import__("hashlib").sha256(b"s1").hexdigest()
+        first_chunk = self.root / "units" / key / "attempt-001" / "chunk-000001.json"
+        observed = []
+
+        class SegmentedStream(httpx.SyncByteStream):
+            def __iter__(self):
+                events = [part + b"\n\n" for part in self_body.split(b"\n\n") if part]
+                for index, event in enumerate(events):
+                    if index == 1:
+                        observed.append(first_chunk.is_file())
+                    yield event
+
+        self_body = self._stream_body()
+
+        def primary(request):
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  stream=SegmentedStream(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary)},
+        )
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(observed, [True])
+        terminal = json.loads((self.attempt_dirs()[0] / "terminal.json").read_bytes())
+        self.assertTrue(terminal["stream_complete"])
+
+    def test_timeout_stops_without_fallback(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            raise httpx.ReadTimeout("fixture timeout", request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"}, prompt_identity="fixture-v2",
+            source_identity="fixture-source", environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "stopped_unknown_execution")
+        self.assertEqual(called, ["tokenmetro"])
+
+    def test_connection_reset_stops_without_fallback(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            raise httpx.ReadError("fixture connection reset", request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"}, prompt_identity="fixture-v2",
+            source_identity="fixture-source", environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "stopped_unknown_execution")
+        self.assertEqual(called, ["tokenmetro"])
+
+    def test_explicit_route_canaries_share_request_identity_without_fallback(self):
+        environment = self._route_environment()
+        bodies = []
+
+        def handler(request):
+            bodies.append(json.loads(request.content))
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        first = run_sdk_route_canary(
+            self.root / "tokenmetro", route="tokenmetro", units=[unit("s1")],
+            prompt={"version": "v2"}, prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment, transport=httpx.MockTransport(handler),
+        )
+        second = run_sdk_route_canary(
+            self.root / "jizhi", route="jizhi", units=[unit("s1")],
+            prompt={"version": "v2"}, prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment, transport=httpx.MockTransport(handler),
+        )
+        self.assertEqual(first["disposition"], "accepted_for_local_contract")
+        self.assertEqual(second["disposition"], "accepted_for_local_contract")
+        self.assertEqual(first["request_identity"], second["request_identity"])
+        self.assertEqual(bodies[0], bodies[1])
+        self.assertEqual(first["usage"]["prompt_tokens"], 3)
+        self.assertEqual(first["usage"]["completion_tokens"], 4)
+        for path in self.root.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(b"tokenmetro-secret", path.read_bytes())
+                self.assertNotIn(b"jizhi-secret", path.read_bytes())
+
+    def test_route_pair_rejects_ambiguous_http_and_local_failures(self):
+        environment = self._route_environment()
+        cases = [
+            ("rate_limit", httpx.Response(429, text="busy"), "transport_failure"),
+            ("server_error", httpx.Response(503, text="busy"), "transport_failure"),
+            ("ordinary_403", httpx.Response(403, json={"error": {"code": "other"}}), "transport_failure"),
+            ("unauthorized", httpx.Response(401, text="unauthorized"), "transport_failure"),
+            ("missing_route", httpx.Response(404, text="missing"), "transport_failure"),
+            ("length", httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                      content=self._stream_body(finish="length")), "output_budget_blocked"),
+            ("missing_done", httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                            content=self._stream_body().replace(b"data: [DONE]\n\n", b"")), "transport_failure"),
+            ("bad_json", httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                        content=b'data: {"choices":[{"delta":{"content":"{"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'), "local_validation_failed"),
+        ]
+        for name, response, expected_disposition in cases:
+            with self.subTest(name=name):
+                called = []
+
+                def primary(request):
+                    called.append("tokenmetro")
+                    return response
+
+                def fallback(request):
+                    called.append("jizhi")
+                    return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                          content=self._stream_body(), request=request)
+
+                result = run_sdk_route_pair(
+                    self.root / name, units=[unit("s1")], prompt={"version": "v2"},
+                    prompt_identity="fixture-v2", source_identity="fixture-source",
+                    environment=environment,
+                    transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+                )
+                self.assertEqual(called, ["tokenmetro"])
+                self.assertEqual(result["provider_attempts_total"], 1)
+                key = __import__("hashlib").sha256(b"s1").hexdigest()
+                terminal = json.loads((self.root / name / "units" / key / "attempt-001" / "terminal.json").read_bytes())
+                self.assertEqual(terminal["disposition"], expected_disposition)
+
+    def test_route_pair_resume_skips_success_and_rejects_changed_identity(self):
+        environment = self._route_environment()
+        calls = []
+
+        def primary(request):
+            calls.append("tokenmetro")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary)},
+        }
+        first = run_sdk_route_pair(self.root, **kwargs)
+        second = run_sdk_route_pair(self.root, **kwargs)
+        self.assertEqual(first["status"], "complete")
+        self.assertEqual(second["provider_attempts_this_invocation"], 0)
+        self.assertEqual(calls, ["tokenmetro"])
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            run_sdk_route_pair(self.root, **{**kwargs, "source_identity": "changed"})
+
+    def test_policy_primary_resumes_once_when_fallback_credential_arrives(self):
+        environment = self._route_environment()
+        initial = dict(environment)
+        initial.pop("JIZHI_API_KEY")
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"type": "content_policy_violation", "code": None}}, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        common = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "transports": {"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        }
+        first = run_sdk_route_pair(self.root, environment=initial, **common)
+        self.assertEqual(first["status"], "blocked_missing_fallback_credential")
+        self.assertEqual(first["provider_attempts_total"], 1)
+        second = run_sdk_route_pair(self.root, environment=environment, **common)
+        self.assertEqual(second["status"], "complete")
+        self.assertEqual(called, ["tokenmetro", "jizhi"])
+        self.assertEqual(second["provider_attempts_total"], 2)
+        self.assertEqual(second["counters"]["accepted_fallback"], 1)
+        again = run_sdk_route_pair(self.root, environment=environment, **common)
+        self.assertEqual(again["provider_attempts_this_invocation"], 0)
+
+    def test_fallback_failure_is_terminal_and_not_reissued(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"code": "content_policy_violation"}}, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(503, text="unavailable", request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        }
+        first = run_sdk_route_pair(self.root, **kwargs)
+        second = run_sdk_route_pair(self.root, **kwargs)
+        self.assertEqual(first["status"], "blocked")
+        self.assertEqual(second["provider_attempts_this_invocation"], 0)
+        self.assertEqual(called, ["tokenmetro", "jizhi"])
+        self.assertEqual(first["counters"]["jizhi_fallback_failures"], 1)
 
 
 if __name__ == "__main__":

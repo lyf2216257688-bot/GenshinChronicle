@@ -283,6 +283,38 @@ changing the frozen semantic/request identity. They are operating points,
 not permanent correctness invariants. Local-contract acceptance
 remains separate from human semantic acceptance and active-view eligibility.
 
+## DeepSeek route-pair contract
+
+The production candidate route is TokenMetro with Jizhi as an explicit,
+conservative fallback for the same `deepseek-v4.1-flash` model. Route profiles
+are loaded at runtime from `TOKENMETRO_BASE_URL`/`TOKENMETRO_API_KEY` and
+`JIZHI_BASE_URL`/`JIZHI_API_KEY`; only route names, safe configuration
+identities, and environment variable names may enter persisted evidence.
+
+The route-aware SDK runner creates one logical request identity over source,
+Prompt v2, schema, model, canonical messages/payload, stream setting, output
+ceiling, and generation parameters. A fallback attempt must use the same
+identity and is represented as a second immutable attempt under the same unit.
+The wire request is Chat Completions on both routes for this contract; a
+Responses dialect requires a separate contract and is not inferred from
+historical relay evidence.
+
+Fallback is legal only for TokenMetro HTTP 403 with exact JSON
+`error.code=content_policy_violation`, or the frozen TokenMetro variant
+`error.type=content_policy_violation` with null `error.code`, received before
+any stream chunk or visible/reasoning content, with no usage or finish reason.
+Timeout, connection
+errors, 429/5xx, ordinary 403, incomplete streams, partial content, output
+length, and local parse/schema/source-binding failures are never route
+fallbacks. They preserve their terminal evidence and stop fail closed.
+
+Route-pair execution uses no automatic retry. Primary terminal evidence is
+persisted and checkpointed before a fallback request is issued. Accepted units
+are skipped on resume; unresolved attempts, changed identities, or a prior
+fallback terminal block further requests. Accounting exposes route history,
+policy-403 counts, fallback outcomes, execution-unknown stops, latency, and
+provider-reported usage/cost with `UNKNOWN` preserved where unavailable.
+
 ## P05-W1 acceptance
 
 The provider-free contract fixture demonstrates two deterministic 2-hop routes

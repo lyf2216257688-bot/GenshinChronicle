@@ -7,11 +7,18 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
-**Phase 05 - Source-Bound Semantic Navigation (P05-W2 B JSON-object local
-contract canaries PASS; B v2 SDK three-model comparison and later ordinal 21
-recovery attempts remain incomplete; fresh Jizhi direct-Python verification is
-EXTERNAL BLOCKER; semantic quality not PASS; P05-W2-U1 and P05-W1 mechanical
-contracts PASS).** Phase 04 established
+**Phase 05 - Source-Bound Semantic Navigation (DeepSeek V4.1 Flash selected as
+the Semantic Compiler production-model candidate; the TokenMetro primary /
+Jizhi fallback SDK mechanism is structurally ready, with same-payload
+ordinal16 canaries passing on both routes; bounded pilot not yet authorized;
+P05-W2 B JSON-object local contract canaries PASS; the separately authorized TokenMetro-only DeepSeek/GLM
+ordinal 16/20 comparison is complete with one GLM ordinal 20 incomplete
+stream; B v2 SDK three-model comparison and ordinal 21 recovery remain
+incomplete; historical Jizhi direct-Python verification was externally blocked,
+superseded only for the current-key DeepSeek Chat Completions ordinal16 canary;
+TokenMetro ordinal 21 is currently blocked by a reproducible
+route/provider-policy false positive involving the frozen `钓鱼` text; semantic
+quality not PASS; P05-W2-U1 and P05-W1 mechanical contracts PASS).** Phase 04 established
 the first complete end-to-end RAG baseline. Phase 01 Raw, Phase 02 Parsed,
 Phase 03 Canonical, and Phase 04 Block A are closed at their accepted
 boundaries; the production corpus scope remains `zh-cn` MiHoYo OBC.
@@ -508,6 +515,52 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
+DeepSeek V4.1 Flash is the selected Semantic Compiler production-model
+candidate. The next Phase 05 work unit is a separately authorized bounded
+route-pair pilot using TokenMetro as primary and Jizhi only for the exact
+pre-generation policy 403. Both current-key ordinal16 route canaries passed
+the local contract with identical request bytes under
+`data/retrieval/p05-w2-deepseek-route-canary-tokenmetro-20260926-r1` and
+`data/retrieval/p05-w2-deepseek-route-canary-jizhi-20260926-r1`. These canaries
+do not demonstrate a real fallback transition, semantic acceptance, or
+production-scale stability. The route-pair CLI remains pilot-gated; no full
+semantic build is authorized.
+
+The current ordinal 21 blocker is further localized than the historical
+generic `content_policy_violation` description: the tested TokenMetro
+DeepSeek route rejects the complete frozen payload before generation with the
+reproducible `钓鱼` trigger text, while the corresponding GLM frozen route
+shows the same pre-generation policy block. A same-payload diagnostic with
+all such occurrences replaced passes the tested DeepSeek pre-generation gate.
+An alternate relay accepted the same text, so this is
+treated as a TokenMetro route/provider-policy overblocking issue rather than
+evidence that DeepSeek itself forbids the term. The responsible layer is
+still unknown: available client evidence does not distinguish TokenMetro,
+its model channel, or upstream moderation/provider policy.
+
+Do not alter official source text, Prompt v2, or the output schema to bypass
+this route behavior. TokenMetro remains the low-cost primary-route candidate.
+The route-aware SDK runner now has a structural TokenMetro -> Jizhi fallback
+mechanism for the exact pre-generation HTTP 403
+`content_policy_violation` response (`error.code`, or the frozen TokenMetro
+`error.type` variant with null `error.code`). It is fail-closed for all ambiguous
+execution outcomes. One fresh current-key DeepSeek ordinal16 canary on each
+route returned HTTP 200, `finish_reason=stop`, and passed the local contract;
+both used identical logical and wire request bodies. This resolves the
+historical Jizhi key/generation blocker for this exact tested route and sample,
+but it does not establish Jizhi ordinal21 policy behavior or authorize a
+bounded pilot automatically.
+The separately authorized TokenMetro-only, same-condition comparison of
+`deepseek-v4.1-flash` and `glm-5.3-flash` on frozen ordinals 16 and 20 is
+complete under
+`docs/research/phase-05/p05-w2-tokenmetro-deepseek-glm-comparison-20260926.md`.
+DeepSeek completed both units; GLM ordinal 16 completed, while ordinal 20
+ended after a partial stream with no visible semantic output. Historical GLM
+ordinal 20 output is retained only as a non-paired reference. This is not a
+restored Gemini/DeepSeek/GLM 3x3 benchmark and did not start the full semantic
+build; Prompt v2, schema, frozen source, and Block A remain unchanged. No
+automatic retry or sample expansion follows from this comparison.
+
 **Phase 05 P05-W1 and P05-W2-U1 mechanical gates are PASS; the provider-free
 bounded live preflight is READY; B JSON-object implementation and three
 TokenMetro Gemini formal local-contract canaries are mechanically PASS. B v2
@@ -601,8 +654,12 @@ unchanged request/wire bodies; no ordinal 21 GLM/DeepSeek semantic output or
 local validation exists. The updated available-evidence comparison is
 `data/retrieval/p05-w2-b-v2-three-model-available-evidence-20260924-r2/review.md`.
 A subsequent separately authorized route diagnosis is recorded in
-`docs/research/phase-05/p05-w2-ordinal21-route-recovery-20260924.md`. Jizhi's
-small DeepSeek canary failed at TLS/connect with WinError 10054; a later Jizhi
+`docs/research/phase-05/p05-w2-ordinal21-route-recovery-20260924.md`.
+The reproducible `钓鱼` trigger localization and route-policy conclusion are
+recorded separately in
+`docs/research/phase-05/p05-w2-tokenmetro-ordinal21-policy-trigger-20260925.md`.
+Jizhi's small DeepSeek canary failed at TLS/connect with WinError 10054; a later
+Jizhi
 `/v1/models` request returned HTTP 401 `INVALID_API_KEY`, so Jizhi DeepSeek/GLM
 ordinal 21 generation and policy behavior remain UNKNOWN. TokenMetro advertised
 Responses for both models and returned HTTP 200 on small Responses canaries,
@@ -633,10 +690,12 @@ official OpenAI SDK 3.19.2 request construction; all produced no HTTP response,
 usage, stream chunks, or generated content. This is recorded at
 `docs/research/phase-05/p05-w2-jizhi-direct-python-fresh-20260925.md` with
 immutable roots `data/retrieval/p05-w2-jizhi-direct-python-20260925-r1` through
-`-r8`. Because neither model canary generated text, no unproven direct route
-was integrated into the provider runner and frozen ordinal21 was not issued.
-The current blocker is external Jizhi key/account/edge state; the minimum
-reproduction is the redacted Bearer `GET /v1/models` returning HTTP 401.
+`-r8`. At that checkpoint neither model canary generated text, no unproven
+direct route was integrated, and frozen ordinal21 was not issued. The minimum
+reproduction was the redacted Bearer `GET /v1/models` returning HTTP 401. The
+later current-key DeepSeek Chat Completions ordinal16 canary succeeded as
+recorded above; the old 401 remains historical evidence, not current route
+availability authority.
 For future Phase 05 TokenMetro Chat Completions execution, the formal default
 is the official `openai` Python SDK through `semantic-sdk-run` / the reusable
 SDK unit runner. The direct-HTTP `semantic-live-run` and earlier comparison
@@ -652,6 +711,17 @@ bounded transient retries per invocation, with identity-checked resume and
 immutable attempt evidence. This is an engineering operating point, not a
 semantic acceptance or a new paid-run authorization. Prompt v2, output schema,
 and the prior r1/r2 evidence roots remain unchanged.
+The DeepSeek route-pair entry point is separate from that historical single-
+route operating point: it fixes `stream=true`, disables automatic retries, and
+records ordered TokenMetro primary and Jizhi fallback attempts under one
+logical request identity. Only the exact pre-generation policy 403 can create
+the fallback attempt; timeout, connection, 5xx, partial stream, and local
+validation failures stop without a route change. The route-pair mechanism is
+provider-free tested, and the two route canaries passed under separate
+immutable roots. The CLI permits one explicit route canary at a time and
+keeps automatic paid route-pair execution gated. An actual fallback transition
+has only provider-free test evidence; the first bounded paid pilot remains a
+separately authorized next work unit.
 `accepted_for_local_contract` does not by itself authorize active semantic
 views or production adoption. Any additional paid canary requires separate
 authorization, historical attempt accounting, a new root, and a fresh
