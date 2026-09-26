@@ -8,9 +8,10 @@ its detailed lookup-only archive is linked there and is not current authority.
 ## Active phase and work unit
 
 **Phase 05 - Source-Bound Semantic Navigation (P05-W2 B JSON-object local
-contract canaries PASS; B v2 SDK three-model comparison stopped under its
-per-model gates after six requests; semantic quality not PASS; P05-W2-U1 and
-P05-W1 mechanical contracts PASS).** Phase 04 established
+contract canaries PASS; B v2 SDK three-model comparison and later ordinal 21
+recovery attempts remain incomplete; fresh Jizhi direct-Python verification is
+EXTERNAL BLOCKER; semantic quality not PASS; P05-W2-U1 and P05-W1 mechanical
+contracts PASS).** Phase 04 established
 the first complete end-to-end RAG baseline. Phase 01 Raw, Phase 02 Parsed,
 Phase 03 Canonical, and Phase 04 Block A are closed at their accepted
 boundaries; the production corpus scope remains `zh-cn` MiHoYo OBC.
@@ -589,6 +590,53 @@ adoption follows from mechanical passes. Scoped evidence and accounting are in
 `docs/research/phase-05/p05-w2-v2-sdk-three-model-20260924.md`.
 This separately authorized work unit is complete; further paid requests and
 optimization require new authorization.
+Later separate, explicitly authorized streaming 500,000-token attempts added
+local-contract GLM/DeepSeek ordinal 20 results, while both original ordinal 21
+routes returned pre-generation HTTP 403 `content_policy_violation`. TokenMetro
+subsequently reported removing blocking rules. One fresh, exact frozen-payload
+retry per model after that report still returned HTTP 403 with zero stream
+chunks: GLM in 1,437.606 ms and DeepSeek in 1,509.070 ms. The previous 403
+roots remain historical evidence. Both new roots contain one attempt and
+unchanged request/wire bodies; no ordinal 21 GLM/DeepSeek semantic output or
+local validation exists. The updated available-evidence comparison is
+`data/retrieval/p05-w2-b-v2-three-model-available-evidence-20260924-r2/review.md`.
+A subsequent separately authorized route diagnosis is recorded in
+`docs/research/phase-05/p05-w2-ordinal21-route-recovery-20260924.md`. Jizhi's
+small DeepSeek canary failed at TLS/connect with WinError 10054; a later Jizhi
+`/v1/models` request returned HTTP 401 `INVALID_API_KEY`, so Jizhi DeepSeek/GLM
+ordinal 21 generation and policy behavior remain UNKNOWN. TokenMetro advertised
+Responses for both models and returned HTTP 200 on small Responses canaries,
+but exact frozen ordinal 21 semantic content returned pre-generation HTTP 403
+`content_policy_violation` on that API surface for both models, with zero
+events. Local validation and a three-model ordinal 21 comparison remain blocked;
+no production/default or semantic-quality conclusion follows.
+The historical Jizhi route investigation is retained at
+`docs/research/phase-05/p05-w2-jizhi-path-recovery-20260925.md`; the current
+Python-direct continuation is recorded at
+`docs/research/phase-05/p05-w2-jizhi-direct-python-20260925.md`. The user added
+50 Jizhi requests, raising the cumulative hard cap to 70 while preserving the
+prior 11-attempt ledger. Seven new raw-Python attempts used a TLS/SNI-preserved
+pinned IPv4 route and tested `/v1/responses`, `/v1/chat/completions`, and the
+documented root `/responses`; DeepSeek, GLM, and a historical Gemini control all
+returned application-layer HTTP 401 `INVALID_API_KEY`. The cumulative
+conservative paid ledger is 18/70. No Python-direct path reached generation,
+and frozen ordinal 21 was not rerun; Jizhi policy behavior remains UNKNOWN.
+CC Switch, its credentials, and its relay are outside the current investigation
+scope and were not used in this continuation.
+The fresh direct-Python verification then used only the current process
+`JIZHI_API_KEY` and standard-library `http.client` against the public hostname.
+One `/v1/models` discovery returned HTTP 401 `INVALID_API_KEY`; independent
+DeepSeek and GLM Responses and Chat Completions canaries each reset at the TLS/
+connection layer (WinError 10054), including one isolated TLS 1.2 control.
+Seven fresh POSTs covered standard-library HTTP/1.1, `httpx` streaming, and
+official OpenAI SDK 3.19.2 request construction; all produced no HTTP response,
+usage, stream chunks, or generated content. This is recorded at
+`docs/research/phase-05/p05-w2-jizhi-direct-python-fresh-20260925.md` with
+immutable roots `data/retrieval/p05-w2-jizhi-direct-python-20260925-r1` through
+`-r8`. Because neither model canary generated text, no unproven direct route
+was integrated into the provider runner and frozen ordinal21 was not issued.
+The current blocker is external Jizhi key/account/edge state; the minimum
+reproduction is the redacted Bearer `GET /v1/models` returning HTTP 401.
 For future Phase 05 TokenMetro Chat Completions execution, the formal default
 is the official `openai` Python SDK through `semantic-sdk-run` / the reusable
 SDK unit runner. The direct-HTTP `semantic-live-run` and earlier comparison
@@ -606,8 +654,8 @@ semantic acceptance or a new paid-run authorization. Prompt v2, output schema,
 and the prior r1/r2 evidence roots remain unchanged.
 `accepted_for_local_contract` does not by itself authorize active semantic
 views or production adoption. Any additional paid canary requires separate
-authorization, an unattempted frozen unit, historical attempt accounting, a new
-root, and a fresh zero-network preflight. A later prompt change also requires
+authorization, historical attempt accounting, a new root, and a fresh
+zero-network preflight. A later prompt change also requires
 a new experiment/prompt identity. Broader semantic/live evaluation of P05-derived
 views and navigation remains later and is not implied.
 The real bounded Genshin story slice is an open acceptance dependency for that
