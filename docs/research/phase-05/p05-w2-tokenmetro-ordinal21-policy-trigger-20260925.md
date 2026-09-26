@@ -32,6 +32,14 @@ tested `钓鱼` span is therefore unknown.
 
 ## Engineering decision
 
+The decision below describes the 2026-09-25 checkpoint. The route-pair
+mechanism was implemented at `80616c0`; a later synthetic `钓鱼` diagnostic
+completed on TokenMetro primary without a 403, and its explicit retry stopped
+on an incomplete primary stream. A real fallback transition remains
+unobserved. See `p05-w2-deepseek-real-fallback-diagnostic-20260926.md`,
+`p05-w2-deepseek-real-fallback-retry-20260926.md`, and current authority in
+`docs/current-phase.md`.
+
 Resolve this at the provider-route/policy layer. Do not edit official source
 content, Prompt v2, or the schema to evade the rejection. TokenMetro remains
 the low-cost primary-route candidate. A fallback route for an explicit

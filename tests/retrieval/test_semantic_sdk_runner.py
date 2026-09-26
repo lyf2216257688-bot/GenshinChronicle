@@ -319,6 +319,52 @@ class SdkRunnerTest(unittest.TestCase):
         self.assertEqual(terminal["execution_state"], "unknown")
         self.assertFalse(terminal["stream_complete"])
 
+    def test_stream_error_event_preserves_safe_diagnostics_without_fallback(self):
+        environment = self._route_environment()
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            events = [
+                {"choices": [{"index": 0, "delta": {"reasoning_content": "partial"}, "finish_reason": None}]},
+                {"error": {"message": "Upstream response stream ended before completion",
+                           "code": "upstream_stream_incomplete", "type": "provider_stream_error",
+                           "param": "tokenmetro-secret"}},
+            ]
+            body = b"".join(b"data: " + json.dumps(event).encode() + b"\n\n" for event in events)
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=body, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        self.assertEqual(result["status"], "stopped_unknown_execution")
+        self.assertEqual(called, ["tokenmetro"])
+        self.assertEqual(result["provider_attempts_total"], 1)
+        terminal = json.loads((self.attempt_dirs()[0] / "terminal.json").read_bytes())
+        self.assertEqual(terminal["http_status"], 200)
+        self.assertEqual(terminal["stream_chunk_count"], 1)
+        self.assertEqual(terminal["disposition"], "transport_failure")
+        self.assertFalse(terminal["fallback_eligible"])
+        error = json.loads((self.attempt_dirs()[0] / "sdk_error.json").read_bytes())
+        self.assertEqual(error["type"], "APIError")
+        self.assertEqual(error["origin"], "sse_error_event")
+        self.assertEqual(error["provider_error_code"], "upstream_stream_incomplete")
+        self.assertEqual(error["provider_error_type"], "provider_stream_error")
+        self.assertEqual(error["provider_error_param"], "[REDACTED]")
+        for path in self.root.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(b"tokenmetro-secret", path.read_bytes())
+                self.assertNotIn(b"jizhi-secret", path.read_bytes())
+
     def test_stream_chunks_are_immutable_before_next_network_segment(self):
         environment = self._route_environment()
         key = __import__("hashlib").sha256(b"s1").hexdigest()

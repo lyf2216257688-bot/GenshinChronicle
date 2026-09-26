@@ -10,14 +10,19 @@ its detailed lookup-only archive is linked there and is not current authority.
 **Phase 05 - Source-Bound Semantic Navigation (DeepSeek V4.1 Flash selected as
 the Semantic Compiler production-model candidate; the TokenMetro primary /
 Jizhi fallback SDK mechanism is structurally ready, with same-payload
-ordinal16 canaries passing on both routes; bounded pilot not yet authorized;
+ordinal16 canaries passing on both routes; real synthetic route-pair r1
+accepted on TokenMetro primary, explicit retry r2 stopped on an incomplete
+primary stream, and fresh r4 again accepted on TokenMetro primary; real
+automatic handoff remains UNOBSERVED (not FAIL) and does not block a bounded
+pilot; the 3-unit DeepSeek route-pair pilot completed with all units accepted
+on TokenMetro primary and no fallback trigger;
 P05-W2 B JSON-object local contract canaries PASS; the separately authorized TokenMetro-only DeepSeek/GLM
 ordinal 16/20 comparison is complete with one GLM ordinal 20 incomplete
 stream; B v2 SDK three-model comparison and ordinal 21 recovery remain
 incomplete; historical Jizhi direct-Python verification was externally blocked,
 superseded only for the current-key DeepSeek Chat Completions ordinal16 canary;
-TokenMetro ordinal 21 is currently blocked by a reproducible
-route/provider-policy false positive involving the frozen `钓鱼` text; semantic
+the last-tested TokenMetro ordinal21 frozen request returned a
+route/provider-policy 403 involving `钓鱼` text; semantic
 quality not PASS; P05-W2-U1 and P05-W1 mechanical contracts PASS).** Phase 04 established
 the first complete end-to-end RAG baseline. Phase 01 Raw, Phase 02 Parsed,
 Phase 03 Canonical, and Phase 04 Block A are closed at their accepted
@@ -516,22 +521,81 @@ governs only its historical benchmark path.
 ## Immediate next gate
 
 DeepSeek V4.1 Flash is the selected Semantic Compiler production-model
-candidate. The next Phase 05 work unit is a separately authorized bounded
-route-pair pilot using TokenMetro as primary and Jizhi only for the exact
-pre-generation policy 403. Both current-key ordinal16 route canaries passed
-the local contract with identical request bytes under
+candidate. Real automatic handoff is UNOBSERVED, not FAIL, and is not a
+prerequisite for a bounded production-route pilot. Both current-key
+ordinal16 route canaries passed the local contract with identical request
+bytes under
 `data/retrieval/p05-w2-deepseek-route-canary-tokenmetro-20260926-r1` and
 `data/retrieval/p05-w2-deepseek-route-canary-jizhi-20260926-r1`. These canaries
 do not demonstrate a real fallback transition, semantic acceptance, or
-production-scale stability. The route-pair CLI remains pilot-gated; no full
-semantic build is authorized.
+production-scale stability. The separately authorized one-shot synthetic
+`钓鱼` r1 diagnostic under
+`data/retrieval/p05-w2-deepseek-route-fallback-diagnostic-20260926-r1`
+returned HTTP 200 with `finish_reason=stop` on TokenMetro and passed the local
+contract. Only one provider attempt was issued; the strict policy-403 trigger
+did not occur and Jizhi was not called. Its offline evidence audit and replay
+passed. The separately authorized r2 retry under
+`data/retrieval/p05-w2-deepseek-route-fallback-diagnostic-20260926-r2`
+sent one new synthetic unit with 15 `钓鱼` occurrences. TokenMetro returned
+HTTP 200 but its stream ended before completion after 1,592 chunks, with no
+visible output, finish reason, or usage. The runner stopped with execution
+UNKNOWN and issued no Jizhi attempt. The r2 artifact audit and isolated
+resume-stop check passed. At this historical diagnostic checkpoint the
+transition was unobserved; current status is UNOBSERVED, not FAIL, and it is
+not a bounded-pilot gate. Post-run SDK inspection and a zero-network reproduction
+identify an HTTP 200 SSE `error` event as the immediate interruption
+mechanism. The exact error code and responsible TokenMetro/upstream layer are
+UNKNOWN because the r2 runner did not preserve the structured error body.
+The runner now records bounded, redacted provider error fields for future
+stream failures; focused SDK tests pass 28/28. This diagnostic repair does
+not recover r2 or change the no-retry/no-fallback-on-partial-stream rule. A
+single explicitly authorized exact-request recovery in fresh root
+`data/retrieval/p05-w2-deepseek-route-stream-error-diagnostic-20260926-r3`
+completed on TokenMetro with identical wire bytes, confirming an intermittent
+route/provider interruption. It still did not exercise Jizhi; automatic
+handoff remains UNOBSERVED. The investigation is recorded in
+`docs/research/phase-05/p05-w2-deepseek-stream-error-diagnostic-20260926.md`.
+The earlier policy-trigger result remains historical evidence for its exact
+request and time; the changed behavior has no established cause. A new live
+attempt would need separate authorization, a fresh root, and explicit attempt
+accounting. A further separately authorized fresh-root r4 diagnostic under
+`data/retrieval/p05-w2-deepseek-route-fallback-diagnostic-20260926-r4` used the
+same minimal synthetic `钓鱼` segment and unchanged Prompt v2, schema, model,
+streaming, token limit, and no-retry policy. TokenMetro again returned HTTP
+200 with `finish_reason=stop` after 938 chunks; local contract validation,
+artifact integrity, replay, and isolated resume checks passed. It issued one
+primary attempt, recorded `tokenmetro_policy_403=0` and
+`jizhi_fallback_issued=0`, and did not call Jizhi. This is another
+non-triggering primary result, not evidence that the historical policy block
+was removed. The r1, r2, and r4 facts are recorded in
+`docs/research/phase-05/p05-w2-deepseek-real-fallback-diagnostic-20260926.md`,
+`docs/research/phase-05/p05-w2-deepseek-real-fallback-retry-20260926.md`, and
+`docs/research/phase-05/p05-w2-deepseek-real-fallback-diagnostic-r4-20260926.md`.
 
-The current ordinal 21 blocker is further localized than the historical
-generic `content_policy_violation` description: the tested TokenMetro
-DeepSeek route rejects the complete frozen payload before generation with the
-reproducible `钓鱼` trigger text, while the corresponding GLM frozen route
-shows the same pre-generation policy block. A same-payload diagnostic with
-all such occurrences replaced passes the tested DeepSeek pre-generation gate.
+The bounded production-route pilot then ran three real RU-bound Semantic
+Compilation Units (ordinals 0, 2, and 14) once under
+`data/retrieval/p05-w2-deepseek-bounded-pilot-20260927-r1`. All three returned
+HTTP 200, completed with `finish_reason=stop`, and passed local schema and
+segment-binding validation on TokenMetro primary. It recorded 3/3 accepted,
+three primary attempts, zero failures/indeterminate outcomes, zero policy
+403s, and zero Jizhi fallback attempts. Replay, artifact integrity, credential
+scan, and isolated resume skip passed offline. Aggregate usage was 4,368 input,
+23,244 output, and 21,466 reasoning tokens; latency was 12.398-60.462 seconds
+(mean 43.958 seconds). Reported credit was 0; currency and billable status
+remain UNKNOWN. Real automatic handoff remains UNOBSERVED, not FAIL, and did
+not block this bounded pilot. The pilot establishes operational/mechanical
+evidence only, not semantic correctness or corpus-scale stability. Its full
+evidence and per-unit metrics are in
+`docs/research/phase-05/p05-w2-deepseek-bounded-pilot-20260927-r1.md`.
+No larger or full semantic build was run.
+
+The last-tested ordinal21 blocker was localized beyond the historical
+generic `content_policy_violation` description: at that checkpoint, the
+TokenMetro DeepSeek route rejected the complete frozen payload before
+generation with a reproducible `钓鱼` trigger text, while the corresponding
+GLM frozen route showed the same pre-generation policy block. A same-payload
+diagnostic with all such occurrences replaced passed the tested DeepSeek
+pre-generation gate.
 An alternate relay accepted the same text, so this is
 treated as a TokenMetro route/provider-policy overblocking issue rather than
 evidence that DeepSeek itself forbids the term. The responsible layer is
@@ -548,8 +612,10 @@ execution outcomes. One fresh current-key DeepSeek ordinal16 canary on each
 route returned HTTP 200, `finish_reason=stop`, and passed the local contract;
 both used identical logical and wire request bodies. This resolves the
 historical Jizhi key/generation blocker for this exact tested route and sample,
-but it does not establish Jizhi ordinal21 policy behavior or authorize a
-bounded pilot automatically.
+but it does not establish Jizhi ordinal21 policy behavior or broad route
+stability. The later synthetic r1 and r4 route-pair
+diagnostics completed on TokenMetro primary, while r2 stopped on a partial
+primary stream; none exercised Jizhi fallback.
 The separately authorized TokenMetro-only, same-condition comparison of
 `deepseek-v4.1-flash` and `glm-5.3-flash` on frozen ordinals 16 and 20 is
 complete under
@@ -718,10 +784,13 @@ logical request identity. Only the exact pre-generation policy 403 can create
 the fallback attempt; timeout, connection, 5xx, partial stream, and local
 validation failures stop without a route change. The route-pair mechanism is
 provider-free tested, and the two route canaries passed under separate
-immutable roots. The CLI permits one explicit route canary at a time and
-keeps automatic paid route-pair execution gated. An actual fallback transition
-has only provider-free test evidence; the first bounded paid pilot remains a
-separately authorized next work unit.
+immutable roots. The CLI permits one explicit route canary at a time. The
+subsequent three-unit bounded pilot completed on TokenMetro primary with 3/3
+local contract passes, three attempts, and no retry; real automatic handoff
+remains UNOBSERVED, not FAIL, and is not a bounded-pilot gate. This pilot does
+not establish semantic quality or larger-scale stability. The current
+evidence supports considering a separately scoped next-stage semantic build
+after source/output review; it does not establish readiness for a full build.
 `accepted_for_local_contract` does not by itself authorize active semantic
 views or production adoption. Any additional paid canary requires separate
 authorization, historical attempt accounting, a new root, and a fresh

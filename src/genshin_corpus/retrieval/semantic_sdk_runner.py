@@ -784,6 +784,7 @@ def run_sdk_route_pair(
         done_tracker: _DoneTrackingStream | None = None
         sdk_error_type: str | None = None
         sdk_error_message: str | None = None
+        sdk_error_details: dict[str, str] = {}
 
         def on_request(request: httpx.Request) -> None:
             nonlocal wire_count
@@ -856,6 +857,15 @@ def run_sdk_route_pair(
             sdk_error_type = type(exc).__name__
             sdk_error_message = _redact(str(exc), secret_values)
             status = exc.status_code
+        except openai.APIError as exc:
+            sdk_error_type = type(exc).__name__
+            sdk_error_message = _redact(str(exc), secret_values)
+            if status == 200 and type(exc) is openai.APIError and isinstance(exc.body, Mapping):
+                sdk_error_details["origin"] = "sse_error_event"
+                for field in ("code", "type", "param"):
+                    value = exc.body.get(field)
+                    if isinstance(value, (str, int, float, bool)):
+                        sdk_error_details[f"provider_error_{field}"] = _redact(str(value), secret_values)[:1024]
         except Exception as exc:
             if wire_count != 1:
                 raise
@@ -911,6 +921,7 @@ def run_sdk_route_pair(
         if sdk_error_type is not None:
             artifacts["sdk_error"] = _json_once(stem / "sdk_error.json", {
                 "type": sdk_error_type, "message": sdk_error_message, "http_status": status,
+                **sdk_error_details,
             })
         terminal = {
             "run_identity": run_identity, "unit_id": unit["unit_id"], "attempt_number": number,

@@ -29,12 +29,15 @@ and tests, one per route.
   The provider-free test uses a small inline fixture with that observed field
   layout, so it does not depend on a local `data/` root.
   All ambiguous execution states stop without a route change.
+- HTTP 200 SSE `error` events are retained as bounded, credential-redacted
+  provider error fields when the SDK exposes them. They remain ambiguous
+  partial execution and never trigger fallback or automatic retry.
 - Existing single-route `run_sdk_units` behavior and historical direct-HTTP
   paths remain available and unchanged in their invocation contract.
 
 ## Provider-free verification
 
-The focused SDK test module passes 27 tests, including the existing single-
+The focused SDK test module passes 28 tests, including the existing single-
 route retry/resume/tamper tests and new route-pair cases for:
 
 - exact policy-403 fallback success;
@@ -45,11 +48,20 @@ route retry/resume/tamper tests and new route-pair cases for:
 - runtime URL/profile validation;
 - resume after a persisted policy 403, accepted-unit skip, and terminal fallback
   failure without reissue.
+- HTTP 200 SSE error-event capture with safe provider error fields and no
+  fallback after partial generation.
 
 The combined semantic retrieval set passes 52 tests covering the
 SDK runner, legacy live runner, B revision, and Prompt v2 serialization.
 
 ## Live validation and current status
+
+This section records the `80616c0` implementation checkpoint. A subsequent
+real route-pair diagnostic accepted on TokenMetro primary; its explicit retry
+stopped on an incomplete primary stream. Neither exercised fallback. See
+`p05-w2-deepseek-real-fallback-diagnostic-20260926.md` and
+`p05-w2-deepseek-real-fallback-retry-20260926.md`. Current status is owned by
+`docs/current-phase.md`.
 
 One fresh current-key ordinal16 canary was issued on each route, under distinct
 immutable roots with no automatic retry:
@@ -84,6 +96,10 @@ The prior Jizhi 401/no-generation blocker is superseded for this exact
 current-key DeepSeek Chat Completions canary. Jizhi behavior for ordinal21,
 real fallback execution, route availability over time, and semantic quality
 remain UNKNOWN. The route-pair mechanism is structurally ready for a separately
-authorized bounded pilot. The CLI currently permits explicit one-route
-canaries and rejects automatic route-pair execution until that pilot is
-authorized. No ordinal21 or full build was run.
+authorized bounded pilot. At this implementation checkpoint the CLI permitted
+explicit one-route canaries and rejected automatic route-pair execution until
+pilot authorization. This historical gate was later superseded: the current
+authorization and the completed three-unit bounded pilot are recorded in
+`docs/current-phase.md` and
+`p05-w2-deepseek-bounded-pilot-20260927-r1.md`. No ordinal21 or full build was
+run as part of the pilot.
