@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from genshin_corpus.retrieval.__main__ import _semantic_live_run_main
+from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.retrieval.semantic_compiler_u1 import SEMANTIC_OUTPUT_SCHEMA_VERSION, semantic_input_identity
 from genshin_corpus.retrieval.semantic_live_runner import ChannelConfig, SemanticProviderRequest, load_adapter, run_channel
 from genshin_corpus.retrieval.semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter, create_adapter
@@ -204,6 +205,281 @@ class SdkRunnerTest(unittest.TestCase):
                 prompt_identity="fixture-v2", source_identity="fixture-source",
                 environment=environment,
             )
+
+    def test_single_route_checkpoint_behind_recovers_without_duplicate_call(self):
+        first, calls = self.run_units([success("s1")])
+        self.assertEqual(first["status"], "complete")
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint.update({"status": "partial", "accepted_units": 0,
+                           "provider_attempts_total": 0, "provider_attempts_this_invocation": 0,
+                           "unit_states": {"s1": "pending"}, "attempt_counts": {"s1": 0}})
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+        resumed, resumed_calls = self.run_units([])
+        self.assertEqual((resumed["status"], resumed["provider_attempts_this_invocation"], len(resumed_calls)),
+                         ("complete", 0, 0))
+        repaired = json.loads((self.root / "checkpoint.json").read_bytes())
+        self.assertEqual(repaired["attempt_counts"], {"s1": 1})
+
+    def test_legacy_single_route_checkpoint_uses_global_count_for_retryable_prefix(self):
+        first, _calls = self.run_units([httpx.Response(503), httpx.Response(503)], retries=1)
+        self.assertEqual((first["status"], first["provider_attempts_total"]), ("paused_transient_outage", 2))
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint.pop("attempt_counts")
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+
+        resumed, calls = self.run_units([success("s1")], retries=0)
+        self.assertEqual((resumed["status"], resumed["provider_attempts_total"], len(calls)),
+                         ("complete", 3, 1))
+
+    def test_single_route_checkpoint_prefix_count_divergence_fails_closed(self):
+        rows = [unit("s1"), unit("s2")]
+        first, _calls = self.run_units([httpx.Response(503), httpx.Response(503)], rows, retries=1)
+        self.assertEqual(first["provider_attempts_total"], 2)
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint["provider_attempts_total"] = 0
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+        with self.assertRaisesRegex(ValueError, "checkpoint identity or history mismatch"):
+            self.run_units([], units=rows, retries=0)
+
+    def test_route_pair_checkpoint_behind_after_primary_success_does_not_reissue(self):
+        environment = self._route_environment()
+        calls = []
+
+        def primary(request):
+            calls.append("tokenmetro")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary)},
+        }
+        run_sdk_route_pair(self.root, **kwargs)
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint.update({"status": "partial", "accepted_units": 0,
+                           "provider_attempts_total": 0, "provider_attempts_this_invocation": 0,
+                           "unit_states": {"s1": "pending"}, "route_history": {"s1": []}})
+        checkpoint["counters"] = {
+            "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
+            "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
+            "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
+            "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
+        }
+        checkpoint["usage_by_route"] = {
+            "tokenmetro": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                           "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+            "jizhi": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                      "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+        }
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+
+        def unexpected(request):
+            raise AssertionError("completed primary was reissued")
+
+        resumed = run_sdk_route_pair(self.root, **{**kwargs,
+            "transports": {"tokenmetro": httpx.MockTransport(unexpected)}})
+        self.assertEqual(resumed["provider_attempts_this_invocation"], 0)
+        self.assertEqual(calls, ["tokenmetro"])
+
+    def test_route_pair_checkpoint_behind_after_policy_primary_continues_at_fallback(self):
+        environment = self._route_environment()
+        primary_only_environment = dict(environment)
+        primary_only_environment.pop("JIZHI_API_KEY")
+        calls = []
+
+        def primary(request):
+            calls.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"type": "content_policy_violation", "code": None}}, request=request)
+
+        def fallback(request):
+            calls.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "transports": {"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        }
+        first = run_sdk_route_pair(self.root, environment=primary_only_environment, **kwargs)
+        self.assertEqual(first["status"], "blocked_missing_fallback_credential")
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint.update({"status": "partial", "accepted_units": 0,
+                           "provider_attempts_total": 0, "provider_attempts_this_invocation": 0,
+                           "unit_states": {"s1": "pending"}, "route_history": {"s1": []}})
+        checkpoint["counters"] = {
+            "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
+            "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
+            "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
+            "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
+        }
+        checkpoint["usage_by_route"] = {
+            route: {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                    "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0}
+            for route in ("tokenmetro", "jizhi")
+        }
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+
+        def unexpected_primary(request):
+            raise AssertionError("known policy failure was reissued")
+
+        resumed = run_sdk_route_pair(self.root, environment=environment, **{
+            **kwargs, "transports": {"tokenmetro": httpx.MockTransport(unexpected_primary),
+                                     "jizhi": httpx.MockTransport(fallback)}})
+        self.assertEqual(resumed["status"], "complete")
+        self.assertEqual(resumed["provider_attempts_this_invocation"], 1)
+        self.assertEqual(calls, ["tokenmetro", "jizhi"])
+
+    def test_route_pair_unresolved_issued_attempt_fails_before_provider_io(self):
+        environment = self._route_environment()
+        calls = []
+
+        def primary(request):
+            calls.append("tokenmetro")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary)},
+        }
+        run_sdk_route_pair(self.root, **kwargs)
+        (self.attempt_dirs()[0] / "terminal.json").unlink()
+
+        def unexpected(request):
+            raise AssertionError("unresolved provider execution was replayed")
+
+        with self.assertRaisesRegex(ValueError, "unresolved issued attempt"):
+            run_sdk_route_pair(self.root, **{**kwargs,
+                "transports": {"tokenmetro": httpx.MockTransport(unexpected),
+                               "jizhi": httpx.MockTransport(unexpected)}})
+        self.assertEqual(calls, ["tokenmetro"])
+
+    def test_route_pair_checkpoint_behind_after_fallback_does_not_reissue(self):
+        environment = self._route_environment()
+        calls = []
+
+        def primary(request):
+            calls.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"type": "content_policy_violation", "code": None}}, request=request)
+
+        def fallback(request):
+            calls.append("jizhi")
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        }
+        run_sdk_route_pair(self.root, **kwargs)
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint.update({"status": "partial", "accepted_units": 0,
+                           "provider_attempts_total": 1, "provider_attempts_this_invocation": 1,
+                           "unit_states": {"s1": "fallback_pending"}, "route_history": {"s1": ["tokenmetro"]}})
+        checkpoint["counters"].update({"jizhi_fallback_issued": 0, "jizhi_fallback_successes": 0,
+                                       "jizhi_fallback_failures": 0, "accepted_fallback": 0})
+        checkpoint["usage_by_route"]["jizhi"] = {
+            "input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+            "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0,
+        }
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+
+        def unexpected(request):
+            raise AssertionError("completed route attempt was reissued")
+
+        resumed = run_sdk_route_pair(self.root, **{**kwargs,
+            "transports": {"tokenmetro": httpx.MockTransport(unexpected), "jizhi": httpx.MockTransport(unexpected)}})
+        self.assertEqual(resumed["provider_attempts_this_invocation"], 0)
+        self.assertEqual(calls, ["tokenmetro", "jizhi"])
+
+    def test_route_pair_checkpoint_prefix_summary_divergence_fails_closed(self):
+        environment = self._route_environment()
+        run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(lambda request: httpx.Response(
+                200, headers={"content-type": "text/event-stream"},
+                content=self._stream_body(), request=request))},
+        )
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint["route_history"] = {"s1": []}
+        checkpoint["unit_states"] = {"s1": "pending"}
+        checkpoint["accepted_units"] = 0
+        checkpoint["provider_attempts_total"] = 0
+        checkpoint["counters"]["tokenmetro_successes"] = 0
+        checkpoint["counters"]["accepted_primary"] = 0
+        checkpoint["usage_by_route"]["tokenmetro"]["input_tokens"] = 0
+        checkpoint["usage_by_route"]["tokenmetro"]["output_tokens"] = 0
+        checkpoint["identity"] = sha256_json({key: value for key, value in checkpoint.items() if key != "identity"})
+        (self.root / "checkpoint.json").write_bytes(canonical_json_bytes(checkpoint))
+        with self.assertRaisesRegex(ValueError, "route checkpoint identity or history mismatch"):
+            run_sdk_route_pair(
+                self.root, units=[unit("s1")], prompt={"version": "v2"},
+                prompt_identity="fixture-v2", source_identity="fixture-source",
+                environment=environment,
+            )
+
+    def test_audit_rebinds_request_and_wire_to_manifest_identity(self):
+        environment = self._route_environment()
+        run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(lambda request: httpx.Response(
+                200, headers={"content-type": "text/event-stream"},
+                content=self._stream_body(), request=request))},
+        )
+        attempt = self.attempt_dirs()[0]
+        terminal = json.loads((attempt / "terminal.json").read_bytes())
+        mutated = json.loads((self.root / terminal["artifacts"]["request"]["path"]).read_bytes())
+        mutated["model"] = "changed-after-freeze"
+        body = canonical_json_bytes(mutated)
+        for name in ("request", "wire_request"):
+            descriptor = terminal["artifacts"][name]
+            path = self.root / descriptor["path"]
+            path.write_bytes(body)
+            descriptor.update({"sha256": __import__("hashlib").sha256(body).hexdigest(), "byte_count": len(body)})
+        (attempt / "terminal.json").write_bytes(canonical_json_bytes(terminal))
+        with self.assertRaisesRegex(ValueError, "wire request identity changed"):
+            audit_sdk_route_integrity(self.root)
+
+    def test_audit_rejects_fallback_after_non_policy_primary(self):
+        environment = self._route_environment()
+
+        def primary(request):
+            return httpx.Response(403, json={"error": {"type": "content_policy_violation", "code": None}}, request=request)
+
+        def fallback(request):
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        )
+        attempt = self.attempt_dirs()[0]
+        terminal = json.loads((attempt / "terminal.json").read_bytes())
+        terminal.update({"disposition": "transport_failure", "fallback_eligible": False,
+                         "fallback_decision": "not_eligible"})
+        (attempt / "terminal.json").write_bytes(canonical_json_bytes(terminal))
+        with self.assertRaisesRegex(ValueError, "fallback lacks a qualifying primary policy failure"):
+            audit_sdk_route_integrity(self.root)
 
     def test_legacy_cli_requires_explicit_selector(self):
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit):

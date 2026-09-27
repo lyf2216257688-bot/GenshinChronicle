@@ -291,6 +291,11 @@ def _attempts(root: Path, unit_key: str, request_identity: str, run_identity: st
     attempts: list[dict[str, Any]] = []
     for index, path in enumerate(sorted(directory.glob("attempt-*")), 1):
         attempts.append(_verified_attempt(root, path, index, request_identity, run_identity, unit_id))
+    if attempts:
+        if attempts[0].get("route") is not None:
+            _validate_route_pair_history_shape(root, attempts)
+        else:
+            _validate_single_history(attempts)
     return attempts
 
 
@@ -336,6 +341,112 @@ def _verified_attempt(root: Path, path: Path, index: int, request_identity: str,
     ):
         raise ValueError("accepted attempt evidence is incomplete")
     return terminal
+
+
+def _single_history_state(history: Sequence[Mapping[str, Any]]) -> str:
+    if not history:
+        return "pending"
+    last = history[-1]
+    if last.get("disposition") == "accepted_for_local_contract":
+        return "accepted"
+    if last.get("retry_classification") == "transient":
+        return "retryable"
+    return "blocked"
+
+
+def _route_history_state(history: Sequence[Mapping[str, Any]]) -> str:
+    if not history:
+        return "pending"
+    if history[-1].get("disposition") == "accepted_for_local_contract":
+        return "accepted"
+    if (len(history) == 1
+            and history[-1].get("disposition") == "primary_policy_403_pre_generation"):
+        return "fallback_pending"
+    return "blocked"
+
+
+def _validate_single_history(history: Sequence[Mapping[str, Any]]) -> None:
+    for index, row in enumerate(history):
+        if index < len(history) - 1 and row.get("retry_classification") != "transient":
+            raise ValueError("single-route attempt history is not resumable")
+        if row.get("disposition") == "accepted_for_local_contract" and index < len(history) - 1:
+            raise ValueError("single-route attempt follows an accepted attempt")
+
+
+def _qualifying_policy_attempt(root: Path, row: Mapping[str, Any]) -> bool:
+    artifacts = row.get("artifacts")
+    raw_descriptor = artifacts.get("response") if isinstance(artifacts, Mapping) else None
+    if not isinstance(raw_descriptor, Mapping):
+        return False
+    raw = (root / str(raw_descriptor["path"])).read_bytes()
+    return (
+        row.get("route") == "tokenmetro"
+        and row.get("route_role") == "primary"
+        and row.get("disposition") == "primary_policy_403_pre_generation"
+        and row.get("sdk_error_type") == "PermissionDeniedError"
+        and row.get("fallback_eligible") is True
+        and row.get("fallback_decision") == "eligible"
+        and row.get("stream_complete") is False
+        and row.get("execution_state") == "not_started"
+        and _policy_403_pre_generation(
+            raw, row.get("http_status"), chunk_count=row.get("stream_chunk_count", -1),
+            reasoning_chars=row.get("reasoning_chars", -1), visible_chars=row.get("visible_chars", -1),
+            usage=row.get("usage"), finish_reason=row.get("finish_reason"),
+        )
+    )
+
+
+def _validate_route_pair_history_shape(root: Path, history: Sequence[Mapping[str, Any]]) -> None:
+    if not history:
+        return
+    if any(row.get("retry_classification") != "terminal" or row.get("automatic_retry") is not False
+           for row in history):
+        raise ValueError("route attempt history contains an invalid retry state")
+    if len(history) > 2:
+        raise ValueError("route attempt history has too many attempts")
+    first = history[0]
+    if (first.get("attempt_number") != 1
+            or first.get("route") != "tokenmetro"
+            or first.get("route_role") != "primary"):
+        raise ValueError("route attempt order is ambiguous")
+    qualifies = _qualifying_policy_attempt(root, first)
+    if len(history) == 1:
+        if first.get("disposition") == "primary_policy_403_pre_generation" and not qualifies:
+            raise ValueError("primary fallback predicate is invalid")
+        if first.get("disposition") != "primary_policy_403_pre_generation" and first.get("fallback_eligible") is True:
+            raise ValueError("non-policy primary cannot authorize fallback")
+        return
+    if not qualifies:
+        raise ValueError("fallback lacks a qualifying primary policy failure")
+    fallback = history[1]
+    if (fallback.get("attempt_number") != 2
+            or fallback.get("route") != "jizhi"
+            or fallback.get("route_role") != "fallback"
+            or fallback.get("fallback_eligible") is not False
+            or fallback.get("fallback_decision") != "not_eligible"
+            or fallback.get("disposition") == "primary_policy_403_pre_generation"):
+        raise ValueError("fallback history is not causally valid")
+
+
+def _verify_manifest_request_binding(root: Path, unit: Mapping[str, Any], artifacts: Any) -> None:
+    if not isinstance(artifacts, Mapping):
+        raise ValueError("route attempt artifacts are invalid")
+    request_descriptor = artifacts.get("request")
+    wire_descriptor = artifacts.get("wire_request")
+    if not isinstance(request_descriptor, Mapping) or not isinstance(wire_descriptor, Mapping):
+        raise ValueError("route attempt lacks immutable request evidence")
+    request_body = (root / str(request_descriptor["path"])).read_bytes()
+    wire_body = (root / str(wire_descriptor["path"])).read_bytes()
+    try:
+        request_value = json.loads(request_body)
+        wire_value = json.loads(wire_body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("route attempt request evidence is not valid JSON") from exc
+    if request_value != wire_value:
+        raise ValueError("route attempt request differs from wire evidence")
+    expected_wire_identity = unit.get("wire_request_identity")
+    if not isinstance(expected_wire_identity, str) or sha256_json(wire_value) != expected_wire_identity:
+        raise ValueError("route attempt wire request identity changed")
 
 
 def run_sdk_units(
@@ -456,6 +567,8 @@ def run_sdk_units(
                    "accepted_units": sum(value == "accepted" for value in states.values()),
                    "provider_attempts_total": cumulative,
                    "provider_attempts_this_invocation": issued_now, "unit_states": states,
+                   "attempt_counts": {candidate["unit_id"]: len(history_cache[candidate["unit_id"]])
+                                      for candidate in prepared},
                    "retry_policy_this_invocation": {"max_retries": max_retries,
                                                     "backoff_cap_seconds": backoff_cap_seconds}}
         if blocked_unit is not None:
@@ -464,23 +577,68 @@ def run_sdk_units(
         atomic_write(root / "checkpoint.json", canonical_json_bytes(summary))
         return summary
 
-    checkpoint_path = root / "checkpoint.json"
-    if checkpoint_path.exists():
+    def verify_checkpoint() -> bool:
+        checkpoint_path = root / "checkpoint.json"
+        if not checkpoint_path.exists():
+            return False
         saved = _read(checkpoint_path)
         unsigned = {key: value for key, value in saved.items() if key != "identity"}
-        expected_states = {
-            candidate["unit_id"]: (
-                "pending" if not history_cache[candidate["unit_id"]] else
-                "accepted" if history_cache[candidate["unit_id"]][-1]["disposition"] == "accepted_for_local_contract" else
-                "retryable" if history_cache[candidate["unit_id"]][-1]["retry_classification"] == "transient" else "blocked"
-            ) for candidate in prepared
-        }
         identity_valid = (saved.get("identity") == sha256_json(unsigned)
                           if "identity" in saved else True)
-        if (not identity_valid or saved.get("run_identity") != identity
-                or saved.get("unit_states") != expected_states
-                or saved.get("provider_attempts_total") != sum(map(len, history_cache.values()))):
+        if not identity_valid or saved.get("run_identity") != identity:
             raise ValueError("checkpoint identity or history mismatch")
+        current_counts = {candidate["unit_id"]: len(history_cache[candidate["unit_id"]]) for candidate in prepared}
+        saved_counts = saved.get("attempt_counts")
+        if saved_counts is None:
+            saved_states = saved.get("unit_states")
+            if not isinstance(saved_states, Mapping) or set(saved_states) != set(current_counts):
+                raise ValueError("checkpoint history shape is invalid")
+            reachable_totals = {0}
+            for candidate in prepared:
+                unit_id = candidate["unit_id"]
+                state = saved_states[unit_id]
+                options = [index for index in range(current_counts[unit_id] + 1)
+                           if _single_history_state(history_cache[unit_id][:index]) == state]
+                if not options:
+                    raise ValueError("checkpoint history shape is invalid")
+                reachable_totals = {total + option for total in reachable_totals for option in options}
+            saved_total = saved.get("provider_attempts_total")
+            if (type(saved_total) is not int or saved_total not in reachable_totals
+                    or saved.get("logical_units") != len(prepared)
+                    or saved.get("accepted_units") != sum(value == "accepted" for value in saved_states.values())):
+                raise ValueError("checkpoint identity or history mismatch")
+            if saved.get("status") == "complete" and (
+                    saved_total != sum(current_counts.values())
+                    or any(saved_states[candidate["unit_id"]] != _single_history_state(history_cache[candidate["unit_id"]])
+                           for candidate in prepared)
+                    or any(value != "accepted" for value in saved_states.values())):
+                raise ValueError("checkpoint is ahead of verified history")
+            return saved_total < sum(current_counts.values())
+        if (not isinstance(saved_counts, Mapping)
+                or set(saved_counts) != set(current_counts)
+                or any(type(value) is not int or value < 0 or value > current_counts[key]
+                       for key, value in saved_counts.items())):
+            raise ValueError("checkpoint identity or history mismatch")
+        expected_states = {
+            candidate["unit_id"]: _single_history_state(
+                history_cache[candidate["unit_id"]][:saved_counts[candidate["unit_id"]]])
+            for candidate in prepared
+        }
+        expected_total = sum(saved_counts.values())
+        if (saved.get("logical_units") != len(prepared)
+                or saved.get("unit_states") != expected_states
+                or saved.get("accepted_units") != sum(value == "accepted" for value in expected_states.values())
+                or saved.get("provider_attempts_total") != expected_total):
+            raise ValueError("checkpoint identity or history mismatch")
+        if saved.get("status") == "complete" and saved_counts != current_counts:
+            raise ValueError("checkpoint is ahead of verified history")
+        if saved.get("status") == "complete" and any(value != "accepted" for value in expected_states.values()):
+            raise ValueError("complete checkpoint has non-accepted unit history")
+        return any(saved_counts[key] < current_counts[key] for key in current_counts)
+
+    checkpoint_behind = verify_checkpoint()
+    if checkpoint_behind:
+        checkpoint("partial", 0)
 
     issued_now = 0
     for unit in prepared:
@@ -737,6 +895,7 @@ def run_sdk_route_pair(
         _json_once(manifest_path, manifest)
 
     def validate_route_history(unit: Mapping[str, Any], history: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        _validate_route_pair_history_shape(root, history)
         for row in history:
             route = row.get("route")
             profile = profiles.get(route)
@@ -745,10 +904,9 @@ def run_sdk_route_pair(
             if row.get("wire_request_identity") != unit["wire_request_identity"]:
                 raise ValueError("attempt wire request identity changed")
             artifacts = row.get("artifacts", {})
-            request_descriptor = artifacts.get("request")
-            wire_descriptor = artifacts.get("wire_request")
-            if not isinstance(request_descriptor, Mapping) or not isinstance(wire_descriptor, Mapping):
-                raise ValueError("route attempt lacks immutable request evidence")
+            _verify_manifest_request_binding(root, unit, artifacts)
+            request_descriptor = artifacts["request"]
+            wire_descriptor = artifacts["wire_request"]
             request_bytes = (root / str(request_descriptor["path"])).read_bytes()
             wire_bytes = (root / str(wire_descriptor["path"])).read_bytes()
             if (json.loads(request_bytes) != unit["body"] or json.loads(wire_bytes) != unit["body"]):
@@ -843,6 +1001,75 @@ def run_sdk_route_pair(
             checkpoint_accepted += 1
         checkpoint_states[unit_id] = new_state
 
+    def project_checkpoint(prefix_lengths: Mapping[str, int]) -> tuple[
+        dict[str, str], int, int, dict[str, int], dict[str, dict[str, Any]]
+    ]:
+        """Recompute a saved prefix summary without changing the live ledger."""
+
+        states = {candidate["unit_id"]: "pending" for candidate in prepared}
+        routes = {candidate["unit_id"]: [] for candidate in prepared}
+        counters = {
+            "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
+            "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
+            "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
+            "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
+        }
+        usage: dict[str, dict[str, Any]] = {
+            "tokenmetro": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                           "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+            "jizhi": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                      "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+        }
+        total = 0
+        accepted = 0
+        for candidate in prepared:
+            unit_id = candidate["unit_id"]
+            for row in history_cache[unit_id][:prefix_lengths[unit_id]]:
+                total += 1
+                route = row.get("route")
+                routes[unit_id].append(str(route))
+                if route in usage:
+                    normalized = row.get("usage_normalized")
+                    if isinstance(normalized, Mapping):
+                        for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
+                            value = normalized.get(field)
+                            if isinstance(value, int):
+                                usage[route][field] += value
+                    else:
+                        usage[route]["unknown_usage_attempts"] += 1
+                    billing = row.get("billing")
+                    credit = billing.get("reported_credit") if isinstance(billing, Mapping) else None
+                    if isinstance(credit, (int, float)):
+                        usage[route]["reported_credit"] += credit
+                    else:
+                        usage[route]["unknown_credit_attempts"] += 1
+                if route == "tokenmetro":
+                    counters["tokenmetro_attempts"] += 1
+                    if row.get("disposition") == "accepted_for_local_contract":
+                        counters["tokenmetro_successes"] += 1
+                        counters["accepted_primary"] += 1
+                    if row.get("disposition") == "primary_policy_403_pre_generation":
+                        counters["tokenmetro_policy_403"] += 1
+                elif route == "jizhi":
+                    counters["jizhi_fallback_issued"] += 1
+                    if row.get("disposition") == "accepted_for_local_contract":
+                        counters["jizhi_fallback_successes"] += 1
+                        counters["accepted_fallback"] += 1
+                    else:
+                        counters["jizhi_fallback_failures"] += 1
+                if row.get("execution_state") == "unknown":
+                    counters["stopped_indeterminate"] += 1
+                previous = states[unit_id]
+                if row.get("disposition") == "accepted_for_local_contract":
+                    states[unit_id] = "accepted"
+                elif row.get("disposition") == "primary_policy_403_pre_generation" and len(routes[unit_id]) == 1:
+                    states[unit_id] = "fallback_pending"
+                else:
+                    states[unit_id] = "blocked"
+                accepted += int(previous != "accepted" and states[unit_id] == "accepted")
+                accepted -= int(previous == "accepted" and states[unit_id] != "accepted")
+        return states, accepted, total, counters, usage
+
     for candidate in prepared:
         for existing in history_cache[candidate["unit_id"]]:
             account_attempt(candidate["unit_id"], existing)
@@ -867,27 +1094,51 @@ def run_sdk_route_pair(
             raise ValueError("route checkpoint persistence failed")
         return summary
 
-    def verify_checkpoint() -> None:
+    def verify_checkpoint() -> bool:
         checkpoint_path = root / "checkpoint.json"
         if not checkpoint_path.exists():
-            return
+            return False
         saved = _read(checkpoint_path)
         identity = saved.get("identity")
         unsigned = {key: value for key, value in saved.items() if key != "identity"}
-        if (identity != sha256_json(unsigned) or saved.get("run_identity") != run_identity
-                or saved.get("route_history") != checkpoint_routes
-                or saved.get("unit_states") != checkpoint_states
-                or saved.get("provider_attempts_total") != checkpoint_total):
+        if identity != sha256_json(unsigned) or saved.get("run_identity") != run_identity:
             raise ValueError("route checkpoint identity or history mismatch")
+        saved_routes = saved.get("route_history")
+        if (not isinstance(saved_routes, Mapping)
+                or set(saved_routes) != set(checkpoint_routes)):
+            raise ValueError("route checkpoint history shape is invalid")
+        prefix_lengths: dict[str, int] = {}
+        for candidate in prepared:
+            unit_id = candidate["unit_id"]
+            prefix = saved_routes[unit_id]
+            full = checkpoint_routes[unit_id]
+            if (not isinstance(prefix, list) or len(prefix) > len(full)
+                    or prefix != full[:len(prefix)]):
+                raise ValueError("route checkpoint history diverged")
+            prefix_lengths[unit_id] = len(prefix)
+        expected_states, expected_accepted, expected_total, expected_counters, expected_usage = project_checkpoint(prefix_lengths)
+        if (saved.get("logical_units") != len(prepared)
+                or saved.get("unit_states") != expected_states
+                or saved.get("accepted_units") != expected_accepted
+                or saved.get("provider_attempts_total") != expected_total
+                or saved.get("counters") != expected_counters
+                or saved.get("usage_by_route") != expected_usage):
+            raise ValueError("route checkpoint identity or history mismatch")
+        behind = any(prefix_lengths[key] < len(checkpoint_routes[key]) for key in checkpoint_routes)
+        if saved.get("status") == "complete" and behind:
+            raise ValueError("route checkpoint is ahead of verified history")
+        if saved.get("status") == "complete" and expected_accepted != len(prepared):
+            raise ValueError("complete route checkpoint has non-accepted unit history")
+        return behind
 
     def record_attempt(unit: Mapping[str, Any], terminal: Mapping[str, Any]) -> None:
         number = len(history_cache[unit["unit_id"]]) + 1
         path = root / "units" / unit["unit_key"] / f"attempt-{number:03d}"
         verified = _verified_attempt(root, path, number, unit["request_identity"], run_identity, unit["unit_id"])
-        validate_route_history(unit, [verified])
         if dict(verified) != dict(terminal):
             raise ValueError("new attempt terminal changed before checkpoint")
         history_cache[unit["unit_id"]].append(verified)
+        validate_route_history(unit, history_cache[unit["unit_id"]])
         account_attempt(unit["unit_id"], verified)
 
     def run_attempt(unit: Mapping[str, Any], *, route: str, role: str, number: int) -> dict[str, Any]:
@@ -1092,9 +1343,11 @@ def run_sdk_route_pair(
         _json_once(stem / "terminal.json", terminal)
         return terminal
 
-    verify_checkpoint()
-    if not (root / "checkpoint.json").exists():
-        checkpoint("recovered", 0)
+    checkpoint_behind = verify_checkpoint()
+    if checkpoint_behind or not (root / "checkpoint.json").exists():
+        # A terminal may be durable while the previous checkpoint is still a
+        # valid prefix. Re-materialize from verified history before any I/O.
+        checkpoint("partial", 0)
 
     issued_now = 0
     for unit in prepared:
@@ -1364,6 +1617,7 @@ def replay_sdk_route_attempt(root: Path, unit_id: str, attempt_number: int,
         raise ValueError("route replay attempt identity mismatch")
     artifacts = terminal.get("artifacts", {})
     _verify_artifacts(root, artifacts)
+    _verify_manifest_request_binding(root, unit, artifacts)
     if terminal.get("disposition") != "accepted_for_local_contract":
         raise ValueError("route attempt has no accepted output to replay")
     raw = (root / str(artifacts["response"]["path"])).read_bytes()
@@ -1412,15 +1666,7 @@ def audit_sdk_route_integrity(root: Path) -> dict[str, Any]:
             route = attempt.get("route")
             if route not in profiles or attempt.get("route_config_identity") != sha256_json(profiles[route]):
                 raise ValueError("attempt route configuration identity changed")
-            artifacts = attempt.get("artifacts", {})
-            request = artifacts.get("request") if isinstance(artifacts, Mapping) else None
-            wire = artifacts.get("wire_request") if isinstance(artifacts, Mapping) else None
-            if not isinstance(request, Mapping) or not isinstance(wire, Mapping):
-                raise ValueError("route attempt lacks immutable request evidence")
-            request_body = (root / str(request["path"])).read_bytes()
-            wire_body = (root / str(wire["path"])).read_bytes()
-            if json.loads(request_body) != json.loads(wire_body):
-                raise ValueError("route attempt request differs from wire evidence")
+            _verify_manifest_request_binding(root, unit, attempt.get("artifacts", {}))
             attempts_total += 1
             if attempt.get("disposition") == "accepted_for_local_contract":
                 replay_sdk_route_attempt(root, unit_id, int(attempt["attempt_number"]), unit.get("segment_ids", []))

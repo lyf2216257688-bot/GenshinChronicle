@@ -795,7 +795,12 @@ The provider-free Semantic Runtime scale-hardening checkpoint on 2026-09-27
 verified incremental resume/checkpoint accounting and compact JSONL stream
 artifacts through 200- and 1,000-unit local simulations. It removes the two
 bounded-pilot storage/resume blockers for a separately scoped approximately
-200-unit mechanical build, while full-corpus readiness remains unestablished.
+200-unit mechanical build. A subsequent provider-free correctness hardening
+also allows a verified checkpoint-behind crash window to repair from the
+filesystem history before provider I/O, rejects divergent/ahead checkpoint
+summaries, rebinds request evidence to the frozen manifest wire identity, and
+enforces the causal TokenMetro policy-403-to-Jizhi fallback state machine.
+Full-corpus readiness remains unestablished.
 `accepted_for_local_contract` does not by itself authorize active semantic
 views or production adoption. Any additional paid canary requires separate
 authorization, historical attempt accounting, a new root, and a fresh
