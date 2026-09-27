@@ -9,10 +9,12 @@ from genshin_corpus.canonical.fingerprints import canonical_json_bytes
 from genshin_corpus.retrieval.semantic_compiler_u1 import SEMANTIC_OUTPUT_SCHEMA_VERSION
 from genshin_corpus.retrieval.semantic_live_runner import (
     B_EXPERIMENT_REVISION,
+    B_V3_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticProviderRequest,
     SemanticProviderResponse,
     b_experiment_contract,
+    b_v3_experiment_contract,
     replay_response,
     run_b_zero_network_preflight,
     run_channel,
@@ -188,7 +190,6 @@ class SemanticBRevisionTests(unittest.TestCase):
             persisted = b"".join(path.read_bytes() for path in root.rglob("*") if path.is_file())
             self.assertNotIn(b"fixture-super-secret", persisted)
             self.assertNotIn(b"Authorization", persisted)
-
             with self.assertRaisesRegex(ValueError, "already has an issued attempt"):
                 run_channel(
                     PREFLIGHT, root, self.config, adapter,
@@ -196,6 +197,30 @@ class SemanticBRevisionTests(unittest.TestCase):
                     prior_attempt_roots=(PRIOR_GEMINI_A,), experiment=self.experiment,
                 )
             self.assertEqual(adapter.calls, 1)
+
+    def test_v3_replay_rejects_tampered_request_used_for_strict_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "run"
+            config = ChannelConfig.for_b_json_object("gemini_a", {})
+            experiment = b_v3_experiment_contract()
+            self.assertEqual(experiment.revision, B_V3_EXPERIMENT_REVISION)
+            adapter = FixtureBAdapter(config, json.dumps(_valid_output()))
+            result = run_channel(
+                PREFLIGHT, root, config, adapter,
+                unit_id=_unit()["compilation_unit_id"],
+                environment=self.environment,
+                prior_attempt_roots=(PRIOR_GEMINI_A,),
+                experiment=experiment,
+            )
+            self.assertEqual(result["status"], "complete")
+            row = json.loads((root / "metadata/request_ledger.jsonl").read_text(encoding="utf-8"))
+            request_path = root / row["request_artifact"]["path"]
+            request_path.write_bytes(request_path.read_bytes() + b" ")
+            with self.assertRaisesRegex(ValueError, "request artifact hash mismatch"):
+                replay_response(
+                    root, config, create_offline_adapter(config),
+                    _unit()["compilation_unit_id"], experiment=experiment,
+                )
 
     def test_b_canary_rejects_consumed_unit_and_remaining_mode_before_invocation(self) -> None:
         consumed_unit = json.loads((PREFLIGHT / "gemini_units.json").read_text(encoding="utf-8"))["items"][0]

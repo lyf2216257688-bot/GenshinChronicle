@@ -2,8 +2,8 @@
 
 Status: **active; P05-W1 mechanical contracts PASS; P05-W2-U1 provider-free
 projection/accounting PASS; B JSON-object formal local-contract canaries PASS;
-B v2 prompt/contract provider-free validation PASS; semantic-quality and
-real-story-slice acceptance OPEN**
+B v2 prompt/contract and v3 review-hardening provider-free validation PASS;
+semantic-quality and real-story-slice acceptance OPEN**
 
 This specification is the durable Phase 05 boundary. Current authorization,
 production/default behavior, and immediate next action remain owned by
@@ -249,6 +249,23 @@ models, frozen inputs, and validator; its run and attempt ledgers remain
 separate from historical B attempts. Current results and authorization are
 owned by `docs/current-phase.md` and its linked research note.
 
+## P05-W2 review hardening (provider-free)
+
+The opt-in experiment `phase05-w2-b-json-object-0.3` is a new prompt/experiment
+identity over the unchanged JSON output schema. Prompt identity,
+`2c332577f91edb50806a4f4c2cf663b720932c4833ac0e6023e1050c74370a2d`, adds an
+explicit stage completeness check for dates, subject headings, point markers,
+and other source stage boundaries. The compiler fragments explicit `主题：`
+and dialogue point boundaries before provider input construction and retains
+the parent segment lineage under source-unit-policy-0.2; unmarked long text
+still follows the existing hard-cap/oversized handling. The prompt also
+requires minimal source binding.
+An image/map-only `map_desc` may support a directly stated location/topic item,
+but it may not be attached redundantly to a textual event, fact, relation, or
+mention. v3 provider-free preflight and replay pass with zero formal/provider/
+network calls. This is a contract and omission-risk repair, not semantic
+acceptance or a model benchmark.
+
 ## TokenMetro SDK retry and resume contract
 
 Formal Phase 05 TokenMetro Chat Completions execution uses the official
@@ -314,6 +331,19 @@ are skipped on resume; unresolved attempts, changed identities, or a prior
 fallback terminal block further requests. Accounting exposes route history,
 policy-403 counts, fallback outcomes, execution-unknown stops, latency, and
 provider-reported usage/cost with `UNKNOWN` preserved where unavailable.
+
+Completed stream evidence is durably appended and fsynced as JSONL while the
+provider stream is active. After a complete terminal stream, the runner
+atomically writes deterministic gzip JSONL beside the attempt, records both
+compressed and uncompressed hashes/byte counts plus the row count and format,
+then removes the loose JSONL. An archive failure leaves the attempt without a
+terminal and therefore unresolved for resume, preserving fail-closed accounting.
+Offline audit accepts both `jsonl-1` and `jsonl-gzip-1`; gzip is an artifact
+storage representation, not a canonical semantic representation. The 200-unit
+measurement retained all 2,213,505 stream rows while reducing 881,535,308
+stream bytes to 10,314,280 in a temporary projection; file count remained
+unchanged. Full-build loose-file/index cost remains outside this contract and
+requires a future measured storage decision.
 
 ## P05-W1 acceptance
 

@@ -11,6 +11,7 @@ import argparse
 import gzip
 import hashlib
 import json
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,11 +25,13 @@ U1_SCHEMA_VERSION = "phase05-w2-u1-0.1"
 PROJECTION_SCHEMA_VERSION = "phase05-w2-semantic-input-0.2"
 SEMANTIC_OUTPUT_SCHEMA_VERSION = "phase05-w2-semantic-output-0.1"
 PROJECTION_POLICY_VERSION = "phase05-w2-projection-policy-0.1"
-UNIT_POLICY_VERSION = "phase05-w2-source-unit-policy-0.1"
+SOURCE_BINDING_POLICY_VERSION = "phase05-w2-source-binding-0.2"
+UNIT_POLICY_VERSION = "phase05-w2-source-unit-policy-0.2"
 IDENTITY_SCHEMA_VERSION = "phase05-w2-identity-0.1"
 SAMPLE_SCHEMA_VERSION = "phase05-w2-sample-0.2"
 ACCOUNTING_SCHEMA_VERSION = "phase05-w2-accounting-0.1"
 CAP_PROFILE_SOFT_CAPS = (8_000, 12_000, 16_000, 24_000)
+SEMANTIC_STAGE_CAP_DEFAULT = 4_096
 SEMANTIC_ITEM_KINDS = frozenset({"topic", "mention", "fact", "event", "relation"})
 SEGMENT_COVERAGE_DISPOSITIONS = frozenset({"covered", "no_navigation_material", "ambiguous", "unsupported"})
 
@@ -126,6 +129,7 @@ class ProjectionPolicy:
 
     record_soft_cap: int = 8_000
     hard_cap: int = 16_000
+    semantic_stage_cap: int = SEMANTIC_STAGE_CAP_DEFAULT
     include_text_segments: bool = True
     include_explicit_references: bool = True
     model_diagnostic_codes: tuple[str, ...] = (
@@ -142,6 +146,8 @@ class ProjectionPolicy:
             raise SemanticCompilerU1Error("record_soft_cap must be positive")
         if not isinstance(self.hard_cap, int) or self.hard_cap < self.record_soft_cap:
             raise SemanticCompilerU1Error("hard_cap must be >= record_soft_cap")
+        if not isinstance(self.semantic_stage_cap, int) or self.semantic_stage_cap <= 0:
+            raise SemanticCompilerU1Error("semantic_stage_cap must be positive")
         if len(set(self.model_diagnostic_codes)) != len(self.model_diagnostic_codes):
             raise SemanticCompilerU1Error("model_diagnostic_codes must be unique")
 
@@ -149,6 +155,7 @@ class ProjectionPolicy:
         return {
             "record_soft_cap": self.record_soft_cap,
             "hard_cap": self.hard_cap,
+            "semantic_stage_cap": self.semantic_stage_cap,
             "include_text_segments": self.include_text_segments,
             "include_explicit_references": self.include_explicit_references,
             "model_diagnostic_codes": list(self.model_diagnostic_codes),
@@ -359,10 +366,69 @@ def validate_semantic_output_schema(value: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def semantic_segment_binding_metadata(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Project only local source facts needed by strict binding checks."""
+
+    segments = payload.get("segments")
+    if not isinstance(segments, list):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for entry in segments:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("segment_id"), str):
+            continue
+        value = entry.get("value")
+        if not isinstance(value, Mapping):
+            continue
+        component = value.get("component") if isinstance(value.get("component"), str) else None
+        has_text = bool(value.get("text")) or bool(value.get("dialogue"))
+        if component != "map_desc" and not has_text:
+            decoded = value.get("decoded")
+            has_text = isinstance(decoded, (str, list, dict)) and bool(decoded)
+        result[entry["segment_id"]] = {
+            "component": component,
+            "kind": value.get("kind"),
+            "section": value.get("section") if isinstance(value.get("section"), str) else "",
+            "has_direct_text": has_text,
+        }
+    return result
+
+
+def _validate_minimal_source_binding(
+    items: Sequence[Mapping[str, Any]],
+    metadata: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Reject source references that are structurally redundant or non-supporting."""
+
+    for index, item in enumerate(items):
+        refs = item.get("source_segment_ids")
+        if not isinstance(refs, list):
+            continue
+        map_refs = [ref for ref in refs if metadata.get(ref, {}).get("component") == "map_desc"]
+        if not map_refs:
+            continue
+        non_map_refs = [ref for ref in refs if ref not in map_refs]
+        if non_map_refs:
+            raise SemanticCompilerU1Error(
+                f"semantic output item {index} source binding is not minimal: map_desc is redundant"
+            )
+        kind = item.get("kind")
+        label = item.get("label") if isinstance(item.get("label"), str) else ""
+        qualifiers = item.get("qualifiers") if isinstance(item.get("qualifiers"), Mapping) else {}
+        direct_map_claim = kind in {"topic", "mention"} and (
+            qualifiers.get("source_role") in {"map_location", "map_screenshot"}
+            or any(label and label in str(metadata.get(ref, {}).get("section", "")) for ref in map_refs)
+        )
+        if not direct_map_claim:
+            raise SemanticCompilerU1Error(
+                f"semantic output item {index} source binding is not directly supported by map_desc"
+            )
+
+
 def validate_semantic_source_binding(
     value: Mapping[str, Any],
     *,
     expected_segment_ids: Sequence[str],
+    segment_metadata: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Require exact coverage and references to supplied, covered segments."""
 
@@ -393,6 +459,8 @@ def validate_semantic_source_binding(
     disposition_by_id = {entry["segment_id"]: entry["disposition"] for entry in coverage}
     if any(disposition_by_id[ref] != "covered" for ref in item_ref_ids):
         raise SemanticCompilerU1Error("semantic items may reference only covered segments")
+    if segment_metadata is not None:
+        _validate_minimal_source_binding(items, segment_metadata)
     return {
         "schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION,
         "items": sorted(items, key=lambda item: item["local_id"]),
@@ -404,11 +472,14 @@ def validate_semantic_output_envelope(
     value: Mapping[str, Any],
     *,
     expected_segment_ids: Sequence[str],
+    segment_metadata: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Validate schema and source binding without assigning semantic acceptance."""
 
     schema_valid = validate_semantic_output_schema(value)
-    return validate_semantic_source_binding(schema_valid, expected_segment_ids=expected_segment_ids)
+    return validate_semantic_source_binding(
+        schema_valid, expected_segment_ids=expected_segment_ids, segment_metadata=segment_metadata
+    )
 
 
 @dataclass(frozen=True)
@@ -646,18 +717,82 @@ def _segment_chars(segment: _Segment) -> int:
     return _json_chars({"segment_id": segment.segment_id, "value": segment.provider_value})
 
 
+_STAGE_BOUNDARY_RE = re.compile(r"(?m)(?=^(?:主题：|点位\s*[0-9０-９]+|第[一二三四五六七八九十百]+[章节幕])\s*)")
+
+
+def _split_rich_text_segment(segment: _Segment, policy: ProjectionPolicy) -> list[_Segment]:
+    """Split explicitly staged prose while retaining the parent locator."""
+
+    text = segment.provider_value.get("text")
+    if not isinstance(text, str):
+        return [segment]
+    parts = [part.strip() for part in _STAGE_BOUNDARY_RE.split(text) if part.strip()]
+    if len(parts) < 2:
+        return [segment]
+    result: list[_Segment] = []
+    for index, part in enumerate(parts):
+        payload = dict(segment.provider_value)
+        payload["text"] = part
+        payload["semantic_stage"] = {
+            "parent_segment_id": segment.segment_id,
+            "stage_index": index,
+            "stage_count": len(parts),
+            "boundary": "explicit_heading",
+        }
+        result.append(_Segment(
+            f"{segment.segment_id}:p{index}", segment.canonical_address, segment.canonical_unit_id,
+            segment.section_name, segment.component_key, segment.kind, payload,
+            segment.source_unit, segment.canonical_provenance,
+        ))
+    return result
+
+
 def _split_dialogue_segment(segment: _Segment, policy: ProjectionPolicy, *, next_sequence: int) -> tuple[list[_Segment], list[dict[str, Any]], int]:
     dialogue = segment.provider_value.get("dialogue")
     if not isinstance(dialogue, Mapping):
         return [segment], [], next_sequence
     nodes = list(dialogue.get("nodes", []))
-    if _json_chars(segment.provider_value) <= policy.hard_cap:
+    all_edges = list(dialogue.get("edges", [])) if isinstance(dialogue.get("edges"), list) else []
+    staged = False
+    if not all_edges:
+        staged_nodes: list[Mapping[str, Any]] = []
+        for node in nodes:
+            if not isinstance(node, Mapping):
+                staged_nodes.append(node)
+                continue
+            text = node.get("dialogue")
+            if not isinstance(text, str):
+                staged_nodes.append(node)
+                continue
+            parts = [part.strip() for part in re.split(r"(?=<p>\s*[（(]点位\s*[0-9０-９]+[）)]\s*</p>)", text) if part.strip()]
+            if len(parts) < 2:
+                staged_nodes.append(node)
+                continue
+            staged = True
+            for stage_index, part in enumerate(parts):
+                staged_node = dict(node)
+                source_id = str(node.get("source_id", "node"))
+                staged_node["source_id"] = f"{source_id}:stage{stage_index}"
+                staged_node["dialogue"] = part
+                staged_node["semantic_stage"] = {
+                    "parent_source_id": source_id,
+                    "stage_index": stage_index,
+                    "stage_count": len(parts),
+                    "boundary": "explicit_point_marker",
+                }
+                staged_nodes.append(staged_node)
+        if staged:
+            nodes = staged_nodes
+    if not staged and _json_chars(segment.provider_value) <= policy.hard_cap:
         return [segment], [], next_sequence
     chunks: list[list[Mapping[str, Any]]] = []
     current: list[Mapping[str, Any]] = []
     for node in nodes:
         candidate = current + [node]
-        if current and _json_chars({**segment.provider_value, "dialogue": {**dialogue, "nodes": candidate}}) > policy.hard_cap:
+        if staged and current:
+            chunks.append(current)
+            current = [node]
+        elif current and _json_chars({**segment.provider_value, "dialogue": {**dialogue, "nodes": candidate}}) > policy.hard_cap:
             chunks.append(current)
             current = [node]
         else:
@@ -667,7 +802,6 @@ def _split_dialogue_segment(segment: _Segment, policy: ProjectionPolicy, *, next
     if not chunks:
         return [], [{"reason": "oversized_empty_dialogue", "segment_id": segment.segment_id}], next_sequence
     result: list[_Segment] = []
-    all_edges = list(dialogue.get("edges", [])) if isinstance(dialogue.get("edges"), list) else []
     for index, chunk in enumerate(chunks):
         ids = {node.get("source_id") for node in chunk}
         edges = [edge for edge in all_edges if edge.get("parent_id") in ids and edge.get("child_id") in ids]
@@ -694,6 +828,25 @@ def _split_dialogue_segment(segment: _Segment, policy: ProjectionPolicy, *, next
 
 
 def _make_units(record_key: str, title: str, sections: Sequence[dict[str, Any]], policy: ProjectionPolicy) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    staged_sections: list[dict[str, Any]] = []
+    for section in sections:
+        staged_components: list[dict[str, Any]] = []
+        for component in section["components"]:
+            staged_segments: list[_Segment] = []
+            for segment in component["segments"]:
+                if segment.kind == "rich_text":
+                    staged_segments.extend(_split_rich_text_segment(segment, policy))
+                elif segment.kind == "dialogue_graph":
+                    staged_segments.extend(_split_dialogue_segment(segment, policy, next_sequence=0)[0])
+                else:
+                    staged_segments.append(segment)
+            staged_components.append({**component, "segments": staged_segments})
+        staged_sections.append({
+            **section,
+            "components": staged_components,
+            "segments": [segment for component in staged_components for segment in component["segments"]],
+        })
+    sections = staged_sections
     all_units: list[dict[str, Any]] = []
     oversize: list[dict[str, Any]] = []
     record_segments = [segment for section in sections for segment in section["segments"]]
@@ -717,7 +870,9 @@ def _make_units(record_key: str, title: str, sections: Sequence[dict[str, Any]],
                 all_units.append({"unit_scope": "component", "parent_unit_id": None, "section_ordinal": section["ordinal"], "component_key": component["key"], "segment_ids": [s.segment_id for s in component_segments], "provider_payload": component_payload})
                 continue
             for segment in component_segments:
-                pieces, piece_omissions, _ = _split_dialogue_segment(segment, policy, next_sequence=0)
+                pieces, piece_omissions = [segment], []
+                if segment.kind == "dialogue_graph":
+                    pieces, piece_omissions, _ = _split_dialogue_segment(segment, policy, next_sequence=0)
                 for piece in pieces:
                     payload = _unit_payload(record_key, title, [piece], component_omissions + piece_omissions)
                     chars = _json_chars(payload)
@@ -1141,6 +1296,7 @@ def build_u1(
             variant_policy = ProjectionPolicy(
                 record_soft_cap=cap,
                 hard_cap=max(policy.hard_cap, cap),
+                semantic_stage_cap=min(policy.semantic_stage_cap, max(policy.hard_cap, cap)),
                 include_text_segments=policy.include_text_segments,
                 include_explicit_references=policy.include_explicit_references,
                 model_diagnostic_codes=policy.model_diagnostic_codes,

@@ -17,15 +17,27 @@ from .qwen_embedding import (
 from .qwen_full_batch_runner import qwen_full_batch_disk_preflight, qwen_full_batch_dry_run
 from .semantic_live_runner import (
     B_EXPERIMENT_REVISION,
+    B_V2_EXPERIMENT_REVISION,
+    B_V3_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticLiveRunnerError,
     b_experiment_contract,
+    b_v2_experiment_contract,
+    b_v3_experiment_contract,
     load_adapter,
     load_offline_adapter,
     replay_response,
     run_b_zero_network_preflight,
     run_channel,
 )
+
+
+def _semantic_experiment(revision: str | None):
+    return {
+        B_EXPERIMENT_REVISION: b_experiment_contract,
+        B_V2_EXPERIMENT_REVISION: b_v2_experiment_contract,
+        B_V3_EXPERIMENT_REVISION: b_v3_experiment_contract,
+    }.get(revision, lambda: None)()
 
 
 def _qwen_dashscope_main(argv: list[str]) -> int:
@@ -82,14 +94,14 @@ def _semantic_live_run_main(argv: list[str]) -> int:
     parser.add_argument("--preflight-root", required=True, type=Path)
     parser.add_argument("--run-root", required=True, type=Path)
     parser.add_argument("--prior-attempt-root", action="append", default=[], type=Path)
-    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION,))
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
     parser.add_argument("--legacy-direct-http", action="store_true", required=True,
                         help="explicit historical direct-HTTP diagnostic path")
     selector = parser.add_mutually_exclusive_group(required=True)
     selector.add_argument("--unit-id")
     selector.add_argument("--remaining", action="store_true")
     args = parser.parse_args(argv)
-    experiment = b_experiment_contract() if args.experiment_revision == B_EXPERIMENT_REVISION else None
+    experiment = _semantic_experiment(args.experiment_revision)
     config = ChannelConfig.for_b_json_object(args.channel) if experiment is not None else ChannelConfig.from_environment(args.channel)
     adapter = load_adapter(config.adapter_factory, config, allow_legacy_live=args.legacy_direct_http)
     result = run_channel(args.preflight_root, args.run_root, config, adapter, unit_id=args.unit_id, remaining=args.remaining, prior_attempt_roots=args.prior_attempt_root, experiment=experiment)
@@ -102,9 +114,9 @@ def _semantic_live_replay_main(argv: list[str]) -> int:
     parser.add_argument("--channel", choices=("gemini_a", "gemini_b", "deepseek", "glm"), required=True)
     parser.add_argument("--run-root", required=True, type=Path)
     parser.add_argument("--unit-id", required=True)
-    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION,))
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
     args = parser.parse_args(argv)
-    experiment = b_experiment_contract() if args.experiment_revision == B_EXPERIMENT_REVISION else None
+    experiment = _semantic_experiment(args.experiment_revision)
     config = ChannelConfig.for_b_json_object(args.channel) if experiment is not None else ChannelConfig.from_environment(args.channel)
     adapter = load_offline_adapter(config.adapter_factory, config)
     print(canonical_json_bytes(replay_response(args.run_root, config, adapter, args.unit_id, experiment=experiment)).decode("utf-8"))
@@ -115,9 +127,10 @@ def _semantic_b_preflight_main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Run the P05-W2 B zero-network mechanical preflight")
     parser.add_argument("--channel", choices=("gemini_a", "gemini_b", "deepseek", "glm"), required=True)
     parser.add_argument("--output-root", required=True, type=Path)
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
     args = parser.parse_args(argv)
     config = ChannelConfig.for_b_json_object(args.channel)
-    report = run_b_zero_network_preflight(args.output_root, config)
+    report = run_b_zero_network_preflight(args.output_root, config, experiment=_semantic_experiment(args.experiment_revision))
     print(canonical_json_bytes(report).decode("utf-8"))
     return 0 if report.get("status") == "PASS" else 1
 

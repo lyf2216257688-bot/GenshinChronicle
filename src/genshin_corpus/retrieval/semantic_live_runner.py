@@ -29,8 +29,10 @@ from .semantic_compiler_u1 import (
     SEMANTIC_OUTPUT_SCHEMA_VERSION,
     SEGMENT_COVERAGE_DISPOSITIONS,
     SemanticCompilerU1Error,
+    SOURCE_BINDING_POLICY_VERSION,
     semantic_output_schema,
     semantic_input_identity,
+    semantic_segment_binding_metadata,
     validate_semantic_output_schema,
     validate_semantic_source_binding,
 )
@@ -43,7 +45,10 @@ B_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.1"
 B_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.1"
 B_V2_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.2"
 B_V2_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.2"
+B_V3_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.3"
+B_V3_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.3"
 B_REQUEST_CONTRACT_VERSION = "phase05-w2-b-json-object-request-0.1"
+STRICT_SOURCE_BINDING_POLICY = SOURCE_BINDING_POLICY_VERSION
 GEMINI_A_USER_AGENT = "GenshinChronicle-Phase05-SemanticCanary/0.1"
 TRANSPORT_RESPONSE_HEADER_ALLOWLIST = frozenset({"content-type", "server", "cf-ray", "x-request-id"})
 CHANNELS = ("gemini_a", "gemini_b", "deepseek", "glm")
@@ -189,6 +194,21 @@ def b_v2_prompt_contract() -> dict[str, Any]:
     return prompt
 
 
+def b_v3_prompt_contract() -> dict[str, Any]:
+    """Add stage-completeness and strict source-minimality instructions."""
+
+    prompt = b_v2_prompt_contract()
+    prompt["version"] = B_V3_PROMPT_VERSION
+    prompt["extraction_rules"] = [
+        *prompt["extraction_rules"],
+        "Treat each explicit date, subject heading, point marker, or stage boundary as a separate local passage. Emit distinct event items for each independently navigable change; never merge multiple stages only because they share one supplied source segment.",
+        "Before returning, check every staged passage for at least one supported item or an explicit no_navigation_material/ambiguous disposition. Do not mark a stage covered as a substitute for extracting its material events.",
+        "A map_desc segment with only images or map tabs directly supports location/topic navigation only when the item explicitly describes that location or map observation. Do not attach it to a textual event, fact, relation, or mention merely because it is in the same record.",
+    ]
+    prompt["source_binding_policy"] = STRICT_SOURCE_BINDING_POLICY
+    return prompt
+
+
 def b_request_contract() -> dict[str, Any]:
     """Return the provider wire contract that distinguishes B from frozen A."""
 
@@ -258,6 +278,18 @@ def b_v2_experiment_contract() -> SemanticExperimentContract:
         frozen_preflight_identity=ACCEPTED_PREFLIGHT_IDENTITY,
         frozen_semantic_build_identity=FROZEN_SEMANTIC_BUILD_IDENTITY,
         acceptance_authority="local_strict_json_schema_and_source_binding",
+    )
+
+
+def b_v3_experiment_contract() -> SemanticExperimentContract:
+    return SemanticExperimentContract(
+        revision=B_V3_EXPERIMENT_REVISION,
+        prompt_contract=b_v3_prompt_contract(),
+        request_contract=b_request_contract(),
+        output_schema_identity=SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+        frozen_preflight_identity=ACCEPTED_PREFLIGHT_IDENTITY,
+        frozen_semantic_build_identity=FROZEN_SEMANTIC_BUILD_IDENTITY,
+        acceptance_authority="local_strict_json_schema_source_binding_minimality",
     )
 
 
@@ -764,6 +796,7 @@ def _validate_raw_response(
     raw: bytes,
     *,
     expected_segment_ids: Sequence[str],
+    segment_metadata: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], str, dict[str, Any], dict[str, Any]]:
     diagnostics = _validation_diagnostics()
     content: str | None = None
@@ -804,8 +837,13 @@ def _validate_raw_response(
         diagnostics["authoritative_schema_validation"] = {"status": "rejected", "schema_identity": SEMANTIC_OUTPUT_SCHEMA_IDENTITY, "error": str(exc)}
         raise SemanticResponseValidationError("authoritative_schema_validation", exc, diagnostics, content=content, parsed=parsed) from exc
     try:
-        normalized = validate_semantic_source_binding(schema_valid, expected_segment_ids=expected_segment_ids)
-        diagnostics["source_binding_validation"] = {"status": "passed", "expected_segment_count": len(expected_segment_ids)}
+        normalized = validate_semantic_source_binding(
+            schema_valid, expected_segment_ids=expected_segment_ids, segment_metadata=segment_metadata
+        )
+        diagnostics["source_binding_validation"] = {
+            "status": "passed", "expected_segment_count": len(expected_segment_ids),
+            "minimality_policy": STRICT_SOURCE_BINDING_POLICY if segment_metadata is not None else "legacy",
+        }
     except Exception as exc:
         diagnostics["source_binding_validation"] = {"status": "rejected", "expected_segment_count": len(expected_segment_ids), "error": str(exc)}
         raise SemanticResponseValidationError("source_binding_validation", exc, diagnostics, content=content, parsed=schema_valid) from exc
@@ -922,8 +960,16 @@ def run_channel(
     if declared_preflight_identity != recomputed_preflight_identity:
         raise SemanticLiveRunnerError("frozen preflight identity self-check failed")
     if experiment is not None:
-        accepted_b = b_experiment_contract()
-        if experiment.identity != accepted_b.identity or experiment.safe_dict() != accepted_b.safe_dict():
+        accepted_b = {
+            contract.identity: contract
+            for contract in (
+                b_experiment_contract(),
+                b_v2_experiment_contract(),
+                b_v3_experiment_contract(),
+            )
+        }
+        accepted = accepted_b.get(experiment.identity)
+        if accepted is None or experiment.safe_dict() != accepted.safe_dict():
             raise SemanticLiveRunnerError("experiment contract is not the accepted B revision")
         if experiment.frozen_preflight_identity != declared_preflight_identity:
             raise SemanticLiveRunnerError("B experiment does not bind the frozen preflight")
@@ -1135,7 +1181,10 @@ def run_channel(
             # extraction, parsing, schema, or source-binding step can fail.
             _write_ledger(run_root, ledger)
             normalized, content, parsed, diagnostics = _validate_raw_response(
-                adapter, response.raw_response_bytes, expected_segment_ids=row["segment_ids"]
+                adapter, response.raw_response_bytes, expected_segment_ids=row["segment_ids"],
+                segment_metadata=(semantic_segment_binding_metadata(payload)
+                                  if experiment is not None and experiment.revision == B_V3_EXPERIMENT_REVISION
+                                  else None),
             )
             stem = f"{ordinal:03d}-{request.compilation_unit_id}"
             local_artifacts = _persist_local_validation(run_root, stem, diagnostics, content=content, parsed=parsed)
@@ -1217,9 +1266,27 @@ def replay_response(
     raw = artifact_path.read_bytes()
     if artifact.get("sha256") != _sha(raw) or artifact.get("byte_count") != len(raw):
         raise SemanticLiveRunnerError("preserved raw response artifact hash mismatch")
+    replay_metadata = None
+    if manifest.get("experiment_identity") == b_v3_experiment_contract().identity:
+        request_artifact = row.get("request_artifact")
+        if isinstance(request_artifact, Mapping):
+            request_path = Path(str(request_artifact.get("path")))
+            if not request_path.is_absolute():
+                request_path = root / request_path
+            request_bytes = request_path.read_bytes()
+            if (request_artifact.get("byte_count") != len(request_bytes)
+                    or request_artifact.get("sha256") != _sha(request_bytes)
+                    or row.get("request_identity") != _sha(request_bytes)):
+                raise SemanticLiveRunnerError("preserved request artifact hash mismatch")
+            request_body = json.loads(request_bytes)
+            messages = request_body.get("messages") if isinstance(request_body, Mapping) else None
+            if isinstance(messages, list) and len(messages) > 1 and isinstance(messages[1], Mapping):
+                user_content = messages[1].get("content")
+                if isinstance(user_content, str):
+                    replay_metadata = semantic_segment_binding_metadata(json.loads(user_content))
     try:
         normalized, _content, _parsed, diagnostics = _validate_raw_response(
-            adapter, raw, expected_segment_ids=row.get("segment_ids", [])
+            adapter, raw, expected_segment_ids=row.get("segment_ids", []), segment_metadata=replay_metadata
         )
     except SemanticResponseValidationError as exc:
         return {
@@ -1254,7 +1321,11 @@ def run_b_zero_network_preflight(
     if output_root.exists():
         raise SemanticLiveRunnerError("B zero-network preflight output root already exists")
     experiment = b_experiment_contract() if experiment is None else experiment
-    if experiment.identity not in {b_experiment_contract().identity, b_v2_experiment_contract().identity}:
+    if experiment.identity not in {
+        b_experiment_contract().identity,
+        b_v2_experiment_contract().identity,
+        b_v3_experiment_contract().identity,
+    }:
         raise SemanticLiveRunnerError("zero-network preflight requires a known B experiment contract")
     if config.structured_output_mode != "JSON_OBJECT":
         raise SemanticLiveRunnerError("B zero-network preflight requires JSON_OBJECT config")
@@ -1296,7 +1367,7 @@ def run_b_zero_network_preflight(
             {"segment_id": segment_ids[1], "disposition": "no_navigation_material", "reason": "heading only"},
         ],
     }
-    if experiment.revision == B_V2_EXPERIMENT_REVISION:
+    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION}:
         expected["items"] = list(b_v2_prompt_contract()["minimal_example"]["output"]["items"])
         expected["items"] = [
             {**item, "source_segment_ids": [segment_ids[0]]}
@@ -1311,10 +1382,15 @@ def run_b_zero_network_preflight(
     output_root.mkdir(parents=True)
     request_artifact = _relative_artifact(_write_bytes(output_root / "request.json", request_body), output_root)
     response_artifact = _relative_artifact(_write_bytes(output_root / "raw_response.json", raw), output_root)
-    normalized, content, parsed, diagnostics = _validate_raw_response(adapter, raw, expected_segment_ids=segment_ids)
-    if experiment.revision == B_V2_EXPERIMENT_REVISION:
+    strict_metadata = semantic_segment_binding_metadata(payload) if experiment.revision == B_V3_EXPERIMENT_REVISION else None
+    normalized, content, parsed, diagnostics = _validate_raw_response(
+        adapter, raw, expected_segment_ids=segment_ids, segment_metadata=strict_metadata
+    )
+    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION}:
         validate_b_v2_navigation_references(normalized)
-    replayed, _replay_content, _replay_parsed, replay_diagnostics = _validate_raw_response(adapter, raw, expected_segment_ids=segment_ids)
+    replayed, _replay_content, _replay_parsed, replay_diagnostics = _validate_raw_response(
+        adapter, raw, expected_segment_ids=segment_ids, segment_metadata=strict_metadata
+    )
     if replayed != normalized or replay_diagnostics.get("terminal_disposition") != "accepted_for_local_contract":
         raise SemanticLiveRunnerError("B provider-free replay is not deterministic")
     local_artifacts = _persist_local_validation(output_root, "provider-free-fixture", diagnostics, content=content, parsed=parsed)
@@ -1343,12 +1419,12 @@ def run_b_zero_network_preflight(
 
 __all__ = [
     "ACCEPTED_PREFLIGHT_IDENTITY", "B_EXPERIMENT_REVISION", "B_PROMPT_VERSION", "B_REQUEST_CONTRACT_VERSION",
-    "B_V2_EXPERIMENT_REVISION", "B_V2_PROMPT_VERSION",
+    "B_V2_EXPERIMENT_REVISION", "B_V2_PROMPT_VERSION", "B_V3_EXPERIMENT_REVISION", "B_V3_PROMPT_VERSION",
     "CHANNELS", "CHANNEL_LIMITS", "CHANNEL_TRANSPORT_PROFILES", "ChannelConfig", "GEMINI_A_USER_AGENT", "LIVE_RUNNER_SCHEMA_VERSION",
     "OPENAI_CHAT_ADAPTER_FACTORY",
     "SemanticExperimentContract", "SemanticLiveRunnerError", "SemanticProviderTransportError", "SemanticProviderAdapter", "SemanticProviderRequest",
-    "SemanticProviderResponse", "SemanticResponseValidationError", "TRANSPORT_RESPONSE_HEADER_ALLOWLIST", "b_experiment_contract",
-    "b_prompt_contract", "b_request_contract", "b_v2_experiment_contract", "b_v2_prompt_contract",
+    "SemanticProviderResponse", "SemanticResponseValidationError", "STRICT_SOURCE_BINDING_POLICY", "TRANSPORT_RESPONSE_HEADER_ALLOWLIST", "b_experiment_contract",
+    "b_prompt_contract", "b_request_contract", "b_v2_experiment_contract", "b_v2_prompt_contract", "b_v3_experiment_contract", "b_v3_prompt_contract",
     "load_adapter", "load_offline_adapter", "replay_response", "run_b_zero_network_preflight", "run_channel",
     "validate_b_v2_navigation_references",
 ]

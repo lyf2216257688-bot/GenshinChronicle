@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr
 from io import StringIO
 import json
+import gzip
 import tempfile
 import unittest
 from pathlib import Path
@@ -155,7 +156,13 @@ class SdkRunnerTest(unittest.TestCase):
         )
         self.assertEqual(result["status"], "complete")
         self.assertEqual(audit_sdk_route_integrity(self.root)["accepted_attempts"], 1)
-        stream = self.root / "units" / __import__("hashlib").sha256(b"s1").hexdigest() / "attempt-001" / "stream.jsonl"
+        terminal = json.loads((self.root / "units" / __import__("hashlib").sha256(b"s1").hexdigest() / "attempt-001" / "terminal.json").read_bytes())
+        descriptor = terminal["artifacts"]["stream"]
+        self.assertEqual(descriptor["format"], "jsonl-gzip-1")
+        self.assertTrue(descriptor["path"].endswith("stream.jsonl.gz"))
+        self.assertFalse((self.root / "units" / __import__("hashlib").sha256(b"s1").hexdigest() / "attempt-001" / "stream.jsonl").exists())
+        stream = self.root / descriptor["path"]
+        self.assertEqual(len(gzip.decompress(stream.read_bytes()).splitlines()), descriptor["chunk_count"])
         stream.write_bytes(stream.read_bytes() + b"\n")
         with self.assertRaisesRegex(ValueError, "integrity mismatch"):
             run_sdk_route_pair(

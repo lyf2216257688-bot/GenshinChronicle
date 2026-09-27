@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import tempfile
 import time
 from typing import Any, Callable, Mapping, Sequence
 
@@ -16,9 +19,14 @@ import httpx
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
 
-from .semantic_compiler_u1 import SEMANTIC_OUTPUT_SCHEMA_IDENTITY, semantic_input_identity
+from .semantic_compiler_u1 import (
+    SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+    semantic_input_identity,
+    semantic_segment_binding_metadata,
+)
 from .semantic_live_runner import (
     SemanticResponseValidationError,
+    STRICT_SOURCE_BINDING_POLICY,
     _redact,
     _validate_raw_response,
     validate_b_v2_navigation_references,
@@ -215,10 +223,41 @@ class _JsonlArtifactWriter:
             self._handle.close()
             self._handle = None
 
-    def descriptor(self) -> dict[str, Any] | None:
+    def descriptor(self, *, archive: bool = True) -> dict[str, Any] | None:
         self.close()
         if self.chunk_count == 0:
             return None
+        if archive:
+            archive_path = self.path.with_suffix(self.path.suffix + ".gz")
+            fd, temporary = tempfile.mkstemp(prefix=f".{archive_path.name}.", dir=str(archive_path.parent))
+            compressed_digest = hashlib.sha256()
+            compressed_bytes = 0
+            try:
+                with os.fdopen(fd, "wb") as handle:
+                    digesting = _DigestingWriter(handle, compressed_digest)
+                    with gzip.GzipFile(fileobj=digesting, mode="wb", mtime=0) as compressed:
+                        with self.path.open("rb") as source:
+                            shutil.copyfileobj(source, compressed, length=1024 * 1024)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                    compressed_bytes = handle.tell()
+                if archive_path.exists():
+                    raise _ArtifactPersistenceError("stream archive already exists")
+                os.replace(temporary, archive_path)
+                self.path.unlink()
+            except OSError as exc:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+                raise _ArtifactPersistenceError("stream evidence archive could not be persisted") from exc
+            return {
+                "path": str(archive_path.relative_to(self.root)),
+                "sha256": compressed_digest.hexdigest(),
+                "byte_count": compressed_bytes,
+                "uncompressed_sha256": self._digest.hexdigest(),
+                "uncompressed_byte_count": self.byte_count,
+                "chunk_count": self.chunk_count,
+                "format": "jsonl-gzip-1",
+            }
         return {
             "path": str(self.path.relative_to(self.root)),
             "sha256": self._digest.hexdigest(),
@@ -226,6 +265,21 @@ class _JsonlArtifactWriter:
             "chunk_count": self.chunk_count,
             "format": "jsonl-1",
         }
+
+
+class _DigestingWriter:
+    """Update a digest while gzip writes compressed bytes to a file."""
+
+    def __init__(self, handle: Any, digest: Any) -> None:
+        self.handle = handle
+        self.digest = digest
+
+    def write(self, data: bytes) -> int:
+        self.digest.update(data)
+        return self.handle.write(data)
+
+    def flush(self) -> None:
+        self.handle.flush()
 
 
 def _json_once(path: Path, value: Any) -> dict[str, Any]:
@@ -241,23 +295,38 @@ def _read(path: Path) -> dict[str, Any]:
 
 def _verify_artifacts(root: Path, value: Any) -> None:
     if isinstance(value, Mapping):
-        if set(value) in ({"path", "sha256", "byte_count"},
-                          {"path", "sha256", "byte_count", "chunk_count", "format"}):
+        descriptor_keys = set(value)
+        if descriptor_keys in ({"path", "sha256", "byte_count"},
+                               {"path", "sha256", "byte_count", "chunk_count", "format"},
+                               {"path", "sha256", "byte_count", "uncompressed_sha256", "uncompressed_byte_count", "chunk_count", "format"}):
             path = root / str(value["path"])
             if not path.resolve().is_relative_to(root.resolve()):
                 raise ValueError("attempt artifact escapes run root")
             body = path.read_bytes()
             if len(body) != value["byte_count"] or _sha(body) != value["sha256"]:
                 raise ValueError("attempt artifact integrity mismatch")
-            if "chunk_count" in value and (
-                value["format"] != "jsonl-1" or type(value["chunk_count"]) is not int
-                or value["chunk_count"] < 0 or body.count(b"\n") != value["chunk_count"]
-                or (body and not body.endswith(b"\n"))
-            ):
-                raise ValueError("stream artifact framing mismatch")
+            if "chunk_count" in value:
+                if value["format"] == "jsonl-gzip-1":
+                    try:
+                        uncompressed = gzip.decompress(body)
+                    except (OSError, EOFError) as exc:
+                        raise ValueError("stream artifact compression mismatch") from exc
+                    if (len(uncompressed) != value.get("uncompressed_byte_count")
+                            or _sha(uncompressed) != value.get("uncompressed_sha256")):
+                        raise ValueError("stream artifact content hash mismatch")
+                elif value["format"] == "jsonl-1":
+                    uncompressed = body
+                else:
+                    raise ValueError("stream artifact framing mismatch")
+                if (type(value["chunk_count"]) is not int or value["chunk_count"] < 0
+                        or uncompressed.count(b"\n") != value["chunk_count"]
+                        or (uncompressed and not uncompressed.endswith(b"\n"))):
+                    raise ValueError("stream artifact framing mismatch")
+            else:
+                uncompressed = body
             if "chunk_count" in value:
                 try:
-                    rows = [json.loads(line) for line in body.splitlines()]
+                    rows = [json.loads(line) for line in uncompressed.splitlines()]
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                     raise ValueError("stream artifact framing mismatch") from exc
                 if len(rows) != value["chunk_count"] or any(not isinstance(row, Mapping) for row in rows):
@@ -861,7 +930,8 @@ def run_sdk_route_pair(
             "generation_parameters": generation,
         })
         prepared.append({"unit_id": unit_id, "unit_key": _sha(unit_id.encode("utf-8")),
-                         "segment_ids": unit["segment_ids"], "body": body,
+                         "segment_ids": unit["segment_ids"],
+                         "segment_metadata": semantic_segment_binding_metadata(payload), "body": body,
                          "wire_request_identity": sha256_json(body),
                          "request_identity": request_identity,
                          "semantic_input_identity": semantic_id})
@@ -877,8 +947,9 @@ def run_sdk_route_pair(
         "schema_identity": schema_identity, "stream": True,
         "max_tokens": max_tokens, "generation_parameters": generation,
         "timeout_seconds": timeout_seconds, "automatic_retry": False,
-        "validator": "strict_json_schema_source_binding_v2_local_refs",
-        "units": [{key: row[key] for key in ("unit_id", "semantic_input_identity", "request_identity", "wire_request_identity", "segment_ids")}
+        "validator": "strict_json_schema_source_binding_v2_local_refs_minimality",
+        "source_binding_policy": STRICT_SOURCE_BINDING_POLICY,
+        "units": [{key: row[key] for key in ("unit_id", "semantic_input_identity", "request_identity", "wire_request_identity", "segment_ids", "segment_metadata")}
                   for row in prepared],
     }
     run_identity = sha256_json(contract)
@@ -1295,7 +1366,8 @@ def run_sdk_route_pair(
             else:
                 try:
                     normalized, _content, _parsed, validation = _validate_raw_response(
-                        _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"])
+                        _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"],
+                        segment_metadata=unit.get("segment_metadata"))
                     validate_b_v2_navigation_references(normalized)
                     artifacts["canonical_output"] = _json_once(stem / "canonical_output.json", normalized)
                     artifacts["validation"] = _json_once(stem / "validation.json", validation)
@@ -1563,7 +1635,8 @@ def run_sdk_route_canary(
         artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
         try:
             normalized, _content, _parsed, validation = _validate_raw_response(
-                _PARSER, raw, expected_segment_ids=unit["segment_ids"])
+                _PARSER, raw, expected_segment_ids=unit["segment_ids"],
+                segment_metadata=semantic_segment_binding_metadata(payload))
             validate_b_v2_navigation_references(normalized)
             artifacts["validation"] = _json_once(stem / "validation.json", validation)
             artifacts["canonical_output"] = _json_once(stem / "canonical_output.json", normalized)
@@ -1622,7 +1695,9 @@ def replay_sdk_route_attempt(root: Path, unit_id: str, attempt_number: int,
         raise ValueError("route attempt has no accepted output to replay")
     raw = (root / str(artifacts["response"]["path"])).read_bytes()
     normalized, _content, _parsed, _validation = _validate_raw_response(
-        _PARSER, raw, expected_segment_ids=expected_segment_ids)
+        _PARSER, raw, expected_segment_ids=expected_segment_ids,
+        segment_metadata=(unit.get("segment_metadata")
+                          if contract.get("source_binding_policy") == STRICT_SOURCE_BINDING_POLICY else None))
     validate_b_v2_navigation_references(normalized)
     if normalized != _read(root / str(artifacts["canonical_output"]["path"])):
         raise ValueError("provider-free replay differs from accepted output")

@@ -15,10 +15,12 @@ from genshin_corpus.retrieval.semantic_compiler_u1 import (
 )
 from genshin_corpus.retrieval.semantic_live_runner import (
     B_V2_EXPERIMENT_REVISION,
+    B_V3_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticProviderRequest,
     b_experiment_contract,
     b_v2_experiment_contract,
+    b_v3_experiment_contract,
     run_b_zero_network_preflight,
     validate_b_v2_navigation_references,
 )
@@ -122,6 +124,17 @@ def _review_output(ordinal: int, payload: dict) -> tuple[dict, dict[str, tuple[s
 
 
 class SemanticPromptV2Tests(unittest.TestCase):
+    def test_v3_stage_and_map_binding_contract_is_separate_and_schema_compatible(self) -> None:
+        v2 = b_v2_experiment_contract()
+        v3 = b_v3_experiment_contract()
+        rules = " ".join(v3.prompt_contract["extraction_rules"])
+        self.assertEqual(v3.revision, B_V3_EXPERIMENT_REVISION)
+        self.assertNotEqual(v3.identity, v2.identity)
+        self.assertEqual(v3.output_schema_identity, SEMANTIC_OUTPUT_SCHEMA_IDENTITY)
+        self.assertIn("explicit date", rules)
+        self.assertIn("map_desc", rules)
+        self.assertEqual(v3.prompt_contract["source_binding_policy"], "phase05-w2-source-binding-0.2")
+
     def test_new_identity_reuses_authoritative_schema_and_keeps_old_b_frozen(self) -> None:
         old = b_experiment_contract()
         v2 = b_v2_experiment_contract()
@@ -218,6 +231,22 @@ class SemanticPromptV2Tests(unittest.TestCase):
                     mentions = {item["local_id"] for item in output["items"] if item["kind"] == "mention"}
                     event = next(item for item in output["items"] if item["kind"] == "event")
                     self.assertEqual(set(event["participants"]), mentions)
+
+    def test_v3_zero_network_preflight_runs_strict_replay_and_local_reference_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            config = ChannelConfig.for_b_json_object("gemini_b", {})
+            root = Path(temp) / "preflight-v3"
+            report = run_b_zero_network_preflight(root, config, experiment=b_v3_experiment_contract())
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["formal_attempts_consumed"], 0)
+            self.assertEqual(report["provider_calls_executed"], 0)
+            self.assertEqual(report["network_calls_executed"], 0)
+            self.assertTrue(report["offline_replay_verified"])
+            self.assertEqual(report["experiment_identity"], b_v3_experiment_contract().identity)
+            self.assertEqual(
+                b_v3_experiment_contract().prompt_contract["source_binding_policy"],
+                "phase05-w2-source-binding-0.2",
+            )
 
 
 if __name__ == "__main__":

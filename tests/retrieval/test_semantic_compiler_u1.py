@@ -19,11 +19,12 @@ from genshin_corpus.retrieval.semantic_compiler_u1 import (
     build_u1,
     decide_reuse,
     semantic_input_identity,
+    semantic_segment_binding_metadata,
     validate_semantic_output_envelope,
     view_identity,
 )
 from genshin_corpus.parser.rich_text import parse_rich_text
-from genshin_corpus.retrieval.semantic_compiler_u1 import CanonicalProvenance, _segment_from_unit, _select_sample
+from genshin_corpus.retrieval.semantic_compiler_u1 import CanonicalProvenance, _Segment, _segment_from_unit, _select_sample, _split_dialogue_segment, _split_rich_text_segment
 
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "retrieval" / "canonical-rag-w1-record.json"
@@ -43,6 +44,48 @@ def _address(record: dict, section: dict, context: dict, unit: dict) -> dict:
 
 
 class SemanticCompilerU1Tests(unittest.TestCase):
+    def test_explicit_stage_fragments_keep_parent_lineage_for_long_inputs(self) -> None:
+        provenance = CanonicalProvenance("r", "sha", None, None, "run", "manifest")
+        rich = _Segment(
+            "seg-mail", {"record_id": "r"}, "u", "生日邮件", "mail", "rich_text",
+            {"kind": "rich_text", "component": "mail", "section": "生日邮件", "text": "主题：新朋友！\n第一阶段内容\n主题：特别生日会\n第二阶段内容", "text_segments": []},
+            {}, provenance,
+        )
+        rich_parts = _split_rich_text_segment(rich, ProjectionPolicy())
+        self.assertEqual([part.segment_id for part in rich_parts], ["seg-mail:p0", "seg-mail:p1"])
+        self.assertEqual([part.provider_value["text"].splitlines()[0] for part in rich_parts], ["主题：新朋友！", "主题：特别生日会"])
+        dialogue = _Segment(
+            "seg-points", {"record_id": "r"}, "u", "古老的字迹", "dialogue", "dialogue_graph",
+            {"kind": "dialogue_graph", "component": "dialogue", "section": "古老的字迹", "dialogue": {"nodes": [{"source_id": "n1", "dialogue": "<p>（点位1）</p>第一阶段\n<p>（点位2）</p>第二阶段\n<p>（点位3）</p>第三阶段"}], "edges": []}},
+            {}, provenance,
+        )
+        dialogue_parts, omissions, _ = _split_dialogue_segment(dialogue, ProjectionPolicy(), next_sequence=0)
+        self.assertFalse(omissions)
+        self.assertEqual(len(dialogue_parts), 3)
+        self.assertTrue(all(part.segment_id.startswith("seg-points:p") for part in dialogue_parts))
+        self.assertTrue(all(part.provider_value["dialogue"]["split_parent_segment_id"] == "seg-points" for part in dialogue_parts))
+
+    def test_strict_source_binding_rejects_redundant_map_desc(self) -> None:
+        payload = {"segments": [
+            {"segment_id": "map", "value": {"component": "map_desc", "kind": "structured_observation", "section": "残破的出勤记录【阿陀河谷】", "decoded": {"list": [{"tab_name": "位置"}]}}},
+            {"segment_id": "text", "value": {"component": "interactive_dialogue", "kind": "rich_text", "section": "交互文本", "text": "见习人员擅自行动。"}},
+        ]}
+        metadata = semantic_segment_binding_metadata(payload)
+        output = {
+            "schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION,
+            "items": [{"local_id": "t1", "kind": "topic", "label": "阿陀河谷", "source_segment_ids": ["map"], "topic_path": [], "qualifiers": {}}],
+            "segment_coverage": [
+                {"segment_id": "map", "disposition": "covered", "reason": None},
+                {"segment_id": "text", "disposition": "covered", "reason": None},
+            ],
+        }
+        validate_semantic_output_envelope(output, expected_segment_ids=("map", "text"), segment_metadata=metadata)
+        map_event = {**output, "items": [{"local_id": "e0", "kind": "event", "label": "阿陀河谷发生事件", "source_segment_ids": ["map"], "topic_path": [], "qualifiers": {"source_role": "map_location"}}]}
+        with self.assertRaisesRegex(SemanticCompilerU1Error, "not directly supported"):
+            validate_semantic_output_envelope(map_event, expected_segment_ids=("map", "text"), segment_metadata=metadata)
+        event = {**output, "items": [{"local_id": "e1", "kind": "event", "label": "见习人员擅自行动", "source_segment_ids": ["map", "text"], "topic_path": [], "qualifiers": {}}]}
+        with self.assertRaisesRegex(SemanticCompilerU1Error, "not minimal"):
+            validate_semantic_output_envelope(event, expected_segment_ids=("map", "text"), segment_metadata=metadata)
     def _inputs(self) -> tuple[Path, Path, tempfile.TemporaryDirectory[str]]:
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name)

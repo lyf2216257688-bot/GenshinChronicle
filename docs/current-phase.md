@@ -835,6 +835,45 @@ This is operational/mechanical and bounded semantic spot-review evidence only;
 real fallback remains UNOBSERVED, semantic acceptance remains open, and no
 larger or full build is authorized. Stop here pending the next decision.
 
+### Scoped-build review hardening (2026-09-28)
+
+The review follow-up is provider-free and does not alter the immutable
+200-unit root above. The compiler now fragments explicit `主题：` headings and
+dialogue point markers while retaining parent segment lineage, so independently
+navigable stages are supplied separately to the semantic prompt. The opt-in
+experiment `phase05-w2-b-json-object-0.3` uses prompt identity
+`2c332577f91edb50806a4f4c2cf663b720932c4833ac0e6023e1050c74370a2d` and
+experiment identity
+`912d0cfd456543c3d8f2079c8e041c7935e3952095ea97fc7c6d2361ccf092d2`; it
+retains the existing output schema and adds strict minimal source binding.
+`map_desc` remains allowed for a directly supported location/topic item, while
+redundant map references on textual events/facts/relations are rejected.
+Compiler, v3 prompt/preflight/replay, strict-binding, and SDK archive
+regressions pass provider-free. No live semantic validation was executed, so
+semantic correctness, curated acceptance, active-view eligibility, and
+production adoption remain UNKNOWN.
+
+The SDK runner now archives a completed append-only `stream.jsonl` as a
+deterministic `stream.jsonl.gz` artifact and records compressed and
+uncompressed hashes, byte counts, chunk count, and format. Existing JSONL
+artifacts remain auditable. On the immutable 200-unit root, the read-only
+measurement was 1,803 files and 896,466,466 bytes; its 200 streams were
+881,535,308 bytes. A temporary gzip projection measured 200 files and
+10,314,280 bytes, saving 871,221,028 stream bytes (1.1700% of the original),
+with 2,213,505 rows preserved. Full offline audit remained PASS with 200
+accepted attempts and zero provider/network calls (37.114 s in the final
+repeat). Direct stream
+access was 1.021 s versus 1.198 s for gzip read/decompression in this local
+measurement; gzip adds access CPU while removing most byte I/O. File count is
+unchanged, and the projected full-build loose-file/index problem remains
+UNKNOWN and separately requires an authorized storage design.
+
+Crash-safe per-chunk flush/fsync, immutable issued/terminal accounting,
+resume, and fail-closed unresolved-attempt handling remain unchanged. A
+targeted live semantic validation is conditionally ready only after a fresh
+authorized evidence root, v3 provider-free preflight PASS, explicit unit
+selection, and separate live authorization; it has not started.
+
 ### Historical Phase 04 recovery gate
 
 **Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE

@@ -106,3 +106,40 @@ or route execution blocker was observed in this scope. Real fallback remains
 unobserved, semantic acceptance remains open, and the evidence does not
 authorize expanding the sample, starting a full build, or changing production
 defaults. Stop here pending the next decision.
+
+## Review hardening and storage measurement (2026-09-28)
+
+The immutable live root above was inspected read-only for the review findings.
+Record `507825` is one dialogue graph with three explicit point markers, and
+record `2606` contains multiple `主题：` email headings inside one rich-text
+segment. The compiler now splits those explicit boundaries before provider
+input construction and preserves parent segment lineage. The v3 prompt adds a
+stage completeness instruction and strict minimal source binding. Record
+`502434` showed a textual event bound to an image/map-only `map_desc`; v3 keeps
+map-only location/topic support but rejects that redundant mixed binding.
+These changes preserve the schema and are covered by provider-free compiler,
+strict-binding, prompt, preflight, and replay regressions. They do not convert
+the existing v2 outputs into v3 outputs and do not establish semantic quality.
+
+The current code archives completed stream JSONL only after all per-chunk
+append/flush/fsync operations and before terminal persistence. A read-only
+measurement of the existing root found 1,803 files and 896,466,466 bytes;
+the 200 stream files were 881,535,308 bytes with 2,213,505 JSONL rows. A
+temporary deterministic gzip projection used 200 replacement files totaling
+10,314,280 bytes, saving 871,221,028 bytes (98.8299% of stream bytes) while
+preserving all rows. Compression took 2.966 s. Reading the uncompressed stream
+files took 1.021 s and reading/decompressing the gzip projection took 1.198 s
+on this machine. The full `audit_sdk_route_integrity()` over the immutable
+root remained PASS in 37.114 s in the final repeat: 200 logical units, 200
+attempts, 200 accepted, and zero provider/network calls. The gzip projection
+was not installed over
+the immutable root; its access result is a storage measurement, while the
+archive descriptor and dual-format audit behavior are covered by SDK tests.
+
+Replacing each stream file does not reduce loose-file count. The existing
+per-attempt layout therefore still leaves the projected full-build file/index
+cost unresolved; no database or alternate canonical format was introduced.
+JSON remains canonical semantic authority, and Markdown remains unnecessary as
+a canonical storage format. Crash recovery, append-only accounting, resume,
+and offline audit remain PASS; an archive failure leaves no terminal and is
+handled as an unresolved issued attempt.
