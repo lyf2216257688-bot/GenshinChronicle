@@ -791,6 +791,11 @@ remains UNOBSERVED, not FAIL, and is not a bounded-pilot gate. This pilot does
 not establish semantic quality or larger-scale stability. The current
 evidence supports considering a separately scoped next-stage semantic build
 after source/output review; it does not establish readiness for a full build.
+The provider-free Semantic Runtime scale-hardening checkpoint on 2026-09-27
+verified incremental resume/checkpoint accounting and compact JSONL stream
+artifacts through 200- and 1,000-unit local simulations. It removes the two
+bounded-pilot storage/resume blockers for a separately scoped approximately
+200-unit mechanical build, while full-corpus readiness remains unestablished.
 `accepted_for_local_contract` does not by itself authorize active semantic
 views or production adoption. Any additional paid canary requires separate
 authorization, historical attempt accounting, a new root, and a fresh

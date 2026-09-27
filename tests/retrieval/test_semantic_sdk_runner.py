@@ -15,6 +15,7 @@ from genshin_corpus.retrieval.semantic_live_runner import ChannelConfig, Semanti
 from genshin_corpus.retrieval.semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter, create_adapter
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _policy_403_pre_generation,
+    audit_sdk_route_integrity,
     replay_sdk_route_attempt,
     run_sdk_route_canary,
     run_sdk_route_pair,
@@ -141,6 +142,69 @@ class SdkRunnerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "integrity mismatch"):
             self.run_units([])
 
+    def test_jsonl_stream_tamper_and_full_integrity_audit(self):
+        environment = self._route_environment()
+        result = run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(lambda request: httpx.Response(
+                200, headers={"content-type": "text/event-stream"},
+                content=self._stream_body(), request=request))},
+        )
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(audit_sdk_route_integrity(self.root)["accepted_attempts"], 1)
+        stream = self.root / "units" / __import__("hashlib").sha256(b"s1").hexdigest() / "attempt-001" / "stream.jsonl"
+        stream.write_bytes(stream.read_bytes() + b"\n")
+        with self.assertRaisesRegex(ValueError, "integrity mismatch"):
+            run_sdk_route_pair(
+                self.root, units=[unit("s1")], prompt={"version": "v2"},
+                prompt_identity="fixture-v2", source_identity="fixture-source",
+                environment=environment,
+            )
+
+    def test_missing_checkpoint_is_rebuilt_without_provider_calls(self):
+        environment = self._route_environment()
+        calls = []
+
+        def primary(request):
+            calls.append(True)
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=self._stream_body(), request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary)},
+        }
+        run_sdk_route_pair(self.root, **kwargs)
+        (self.root / "checkpoint.json").unlink()
+        resumed = run_sdk_route_pair(self.root, **kwargs)
+        self.assertEqual(resumed["provider_attempts_this_invocation"], 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(audit_sdk_route_integrity(self.root)["status"], "PASS")
+
+    def test_stale_checkpoint_identity_fails_closed(self):
+        environment = self._route_environment()
+        run_sdk_route_pair(
+            self.root, units=[unit("s1")], prompt={"version": "v2"},
+            prompt_identity="fixture-v2", source_identity="fixture-source",
+            environment=environment,
+            transports={"tokenmetro": httpx.MockTransport(lambda request: httpx.Response(
+                200, headers={"content-type": "text/event-stream"},
+                content=self._stream_body(), request=request))},
+        )
+        checkpoint = json.loads((self.root / "checkpoint.json").read_bytes())
+        checkpoint["provider_attempts_total"] = 0
+        (self.root / "checkpoint.json").write_bytes(json.dumps(checkpoint).encode())
+        with self.assertRaisesRegex(ValueError, "checkpoint identity or history mismatch"):
+            run_sdk_route_pair(
+                self.root, units=[unit("s1")], prompt={"version": "v2"},
+                prompt_identity="fixture-v2", source_identity="fixture-source",
+                environment=environment,
+            )
+
     def test_legacy_cli_requires_explicit_selector(self):
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
             _semantic_live_run_main(["--channel", "glm", "--preflight-root", "unused",
@@ -264,9 +328,10 @@ class SdkRunnerTest(unittest.TestCase):
         fallback_terminal = json.loads((attempts[1] / "terminal.json").read_bytes())
         self.assertEqual(primary_terminal["disposition"], "primary_policy_403_pre_generation")
         self.assertEqual(fallback_terminal["disposition"], "accepted_for_local_contract")
-        chunk_descriptors = fallback_terminal["artifacts"]["stream_chunks"]
-        self.assertEqual(len(chunk_descriptors), fallback_terminal["stream_chunk_count"])
-        self.assertTrue(all((self.root / row["path"]).is_file() for row in chunk_descriptors))
+        stream_descriptor = fallback_terminal["artifacts"]["stream"]
+        self.assertEqual(stream_descriptor["chunk_count"], fallback_terminal["stream_chunk_count"])
+        self.assertTrue((self.root / stream_descriptor["path"]).is_file())
+        self.assertEqual(list(attempts[1].glob("chunk-*.json")), [])
         replay = replay_sdk_route_attempt(self.root, "s1", 2, ["s1"])
         self.assertEqual(replay["network_calls_executed"], 0)
         self.assertEqual(replay["status"], "PASS")
@@ -368,7 +433,7 @@ class SdkRunnerTest(unittest.TestCase):
     def test_stream_chunks_are_immutable_before_next_network_segment(self):
         environment = self._route_environment()
         key = __import__("hashlib").sha256(b"s1").hexdigest()
-        first_chunk = self.root / "units" / key / "attempt-001" / "chunk-000001.json"
+        first_chunk = self.root / "units" / key / "attempt-001" / "stream.jsonl"
         observed = []
 
         class SegmentedStream(httpx.SyncByteStream):

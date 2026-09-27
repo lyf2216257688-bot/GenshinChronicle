@@ -108,11 +108,10 @@ def _stream_delta(choice: Mapping[str, Any]) -> tuple[str, str]:
     return (visible if isinstance(visible, str) else "", reasoning if isinstance(reasoning, str) else "")
 
 
-def _stream_envelope(chunks: Sequence[Mapping[str, Any]], visible: str, reasoning: str,
+def _stream_envelope(identifier: str | None, visible: str, reasoning: str,
                      finish_reason: str | None, usage: Any) -> bytes:
     """Build the same local Chat Completions envelope used by non-stream validation."""
 
-    identifier = next((value.get("id") for value in reversed(chunks) if isinstance(value.get("id"), str)), None)
     choice: dict[str, Any] = {
         "index": 0,
         "finish_reason": finish_reason,
@@ -181,6 +180,54 @@ def _write_once(path: Path, body: bytes) -> dict[str, Any]:
     return {"path": str(path.relative_to(root)), "sha256": _sha(body), "byte_count": len(body)}
 
 
+class _ArtifactPersistenceError(OSError):
+    pass
+
+
+class _JsonlArtifactWriter:
+    """Durably append one canonical JSON record per observed stream chunk."""
+
+    def __init__(self, path: Path, root: Path) -> None:
+        self.path = path
+        self.root = root
+        self._handle: Any = None
+        self._digest = hashlib.sha256()
+        self.byte_count = 0
+        self.chunk_count = 0
+
+    def append(self, value: Mapping[str, Any]) -> None:
+        line = canonical_json_bytes(value) + b"\n"
+        try:
+            if self._handle is None:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self._handle = self.path.open("xb")
+            self._handle.write(line)
+            self._handle.flush()
+            os.fsync(self._handle.fileno())
+        except OSError as exc:
+            raise _ArtifactPersistenceError("stream evidence could not be persisted") from exc
+        self._digest.update(line)
+        self.byte_count += len(line)
+        self.chunk_count += 1
+
+    def close(self) -> None:
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
+
+    def descriptor(self) -> dict[str, Any] | None:
+        self.close()
+        if self.chunk_count == 0:
+            return None
+        return {
+            "path": str(self.path.relative_to(self.root)),
+            "sha256": self._digest.hexdigest(),
+            "byte_count": self.byte_count,
+            "chunk_count": self.chunk_count,
+            "format": "jsonl-1",
+        }
+
+
 def _json_once(path: Path, value: Any) -> dict[str, Any]:
     return _write_once(path, canonical_json_bytes(value))
 
@@ -194,13 +241,27 @@ def _read(path: Path) -> dict[str, Any]:
 
 def _verify_artifacts(root: Path, value: Any) -> None:
     if isinstance(value, Mapping):
-        if set(value) == {"path", "sha256", "byte_count"}:
+        if set(value) in ({"path", "sha256", "byte_count"},
+                          {"path", "sha256", "byte_count", "chunk_count", "format"}):
             path = root / str(value["path"])
             if not path.resolve().is_relative_to(root.resolve()):
                 raise ValueError("attempt artifact escapes run root")
             body = path.read_bytes()
             if len(body) != value["byte_count"] or _sha(body) != value["sha256"]:
                 raise ValueError("attempt artifact integrity mismatch")
+            if "chunk_count" in value and (
+                value["format"] != "jsonl-1" or type(value["chunk_count"]) is not int
+                or value["chunk_count"] < 0 or body.count(b"\n") != value["chunk_count"]
+                or (body and not body.endswith(b"\n"))
+            ):
+                raise ValueError("stream artifact framing mismatch")
+            if "chunk_count" in value:
+                try:
+                    rows = [json.loads(line) for line in body.splitlines()]
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("stream artifact framing mismatch") from exc
+                if len(rows) != value["chunk_count"] or any(not isinstance(row, Mapping) for row in rows):
+                    raise ValueError("stream artifact framing mismatch")
         else:
             for child in value.values():
                 _verify_artifacts(root, child)
@@ -229,36 +290,52 @@ def _attempts(root: Path, unit_key: str, request_identity: str, run_identity: st
         return []
     attempts: list[dict[str, Any]] = []
     for index, path in enumerate(sorted(directory.glob("attempt-*")), 1):
-        if path.name != f"attempt-{index:03d}" or not path.is_dir():
-            raise ValueError("attempt numbering is ambiguous")
-        issued = _read(path / "issued.json")
-        if (issued.get("request_identity") != request_identity or issued.get("run_identity") != run_identity
-                or issued.get("unit_id") != unit_id or issued.get("attempt_number") != index):
-            raise ValueError("attempt request identity changed")
-        terminal_path = path / "terminal.json"
-        if not terminal_path.exists():
-            raise ValueError("unresolved issued attempt; provider accounting is ambiguous")
-        terminal = _read(terminal_path)
-        if (terminal.get("attempt_number") != index or terminal.get("request_identity") != request_identity
-                or terminal.get("run_identity") != run_identity or terminal.get("unit_id") != unit_id):
-            raise ValueError("attempt terminal identity changed")
-        if issued.get("route") is not None:
-            if (issued.get("route") != terminal.get("route")
-                    or issued.get("route_role") != terminal.get("route_role")
-                    or issued.get("route_config_identity") != terminal.get("route_config_identity")
-                    or issued.get("wire_request_identity") != terminal.get("wire_request_identity")):
-                raise ValueError("attempt route identity changed")
-            expected = ("tokenmetro", "primary") if index == 1 else ("jizhi", "fallback")
-            if (terminal.get("route"), terminal.get("route_role")) != expected:
-                raise ValueError("route attempt order is ambiguous")
-        _verify_artifacts(root, terminal.get("artifacts", {}))
-        if terminal.get("disposition") == "accepted_for_local_contract" and (
-            terminal.get("http_status") != 200 or terminal.get("finish_reason") != "stop"
-            or not {"response", "validation", "canonical_output"}.issubset(terminal.get("artifacts", {}))
-        ):
-            raise ValueError("accepted attempt evidence is incomplete")
-        attempts.append(terminal)
+        attempts.append(_verified_attempt(root, path, index, request_identity, run_identity, unit_id))
     return attempts
+
+
+def _verified_attempt(root: Path, path: Path, index: int, request_identity: str,
+                      run_identity: str, unit_id: str) -> dict[str, Any]:
+    if path.name != f"attempt-{index:03d}" or not path.is_dir():
+        raise ValueError("attempt numbering is ambiguous")
+    issued = _read(path / "issued.json")
+    if (issued.get("request_identity") != request_identity or issued.get("run_identity") != run_identity
+            or issued.get("unit_id") != unit_id or issued.get("attempt_number") != index):
+        raise ValueError("attempt request identity changed")
+    terminal_path = path / "terminal.json"
+    if not terminal_path.exists():
+        raise ValueError("unresolved issued attempt; provider accounting is ambiguous")
+    terminal = _read(terminal_path)
+    if (terminal.get("attempt_number") != index or terminal.get("request_identity") != request_identity
+            or terminal.get("run_identity") != run_identity or terminal.get("unit_id") != unit_id):
+        raise ValueError("attempt terminal identity changed")
+    if issued.get("route") is not None:
+        if (issued.get("route") != terminal.get("route")
+                or issued.get("route_role") != terminal.get("route_role")
+                or issued.get("route_config_identity") != terminal.get("route_config_identity")
+                or issued.get("wire_request_identity") != terminal.get("wire_request_identity")):
+            raise ValueError("attempt route identity changed")
+        expected = ("tokenmetro", "primary") if index == 1 else ("jizhi", "fallback")
+        if (terminal.get("route"), terminal.get("route_role")) != expected:
+            raise ValueError("route attempt order is ambiguous")
+    artifacts = terminal.get("artifacts", {})
+    _verify_artifacts(root, artifacts)
+    stream = artifacts.get("stream") if isinstance(artifacts, Mapping) else None
+    chunks = artifacts.get("stream_chunks") if isinstance(artifacts, Mapping) else None
+    if stream is not None and chunks is not None:
+        raise ValueError("ambiguous stream artifact format")
+    if stream is not None and (not isinstance(stream, Mapping)
+                               or stream.get("chunk_count") != terminal.get("stream_chunk_count")):
+        raise ValueError("stream chunk count mismatch")
+    if chunks is not None and (not isinstance(chunks, list)
+                               or len(chunks) != terminal.get("stream_chunk_count")):
+        raise ValueError("stream chunk count mismatch")
+    if terminal.get("disposition") == "accepted_for_local_contract" and (
+        terminal.get("http_status") != 200 or terminal.get("finish_reason") != "stop"
+        or not {"response", "validation", "canonical_output"}.issubset(artifacts)
+    ):
+        raise ValueError("accepted attempt evidence is incomplete")
+    return terminal
 
 
 def run_sdk_units(
@@ -358,11 +435,17 @@ def run_sdk_units(
         root.mkdir(parents=True)
         _json_once(manifest_path, {"identity": identity, "contract": contract})
 
+    history_cache: dict[str, list[dict[str, Any]]] = {
+        candidate["unit_id"]: _attempts(root, candidate["unit_key"], candidate["request_identity"],
+                                         identity, candidate["unit_id"])
+        for candidate in prepared
+    }
+
     def checkpoint(status: str, issued_now: int, blocked_unit: str | None = None) -> dict[str, Any]:
         states: dict[str, str] = {}
         cumulative = 0
         for candidate in prepared:
-            history = _attempts(root, candidate["unit_key"], candidate["request_identity"], identity, candidate["unit_id"])
+            history = history_cache[candidate["unit_id"]]
             cumulative += len(history)
             states[candidate["unit_id"]] = (
                 "pending" if not history else
@@ -377,12 +460,31 @@ def run_sdk_units(
                                                     "backoff_cap_seconds": backoff_cap_seconds}}
         if blocked_unit is not None:
             summary["blocked_unit"] = blocked_unit
+        summary["identity"] = sha256_json(summary)
         atomic_write(root / "checkpoint.json", canonical_json_bytes(summary))
         return summary
 
+    checkpoint_path = root / "checkpoint.json"
+    if checkpoint_path.exists():
+        saved = _read(checkpoint_path)
+        unsigned = {key: value for key, value in saved.items() if key != "identity"}
+        expected_states = {
+            candidate["unit_id"]: (
+                "pending" if not history_cache[candidate["unit_id"]] else
+                "accepted" if history_cache[candidate["unit_id"]][-1]["disposition"] == "accepted_for_local_contract" else
+                "retryable" if history_cache[candidate["unit_id"]][-1]["retry_classification"] == "transient" else "blocked"
+            ) for candidate in prepared
+        }
+        identity_valid = (saved.get("identity") == sha256_json(unsigned)
+                          if "identity" in saved else True)
+        if (not identity_valid or saved.get("run_identity") != identity
+                or saved.get("unit_states") != expected_states
+                or saved.get("provider_attempts_total") != sum(map(len, history_cache.values()))):
+            raise ValueError("checkpoint identity or history mismatch")
+
     issued_now = 0
     for unit in prepared:
-        prior = _attempts(root, unit["unit_key"], unit["request_identity"], identity, unit["unit_id"])
+        prior = history_cache[unit["unit_id"]]
         if prior and prior[-1]["disposition"] == "accepted_for_local_contract":
             continue
         if prior and prior[-1]["retry_classification"] != "transient":
@@ -504,7 +606,10 @@ def run_sdk_units(
             if api_key.encode("utf-8") in canonical_json_bytes(terminal):
                 raise ValueError("terminal metadata contains credential")
             _json_once(stem / "terminal.json", terminal)
-            prior.append(terminal)
+            verified = _verified_attempt(root, stem, number, unit["request_identity"], identity, unit["unit_id"])
+            if verified != terminal:
+                raise ValueError("new attempt terminal changed before checkpoint")
+            prior.append(verified)
             checkpoint("partial", issued_now)
             if disposition == "accepted_for_local_contract":
                 break
@@ -631,8 +736,7 @@ def run_sdk_route_pair(
         root.mkdir(parents=True)
         _json_once(manifest_path, manifest)
 
-    def history_for(unit: Mapping[str, Any]) -> list[dict[str, Any]]:
-        history = _attempts(root, unit["unit_key"], unit["request_identity"], run_identity, unit["unit_id"])
+    def validate_route_history(unit: Mapping[str, Any], history: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
         for row in history:
             route = row.get("route")
             profile = profiles.get(route)
@@ -660,74 +764,97 @@ def run_sdk_route_pair(
                     usage=row.get("usage"), finish_reason=row.get("finish_reason"),
                 ) or row.get("fallback_eligible") is not True or row.get("stream_complete") is not False:
                     raise ValueError("primary policy fallback evidence is invalid")
-        return history
+        return list(history)
+
+    def history_for(unit: Mapping[str, Any]) -> list[dict[str, Any]]:
+        history = _attempts(root, unit["unit_key"], unit["request_identity"], run_identity, unit["unit_id"])
+        return validate_route_history(unit, history)
+
+    # Existing attempt trees are verified exactly once at invocation start. All
+    # later checkpoint updates use this in-memory ledger and verify only the
+    # newly completed attempt.
+    history_cache: dict[str, list[dict[str, Any]]] = {
+        candidate["unit_id"]: history_for(candidate) for candidate in prepared
+    }
+
+    checkpoint_states: dict[str, str] = {candidate["unit_id"]: "pending" for candidate in prepared}
+    checkpoint_routes: dict[str, list[str]] = {candidate["unit_id"]: [] for candidate in prepared}
+    checkpoint_counters = {
+        "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
+        "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
+        "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
+        "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
+    }
+    checkpoint_usage: dict[str, dict[str, Any]] = {
+        "tokenmetro": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                       "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+        "jizhi": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                  "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
+    }
+    checkpoint_total = 0
+    checkpoint_accepted = 0
+
+    def account_attempt(unit_id: str, row: Mapping[str, Any]) -> None:
+        nonlocal checkpoint_total, checkpoint_accepted
+        previous = checkpoint_states[unit_id]
+        route = row.get("route")
+        checkpoint_total += 1
+        checkpoint_routes[unit_id].append(str(route))
+        if route in checkpoint_usage:
+            normalized = row.get("usage_normalized")
+            if isinstance(normalized, Mapping):
+                for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
+                    value = normalized.get(field)
+                    if isinstance(value, int):
+                        checkpoint_usage[route][field] += value
+            else:
+                checkpoint_usage[route]["unknown_usage_attempts"] += 1
+            billing = row.get("billing")
+            credit = billing.get("reported_credit") if isinstance(billing, Mapping) else None
+            if isinstance(credit, (int, float)):
+                checkpoint_usage[route]["reported_credit"] += credit
+            else:
+                checkpoint_usage[route]["unknown_credit_attempts"] += 1
+        if route == "tokenmetro":
+            checkpoint_counters["tokenmetro_attempts"] += 1
+            if row.get("disposition") == "accepted_for_local_contract":
+                checkpoint_counters["tokenmetro_successes"] += 1
+                checkpoint_counters["accepted_primary"] += 1
+            if row.get("disposition") == "primary_policy_403_pre_generation":
+                checkpoint_counters["tokenmetro_policy_403"] += 1
+        elif route == "jizhi":
+            checkpoint_counters["jizhi_fallback_issued"] += 1
+            if row.get("disposition") == "accepted_for_local_contract":
+                checkpoint_counters["jizhi_fallback_successes"] += 1
+                checkpoint_counters["accepted_fallback"] += 1
+            else:
+                checkpoint_counters["jizhi_fallback_failures"] += 1
+        if row.get("execution_state") == "unknown":
+            checkpoint_counters["stopped_indeterminate"] += 1
+        if row.get("disposition") == "accepted_for_local_contract":
+            new_state = "accepted"
+        elif row.get("disposition") == "primary_policy_403_pre_generation" and len(checkpoint_routes[unit_id]) == 1:
+            new_state = "fallback_pending"
+        else:
+            new_state = "blocked"
+        if previous == "accepted":
+            checkpoint_accepted -= 1
+        if new_state == "accepted":
+            checkpoint_accepted += 1
+        checkpoint_states[unit_id] = new_state
+
+    for candidate in prepared:
+        for existing in history_cache[candidate["unit_id"]]:
+            account_attempt(candidate["unit_id"], existing)
 
     def checkpoint(status: str, issued_now: int, blocked_unit: str | None = None) -> dict[str, Any]:
-        states: dict[str, str] = {}
-        route_history: dict[str, list[str]] = {}
-        counters = {
-            "tokenmetro_attempts": 0, "tokenmetro_successes": 0,
-            "tokenmetro_policy_403": 0, "jizhi_fallback_issued": 0,
-            "jizhi_fallback_successes": 0, "jizhi_fallback_failures": 0,
-            "stopped_indeterminate": 0, "accepted_primary": 0, "accepted_fallback": 0,
-        }
-        usage_by_route: dict[str, dict[str, Any]] = {
-            "tokenmetro": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
-                           "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
-            "jizhi": {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
-                      "unknown_usage_attempts": 0, "reported_credit": 0, "unknown_credit_attempts": 0},
-        }
-        total = 0
-        for candidate in prepared:
-            history = history_for(candidate)
-            total += len(history)
-            route_history[candidate["unit_id"]] = [str(row.get("route")) for row in history]
-            for row in history:
-                route = row.get("route")
-                if route in usage_by_route:
-                    normalized = row.get("usage_normalized")
-                    if isinstance(normalized, Mapping):
-                        for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
-                            value = normalized.get(field)
-                            if isinstance(value, int):
-                                usage_by_route[route][field] += value
-                    else:
-                        usage_by_route[route]["unknown_usage_attempts"] += 1
-                    credit = row.get("billing", {}).get("reported_credit")
-                    if isinstance(credit, (int, float)):
-                        usage_by_route[route]["reported_credit"] += credit
-                    else:
-                        usage_by_route[route]["unknown_credit_attempts"] += 1
-                if route == "tokenmetro":
-                    counters["tokenmetro_attempts"] += 1
-                    if row.get("disposition") == "accepted_for_local_contract":
-                        counters["tokenmetro_successes"] += 1
-                        counters["accepted_primary"] += 1
-                    if row.get("disposition") == "primary_policy_403_pre_generation":
-                        counters["tokenmetro_policy_403"] += 1
-                elif route == "jizhi":
-                    counters["jizhi_fallback_issued"] += 1
-                    if row.get("disposition") == "accepted_for_local_contract":
-                        counters["jizhi_fallback_successes"] += 1
-                        counters["accepted_fallback"] += 1
-                    else:
-                        counters["jizhi_fallback_failures"] += 1
-                if row.get("execution_state") == "unknown":
-                    counters["stopped_indeterminate"] += 1
-            if not history:
-                states[candidate["unit_id"]] = "pending"
-            elif history[-1].get("disposition") == "accepted_for_local_contract":
-                states[candidate["unit_id"]] = "accepted"
-            elif history[-1].get("disposition") == "primary_policy_403_pre_generation" and len(history) == 1:
-                states[candidate["unit_id"]] = "fallback_pending"
-            else:
-                states[candidate["unit_id"]] = "blocked"
         summary = {
             "status": status, "run_identity": run_identity,
-            "logical_units": len(prepared), "accepted_units": sum(value == "accepted" for value in states.values()),
-            "provider_attempts_total": total, "provider_attempts_this_invocation": issued_now,
-            "unit_states": states, "route_history": route_history, "counters": counters,
-            "usage_by_route": usage_by_route,
+            "logical_units": len(prepared), "accepted_units": checkpoint_accepted,
+            "provider_attempts_total": checkpoint_total, "provider_attempts_this_invocation": issued_now,
+            "unit_states": dict(checkpoint_states), "route_history": {key: list(value) for key, value in checkpoint_routes.items()},
+            "counters": {key: value for key, value in checkpoint_counters.items()},
+            "usage_by_route": {key: dict(value) for key, value in checkpoint_usage.items()},
             "retry_policy": {"automatic_retry": False},
         }
         if blocked_unit is not None:
@@ -740,13 +867,28 @@ def run_sdk_route_pair(
             raise ValueError("route checkpoint persistence failed")
         return summary
 
-    def verify_checkpoint(unit: Mapping[str, Any], history: Sequence[Mapping[str, Any]]) -> None:
-        saved = _read(root / "checkpoint.json")
-        identity = saved.pop("identity", None)
-        if (identity != sha256_json(saved)
-                or saved.get("run_identity") != run_identity
-                or saved.get("route_history", {}).get(unit["unit_id"]) != [row["route"] for row in history]):
+    def verify_checkpoint() -> None:
+        checkpoint_path = root / "checkpoint.json"
+        if not checkpoint_path.exists():
+            return
+        saved = _read(checkpoint_path)
+        identity = saved.get("identity")
+        unsigned = {key: value for key, value in saved.items() if key != "identity"}
+        if (identity != sha256_json(unsigned) or saved.get("run_identity") != run_identity
+                or saved.get("route_history") != checkpoint_routes
+                or saved.get("unit_states") != checkpoint_states
+                or saved.get("provider_attempts_total") != checkpoint_total):
             raise ValueError("route checkpoint identity or history mismatch")
+
+    def record_attempt(unit: Mapping[str, Any], terminal: Mapping[str, Any]) -> None:
+        number = len(history_cache[unit["unit_id"]]) + 1
+        path = root / "units" / unit["unit_key"] / f"attempt-{number:03d}"
+        verified = _verified_attempt(root, path, number, unit["request_identity"], run_identity, unit["unit_id"])
+        validate_route_history(unit, [verified])
+        if dict(verified) != dict(terminal):
+            raise ValueError("new attempt terminal changed before checkpoint")
+        history_cache[unit["unit_id"]].append(verified)
+        account_attempt(unit["unit_id"], verified)
 
     def run_attempt(unit: Mapping[str, Any], *, route: str, role: str, number: int) -> dict[str, Any]:
         profile = profiles[route]
@@ -767,7 +909,7 @@ def run_sdk_route_pair(
             "issued_at": _now(),
         })
         artifacts: dict[str, Any] = {"request": request_artifact}
-        chunks: list[dict[str, Any]] = []
+        stream_writer = _JsonlArtifactWriter(stem / "stream.jsonl", root)
         raw: bytes | None = None
         status: int | None = None
         headers: dict[str, str] = {}
@@ -823,9 +965,7 @@ def run_sdk_route_pair(
                         data = _chunk_mapping(chunk)
                         if any(secret.encode("utf-8") in canonical_json_bytes(data) for secret in secret_values):
                             raise ValueError("stream chunk contains credential")
-                        descriptor = _json_once(stem / f"chunk-{len(chunks) + 1:06d}.json", data)
-                        artifacts.setdefault("stream_chunks", []).append(descriptor)
-                        chunks.append(data)
+                        stream_writer.append(data)
                         if first_chunk_ms is None:
                             first_chunk_ms = round((time.monotonic() - started) * 1000, 3)
                         identifier = data.get("id")
@@ -878,9 +1018,9 @@ def run_sdk_route_pair(
             raise ValueError("HTTP error response was not durably persisted")
         visible = "".join(visible_parts)
         reasoning = "".join(reasoning_parts)
-        chunk_count = len(chunks)
+        chunk_count = stream_writer.chunk_count
         if status == 200 and stream_complete and sdk_error_type is None:
-            raw = _stream_envelope(chunks, visible, reasoning, finish_reason, usage)
+            raw = _stream_envelope(provider_id, visible, reasoning, finish_reason, usage)
             if any(secret.encode("utf-8") in raw for secret in secret_values):
                 raise ValueError("provider response echoed configured secret")
             artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
@@ -923,6 +1063,9 @@ def run_sdk_route_pair(
                 "type": sdk_error_type, "message": sdk_error_message, "http_status": status,
                 **sdk_error_details,
             })
+        stream_descriptor = stream_writer.descriptor()
+        if stream_descriptor is not None:
+            artifacts["stream"] = stream_descriptor
         terminal = {
             "run_identity": run_identity, "unit_id": unit["unit_id"], "attempt_number": number,
             "request_identity": unit["request_identity"], "wire_request_identity": unit["wire_request_identity"],
@@ -949,11 +1092,13 @@ def run_sdk_route_pair(
         _json_once(stem / "terminal.json", terminal)
         return terminal
 
+    verify_checkpoint()
+    if not (root / "checkpoint.json").exists():
+        checkpoint("recovered", 0)
+
     issued_now = 0
     for unit in prepared:
-        history = history_for(unit)
-        if history:
-            verify_checkpoint(unit, history)
+        history = history_cache[unit["unit_id"]]
         if history and history[-1].get("disposition") == "accepted_for_local_contract":
             continue
         if history and not (len(history) == 1 and history[-1].get("disposition") == "primary_policy_403_pre_generation"):
@@ -963,16 +1108,17 @@ def run_sdk_route_pair(
         if route == "jizhi" and not (keys.get(route) or values.get(profiles[route].api_key_env)):
             return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
         terminal = run_attempt(unit, route=route, role=role, number=len(history) + 1)
+        record_attempt(unit, terminal)
         issued_now += 1
         if terminal["disposition"] == "accepted_for_local_contract":
             checkpoint("partial", issued_now)
             continue
         checkpoint("partial", issued_now, unit["unit_id"])
         if terminal.get("fallback_eligible"):
-            verify_checkpoint(unit, [terminal])
             if not (keys.get("jizhi") or values.get(profiles["jizhi"].api_key_env)):
                 return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
             fallback = run_attempt(unit, route="jizhi", role="fallback", number=2)
+            record_attempt(unit, fallback)
             issued_now += 1
             if fallback["disposition"] == "accepted_for_local_contract":
                 checkpoint("partial", issued_now)
@@ -1086,6 +1232,8 @@ def run_sdk_route_canary(
     artifacts: dict[str, Any] = {"request": _json_once(stem / "request.json", body)}
     _json_once(stem / "issued.json", {"request_identity": request_identity, "route": route, "issued_at": _now()})
     chunks: list[dict[str, Any]] = []
+    stream_writer = _JsonlArtifactWriter(stem / "stream.jsonl", root)
+    provider_id: str | None = None
     raw_error: bytes | None = None
     status: int | None = None
     started = time.monotonic()
@@ -1124,9 +1272,10 @@ def run_sdk_route_canary(
                     data = _chunk_mapping(chunk)
                     if key.encode() in canonical_json_bytes(data):
                         raise ValueError("canary stream chunk contains credential")
-                    descriptor = _json_once(stem / f"chunk-{len(chunks) + 1:06d}.json", data)
-                    artifacts.setdefault("stream_chunks", []).append(descriptor)
+                    stream_writer.append(data)
                     chunks.append(data)
+                    if isinstance(data.get("id"), str):
+                        provider_id = data["id"]
                     if first_chunk_ms is None:
                         first_chunk_ms = round((time.monotonic() - started) * 1000, 3)
                     choices = data.get("choices")
@@ -1155,7 +1304,7 @@ def run_sdk_route_canary(
             usage = chunk["usage"]
     disposition = "transport_or_stream_failure"
     if status == 200 and error_type is None and finish_reason == "stop" and done_tracker is not None and done_tracker.saw_done:
-        raw = _stream_envelope(chunks, "".join(visible), "".join(reasoning), finish_reason, usage)
+        raw = _stream_envelope(provider_id, "".join(visible), "".join(reasoning), finish_reason, usage)
         if key.encode() in raw:
             raise ValueError("canary response contains credential")
         artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
@@ -1169,6 +1318,9 @@ def run_sdk_route_canary(
         except (SemanticResponseValidationError, ValueError) as exc:
             artifacts["validation"] = _json_once(stem / "validation.json", {"error": str(exc)})
             disposition = "local_validation_failed"
+    stream_descriptor = stream_writer.descriptor()
+    if stream_descriptor is not None:
+        artifacts["stream"] = stream_descriptor
     terminal = {
         "route": route, "request_identity": request_identity, "http_status": status,
         "sdk_error_type": error_type, "finish_reason": finish_reason,
@@ -1224,6 +1376,59 @@ def replay_sdk_route_attempt(root: Path, unit_id: str, attempt_number: int,
         "status": "PASS", "route": terminal["route"], "unit_id": unit_id,
         "attempt_number": attempt_number, "provider_calls_executed": 0,
         "network_calls_executed": 0,
+    }
+
+
+def audit_sdk_route_integrity(root: Path) -> dict[str, Any]:
+    """Run a complete offline integrity/replay audit over a route-pair root.
+
+    Resume uses the incremental ledger above; this function is the explicit
+    expensive operation for operators who want every historical artifact
+    rehashed and every accepted output replayed.
+    """
+
+    root = Path(root)
+    manifest = _read(root / "manifest.json")
+    contract = manifest.get("contract")
+    if (not isinstance(contract, Mapping)
+            or manifest.get("identity") != sha256_json(contract)
+            or contract.get("runner") != "phase05-semantic-sdk-route-pair-0.1"):
+        raise ValueError("route-pair manifest integrity mismatch")
+    profiles = {
+        route: profile for route in ("tokenmetro", "jizhi")
+        if isinstance(profile := contract.get("primary_route" if route == "tokenmetro" else "fallback_route"), Mapping)
+    }
+    attempts_total = 0
+    accepted_total = 0
+    for unit in contract.get("units", []):
+        if not isinstance(unit, Mapping):
+            raise ValueError("route-pair manifest unit is invalid")
+        unit_id = unit.get("unit_id")
+        if not isinstance(unit_id, str):
+            raise ValueError("route-pair manifest unit is invalid")
+        history = _attempts(root, _sha(unit_id.encode("utf-8")), str(unit["request_identity"]),
+                            str(manifest["identity"]), unit_id)
+        for attempt in history:
+            route = attempt.get("route")
+            if route not in profiles or attempt.get("route_config_identity") != sha256_json(profiles[route]):
+                raise ValueError("attempt route configuration identity changed")
+            artifacts = attempt.get("artifacts", {})
+            request = artifacts.get("request") if isinstance(artifacts, Mapping) else None
+            wire = artifacts.get("wire_request") if isinstance(artifacts, Mapping) else None
+            if not isinstance(request, Mapping) or not isinstance(wire, Mapping):
+                raise ValueError("route attempt lacks immutable request evidence")
+            request_body = (root / str(request["path"])).read_bytes()
+            wire_body = (root / str(wire["path"])).read_bytes()
+            if json.loads(request_body) != json.loads(wire_body):
+                raise ValueError("route attempt request differs from wire evidence")
+            attempts_total += 1
+            if attempt.get("disposition") == "accepted_for_local_contract":
+                replay_sdk_route_attempt(root, unit_id, int(attempt["attempt_number"]), unit.get("segment_ids", []))
+                accepted_total += 1
+    return {
+        "status": "PASS", "logical_units": len(contract.get("units", [])),
+        "attempts": attempts_total, "accepted_attempts": accepted_total,
+        "provider_calls_executed": 0, "network_calls_executed": 0,
     }
 
 
