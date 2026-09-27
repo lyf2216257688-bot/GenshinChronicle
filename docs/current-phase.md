@@ -810,6 +810,31 @@ views and navigation remains later and is not implied.
 The real bounded Genshin story slice is an open acceptance dependency for that
 later evaluation/full Phase 05 closure, not a separate unapproved gate.
 
+The separately authorized approximately 200-unit Scoped Semantic Build then
+completed at
+`data/retrieval/p05-w2-scoped-semantic-20260927-r1/run` with run identity
+`84ee8e1eab5d3f2bc3119a96ec1bd68c149828635e9fbef4f0adf90dc285a935`.
+Its fresh RU-bound, non-partial, non-oversized population was 206,849 units;
+the existing 16,000-byte provider-facing ceiling left 205,208 units in the
+bounded sample-admission pool. The deterministic one-unit-per-record stratified sample
+contained 200 distinct source records across 31 stable scope/kind/size strata.
+The pre-provider freeze identities were sample
+`72e1ec582cfb98c06c4ff15d74c2abe5f50d8c7f7e53381d3d224b5d7434577a`,
+preflight
+`01622a5c3d103f5389d68567c31cedc9809058ff0bc98fc030abb86d46e099e7`, and
+freeze
+`ec72dbf572d81ef3e60e333eb2ee301aaa59f2ea7e4749eec551a1ed8cbb1ec9`.
+All 200 TokenMetro primary attempts completed with HTTP 200, complete streams,
+and local contract acceptance; 0 failed, 0 execution-UNKNOWN, 0 policy-403,
+and 0 Jizhi fallback attempts were recorded. Reported usage was 463,121 input,
+2,217,052 output, and 1,965,960 reasoning tokens; reported credit was 111.60,
+while currency and billable status remain `UNKNOWN`. The root contains 1,803
+files and 896,466,466 logical bytes. Full offline audit/replay passed, and an
+isolated resume skipped all 200 accepted units with zero new provider calls.
+This is operational/mechanical and bounded semantic spot-review evidence only;
+real fallback remains UNOBSERVED, semantic acceptance remains open, and no
+larger or full build is authorized. Stop here pending the next decision.
+
 ### Historical Phase 04 recovery gate
 
 **Block A Retrieval/Ranking is CLOSED / FROZEN / ADOPTED; default-BGE
