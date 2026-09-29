@@ -1,0 +1,52 @@
+{
+  "schema_version": "phase05-w2-quality-control-review-0.1",
+  "boundary": "bounded read-only source/output review; not semantic acceptance",
+  "source_root": "data/retrieval/p05-w2-scoped-semantic-20260927-r1",
+  "cases": [
+    {
+      "record_key": "mihoyo_obc:zh-cn:500660",
+      "unit_id": "a349d15cf22a3115bcf7d3e7bf9ca916bb28cb3e3c67604eeca8ba33c49aae74",
+      "role": "ordinary rich-text control",
+      "signals_hit": ["coverage_noncovered"],
+      "source_review": "Three collapse-panel segments contain a forging instruction and related structure; one segment is image-only or unsupported for this output.",
+      "output_review": "The accepted output contains distinct process-start, state-change, visual-signal, and operation events plus local mentions; the unsupported segment is explicitly accounted for.",
+      "bounded_verdict": "no_confirmed_semantic_issue",
+      "signal_result": "coverage_noncovered is a false-positive review trigger for this bounded read"
+    },
+    {
+      "record_key": "mihoyo_obc:zh-cn:4402",
+      "unit_id": "67b593244b6700385a539f0d3b28f91ee3c336f446ababec9e1bf2511d2d66ee",
+      "role": "ordinary multi-segment control",
+      "signals_hit": ["nonempty_without_qualifiers"],
+      "source_review": "Two short collapse-panel segments describe the transformation caused by fire or electro elements and the resulting materials.",
+      "output_review": "The output retains the transformation event, four local mentions, and separate relations for both resulting states and materials.",
+      "bounded_verdict": "no_confirmed_semantic_issue",
+      "signal_result": "absence of qualifiers is a false-positive review trigger for this bounded read"
+    },
+    {
+      "record_key": "mihoyo_obc:zh-cn:503380",
+      "unit_id": "2869761b0d3a342603fab181402058377cbbdb4ae936bb6a2fa275c76ac38bab",
+      "role": "ordinary dialogue split control",
+      "signals_hit": [],
+      "source_review": "The provider-facing dialogue piece has segment id suffix :p509, but its value has no semantic_stage metadata; this is a cap split, not an explicit stage marker.",
+      "output_review": "The accepted output preserves the visible dialogue option, speaker mention, and topic.",
+      "bounded_verdict": "no_confirmed_semantic_issue",
+      "signal_result": "the prior :p substring heuristic would have been a false positive; explicit metadata detection correctly does not flag it"
+    },
+    {
+      "record_key": "mihoyo_obc:zh-cn:506793",
+      "unit_id": "175e3df6f62a7aab852682eb9fcb6f45ca021146383937d7276a5ea721f86844",
+      "role": "ordinary map-only control",
+      "signals_hit": [],
+      "source_review": "The map_desc decoded list contains screenshot and location tabs.",
+      "output_review": "The accepted output contains only map-supported topics corresponding to the record title, NPC display, screenshot, and location tabs; there is no text component in this unit.",
+      "bounded_verdict": "no_confirmed_semantic_issue",
+      "signal_result": "map-only input is not evidence of a map/text binding problem"
+    }
+  ],
+  "limitations": [
+    "These four controls are a small descriptive check, not a calibrated precision/recall study.",
+    "No control establishes semantic acceptance or active Navi/KG eligibility.",
+    "The known 507825 point-1 omission is not captured by empty-output, sparse-output, map/text, or validator-rejection signals; explicit stage metadata can only nominate review and does not prove the omission."
+  ]
+}

@@ -833,7 +833,8 @@ files and 896,466,466 logical bytes. Full offline audit/replay passed, and an
 isolated resume skipped all 200 accepted units with zero new provider calls.
 This is operational/mechanical and bounded semantic spot-review evidence only;
 real fallback remains UNOBSERVED, semantic acceptance remains open, and no
-larger or full build is authorized. Stop here pending the next decision.
+larger or full build is authorized. At that scoped-build checkpoint, further
+execution stopped pending a separate decision.
 
 ### Scoped-build review hardening (2026-09-28)
 
@@ -869,10 +870,57 @@ unchanged, and the projected full-build loose-file/index problem remains
 UNKNOWN and separately requires an authorized storage design.
 
 Crash-safe per-chunk flush/fsync, immutable issued/terminal accounting,
-resume, and fail-closed unresolved-attempt handling remain unchanged. A
-targeted live semantic validation is conditionally ready only after a fresh
-authorized evidence root, v3 provider-free preflight PASS, explicit unit
-selection, and separate live authorization; it has not started.
+resume, and fail-closed unresolved-attempt handling remain unchanged. The
+11-unit targeted v3 input and provider-free preflight are frozen at
+`data/retrieval/p05-w2-targeted-v3-20260928-r1/preflight-final`, identity
+`02b1b33cc742edf0575c08782d048290627562a70b2837c1df9e2f9beb338827`.
+This freezes three point stages, five dated email stages, one map/text
+contrast, and two controls; construction used zero provider/network calls.
+The separately authorized live run is preserved at
+`data/retrieval/p05-w2-targeted-v3-20260928-r1/live-20260928-r1`, run identity
+`a6f88a784b5ff9ed15eadba33d1552c967e0cbad2bd1eaccf4f973496a72fb2d`.
+It issued 9 TokenMetro primary requests, accepted 8 outputs at the local
+JSON/schema/source-binding boundary, and stopped fail-closed on unit 9/11
+(`502434` 残破的出勤记录【阿陀河谷】). After schema normalization,
+the rejected item 11 is a `位置` topic bound only to `map_desc`, whose decoded
+map list includes `tab_name=位置`. Whether this should pass the source-binding
+contract remains unresolved. No retry, fallback, or sample expansion was
+performed; controls `6572` and `6430` remain unattempted. Offline audit/replay
+passed for the 9 attempts and 8 accepted outputs. Targeted semantic review
+shows stage splitting is operationally useful but does not establish semantic
+quality: independent point/email stages are present, while a material omission,
+unresolved ordering/attribution questions, the binding blocker, and unattempted
+controls keep semantic acceptance, ordinary-case regression status, and production adoption
+UNKNOWN. The immutable 200-unit root is unchanged. See
+`docs/research/phase-05/p05-w2-targeted-v3-preflight-20260928.md` and
+`docs/research/phase-05/p05-w2-targeted-v3-live-20260928-r1.md` for scoped
+identities and review evidence; any continuation requires a separate decision.
+
+### Offline semantic-quality signal investigation (2026-09-29)
+
+The first follow-up work unit is provider-free and is recorded at
+`data/retrieval/p05-w2-semantic-quality-signals-20260929-r6`, report identity
+`1874359d7d9e75cf97fcfa74b229c943bfc2ecde300bc2d218338c6175cc6f1d`. It reads
+the immutable 200-unit scoped build and the existing targeted v3 artifacts;
+both source roots remain unchanged. The 200-unit distribution contains 20
+empty outputs, 51 units with non-covered segment dispositions, 22 map/text
+mixtures, and 35 units with at most one output item. The targeted set contains
+eight units with compiler-preserved explicit stage metadata. These are candidate
+review signals only: the empty-output concentration in sub-1KB structured inputs
+and the four small control reads show
+that they produce normal-case review triggers and do not provide calibrated
+precision/recall. The known `507825` point-1 omission was not clearly captured
+by the simple output/validator signals. `502434` remains a validator boundary
+case: after schema normalization, raw item 11 is a map-backed `位置` topic
+whose map tab is also `位置`; the model claim and the correct contract outcome
+remain UNKNOWN, so no contract change is made. Ordering, attribution,
+ordinary-control semantic regression,
+and exact map-topic adjudication remain UNKNOWN. The analyzer issued zero
+provider/API/network calls and passed focused regression tests `36/36`, of
+which 3 are analyzer-specific. Selective review, repair, stronger-model
+escalation, thresholds, and any new quality schema are not frozen; the next
+implementation decision depends on this report and does not authorize live
+execution.
 
 ### Historical Phase 04 recovery gate
 
