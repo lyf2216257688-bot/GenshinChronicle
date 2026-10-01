@@ -19,11 +19,13 @@ from .semantic_live_runner import (
     B_EXPERIMENT_REVISION,
     B_V2_EXPERIMENT_REVISION,
     B_V3_EXPERIMENT_REVISION,
+    B_V4_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticLiveRunnerError,
     b_experiment_contract,
     b_v2_experiment_contract,
     b_v3_experiment_contract,
+    b_v4_experiment_contract,
     load_adapter,
     load_offline_adapter,
     replay_response,
@@ -37,6 +39,7 @@ def _semantic_experiment(revision: str | None):
         B_EXPERIMENT_REVISION: b_experiment_contract,
         B_V2_EXPERIMENT_REVISION: b_v2_experiment_contract,
         B_V3_EXPERIMENT_REVISION: b_v3_experiment_contract,
+        B_V4_EXPERIMENT_REVISION: b_v4_experiment_contract,
     }.get(revision, lambda: None)()
 
 
@@ -94,7 +97,7 @@ def _semantic_live_run_main(argv: list[str]) -> int:
     parser.add_argument("--preflight-root", required=True, type=Path)
     parser.add_argument("--run-root", required=True, type=Path)
     parser.add_argument("--prior-attempt-root", action="append", default=[], type=Path)
-    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION))
     parser.add_argument("--legacy-direct-http", action="store_true", required=True,
                         help="explicit historical direct-HTTP diagnostic path")
     selector = parser.add_mutually_exclusive_group(required=True)
@@ -114,7 +117,7 @@ def _semantic_live_replay_main(argv: list[str]) -> int:
     parser.add_argument("--channel", choices=("gemini_a", "gemini_b", "deepseek", "glm"), required=True)
     parser.add_argument("--run-root", required=True, type=Path)
     parser.add_argument("--unit-id", required=True)
-    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION))
     args = parser.parse_args(argv)
     experiment = _semantic_experiment(args.experiment_revision)
     config = ChannelConfig.for_b_json_object(args.channel) if experiment is not None else ChannelConfig.from_environment(args.channel)
@@ -127,7 +130,7 @@ def _semantic_b_preflight_main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Run the P05-W2 B zero-network mechanical preflight")
     parser.add_argument("--channel", choices=("gemini_a", "gemini_b", "deepseek", "glm"), required=True)
     parser.add_argument("--output-root", required=True, type=Path)
-    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION))
+    parser.add_argument("--experiment-revision", choices=(B_EXPERIMENT_REVISION, B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION))
     args = parser.parse_args(argv)
     config = ChannelConfig.for_b_json_object(args.channel)
     report = run_b_zero_network_preflight(args.output_root, config, experiment=_semantic_experiment(args.experiment_revision))

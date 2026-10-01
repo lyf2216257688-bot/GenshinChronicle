@@ -16,11 +16,13 @@ from genshin_corpus.retrieval.semantic_compiler_u1 import (
 from genshin_corpus.retrieval.semantic_live_runner import (
     B_V2_EXPERIMENT_REVISION,
     B_V3_EXPERIMENT_REVISION,
+    B_V4_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticProviderRequest,
     b_experiment_contract,
     b_v2_experiment_contract,
     b_v3_experiment_contract,
+    b_v4_experiment_contract,
     run_b_zero_network_preflight,
     validate_b_v2_navigation_references,
 )
@@ -232,6 +234,33 @@ class SemanticPromptV2Tests(unittest.TestCase):
                     event = next(item for item in output["items"] if item["kind"] == "event")
                     self.assertEqual(set(event["participants"]), mentions)
 
+    def test_v4_inventory_prompt_is_opt_in_and_provider_free(self) -> None:
+        v3 = b_v3_experiment_contract()
+        v4 = b_v4_experiment_contract()
+        self.assertEqual(v4.revision, B_V4_EXPERIMENT_REVISION)
+        self.assertNotEqual(v4.identity, v3.identity)
+        self.assertNotEqual(v4.prompt_identity, v3.prompt_identity)
+        self.assertEqual(v4.request_contract_identity, v3.request_contract_identity)
+        self.assertEqual(v4.output_schema_identity, v3.output_schema_identity)
+        self.assertEqual(v4.frozen_preflight_identity, v3.frozen_preflight_identity)
+        self.assertEqual(v4.frozen_semantic_build_identity, v3.frozen_semantic_build_identity)
+        self.assertNotIn("Extract a small set", v4.prompt_contract["task"])
+        rules = " ".join(v4.prompt_contract["extraction_rules"])
+        self.assertIn("every independently stated", rules)
+        self.assertIn("completeness result", rules)
+        self.assertEqual(v4.prompt_contract["source_binding_policy"], v3.prompt_contract["source_binding_policy"])
+        with tempfile.TemporaryDirectory() as temp:
+            report = run_b_zero_network_preflight(
+                Path(temp) / "preflight-v4",
+                ChannelConfig.for_b_json_object("gemini_b", {}),
+                experiment=v4,
+            )
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["formal_attempts_consumed"], 0)
+            self.assertEqual(report["provider_calls_executed"], 0)
+            self.assertEqual(report["network_calls_executed"], 0)
+            self.assertTrue(report["offline_replay_verified"])
+            self.assertEqual(report["experiment_identity"], v4.identity)
     def test_v3_zero_network_preflight_runs_strict_replay_and_local_reference_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             config = ChannelConfig.for_b_json_object("gemini_b", {})

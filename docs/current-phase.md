@@ -896,6 +896,39 @@ UNKNOWN. The immutable 200-unit root is unchanged. See
 `docs/research/phase-05/p05-w2-targeted-v3-live-20260928-r1.md` for scoped
 identities and review evidence; any continuation requires a separate decision.
 
+
+### Opt-in semantic extraction inventory Prompt ablation (2026-09-30)
+
+The first implementation after the offline signal investigation is the
+provider-free, opt-in Prompt/task formulation revision
+phase05-w2-b-json-object-0.4. It keeps the existing compiler/input, request
+contract, authoritative schema, strict source-binding policy, frozen semantic
+build/preflight identities, and fail-closed replay behavior. Its task wording
+asks for a bounded inventory of every independently stated, source-supported
+event/fact/relation/topic/mention in each stage, rather than a representative
+small set, while retaining the distinction that covered is not semantic
+completeness. The existing base, v2, and v3 contracts remain frozen.
+
+The v4 contract and CLI mapping are provider-free verified; focused semantic
+prompt/B regressions pass 17/17, with zero formal attempts and zero
+provider/network calls in the v4 preflight. The first three-unit follow-up root
+`data/retrieval/p05-w2-v3-v4-inventory-ablation-preflight-20260930-r1` is retained
+as historical preflight evidence; its `507825` selection was later found to be
+the point2 payload despite the selection label. It must not be used as evidence
+for the confirmed point1 omission. A corrected true-point1 preflight is
+`data/retrieval/p05-w2-true-point1-v3-v4-20260930-preflight-r1` with identity
+`cbb5c77eb7b8f99d8f05f8c08c2072633485ea2a3f3157c5f0f31c52f0994562`, and its
+two-request live root is
+`data/retrieval/p05-w2-true-point1-v3-v4-20260930-live-r1`. Both true-point1
+requests completed on TokenMetro primary with zero Jizhi fallback and zero
+retry; offline audit/replay passed. V4 materially restores the previously
+omitted independent content, but also shows clear redundancy, poetic-content
+over-extraction, and polarity-boundary errors. V4 therefore remains opt-in and
+is not a production/default Prompt. The next experiment is Prompt-only
+simplification that preserves recall while reducing redundancy. Full Semantic
+Build remains blocked; interrupted or failed live roots remain mechanical
+execution evidence and are not semantic evidence.
+
 ### Offline semantic-quality signal investigation (2026-09-29)
 
 The first follow-up work unit is provider-free and is recorded at
