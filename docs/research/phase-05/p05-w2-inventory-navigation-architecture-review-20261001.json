@@ -1,0 +1,94 @@
+{
+  "schema_version": "phase05-bounded-architecture-review-0.1",
+  "boundary": "manual source review and candidate accessibility; not automatic semantic acceptance or active-view eligibility",
+  "mechanical_evidence": {
+    "path": "data/retrieval/p05-w2-two-stage-review-20261001-r1/mechanical_evidence.json",
+    "identity": "357ab830c1b85af7793fc766bd33facc73675b3a0872cf8fda4ed742da9f059a"
+  },
+  "frozen_checklist": "docs/research/phase-05/p05-w2-bounded-navigation-prompt-v5-review-fixture-20261001.json",
+  "point1_inventory": {
+    "path": "D:/Batch4_review/p05-w2-two-stage-inventory-20261001-r1/units/486e34c758278324acb9959418d6043a41a45bb1fc7f8b7bd98ae95e06a7b665/attempt-001/canonical_output.json",
+    "sha256": "ff14460c15aac152185502d997bac99f7afcc16676e8729d3c31571296e08d46",
+    "source_segment_id": "seg-1429481a5c3c335f6270:p0",
+    "item_count": 44,
+    "source_review": "All 39 frozen source distinctions occur in these candidates. This is bounded textual recall evidence; mixed clauses and inherited qualifier errors remain. Names/actions memory syntax stays source-level and must not be resolved beyond evidence."
+  },
+  "claim_to_inventory_members": {
+    "sleep_awake_state": ["e1"],
+    "cloud_rise": ["e2"],
+    "mournful_sound": ["e2"],
+    "unfamiliar_sound": ["r1"],
+    "unseen_temple": ["r2"],
+    "temple_large_stone": ["f1"],
+    "temple_wall_pillars": ["f1"],
+    "temple_gold_wrapping": ["f1"],
+    "temple_gold_socket": ["f1"],
+    "temple_gilded_beams": ["f1"],
+    "no_sky_light": ["f2"],
+    "no_sunlight": ["f2"],
+    "no_moonlight": ["f2"],
+    "interior_light": ["f2"],
+    "heart_empty": ["f3"],
+    "cannot_forget_grief": ["f3"],
+    "cannot_remove_suffering": ["f3"],
+    "name_actions_memory_state": ["f3"],
+    "warning_seal": ["e3"],
+    "warning_wait_here": ["e4"],
+    "warning_threshold": ["e4"],
+    "warning_outside": ["e4"],
+    "command_identity_uncertain": ["f5"],
+    "cannot_leave": ["f5"],
+    "spirits_walk": ["e5"],
+    "spirits_short_shape": ["e5"],
+    "spirits_mournful_light": ["e5"],
+    "spirits_unrecognized": ["e6"],
+    "heart_worried": ["f6"],
+    "inner_spirit_troubled": ["f6"],
+    "cannot_be_silent": ["e7"],
+    "play_qin": ["e7"],
+    "sing_suffering_song": ["e7"],
+    "singing_sorrowful": ["e9"],
+    "tears": ["e9"],
+    "mourning_target_uncertain": ["e9"],
+    "day_night_crying": ["e10"],
+    "remembrance_unrememberable": ["e10"],
+    "sorrow_overwhelms_life": ["e11"]
+  },
+  "architecture_trials": {
+    "curator_v0.2": {
+      "point1_items": 29,
+      "result": "NOT PASS",
+      "defects": ["mixed waiting/prohibition with global negative polarity", "206-character multi-scope performance/lament event", "negation/epistemic substitute fields", "6430 duplicate event/relation propositions"]
+    },
+    "curator_v0.3": {
+      "point1_items": 60,
+      "result": "NOT PASS",
+      "defects": ["name_actions_memory_state absent", "poetic fact/mention inflation remains", "rewritten semantic list is still lossy"]
+    },
+    "historical_inventory_grouping": {
+      "navigation_groups": 5,
+      "accounted_inventory_items": 119,
+      "accessibility_result": "PASS for supplied inventory only",
+      "semantic_result": "NOT PASS",
+      "defects": ["source memory/name distinction missing from historical inventory but missing_source_claims is empty", "f2 negative polarity not corrected", "historical duplicate/noisy candidates merely hidden inside groups"]
+    },
+    "current_inventory_grouping": {
+      "navigation_groups": [13, 9, 9, 5],
+      "inventory_items": [44, 53, 38, 16],
+      "explicit_omissions": [0, 1, 1, 0],
+      "point1_required_claim_accessibility": "39/39 through immutable inventory members",
+      "point1_repeat_groups": 11,
+      "point1_repeat_required_claim_accessibility": "39/39 through immutable inventory members",
+      "semantic_result": "NOT PASS for automatic corrected assertions/KG",
+      "defects": ["repeat leaves r1 unknown sound incorrectly negative in the candidate with no correcting annotation", "repeat adds ambiguous modality to the mournful sound without a clear epistemic trigger", "email marks unnamed people/pronouns uncertain", "some scoped annotations do not preserve complete nested attribution", "self-reported missing_source_claims is not a completeness certificate"]
+    }
+  },
+  "controls_source_review": {
+    "point2": "All 53 candidates accounted; only point marker omitted. Naming/Boreas=north wind, beast/kin co-residence, inability then speech/wisdom, reported southern mission, permission/departure and remembrance remain accessible. Grouped prospective/actual distinction is still ambiguous; no active KG correctness claim.",
+    "email_2606": "37/38 retained; only courtesy closing omitted. Date, Thoma, invitation, Kaeya uncertain arrival, reported gifts, location/distance, self-correction of strength, visit uncertainty and intended greeting remain accessible. Spurious uncertain annotations for pronouns/unnamed roles are a semantic defect.",
+    "control_6430": "16/16 retained in 5 groups. Conditional obtaining/ability, temporary removal, hold interaction/stay, tentative passage and tentative dew cause remain in candidate qualifiers. Image-only segment remains no_navigation_material and is not attached to textual group claims. Labels are navigation headings only, not unconditional assertions."
+  },
+  "decision": "Prefer an immutable high-recall candidate ledger plus an independently versioned compact navigation index with loss accounting and source-scoped interpretation. Do not replace the ledger with a rewritten compact fact list. Current implementation proves mechanics and bounded accessibility, not stable semantic correction or active KG.",
+  "larger_scale_validation": "NOT READY for active semantic build/automatic KG; next bounded work should resolve inventory atomicity and qualifier-scope correction on the same failure cases before expansion",
+  "excluded": "502434 remains UNKNOWN and was not investigated"
+}

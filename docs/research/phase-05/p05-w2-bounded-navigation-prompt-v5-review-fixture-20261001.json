@@ -1,0 +1,512 @@
+{
+  "schema_version": "phase05-w2-bounded-navigation-review-fixture-0.1",
+  "boundary": "read-only source-anchored review checklist; not semantic acceptance or production eligibility",
+  "checkpoint": "64608dd",
+  "provider_calls": 0,
+  "source_anchors": {
+    "true_point1": {
+      "record_key": "mihoyo_obc:zh-cn:507825",
+      "compilation_unit_id": "6e6e03b95e4ddd267c5fdc8bdfcaecd2a128befed6365a2e2fb255bc73fadb1a",
+      "segment_ids": [
+        "seg-1429481a5c3c335f6270:p0"
+      ],
+      "semantic_input_identity": "0103a739f2f74438e9d82149a016efa8da648b17861c37e978158e0d37ccbdcf",
+      "payload_sha256": "cd9a0dec53f3df3022933f360f7957fd3691c1d2b3c30ce676a75c1482c19c9a",
+      "source_root": "data/retrieval/p05-w2-targeted-v3-20260928-r1",
+      "comparison": {
+        "v3_prompt_identity": "2c332577f91edb50806a4f4c2cf663b720932c4833ac0e6023e1050c74370a2d",
+        "v4_prompt_identity": "e7ffc4788e42dd4d1214a36ea35aaa2b2c179f676e237ba0e393c0f9eea9404c",
+        "v3_output": {
+          "path": "data/retrieval/p05-w2-true-point1-v3-v4-20260930-live-r1/live/001-507825-point1-v3/units/486e34c758278324acb9959418d6043a41a45bb1fc7f8b7bd98ae95e06a7b665/attempt-001/canonical_output.json",
+          "sha256": "95c79406de0b3b476eb2006d4c0a5cc4397207b9c5ececf3953b20de1ee7640d",
+          "item_count": 7
+        },
+        "v4_output": {
+          "path": "data/retrieval/p05-w2-true-point1-v3-v4-20260930-live-r1/live/002-507825-point1-v4/units/486e34c758278324acb9959418d6043a41a45bb1fc7f8b7bd98ae95e06a7b665/attempt-001/canonical_output.json",
+          "sha256": "2e1a9cddccda92340e83c65a1b4a025bb8a0a5012741162a9ecad3c1b6a48553",
+          "item_count": 119
+        }
+      }
+    },
+    "ordinary_control_6430": {
+      "record_key": "mihoyo_obc:zh-cn:6430",
+      "compilation_unit_id": "6196fe4f1214366d7a2233b0275e724a5159f097e9de9a105fd9dee9ee822c25",
+      "semantic_input_identity": "2b25ded6229232fed94cdfe4325edfd13f1acbc5fd340e3193fea34e67ad8b94",
+      "source_root": "data/retrieval/p05-w2-scoped-semantic-20260927-r1",
+      "role": "ordinary_multi_event_control",
+      "selection_reason": "accepted output with distinct events, mentions, relations and preserved modality; no confirmed semantic issue",
+      "existing_baseline": {
+        "path": "data/retrieval/p05-w2-scoped-semantic-20260927-r1/run/units/037fdcc7dadd8a65a990a01c820faba88b3f585ea8e42a94c497ce5a7677de44/attempt-001/canonical_output.json",
+        "sha256": "d24f12f734baf95d666aa9e293cec185699d08f16e250c92c2f687a01c36c85e",
+        "item_count": 11,
+        "baseline_prompt_revision": "phase05-w2-b-json-object-prompt-0.2"
+      }
+    }
+  },
+  "excluded_unknowns": [
+    {
+      "record_key": "mihoyo_obc:zh-cn:502434",
+      "reason": "map-topic source-binding boundary remains UNKNOWN; it is not a v5 quality pass condition"
+    }
+  ],
+  "must_retain_claims": [
+    {
+      "id": "sleep_awake_state",
+      "source_quote": "我身睡卧，我心却醒",
+      "description": "sleeping while the heart remains awake",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "cloud_rise",
+      "source_quote": "我看见周围有云雾从地上升腾",
+      "description": "clouds rise around the narrator",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "mournful_sound",
+      "source_quote": "并幽雅的悲音，就是琴瑟的声音",
+      "description": "the sound is identified as mournful cithern-like music",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "unfamiliar_sound",
+      "source_quote": "我的心未曾晓得这声音",
+      "description": "the narrator does not know the sound",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "unseen_temple",
+      "source_quote": "我的眼未曾见过这殿宇",
+      "description": "the narrator has not seen the temple before",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "temple_large_stone",
+      "source_quote": "这殿是用大石建造的",
+      "description": "the temple is built from large stones",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "temple_wall_pillars",
+      "source_quote": "有人把石头立作壁柱",
+      "description": "stones are raised as wall pillars",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "temple_gold_wrapping",
+      "source_quote": "用金子包裹",
+      "description": "the pillars are wrapped with gold",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "temple_gold_socket",
+      "source_quote": "用金子铸造带卯的座",
+      "description": "gold sockets are cast for the structure",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "temple_gilded_beams",
+      "source_quote": "抬起雕金的横梁和椽子",
+      "description": "gilded beams and rafters are raised",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "no_sky_light",
+      "source_quote": "我看不见穹苍的光亮",
+      "description": "sky light is not visible",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "no_sunlight",
+      "source_quote": "没有太阳发光",
+      "description": "the sun gives no light",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "no_moonlight",
+      "source_quote": "没有明月行在空中",
+      "description": "the bright moon is absent from the sky",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "interior_light",
+      "source_quote": "殿里的光亮却甚大",
+      "description": "the temple interior is very bright",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "heart_empty",
+      "source_quote": "我的心却是空虚",
+      "description": "the narrator feels inner emptiness",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "cannot_forget_grief",
+      "source_quote": "我不能忘记我的哀情",
+      "description": "the narrator cannot forget grief",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "cannot_remove_suffering",
+      "source_quote": "除去我的苦楚",
+      "description": "the narrator cannot remove the suffering",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "name_actions_memory_state",
+      "source_quote": "竟忘记了我的名字与所行的",
+      "description": "the passage states a memory state involving the narrator name and actions",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "warning_seal",
+      "source_quote": "放在我心上如印记，叫我常受警醒",
+      "description": "a warning seal remains on the narrator heart",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "warning_wait_here",
+      "source_quote": "你当等待在此地",
+      "description": "the reported voice orders waiting here",
+      "expected_kind": [
+        "event",
+        "fact",
+        "relation"
+      ]
+    },
+    {
+      "id": "warning_threshold",
+      "source_quote": "不可越过这殿的门槛",
+      "description": "the reported voice forbids crossing the threshold",
+      "expected_kind": [
+        "event",
+        "fact",
+        "relation"
+      ]
+    },
+    {
+      "id": "warning_outside",
+      "source_quote": "不可去往外边",
+      "description": "the reported voice forbids going outside",
+      "expected_kind": [
+        "event",
+        "fact",
+        "relation"
+      ]
+    },
+    {
+      "id": "command_identity_uncertain",
+      "source_quote": "虽不知是谁的嘱咐",
+      "description": "the commander identity is uncertain",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "cannot_leave",
+      "source_quote": "我便不敢离去",
+      "description": "the narrator does not dare to leave",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "spirits_walk",
+      "source_quote": "有许多微小的灵在我周围行走",
+      "description": "small spirits walk around the narrator",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "spirits_short_shape",
+      "source_quote": "形状缺短",
+      "description": "the small spirits have incomplete forms",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "spirits_mournful_light",
+      "source_quote": "发出凄凉的光",
+      "description": "the small spirits emit mournful light",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "spirits_unrecognized",
+      "source_quote": "我观看它们，就不认识它们",
+      "description": "the narrator does not recognize the spirits",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "heart_worried",
+      "source_quote": "我的心在我里面忧闷",
+      "description": "the narrator heart is troubled",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "inner_spirit_troubled",
+      "source_quote": "我的灵在我里面愁烦",
+      "description": "the narrator spirit is distressed",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "cannot_be_silent",
+      "source_quote": "我不能静默不言",
+      "description": "the narrator cannot remain silent",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "play_qin",
+      "source_quote": "我就用手弹琴",
+      "description": "the narrator plays the qin by hand",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "sing_suffering_song",
+      "source_quote": "唱除去苦楚的歌曲",
+      "description": "the narrator sings a song to remove suffering",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "singing_sorrowful",
+      "source_quote": "我虽在歌唱，心却极其悲伤",
+      "description": "the narrator sings while the heart remains deeply sorrowful",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "tears",
+      "source_quote": "我的眼泪下流成河",
+      "description": "the narrator tears flow like a river",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "mourning_target_uncertain",
+      "source_quote": "却不知是在为何人举哀",
+      "description": "the mourning target is uncertain",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "day_night_crying",
+      "source_quote": "我昼夜哀哭，泪流满腮",
+      "description": "the narrator cries day and night with tears on the cheeks",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "remembrance_unrememberable",
+      "source_quote": "我纪念那不可纪念的，追想那不可追想的",
+      "description": "the narrator remembers and recalls what cannot be remembered",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    },
+    {
+      "id": "sorrow_overwhelms_life",
+      "source_quote": "这哀愁压过我的性命，我却不能胜过它",
+      "description": "sorrow overwhelms the narrator life and cannot be overcome",
+      "expected_kind": [
+        "event",
+        "fact"
+      ]
+    }
+  ],
+  "optional_or_omittable": [
+    {
+      "id": "closing_poetic_images",
+      "rule": "omit standalone decorative imagery unless it anchors a concrete entity, state, event, relation, identity, location, or epistemic distinction"
+    }
+  ],
+  "quality_rules": {
+    "duplicate_proposition": "same actor, action, object, state, and attribution within one stage is one item; split only for actor, object, state, temporal step, or attribution change",
+    "mention_minimality": "mention is emitted only when referenced by an event/relation or independently useful for navigation",
+    "relation_minimality": "relation adds a distinct explicit predicate and does not merely restate an event or duplicate another relation",
+    "uncertainty_vs_polarity": "不知/未明/似乎/仿佛/或许 and equivalent expressions use modality/uncertainty; polarity is reserved for explicit negation, denial, refusal, prohibition, or non-existence",
+    "coverage_boundary": "covered is input accounting and does not assert semantic completeness"
+  },
+  "review_status": "frozen_checklist; future v5 live output remains unobserved",
+  "repetition_check": {
+    "source_quote": "我便歌唱",
+    "required": "retain at least one singing event or fact linked to the concrete singing action",
+    "maximum_equivalent_items": 1,
+    "split_exception": "additional singing items require a changed state, temporal step, actor, object, or attribution"
+  },
+  "review_scope": "single true point1 source clause checklist; this is not a corpus benchmark or quality-governance system",
+  "future_live_gate": {
+    "status": "frozen provider-free v5 gate manifest; live execution remains separately authorized",
+    "manifest": {
+      "path": "docs/research/phase-05/p05-w2-v5-live-gate-manifest-20261001.json",
+      "identity": "724aad586e2e0a21e2353fbcbc6c2dc4bae8cd1b210ec642e25154e5c60e794a"
+    },
+    "operating_point_to_freeze_before_live": {
+      "model": "deepseek-v4.1-flash",
+      "primary_route": "tokenmetro",
+      "fallback_route": "jizhi",
+      "stream": true,
+      "automatic_retry": false,
+      "schema_identity": "9848b1e07c09b64156497dddc7a1a244f6dd9d7c3d5455c8c0dd0fae380cf312",
+      "source_binding_policy": "phase05-w2-source-binding-0.2",
+      "note": "v5 gate freezes the requested 300000/900 operating point; historical v4/v3 baselines retain their original configurations and are not regenerated"
+    },
+    "units": [
+      {
+        "role": "true_point1_recall_anchor",
+        "record_key": "mihoyo_obc:zh-cn:507825",
+        "compilation_unit_id": "6e6e03b95e4ddd267c5fdc8bdfcaecd2a128befed6365a2e2fb255bc73fadb1a",
+        "semantic_input_identity": "0103a739f2f74438e9d82149a016efa8da648b17861c37e978158e0d37ccbdcf",
+        "payload_sha256": "cd9a0dec53f3df3022933f360f7957fd3691c1d2b3c30ce676a75c1482c19c9a",
+        "segment_ids": [
+          "seg-1429481a5c3c335f6270:p0"
+        ],
+        "v4_baseline": {
+          "path": "data/retrieval/p05-w2-true-point1-v3-v4-20260930-live-r1/live/002-507825-point1-v4/units/486e34c758278324acb9959418d6043a41a45bb1fc7f8b7bd98ae95e06a7b665/attempt-001/canonical_output.json",
+          "sha256": "2e1a9cddccda92340e83c65a1b4a025bb8a0a5012741162a9ecad3c1b6a48553",
+          "prompt_identity": "e7ffc4788e42dd4d1214a36ea35aaa2b2c179f676e237ba0e393c0f9eea9404c"
+        }
+      },
+      {
+        "role": "point2_independent_stage_control",
+        "record_key": "mihoyo_obc:zh-cn:507825",
+        "compilation_unit_id": "e8adb18e3c85b6294dbd2429bdd6f7d80505b3dd4ad414dd412d45a1d4cc97ac",
+        "semantic_input_identity": "18a98a0efef791e6f6afd3406c912ca54ee9af389ec59cf8d4119ac3fdc425c4",
+        "payload_sha256": "cd26c0704098dbb71a85c1705af703ba72fdd6696a7b737c00aea3eefdd9a871",
+        "segment_ids": [
+          "seg-1429481a5c3c335f6270:p1"
+        ],
+        "v3_baseline": {
+          "path": "data/retrieval/p05-w2-targeted-v3-20260928-r1/live-20260928-r1/units/4903866608b2d1a1cb175bc569308e38b8efc95aa7c16bf63bb8568fd5883855/attempt-001/canonical_output.json",
+          "sha256": "31cf108e247a4373623315dced42c0b7dbaf1e04bf5f9fab981c8e24e837bc55",
+          "prompt_identity": "2c332577f91edb50806a4f4c2cf663b720932c4833ac0e6023e1050c74370a2d"
+        }
+      },
+      {
+        "role": "dated_email_stage_control",
+        "record_key": "mihoyo_obc:zh-cn:2606",
+        "compilation_unit_id": "be4c99f58f0187245fb3064084ece0fab11cabc3905f375766bd20109b7f3f90",
+        "semantic_input_identity": "71928f7c367471af48d7a555bae5aaf944f778f32cb7533129ad1a942e2ec5d0",
+        "payload_sha256": "b719e8ba90d24feeea3bb9c79b6a5d982181aff15d9c7321dae6f7f37638cab5",
+        "segment_ids": [
+          "seg-8f81952707d158034428:p0"
+        ],
+        "v3_baseline": {
+          "path": "data/retrieval/p05-w2-targeted-v3-20260928-r1/live-20260928-r1/units/9c80c92d630c4269fa0023abf56fd6773279e995d9c7f2137bf16bd6eab9b265/attempt-001/canonical_output.json",
+          "sha256": "b2fd4bb66770c1d4d04d7500e93b8f47f66824009fcf2d7d80c83e54189d5f90",
+          "prompt_identity": "2c332577f91edb50806a4f4c2cf663b720932c4833ac0e6023e1050c74370a2d"
+        }
+      },
+      {
+        "role": "ordinary_multi_event_control",
+        "record_key": "mihoyo_obc:zh-cn:6430",
+        "compilation_unit_id": "50042a4f9faff7728cfa78631c7189760717694a47f48896d75e887a5474befa",
+        "semantic_input_identity": "2b25ded6229232fed94cdfe4325edfd13f1acbc5fd340e3193fea34e67ad8b94",
+        "payload_sha256": "e0efd1ade952259cf1444cd3c9b1414ba3d847b1ed1654b8b27aaa983a964d8d",
+        "segment_ids": [
+          "seg-59142c1331171c95771b",
+          "seg-583986becc5702d67e34",
+          "seg-6b520d3fa9ce5a506c07"
+        ],
+        "existing_baseline": {
+          "path": "data/retrieval/p05-w2-scoped-semantic-20260927-r1/run/units/037fdcc7dadd8a65a990a01c820faba88b3f585ea8e42a94c497ce5a7677de44/attempt-001/canonical_output.json",
+          "sha256": "d24f12f734baf95d666aa9e293cec185699d08f16e250c92c2f687a01c36c85e",
+          "prompt_identity": "25ebc483c5dfcfe9b3dc8ddd01001f75e98ff4c2b5327aa789a3af84a068003e",
+          "baseline_prompt_revision": "phase05-w2-b-json-object-prompt-0.2"
+        }
+      }
+    ],
+    "not_included": "502434 remains outside the gate because its map-topic source-binding outcome is UNKNOWN"
+  }
+}
