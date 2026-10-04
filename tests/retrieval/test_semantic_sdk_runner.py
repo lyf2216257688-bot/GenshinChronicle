@@ -4,8 +4,10 @@ from contextlib import redirect_stderr
 from io import StringIO
 import json
 import gzip
+import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import httpx
@@ -17,7 +19,9 @@ from genshin_corpus.retrieval.semantic_live_runner import ChannelConfig, Semanti
 from genshin_corpus.retrieval.semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter, create_adapter
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _policy_403_pre_generation,
+    _responses_request_body,
     audit_sdk_route_integrity,
+    frozen_v5_gate_units,
     replay_sdk_route_attempt,
     run_sdk_route_canary,
     run_sdk_route_pair,
@@ -170,6 +174,63 @@ class SdkRunnerTest(unittest.TestCase):
                 prompt_identity="fixture-v2", source_identity="fixture-source",
                 environment=environment,
             )
+
+    def test_tokenmetro_responses_stream_uses_existing_validator_and_replay(self):
+        environment = {**self._route_environment(), "TOKENMETRO_API_SURFACE": "responses"}
+        payload = unit("s1")
+        output = {"schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION, "items": [],
+                  "segment_coverage": [{"segment_id": "s1", "disposition": "covered", "reason": None}]}
+        events = [
+            {"type": "response.created", "response": {"id": "responses-fixture", "status": "in_progress"}},
+            {"type": "response.output_text.delta", "delta": json.dumps(output)},
+            {"type": "response.completed", "response": {"id": "responses-fixture", "status": "completed",
+                                                              "usage": {"input_tokens": 3, "output_tokens": 4}}},
+        ]
+        stream = b"".join(b"data: " + json.dumps(event).encode() + b"\n\n" for event in events)
+        stream += b"data: [DONE]\n\n"
+        calls = []
+
+        def responses(request):
+            calls.append((str(request.url), json.loads(request.content)))
+            return httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                  content=stream, request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=[payload], prompt={"version": "responses-fixture"},
+            prompt_identity="responses-fixture", source_identity="fixture-source",
+            environment=environment, transports={"tokenmetro": httpx.MockTransport(responses)},
+        )
+        self.assertEqual((result["status"], result["accepted_units"], len(calls)), ("complete", 1, 1))
+        self.assertEqual(calls[0][0], "https://tokenmetro.fixture/v1/responses")
+        self.assertEqual(set(calls[0][1]), {"model", "instructions", "input", "max_output_tokens", "stream"})
+        manifest = json.loads((self.root / "manifest.json").read_bytes())
+        self.assertEqual(manifest["contract"]["primary_route"]["api_surface"], "responses")
+        self.assertEqual(manifest["contract"]["primary_route_config_identity"],
+                         route_profile("tokenmetro", environment, require_environment=True).config_identity)
+        self.assertEqual(audit_sdk_route_integrity(self.root)["accepted_attempts"], 1)
+
+    def test_responses_surface_identity_rejects_chat_manifest_before_io(self):
+        environment = self._route_environment()
+        logical = {"model": "deepseek-v4.1-flash", "messages": [
+            {"role": "system", "content": "system"},
+            {"role": "user", "content": "user"},
+        ], "max_tokens": 500000, "stream": True}
+        response_wire = _responses_request_body(logical)
+        candidate = unit("s1")
+        candidate["wire_request_identity"] = sha256_json(response_wire)
+        candidate["route_wire_request_identities"] = {
+            "tokenmetro": sha256_json(response_wire),
+            "jizhi": sha256_json(logical),
+        }
+        calls = []
+        with self.assertRaisesRegex(ValueError, "route wire identity"):
+            run_sdk_route_pair(
+                self.root, units=[candidate], prompt={"version": "responses-fixture"},
+                prompt_identity="responses-fixture", source_identity="fixture-source",
+                environment=environment,
+                transports={"tokenmetro": httpx.MockTransport(lambda request: calls.append(request) or self.fail("network called"))},
+            )
+        self.assertEqual(calls, [])
 
     def test_missing_checkpoint_is_rebuilt_without_provider_calls(self):
         environment = self._route_environment()
@@ -492,6 +553,76 @@ class SdkRunnerTest(unittest.TestCase):
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
             _semantic_live_run_main(["--channel", "glm", "--preflight-root", "unused",
                                      "--run-root", "unused", "--unit-id", "unused"])
+
+    def test_v5_gate_manifest_freezes_four_units_and_mock_route_pair_replays(self):
+        manifest, units = frozen_v5_gate_units(Path("docs/research/phase-05/p05-w2-v5-live-gate-manifest-20261001.json"))
+        self.assertEqual(manifest["identity"], "724aad586e2e0a21e2353fbcbc6c2dc4bae8cd1b210ec642e25154e5c60e794a")
+        self.assertEqual(len(units), 4)
+        self.assertTrue(all(row.get("request_identity") and row.get("wire_request_identity")
+                            for row in manifest["contract"]["units"]))
+        calls = []
+        environment = self._route_environment()
+
+        def primary(request):
+            calls.append(json.loads(request.content)["messages"][1]["content"])
+            body = json.loads(request.content)
+            segment = body["messages"][1]["content"]
+            payload = json.loads(segment)
+            content = {"schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION, "items": [],
+                       "segment_coverage": [{"segment_id": row["segment_id"],
+                                              "disposition": "covered", "reason": None}
+                                             for row in payload["segments"]]}
+            stream_rows = [
+                {"id": "stream-fixture", "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+                {"id": "stream-fixture", "choices": [{"index": 0, "delta": {"content": json.dumps(content)}, "finish_reason": None}]},
+                {"id": "stream-fixture", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+                {"id": "stream-fixture", "choices": [], "usage": {"prompt_tokens": 3, "completion_tokens": 4}},
+            ]
+            stream = b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in stream_rows) + b"data: [DONE]\n\n"
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream, request=request)
+
+        result = run_sdk_route_pair(
+            self.root, units=units, prompt={"version": "v5"},
+            prompt_identity="e28273ded5d649e59e2d3143ce1549d490d8c540b581998d2dad9ae4fdda27c3",
+            source_identity="45520b23490a1c66289476c71dbe55c38cd206167342ebeb5894721055c59677",
+            environment=environment, max_tokens=300000, timeout_seconds=900.0,
+            transports={"tokenmetro": httpx.MockTransport(primary)},
+        )
+        self.assertEqual((result["status"], result["provider_attempts_total"], len(calls)), ("complete", 4, 4))
+        audited = audit_sdk_route_integrity(self.root)
+        self.assertEqual((audited["logical_units"], audited["accepted_attempts"], audited["provider_calls_executed"], audited["network_calls_executed"]), (4, 4, 0, 0))
+
+    def test_v5_gate_cli_requires_explicit_manifest_and_passes_v5_config_without_io(self):
+        import genshin_corpus.retrieval.semantic_sdk_runner as sdk
+        captured = {}
+
+        def fake_run(root, **kwargs):
+            captured.update(kwargs)
+            return {"status": "complete", "provider_attempts_total": 0}
+
+        argv = ["--run-root", str(self.root), "--gate-manifest",
+                "docs/research/phase-05/p05-w2-v5-live-gate-manifest-20261001.json",
+                "--model", "deepseek", "--experiment-revision", "phase05-w2-b-json-object-0.5",
+                "--primary-route", "tokenmetro", "--fallback-route", "jizhi", "--stream", "--max-retries", "0"]
+        with unittest.mock.patch.dict(os.environ, {
+            "TOKENMETRO_BASE_URL": "https://tokenmetro.com/v1",
+            "JIZHI_BASE_URL": "https://jizhiapi.site/v1",
+        }, clear=False), unittest.mock.patch.object(sdk, "run_sdk_units", side_effect=fake_run):
+            self.assertEqual(sdk.main(argv), 0)
+        self.assertEqual(captured["prompt_identity"], "e28273ded5d649e59e2d3143ce1549d490d8c540b581998d2dad9ae4fdda27c3")
+        self.assertEqual(captured["source_identity"], "45520b23490a1c66289476c71dbe55c38cd206167342ebeb5894721055c59677")
+        self.assertEqual(captured["max_tokens"], 300000)
+        self.assertEqual(captured["timeout_seconds"], 900.0)
+        self.assertEqual(len(captured["units"]), 4)
+
+    def test_v5_gate_manifest_tamper_fails_before_any_runner_io(self):
+        source = Path("docs/research/phase-05/p05-w2-v5-live-gate-manifest-20261001.json")
+        tampered = json.loads(source.read_text(encoding="utf-8"))
+        tampered["contract"]["operating_point"]["max_tokens"] = 500000
+        path = Path(self.temp.name) / "tampered-manifest.json"
+        path.write_bytes(canonical_json_bytes(tampered))
+        with self.assertRaisesRegex(ValueError, "identity or experiment binding mismatch"):
+            frozen_v5_gate_units(path)
 
     def test_programmatic_legacy_live_requires_explicit_opt_in(self):
         config = ChannelConfig.from_environment("gemini_b", {})

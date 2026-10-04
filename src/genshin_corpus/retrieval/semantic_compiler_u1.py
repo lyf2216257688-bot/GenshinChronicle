@@ -35,6 +35,31 @@ SEMANTIC_STAGE_CAP_DEFAULT = 4_096
 SEMANTIC_ITEM_KINDS = frozenset({"topic", "mention", "fact", "event", "relation"})
 SEGMENT_COVERAGE_DISPOSITIONS = frozenset({"covered", "no_navigation_material", "ambiguous", "unsupported"})
 
+# ``map_desc`` is a structured source component, not a semantic category.  In
+# the accepted corpus its observed values are image URLs plus UI labels/layout
+# metadata.  Keep this list deliberately narrow: unknown keys and text-bearing
+# values remain provider-visible so a future textual map description is not
+# silently discarded.
+_MAP_DESC_MEDIA_KEYS = frozenset({
+    "image", "image_url", "src", "url", "tab_name", "layout_", "moduleName",
+})
+
+
+def _map_desc_has_text_semantic_content(value: Any) -> bool:
+    """Return whether a map_desc value contains source text beyond media/UI metadata."""
+
+    def visit(node: Any, key: str | None = None) -> bool:
+        if isinstance(node, str):
+            return bool(node.strip()) and key not in _MAP_DESC_MEDIA_KEYS
+        if isinstance(node, Mapping):
+            return any(visit(child, str(name)) for name, child in node.items()
+                       if str(name) not in _MAP_DESC_MEDIA_KEYS)
+        if isinstance(node, list):
+            return any(visit(child, key) for child in node)
+        return False
+
+    return visit(value)
+
 
 class SemanticCompilerU1Error(ValueError):
     """Raised when an accepted input cannot support an auditable U1 build."""
@@ -658,6 +683,17 @@ def _segment_from_unit(
     elif kind == "structured_observation":
         if "decoded" not in value:
             omissions.append({"reason": "structured_value_missing_decoded", "canonical_address": address})
+        elif str(context.get("source_component_id")) == "map_desc" and not _map_desc_has_text_semantic_content(value.get("decoded")):
+            # Preserve the deterministic source locator in the omission ledger
+            # and sidecar accounting, while keeping the media-only structure out
+            # of the provider payload.
+            omissions.append({
+                "reason": "pure_media_map_desc",
+                "canonical_address": address,
+                "segment_id": f"seg-{sha256_json({'canonical_address': address, 'source_subunit': 'unit'})[:20]}",
+                "source_component": "map_desc",
+                "provider_visible": False,
+            })
         else:
             entries.append(("unit", {**base, "shape": _shape(value.get("decoded")), "decoded": value.get("decoded")}))
     elif kind == "dialogue_graph":
@@ -711,6 +747,20 @@ def _unit_payload(record_key: str, title: str, segments: Sequence[_Segment], omi
             "partial_input": partial,
         },
     }
+
+
+def _accounted_segment_ids(segments: Sequence[_Segment], omissions: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Return provider-visible and explicitly omitted source IDs for unit identity/accounting."""
+    entries: list[tuple[int, str]] = [
+        (int(segment.canonical_address.get("canonical_unit_ordinal", 0)), segment.segment_id)
+        for segment in segments
+    ]
+    entries.extend(
+        (int(item.get("canonical_address", {}).get("canonical_unit_ordinal", 0)), str(item["segment_id"]))
+        for item in omissions
+        if isinstance(item.get("segment_id"), str)
+    )
+    return [segment_id for _ordinal, segment_id in sorted(entries, key=lambda entry: (entry[0], entry[1]))]
 
 
 def _segment_chars(segment: _Segment) -> int:
@@ -853,21 +903,30 @@ def _make_units(record_key: str, title: str, sections: Sequence[dict[str, Any]],
     record_omissions = [item for section in sections for item in section["omissions"]]
     whole_payload = _unit_payload(record_key, title, record_segments, record_omissions)
     if _json_chars(whole_payload) <= policy.record_soft_cap and not any(_segment_chars(segment) > policy.hard_cap for segment in record_segments):
-        all_units.append({"unit_scope": "record", "parent_unit_id": None, "segment_ids": [s.segment_id for s in record_segments], "provider_payload": whole_payload})
+        all_units.append({"unit_scope": "record", "parent_unit_id": None,
+                          "segment_ids": [s.segment_id for s in record_segments],
+                          "accounted_segment_ids": _accounted_segment_ids(record_segments, record_omissions),
+                          "provider_payload": whole_payload})
         return all_units, oversize
     for section in sections:
         section_segments = list(section["segments"])
         section_omissions = list(section["omissions"])
         section_payload = _unit_payload(record_key, title, section_segments, section_omissions)
         if _json_chars(section_payload) <= policy.record_soft_cap:
-            all_units.append({"unit_scope": "section", "parent_unit_id": None, "section_ordinal": section["ordinal"], "segment_ids": [s.segment_id for s in section_segments], "provider_payload": section_payload})
+            all_units.append({"unit_scope": "section", "parent_unit_id": None, "section_ordinal": section["ordinal"],
+                              "segment_ids": [s.segment_id for s in section_segments],
+                              "accounted_segment_ids": _accounted_segment_ids(section_segments, section_omissions),
+                              "provider_payload": section_payload})
             continue
         for component in section["components"]:
             component_segments = list(component["segments"])
             component_omissions = list(component["omissions"])
             component_payload = _unit_payload(record_key, title, component_segments, component_omissions)
             if _json_chars(component_payload) <= policy.record_soft_cap:
-                all_units.append({"unit_scope": "component", "parent_unit_id": None, "section_ordinal": section["ordinal"], "component_key": component["key"], "segment_ids": [s.segment_id for s in component_segments], "provider_payload": component_payload})
+                all_units.append({"unit_scope": "component", "parent_unit_id": None, "section_ordinal": section["ordinal"], "component_key": component["key"],
+                                  "segment_ids": [s.segment_id for s in component_segments],
+                                  "accounted_segment_ids": _accounted_segment_ids(component_segments, component_omissions),
+                                  "provider_payload": component_payload})
                 continue
             for segment in component_segments:
                 pieces, piece_omissions = [segment], []
@@ -876,7 +935,10 @@ def _make_units(record_key: str, title: str, sections: Sequence[dict[str, Any]],
                 for piece in pieces:
                     payload = _unit_payload(record_key, title, [piece], component_omissions + piece_omissions)
                     chars = _json_chars(payload)
-                    row = {"unit_scope": "segment", "parent_unit_id": None, "section_ordinal": section["ordinal"], "component_key": component["key"], "segment_ids": [piece.segment_id], "provider_payload": payload}
+                    row = {"unit_scope": "segment", "parent_unit_id": None, "section_ordinal": section["ordinal"], "component_key": component["key"],
+                           "segment_ids": [piece.segment_id],
+                           "accounted_segment_ids": _accounted_segment_ids([piece], component_omissions + piece_omissions),
+                           "provider_payload": payload}
                     if chars > policy.hard_cap:
                         row["status"] = "oversized_unresolved"
                         row["oversized_reason"] = "source_meaningful_boundary_exceeds_hard_cap"
@@ -1264,6 +1326,26 @@ def build_u1(
                     record_omissions.append(omission)
                     omissions.append(omission)
                     profile_counters[f"omission:{omission.get('reason')}"] += 1
+                    omitted_segment_id = omission.get("segment_id")
+                    if isinstance(omitted_segment_id, str):
+                        if omitted_segment_id in sidecars:
+                            raise SemanticCompilerU1Error(f"source-segment identity collision: {omitted_segment_id}")
+                        ru_ids = ru_bindings.get(canonical_json_bytes(omission["canonical_address"]).decode("utf-8"), [])
+                        sidecars[omitted_segment_id] = {
+                            "segment_id": omitted_segment_id,
+                            "canonical_unit_id": str(unit.get("unit_id")),
+                            "canonical_address": omission["canonical_address"],
+                            "canonical_provenance": provenance.to_dict(),
+                            "lineage": unit.get("lineage"),
+                            "raw_refs": (unit.get("lineage") or {}).get("raw_refs", []),
+                            "retrieval_unit_build_identity": ru_build_identity,
+                            "retrieval_unit_ids": list(ru_ids),
+                            "tags": ["component:map_desc", "kind:structured_observation", "omitted:pure_media_map_desc"],
+                            "projection_identity": None,
+                            "provider_visible": False,
+                            "omission_reason": omission.get("reason"),
+                        }
+                        profile_counters["source_omitted"] += 1
                 component = by_component.setdefault(component_key, {"key": component_key, "segments": [], "omissions": []})
                 component["segments"].extend(segments)
                 component["omissions"].extend(unit_omissions)
@@ -1328,6 +1410,7 @@ def build_u1(
                 "semantic_input_identity": input_identity,
                 "scope": unit["unit_scope"],
                 "segment_ids": unit["segment_ids"],
+                "accounted_segment_ids": unit.get("accounted_segment_ids", unit["segment_ids"]),
             })
             unit["compilation_unit_id"] = unit_id
             unit["record_id"] = record.get("record_id")
@@ -1405,7 +1488,8 @@ def build_u1(
         "canonical_record_bytes": canonical_record_bytes,
         "canonical_record_chars": canonical_record_chars,
         "compilation_unit_count": len(unit_rows),
-        "source_segment_count": profile_counters["ru_bound"] + profile_counters["ru_unbound"],
+        "source_segment_count": profile_counters["ru_bound"] + profile_counters["ru_unbound"] + profile_counters["source_omitted"],
+        "omitted_source_segment_count": profile_counters["source_omitted"],
         "compilation_segment_count": len(compilation_segment_ids),
         "sidecar_segment_count": len(sidecar_rows),
         "split_parent_segment_count": len(split_parent_ids),
@@ -1453,9 +1537,10 @@ def build_u1(
             "provider_token_counts": None,
             "record_count": len(record_stats),
             "compilation_unit_count": len(unit_rows),
-            "source_segment_count": profile_counters["ru_bound"] + profile_counters["ru_unbound"],
+            "source_segment_count": profile_counters["ru_bound"] + profile_counters["ru_unbound"] + profile_counters["source_omitted"],
             "compilation_segment_count": len(compilation_segment_ids),
             "sidecar_segment_count": len(sidecar_rows),
+            "omitted_source_segment_count": profile_counters["source_omitted"],
         },
     }
     output_root.mkdir(parents=True, exist_ok=True)

@@ -17,12 +17,14 @@ from genshin_corpus.retrieval.semantic_live_runner import (
     B_V2_EXPERIMENT_REVISION,
     B_V3_EXPERIMENT_REVISION,
     B_V4_EXPERIMENT_REVISION,
+    B_V5_EXPERIMENT_REVISION,
     ChannelConfig,
     SemanticProviderRequest,
     b_experiment_contract,
     b_v2_experiment_contract,
     b_v3_experiment_contract,
     b_v4_experiment_contract,
+    b_v5_experiment_contract,
     run_b_zero_network_preflight,
     validate_b_v2_navigation_references,
 )
@@ -261,6 +263,87 @@ class SemanticPromptV2Tests(unittest.TestCase):
             self.assertEqual(report["network_calls_executed"], 0)
             self.assertTrue(report["offline_replay_verified"])
             self.assertEqual(report["experiment_identity"], v4.identity)
+    def test_v5_bounded_navigation_prompt_is_opt_in_and_provider_free(self) -> None:
+        v3 = b_v3_experiment_contract()
+        v4 = b_v4_experiment_contract()
+        v5 = b_v5_experiment_contract()
+        self.assertEqual(v5.revision, B_V5_EXPERIMENT_REVISION)
+        self.assertNotEqual(v5.identity, v4.identity)
+        self.assertNotEqual(v5.prompt_identity, v4.prompt_identity)
+        self.assertEqual(v5.request_contract_identity, v4.request_contract_identity)
+        self.assertEqual(v5.output_schema_identity, v4.output_schema_identity)
+        self.assertEqual(v5.frozen_preflight_identity, v4.frozen_preflight_identity)
+        self.assertEqual(v5.frozen_semantic_build_identity, v4.frozen_semantic_build_identity)
+        self.assertEqual(v5.prompt_contract["source_binding_policy"], v3.prompt_contract["source_binding_policy"])
+        self.assertIn("navigation-worthy", v5.prompt_contract["task"])
+        rules = " ".join(v5.prompt_contract["extraction_rules"])
+        for phrase in ("merge repeated wording", "decorative", "uncertainty is not negative polarity", "Emit a mention only"):
+            self.assertIn(phrase, rules)
+        self.assertNotIn("omit only unsupported or genuinely ambiguous material", rules)
+        self.assertIn("source-supported standalone claim with no independent navigation value", rules)
+        with tempfile.TemporaryDirectory() as temp:
+            report = run_b_zero_network_preflight(
+                Path(temp) / "preflight-v5",
+                ChannelConfig.for_b_json_object("gemini_b", {}),
+                experiment=v5,
+            )
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["formal_attempts_consumed"], 0)
+            self.assertEqual(report["provider_calls_executed"], 0)
+            self.assertEqual(report["network_calls_executed"], 0)
+            self.assertTrue(report["offline_replay_verified"])
+            self.assertEqual(report["experiment_identity"], v5.identity)
+
+    def test_v5_review_fixture_binds_immutable_outputs_and_excludes_unknown_boundary(self) -> None:
+        fixture_path = Path("docs/research/phase-05/p05-w2-bounded-navigation-prompt-v5-review-fixture-20261001.json")
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        true_anchor = fixture["source_anchors"]["true_point1"]
+        true_point1 = true_anchor["comparison"]
+        preflight = json.loads(Path("data/retrieval/p05-w2-true-point1-v3-v4-20260930-preflight-r1/preflight.json").read_text(encoding="utf-8"))
+        self.assertEqual(preflight["compilation_unit_id"], true_anchor["compilation_unit_id"])
+        self.assertEqual(preflight["semantic_input_identity"], true_anchor["semantic_input_identity"])
+        self.assertEqual(preflight["payload_sha256"], true_anchor["payload_sha256"])
+        self.assertEqual(preflight["segment_ids"], true_anchor["segment_ids"])
+        self.assertEqual(preflight["v3_prompt_identity"], true_point1["v3_prompt_identity"])
+        self.assertEqual(preflight["v4_prompt_identity"], true_point1["v4_prompt_identity"])
+        for key in ("v3_output", "v4_output"):
+            row = true_point1[key]
+            artifact = Path(row["path"])
+            self.assertTrue(artifact.is_file())
+            self.assertEqual(hashlib.sha256(artifact.read_bytes()).hexdigest(), row["sha256"])
+        control = fixture["source_anchors"]["ordinary_control_6430"]["existing_baseline"]
+        artifact = Path(control["path"])
+        self.assertTrue(artifact.is_file())
+        self.assertEqual(hashlib.sha256(artifact.read_bytes()).hexdigest(), control["sha256"])
+        self.assertEqual(fixture["excluded_unknowns"][0]["record_key"], "mihoyo_obc:zh-cn:502434")
+        self.assertEqual(true_point1["v3_output"]["item_count"], 7)
+        self.assertEqual(true_point1["v4_output"]["item_count"], 119)
+        claims = fixture["must_retain_claims"]
+        self.assertGreaterEqual(len(claims), 30)
+        self.assertTrue(all(claim["source_quote"] and " or " not in claim["description"].lower() for claim in claims))
+        gate = fixture["future_live_gate"]
+        self.assertEqual(len(gate["units"]), 4)
+        gate_manifest = gate["manifest"]
+        self.assertEqual(gate_manifest["identity"], "724aad586e2e0a21e2353fbcbc6c2dc4bae8cd1b210ec642e25154e5c60e794a")
+        self.assertTrue(Path(gate_manifest["path"]).is_file())
+        self.assertEqual({unit["record_key"] for unit in gate["units"]}, {"mihoyo_obc:zh-cn:507825", "mihoyo_obc:zh-cn:2606", "mihoyo_obc:zh-cn:6430"})
+        self.assertNotIn("mihoyo_obc:zh-cn:502434", {unit["record_key"] for unit in gate["units"]})
+        target_units_body = json.loads(Path("data/retrieval/p05-w2-targeted-v3-20260928-r1/preflight-final/units.json").read_text(encoding="utf-8"))
+        target_units = target_units_body.get("items", target_units_body.get("units", []))
+        target_by_id = {row["compilation_unit_id"]: row for row in target_units}
+        for unit in gate["units"]:
+            if unit["compilation_unit_id"] in target_by_id:
+                frozen = target_by_id[unit["compilation_unit_id"]]
+                self.assertEqual(frozen["semantic_input_identity"], unit["semantic_input_identity"])
+                self.assertEqual(frozen["payload_sha256"], unit["payload_sha256"])
+                self.assertEqual(frozen["segment_ids"], unit["segment_ids"])
+            baseline = unit.get("v4_baseline") or unit.get("v3_baseline") or unit.get("existing_baseline")
+            if baseline is None:
+                continue
+            artifact = Path(baseline["path"])
+            self.assertTrue(artifact.is_file())
+            self.assertEqual(hashlib.sha256(artifact.read_bytes()).hexdigest(), baseline["sha256"])
+
     def test_v3_zero_network_preflight_runs_strict_replay_and_local_reference_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             config = ChannelConfig.for_b_json_object("gemini_b", {})

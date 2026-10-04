@@ -24,7 +24,7 @@ from genshin_corpus.retrieval.semantic_compiler_u1 import (
     view_identity,
 )
 from genshin_corpus.parser.rich_text import parse_rich_text
-from genshin_corpus.retrieval.semantic_compiler_u1 import CanonicalProvenance, _Segment, _segment_from_unit, _select_sample, _split_dialogue_segment, _split_rich_text_segment
+from genshin_corpus.retrieval.semantic_compiler_u1 import CanonicalProvenance, _Segment, _map_desc_has_text_semantic_content, _segment_from_unit, _select_sample, _split_dialogue_segment, _split_rich_text_segment
 
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "retrieval" / "canonical-rag-w1-record.json"
@@ -86,6 +86,28 @@ class SemanticCompilerU1Tests(unittest.TestCase):
         event = {**output, "items": [{"local_id": "e1", "kind": "event", "label": "见习人员擅自行动", "source_segment_ids": ["map", "text"], "topic_path": [], "qualifiers": {}}]}
         with self.assertRaisesRegex(SemanticCompilerU1Error, "not minimal"):
             validate_semantic_output_envelope(event, expected_segment_ids=("map", "text"), segment_metadata=metadata)
+
+    def test_map_desc_media_only_is_omitted_but_text_bearing_values_are_retained(self) -> None:
+        self.assertFalse(_map_desc_has_text_semantic_content({"list": [{"image": "https://example/image.png", "tab_name": "位置"}], "layout_": "banner"}))
+        self.assertTrue(_map_desc_has_text_semantic_content({"list": [{"image": "https://example/image.png", "description": "入口在桥下"}]}))
+        provenance = CanonicalProvenance("r", "sha", None, None, "run", "manifest")
+        record = {"source_identity": {"key": "source"}, "record_id": "r"}
+        section = {"ordinal": 0, "source_metadata": {"name": "地图说明"}}
+        context = {"observation_key": "map", "ordinal": 0, "source_component_id": "map_desc"}
+        base_unit = {
+            "unit_id": "u", "kind": "structured_observation", "ordinal": 0,
+            "parent_component_key": "map", "content_role": {"labels": []},
+            "lineage": {"parsed_json_pointer": "/sections/0/units/0", "raw_refs": []},
+        }
+        pure = {**base_unit, "value": {"decoded": {"list": [{"image": "x", "tab_name": "截图"}]}}}
+        retained = {**base_unit, "value": {"decoded": {"list": [{"image": "x", "description": "文本说明"}]}}}
+        segments, omissions = _segment_from_unit(record=record, section=section, context=context, unit=pure, provenance=provenance, policy=ProjectionPolicy())
+        self.assertEqual(segments, [])
+        self.assertEqual(omissions[0]["reason"], "pure_media_map_desc")
+        self.assertFalse(omissions[0]["provider_visible"])
+        segments, omissions = _segment_from_unit(record=record, section=section, context=context, unit=retained, provenance=provenance, policy=ProjectionPolicy())
+        self.assertEqual(len(segments), 1)
+        self.assertFalse(omissions)
     def _inputs(self) -> tuple[Path, Path, tempfile.TemporaryDirectory[str]]:
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name)

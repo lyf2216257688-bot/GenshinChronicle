@@ -49,6 +49,8 @@ B_V3_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.3"
 B_V3_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.3"
 B_V4_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.4"
 B_V4_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.4"
+B_V5_EXPERIMENT_REVISION = "phase05-w2-b-json-object-0.5"
+B_V5_PROMPT_VERSION = "phase05-w2-b-json-object-prompt-0.5"
 B_REQUEST_CONTRACT_VERSION = "phase05-w2-b-json-object-request-0.1"
 STRICT_SOURCE_BINDING_POLICY = SOURCE_BINDING_POLICY_VERSION
 GEMINI_A_USER_AGENT = "GenshinChronicle-Phase05-SemanticCanary/0.1"
@@ -230,6 +232,42 @@ def b_v4_prompt_contract() -> dict[str, Any]:
     return prompt
 
 
+def b_v5_prompt_contract() -> dict[str, Any]:
+    """Bound the v4 inventory to independently navigable claims."""
+    prompt = b_v4_prompt_contract()
+    prompt["version"] = B_V5_PROMPT_VERSION
+    prompt["task"] = (
+        "Scan every supplied stage completely, then extract only independently stated, "
+        "source-supported navigation-worthy claims: concrete topics, identities, "
+        "goals, state changes, events, explicit relationships, or epistemically qualified facts. "
+        "Preserve the recall of a complete stage review without turning every descriptive or "
+        "poetic clause into a standalone record."
+    )
+    inherited_rules = [
+        (
+            "Do not collapse distinct navigation-worthy changes merely to keep the output small. "
+            "A source-supported standalone claim with no independent navigation value may be omitted "
+            "or merged under the navigation-worthiness rule; unsupported or genuinely ambiguous material "
+            "must still be omitted with an explicit segment disposition."
+            if rule.startswith("A stage being covered or having one valid item")
+            else rule
+        )
+        for rule in prompt["extraction_rules"]
+    ]
+    prompt["extraction_rules"] = [
+        *inherited_rules,
+        "A claim is navigation-worthy when it identifies a concrete entity, location, goal, possession, state, event, reversal, explicit relationship, attribution, uncertainty, or negation useful for later retrieval or traversal.",
+        "Do not emit a standalone decorative, sensory, metaphorical, or poetic item when it adds no concrete entity, state, event, relation, identity, location, or epistemic distinction; retain it only when it anchors one of those navigation claims.",
+        "Within one stage, merge repeated wording with the same actor, action, object, state, and attribution into one item. Split repeated wording only when an actor, object, state, temporal step, or attribution changes.",
+        "Emit a mention only when an event or relation references it, or when the mention itself is an independently useful identity, location, or topic. Do not emit noun phrases merely because they occur in descriptive prose.",
+        "Do not emit a relation that merely restates an event, duplicates another relation, or uses a generic predicate; each relation must add a distinct explicit source-supported relationship.",
+        "Treat expressions such as 不知、未明、似乎、仿佛、或许, and equivalent uncertainty as modality/uncertainty. Use polarity only for explicit negation, denial, refusal, prohibition, or non-existence; uncertainty is not negative polarity.",
+        "Before returning, verify that every independently navigable stage claim is represented, while decorative-only material and repeated equivalent claims are omitted. Keep segment_coverage as input accounting, not as a completeness assertion.",
+    ]
+    prompt["source_binding_policy"] = STRICT_SOURCE_BINDING_POLICY
+    return prompt
+
+
 def b_v4_experiment_contract() -> SemanticExperimentContract:
     return SemanticExperimentContract(
         revision=B_V4_EXPERIMENT_REVISION,
@@ -317,6 +355,18 @@ def b_v3_experiment_contract() -> SemanticExperimentContract:
     return SemanticExperimentContract(
         revision=B_V3_EXPERIMENT_REVISION,
         prompt_contract=b_v3_prompt_contract(),
+        request_contract=b_request_contract(),
+        output_schema_identity=SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+        frozen_preflight_identity=ACCEPTED_PREFLIGHT_IDENTITY,
+        frozen_semantic_build_identity=FROZEN_SEMANTIC_BUILD_IDENTITY,
+        acceptance_authority="local_strict_json_schema_source_binding_minimality",
+    )
+
+
+def b_v5_experiment_contract() -> SemanticExperimentContract:
+    return SemanticExperimentContract(
+        revision=B_V5_EXPERIMENT_REVISION,
+        prompt_contract=b_v5_prompt_contract(),
         request_contract=b_request_contract(),
         output_schema_identity=SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
         frozen_preflight_identity=ACCEPTED_PREFLIGHT_IDENTITY,
@@ -999,6 +1049,7 @@ def run_channel(
                 b_v2_experiment_contract(),
                 b_v3_experiment_contract(),
                 b_v4_experiment_contract(),
+                b_v5_experiment_contract(),
             )
         }
         accepted = accepted_b.get(experiment.identity)
@@ -1216,7 +1267,7 @@ def run_channel(
             normalized, content, parsed, diagnostics = _validate_raw_response(
                 adapter, response.raw_response_bytes, expected_segment_ids=row["segment_ids"],
                 segment_metadata=(semantic_segment_binding_metadata(payload)
-                                  if experiment is not None and experiment.revision in {B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION}
+                                  if experiment is not None and experiment.revision in {B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION, B_V5_EXPERIMENT_REVISION}
                                   else None),
             )
             stem = f"{ordinal:03d}-{request.compilation_unit_id}"
@@ -1300,7 +1351,7 @@ def replay_response(
     if artifact.get("sha256") != _sha(raw) or artifact.get("byte_count") != len(raw):
         raise SemanticLiveRunnerError("preserved raw response artifact hash mismatch")
     replay_metadata = None
-    if manifest.get("experiment_identity") in {b_v3_experiment_contract().identity, b_v4_experiment_contract().identity}:
+    if manifest.get("experiment_identity") in {b_v3_experiment_contract().identity, b_v4_experiment_contract().identity, b_v5_experiment_contract().identity}:
         request_artifact = row.get("request_artifact")
         if isinstance(request_artifact, Mapping):
             request_path = Path(str(request_artifact.get("path")))
@@ -1359,6 +1410,7 @@ def run_b_zero_network_preflight(
         b_v2_experiment_contract().identity,
         b_v3_experiment_contract().identity,
         b_v4_experiment_contract().identity,
+        b_v5_experiment_contract().identity,
     }:
         raise SemanticLiveRunnerError("zero-network preflight requires a known B experiment contract")
     if config.structured_output_mode != "JSON_OBJECT":
@@ -1401,7 +1453,7 @@ def run_b_zero_network_preflight(
             {"segment_id": segment_ids[1], "disposition": "no_navigation_material", "reason": "heading only"},
         ],
     }
-    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION}:
+    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION, B_V5_EXPERIMENT_REVISION}:
         expected["items"] = list(b_v2_prompt_contract()["minimal_example"]["output"]["items"])
         expected["items"] = [
             {**item, "source_segment_ids": [segment_ids[0]]}
@@ -1416,11 +1468,11 @@ def run_b_zero_network_preflight(
     output_root.mkdir(parents=True)
     request_artifact = _relative_artifact(_write_bytes(output_root / "request.json", request_body), output_root)
     response_artifact = _relative_artifact(_write_bytes(output_root / "raw_response.json", raw), output_root)
-    strict_metadata = semantic_segment_binding_metadata(payload) if experiment.revision in {B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION} else None
+    strict_metadata = semantic_segment_binding_metadata(payload) if experiment.revision in {B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION, B_V5_EXPERIMENT_REVISION} else None
     normalized, content, parsed, diagnostics = _validate_raw_response(
         adapter, raw, expected_segment_ids=segment_ids, segment_metadata=strict_metadata
     )
-    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION}:
+    if experiment.revision in {B_V2_EXPERIMENT_REVISION, B_V3_EXPERIMENT_REVISION, B_V4_EXPERIMENT_REVISION, B_V5_EXPERIMENT_REVISION}:
         validate_b_v2_navigation_references(normalized)
     replayed, _replay_content, _replay_parsed, replay_diagnostics = _validate_raw_response(
         adapter, raw, expected_segment_ids=segment_ids, segment_metadata=strict_metadata
@@ -1454,12 +1506,12 @@ def run_b_zero_network_preflight(
 __all__ = [
     "ACCEPTED_PREFLIGHT_IDENTITY", "B_EXPERIMENT_REVISION", "B_PROMPT_VERSION", "B_REQUEST_CONTRACT_VERSION",
     "B_V2_EXPERIMENT_REVISION", "B_V2_PROMPT_VERSION", "B_V3_EXPERIMENT_REVISION", "B_V3_PROMPT_VERSION",
-    "B_V4_EXPERIMENT_REVISION", "B_V4_PROMPT_VERSION",
+    "B_V4_EXPERIMENT_REVISION", "B_V4_PROMPT_VERSION", "B_V5_EXPERIMENT_REVISION", "B_V5_PROMPT_VERSION",
     "CHANNELS", "CHANNEL_LIMITS", "CHANNEL_TRANSPORT_PROFILES", "ChannelConfig", "GEMINI_A_USER_AGENT", "LIVE_RUNNER_SCHEMA_VERSION",
     "OPENAI_CHAT_ADAPTER_FACTORY",
     "SemanticExperimentContract", "SemanticLiveRunnerError", "SemanticProviderTransportError", "SemanticProviderAdapter", "SemanticProviderRequest",
     "SemanticProviderResponse", "SemanticResponseValidationError", "STRICT_SOURCE_BINDING_POLICY", "TRANSPORT_RESPONSE_HEADER_ALLOWLIST", "b_experiment_contract",
-    "b_prompt_contract", "b_request_contract", "b_v2_experiment_contract", "b_v2_prompt_contract", "b_v3_experiment_contract", "b_v3_prompt_contract", "b_v4_experiment_contract", "b_v4_prompt_contract",
+    "b_prompt_contract", "b_request_contract", "b_v2_experiment_contract", "b_v2_prompt_contract", "b_v3_experiment_contract", "b_v3_prompt_contract", "b_v4_experiment_contract", "b_v4_prompt_contract", "b_v5_experiment_contract", "b_v5_prompt_contract",
     "load_adapter", "load_offline_adapter", "replay_response", "run_b_zero_network_preflight", "run_channel",
     "validate_b_v2_navigation_references",
 ]

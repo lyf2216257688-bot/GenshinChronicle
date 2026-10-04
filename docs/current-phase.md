@@ -16,7 +16,12 @@ primary stream, and fresh r4 again accepted on TokenMetro primary; real
 automatic handoff remains UNOBSERVED (not FAIL) and does not block a bounded
 pilot; the 3-unit DeepSeek route-pair pilot completed with all units accepted
 on TokenMetro primary and no fallback trigger;
-P05-W2 B JSON-object local contract canaries PASS; the separately authorized TokenMetro-only DeepSeek/GLM
+P05-W2 B JSON-object local contract canaries PASS; opt-in v5 bounded-navigation
+Prompt contract/preflight PASS; the authorized v5 live gate is mechanically
+complete but semantic quality is NOT PASS; bounded inventory/compact-view
+architecture research is complete, with candidate accessibility preserved but
+automatic semantic correction still NOT PASS and no active KG adoption; the
+separately authorized TokenMetro-only DeepSeek/GLM
 ordinal 16/20 comparison is complete with one GLM ordinal 20 incomplete
 stream; B v2 SDK three-model comparison and ordinal 21 recovery remain
 incomplete; historical Jizhi direct-Python verification was externally blocked,
@@ -27,6 +32,58 @@ quality not PASS; P05-W2-U1 and P05-W1 mechanical contracts PASS).** Phase 04 es
 the first complete end-to-end RAG baseline. Phase 01 Raw, Phase 02 Parsed,
 Phase 03 Canonical, and Phase 04 Block A are closed at their accepted
 boundaries; the production corpus scope remains `zh-cn` MiHoYo OBC.
+
+The TokenMetro DeepSeek Responses transport is an opt-in route variant;
+Chat Completions remains retained for compatibility and the narrow Jizhi
+fallback rule is unchanged. Its fixed true `507825` point1 plus `6430` control
+gate completed with two HTTP 200 terminal Responses streams, two local
+atomic/schema/source-binding accepts, zero fallback attempts, zero retries, and
+provider-free replay PASS. The source-anchored review found all 39 frozen
+point1 claims and no obvious regression against the existing v0.7 runs. The
+first Responses-primary 200-unit attempt stopped on the first pure-media
+`map_desc` unit because the existing validator correctly rejected an unsupported
+source binding. Corpus inspection then established that the observed 9,920
+`map_desc` segments contain only media/UI metadata; a narrow provider-free
+projection correction now omits those segments from LLM payloads while keeping
+source/RU provenance and accounting. The revised 200-unit manifest retains all
+200 historical members and marks 9 provider-omitted units. A later identity
+audit found that the preceding `mapmedia-r1` manifest persisted
+`api_surface=chat_completions`; its label did not match its actual Chat
+Completions route. That root remains immutable historical evidence. A new
+Responses-bound manifest/root was then created. The new run issued 132
+TokenMetro `/v1/responses` attempts: 131 complete local accepts, then an HTTP
+503 `Service temporarily unavailable` with zero chunks, no usage, and no
+provider request ID. Execution/billing remain UNKNOWN; the runner stopped
+without fallback or retry. Offline route integrity/replay passed for the 131
+accepted outputs with zero replay provider/network calls. The new immutable
+root is
+`D:/Batch4_review/p05-w2-atomic-inventory-live-historical-200-20261004-responses-r1`.
+The original
+blocked root remains immutable; the historical Chat Completions run is
+`D:/Batch4_review/p05-w2-atomic-inventory-live-historical-200-20261004-mapmedia-r1`.
+The new Responses run is incomplete mechanical evidence, not semantic-quality
+acceptance; fixed-sample semantic review was not performed.
+After the upstream 503 diagnosis, a separate TokenMetro Responses
+continuation root was authorized for the blocked unit plus the 59 remaining
+units. It completed 55/60 local accepts, then stopped on an HTTP 200 complete
+stream whose local validation failed (`B v2 relation requires an explicit
+predicate`). Four continuation units were not issued; no retry or fallback was
+used. The continuation root is
+`D:/Batch4_review/p05-w2-atomic-inventory-live-historical-200-20261004-responses-metro-continuation-r1`.
+The four unissued frozen members were then run in two separate immutable
+TokenMetro Responses roots. The first root stopped at an indeterminate
+provider execution before issuing the remaining members; its offline route
+integrity/replay audit passed. After a backend-channel change, the second root
+completed all four primary attempts with no fallback or retry. One output
+passed the atomic source-binding review and three were rejected because their
+`source_quote` values were not exact substrings of the bound source payload.
+The unified historical-200 audit therefore records 9 pure-media omissions,
+187 accepted logical members, and 4 correctness-rejected logical members.
+Lineage and hashes are recorded in
+`D:/Batch4_review/p05-w2-atomic-inventory-audit-20261004-r1/lineage-audit.json`.
+These source-quote and predicate failures keep v0.7 inventory validation open;
+compact navigation plus official RU backcheck is not yet authorized.
+Production/default selectors and the Full Semantic Build remain unchanged.
 
 P05-W1 implementation is MECHANICAL CONTRACT PASS, with actual-review
 corrections applied for baseline-overlap navigation progress, admission/Packet
@@ -520,6 +577,54 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
+The latest bounded architecture decision follows the failed v5 point1 recall
+gate: preserve an immutable recall-oriented candidate ledger and derive a
+compact navigation view over it, rather than rewriting it into a shorter fact
+list. The authorized four-unit research and one current-point1 repeat are
+complete. All 20 completed experimental requests passed mechanical gates on
+TokenMetro primary with no fallback or automatic retry; one agent-interrupted
+request remains unresolved in its immutable root. Current point1 retains all
+39 frozen source distinctions through candidates in both grouped outputs,
+but qualifier corrections and inventory completeness remain unstable. This is
+NOT semantic acceptance or active KG readiness. Stop live research at this
+checkpoint; the next bounded decision concerns inventory claim/qualifier
+scope and typed-view/RU resolution, before larger validation. Full Semantic
+Build and production/default adoption remain blocked. Evidence and exact
+limits are in
+`docs/research/phase-05/p05-w2-inventory-navigation-architecture-20261001.md`.
+
+The 2026-10-02 atomic-inventory follow-up is mechanically wired and remains
+opt-in. Its provider-free focused suite passed `66/66` after a source projection
+fix for retained decoded rich text. The first point1
+atomic request is immutable mechanical evidence at
+`D:/Batch4_review/p05-w2-atomic-inventory-live-20261002-r1`: TokenMetro returned
+HTTP 200 but produced no stream chunk or semantic output, so the runner stopped
+fail-closed before fallback and point1 semantic quality is `UNKNOWN`. A
+separate frozen `6430` control completed at
+`D:/Batch4_review/p05-w2-atomic-inventory-live-6430-20261002-r1` with one
+accepted TokenMetro response and atomic source-quote contract PASS. A point1-only
+retry under the same frozen input/config at
+`D:/Batch4_review/p05-w2-atomic-inventory-live-point1-20261002-r2` failed with a
+TokenMetro `APIConnectionError` before any stream chunk; it contains no semantic
+output and remains immutable mechanical evidence. A subsequent point1-only root
+at `D:/Batch4_review/p05-w2-atomic-inventory-live-point1-20261002-r3` completed
+with one accepted TokenMetro response and 83 source-quoted candidates. All 39
+frozen point1 claims are accessible, but qualifier/atomicity review remains NOT
+PASS: unknown sound is marked negative, rhetorical questions use an imprecise
+condition field, and two grief claims remain merged. Repeated source phrases are
+retained for downstream deduplication. The semantic audit is at
+`D:/Batch4_review/p05-w2-atomic-inventory-live-point1-20261002-r3-semantic-audit.json`.
+The subsequent v0.7 opt-in Prompt bounded validation used new immutable roots
+under `D:/Batch4_review/p05-w2-atomic-inventory-live-*-20261003-v07-r1` and
+two point1 requests under one frozen manifest. Both retained all 39 frozen
+point1 claims with the known qualifier boundaries corrected. The dated-email
+control preserved self-correction and tentative attribution; the 6430 control
+preserved conditional antecedents and tentative outcomes. The review artifact
+is `D:/Batch4_review/p05-w2-atomic-inventory-v07-review-20261003-r1.json`.
+This is bounded semantic evidence and supports considering a separately
+authorized larger validation sample; it does not authorize Full Semantic Build,
+production/default change, or KG activation.
+
 DeepSeek V4.1 Flash is the selected Semantic Compiler production-model
 candidate. Real automatic handoff is UNOBSERVED, not FAIL, and is not a
 prerequisite for a bounded production-route pilot. Both current-key
@@ -924,10 +1029,107 @@ requests completed on TokenMetro primary with zero Jizhi fallback and zero
 retry; offline audit/replay passed. V4 materially restores the previously
 omitted independent content, but also shows clear redundancy, poetic-content
 over-extraction, and polarity-boundary errors. V4 therefore remains opt-in and
-is not a production/default Prompt. The next experiment is Prompt-only
-simplification that preserves recall while reducing redundancy. Full Semantic
-Build remains blocked; interrupted or failed live roots remain mechanical
+is not a production/default Prompt. The bounded-navigation v5 implementation
+below was intended to preserve recall while reducing redundancy; its authorized
+live behavior is now observed and fails the frozen point1 recall gate. Full
+Semantic Build remains
+blocked; interrupted or failed live roots remain mechanical
 execution evidence and are not semantic evidence.
+
+### Bounded-navigation Prompt v5 (2026-10-01)
+
+The opt-in revision `phase05-w2-b-json-object-0.5` is implemented as a
+provider-free Prompt/task refinement over v4. Experiment identity is
+`d0e325441e724af31eb7e3f20671a31f7cac8eaf1e66ff2ab45670ae0645a622`; Prompt
+identity is `e28273ded5d649e59e2d3143ce1549d490d8c540b581998d2dad9ae4fdda27c3`.
+It keeps the v4 stage inventory, compiler/input, request contract, authoritative
+schema, strict source binding, local-reference validation, frozen semantic build
+and preflight identities, and fail-closed replay. It adds bounded
+navigation-worthiness, decorative/poetic suppression, repeated-proposition
+merging, mention/relation minimality, and explicit uncertainty-versus-polarity
+instructions. v3 and v4 remain frozen and v5 is not a production/default
+Prompt.
+
+The v5 CLI mapping and zero-network preflight pass with zero formal attempts,
+provider calls, and network calls; offline replay is deterministic. The
+combined focused semantic suites pass `19/19` in the current environment. The
+source-anchored review fixture is
+`docs/research/phase-05/p05-w2-bounded-navigation-prompt-v5-review-fixture-20261001.json`.
+The wiring-focused SDK suite passes `63/63`; the v5 manifest loader, explicit
+CLI selection, four-unit mock route-pair replay, request/wire identity checks,
+and tamper fail-closed path are provider-free. A fresh v5 B preflight at
+`D:/Batch4_review/p05-w2-v5-gate-preflight-20261001-r2` reports zero formal
+attempts, provider calls, and network calls.
+The preceding contract and review-fixture evidence does not establish semantic
+acceptance, active Navi/KG eligibility, production adoption, or Full Semantic
+Build. The historical four-unit v5 live-gate manifest remains frozen at
+`docs/research/phase-05/p05-w2-v5-live-gate-manifest-20261001.json`, identity
+`724aad586e2e0a21e2353fbcbc6c2dc4bae8cd1b210ec642e25154e5c60e794a`, with its
+original Chat Completions surface. A corrected provider-free Responses gate
+manifest is frozen at
+`D:/Batch4_review/p05-w2-v5-live-gate-manifest-responses-20261004-r1.json`,
+identity `cb31c3f5536104500d6d6c3a8dfa447485570fae7b729c615fdc1b91bf7cd266`.
+A matching provider-free historical 200-unit Responses manifest is frozen at
+`D:/Batch4_review/p05-w2-atomic-inventory-manifest-historical-200-20261004-responses-r1.json`,
+identity `872c9ebf5a83ffb26c07d5bf9d5b1257bf0acaf54dedd2ead91fbb2bd0ea6294`;
+it retains the same 200 members and 9 pure-media omissions.
+It binds
+the four payload/segment identities before execution and fixes the current
+DeepSeek route-pair operating point at `max_tokens=300000`, timeout `900s`,
+streaming, and no automatic retry. The explicit SDK gate path selects v5 only
+with this manifest and `TokenMetro -> Jizhi` route arguments; legacy v2/8601
+selection remains unchanged. This is provider-free execution wiring evidence,
+not a live or semantic-quality result. Any future live gate still requires
+separate authorization and a new immutable root.
+
+The authorized four-unit v5 live gate completed at
+`D:/Batch4_review/p05-w2-v5-live-gate-20261001-r4`. All four units were
+accepted on TokenMetro primary (`4/4`), with zero Jizhi fallback, zero automatic
+retry, complete streams, HTTP 200, and local schema/source-binding validation
+PASS. Offline route-pair integrity audit passed with four accepted attempts and
+zero replay provider/network calls. The earlier `r1`, `r2`, and `r3` roots are
+retained as interrupted mechanical evidence and were not overwritten.
+
+The semantic gate itself failed on the frozen true-point1 checklist. V5 reduced
+true-point1 output from v4's 119 items to 14 and removed much of the known
+redundancy/poetic expansion, while omitting many required independent claims
+(including the sleep/awake state, rising clouds, mournful sound, several grief,
+memory, tears, and inner-state claims). Its prohibition and commander
+uncertainty were represented with the intended negative/modality distinction.
+Point2 produced 52 items versus its historical v3 21-item output, so further
+over-extraction remains possible; the dated email produced 21 items with its
+uncertain arrival represented as uncertainty, and the ordinary control retained
+explicit conditional/tentative/uncertain boundaries with image-only accounting.
+These controls show no confirmed mechanical or obvious semantic regression, but
+they do not compensate for the point1 recall failure. V5 remains opt-in,
+semantic acceptance is NOT PASS, and Full Semantic Build and production/default
+adoption remain blocked.
+
+### Inventory and compact navigation view research (2026-10-01)
+
+The subsequent user-authorized architecture unit tested v4 inventory followed
+by source-verified curation. Rewriting the semantic list remained unreliable:
+curator v0.2 produced 29 point1 items with multi-scope qualifier errors, while
+v0.3 produced 60 and omitted the names/actions memory distinction. The tested
+alternative preserves candidates and produces compact navigation groups with
+explicit member/omission accounting and source-quote-scoped interpretations.
+The current four inventories contain 44/53/38/16 items; their grouped views
+contain 13/9/9/5 navigation groups plus accounting metadata. Point1's repeat
+contains 11 groups and preserves the same 39 frozen source distinctions.
+
+All eight completed roots pass offline integrity/replay; all six grouped
+accepted requests pass the additional accounting/source-quote contract. This
+is mechanical and bounded candidate-accessibility evidence only. Repeated
+unknown-sound polarity repair, nested attribution, and entity-identity versus
+claim-uncertainty distinctions remain incorrect or unstable. Group labels are
+navigation headings and cannot become fact authority. No output is active KG,
+no production/default changed, and no full build or push occurred.
+The scoped prototype is
+`src/genshin_corpus/retrieval/semantic_two_stage_experiment.py`; research and
+manual claim mapping are owned by the architecture note linked above and its
+companion review JSON. Provider-free tests actually run in this unit passed
+9/9 experiment, 44/44 SDK, 10/10 Prompt and 9/9 B-revision tests. Larger-scale
+automatic semantic validation is not ready; live activity stops here.
 
 ### Offline semantic-quality signal investigation (2026-09-29)
 

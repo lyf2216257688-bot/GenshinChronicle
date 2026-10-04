@@ -38,8 +38,8 @@ class SemanticRouteProfile:
     def __post_init__(self) -> None:
         if self.route not in {"tokenmetro", "jizhi"}:
             raise ValueError("unsupported semantic route")
-        if self.api_surface != "chat_completions":
-            raise ValueError("only the Chat Completions route is currently authorized")
+        if self.api_surface not in {"chat_completions", "responses"}:
+            raise ValueError("unsupported route API surface")
         if not self.model_id or not self.provider:
             raise ValueError("route provider and model are required")
         parsed = urlsplit(self.base_url)
@@ -92,10 +92,15 @@ def route_profile(route: str, environment: Mapping[str, str] | None = None, *, r
         if require_environment:
             raise ValueError(f"{template.base_url_env} is required for route {route}")
         configured = template.base_url
+    api_surface = template.api_surface
+    if route == "tokenmetro":
+        requested_surface = values.get("TOKENMETRO_API_SURFACE")
+        if requested_surface:
+            api_surface = requested_surface
     return SemanticRouteProfile(
         route=template.route, provider=template.provider, model_id=template.model_id,
         base_url=configured.rstrip("/"), base_url_env=template.base_url_env,
-        api_key_env=template.api_key_env, api_surface=template.api_surface,
+        api_key_env=template.api_key_env, api_surface=api_surface,
     )
 
 
