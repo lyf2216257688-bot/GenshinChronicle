@@ -113,6 +113,10 @@ selectors, production/default behavior, current provider/model, and package or
 directory absence/implementation status. A historical statement may remain
 only when its scope is clear enough that it cannot override current authority.
 
+## Windows command guidance
+
+- When a task requires commands for the user to run manually on Windows, provide PowerShell 7 (`pwsh`)-compatible commands by default. Use Windows PowerShell 5.1 only for an explicit legacy-compatibility requirement. This applies only to commands given to the user; Codex must use the shell available in its actual runtime and must not assume PowerShell 7 is installed there. Do not include usernames, absolute PowerShell installation paths, or other machine-specific paths in repository content.
+
 ## Engineering behavior
 - Prefer small, reviewable changes with clear acceptance criteria.
 - Separate observed facts from assumptions and historical leads.
