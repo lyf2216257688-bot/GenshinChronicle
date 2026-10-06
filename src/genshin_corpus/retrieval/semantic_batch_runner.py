@@ -280,13 +280,21 @@ def _lineage_roots(root: Path) -> tuple[list[Path], list[dict[str, Any]]]:
             manifest_path = candidate / "manifest.json"
             if not manifest_path.exists():
                 continue
+            # Sibling directories share historical storage roots with the
+            # batch runner.  Inspect only the untrusted parent pointer first;
+            # unrelated manifests must not enter semantic-batch validation.
             try:
-                child_manifest = _load_manifest(candidate)
-            except OSError:
+                candidate_value = json.loads(manifest_path.read_bytes())
+            except (OSError, json.JSONDecodeError):
                 continue
-            parent = child_manifest.get("parent_root")
-            if (child_manifest.get("mode") == "continuation" and isinstance(parent, str)
-                    and Path(parent).resolve() == head):
+            if not isinstance(candidate_value, Mapping):
+                continue
+            parent = candidate_value.get("parent_root")
+            if (candidate_value.get("mode") == "continuation"
+                    and isinstance(parent, str) and Path(parent).resolve() == head):
+                # A matching parent is an explicit claim of membership.  The
+                # strict loader must reject any damaged identity/contract.
+                child_manifest = _load_manifest(candidate)
                 children.append(candidate.resolve())
         if len(children) > 1:
             raise ValueError("batch lineage has multiple continuation heads; select one explicitly")

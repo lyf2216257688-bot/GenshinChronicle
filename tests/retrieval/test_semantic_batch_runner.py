@@ -261,6 +261,22 @@ class SemanticBatchRunnerTests(unittest.TestCase):
         ]), 0)
         self.assertEqual(_semantic_batch_main(["status", "--root", str(self.root)]), 0)
 
+    def test_unrelated_sibling_manifest_is_ignored_but_damaged_child_fails_closed(self) -> None:
+        self.make_root()
+        unrelated = self.root.parent / "historical-other-format"
+        unrelated.mkdir()
+        (unrelated / "manifest.json").write_text(json.dumps({"mode": None, "run_id": "legacy"}), encoding="utf-8")
+
+        self.assertEqual(aggregate_status(self.root)["logical_units"], 3)
+        self.assertEqual(__import__("genshin_corpus.retrieval.semantic_batch_runner", fromlist=["dry_run"]).dry_run(self.root)["status"], "READY")
+
+        child = create_resume(self.root)
+        child_manifest = json.loads((child / "manifest.json").read_bytes())
+        child_manifest.pop("identity")
+        (child / "manifest.json").write_text(json.dumps(child_manifest), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "identity"):
+            aggregate_status(self.root)
+
     def test_local_reject_requires_complete_evidence(self) -> None:
         self.make_root()
         run_batch(self.root, workers=1, executor=lambda *_: AttemptOutcome(LOCAL_REJECT, "complete", failure_class="schema"), max_units=1)
