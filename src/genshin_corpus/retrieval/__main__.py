@@ -141,6 +141,150 @@ def _semantic_b_preflight_main(argv: list[str]) -> int:
     return 0 if report.get("status") == "PASS" else 1
 
 
+def _load_batch_executor(path: str | None, outcome_map: Path | None, *, sdk_route: str | None = None,
+                         sdk_model: str | None = None, sdk_prompt: Path | None = None,
+                         sdk_prompt_identity: str | None = None, sdk_source_identity: str | None = None,
+                         sdk_max_tokens: int = 500000, sdk_timeout_seconds: float = 300.0):
+    from .semantic_batch_runner import AttemptOutcome, UNKNOWN
+    if sdk_route is not None:
+        if path is not None or outcome_map is not None or sdk_model is None or sdk_prompt is None or sdk_prompt_identity is None:
+            raise ValueError("SDK batch execution requires route, model, prompt, and prompt identity only")
+        from .semantic_sdk_runner import make_sdk_batch_executor
+        prompt = json.loads(sdk_prompt.read_bytes())
+        if not isinstance(prompt, dict):
+            raise ValueError("SDK prompt must be a JSON object")
+        return make_sdk_batch_executor(
+            route=sdk_route, model=sdk_model, prompt=prompt,
+            prompt_identity=sdk_prompt_identity, source_identity=sdk_source_identity,
+            max_tokens=sdk_max_tokens, timeout_seconds=sdk_timeout_seconds)
+    if outcome_map is not None:
+        values = json.loads(outcome_map.read_bytes())
+        if not isinstance(values, dict):
+            raise ValueError("outcome map must be a JSON object")
+        def fake(unit, _stem, _manifest):
+            value = values.get(unit["compilation_unit_id"], {"disposition": UNKNOWN, "execution_certainty": "unknown", "failure_class": "not_provided"})
+            return AttemptOutcome(**value) if isinstance(value, dict) else value
+        return fake
+    if path is None:
+        raise ValueError("run requires an explicit executor adapter")
+    import importlib
+    module_name, separator, attr = path.partition(":")
+    if not separator or not module_name or not attr:
+        raise ValueError("executor must use module:function syntax")
+    value = getattr(importlib.import_module(module_name), attr)
+    if not callable(value):
+        raise ValueError("executor is not callable")
+    return value
+
+
+def _semantic_batch_main(argv: list[str]) -> int:
+    from .semantic_batch_runner import (
+        aggregate_status, create_rerun, create_resume, dry_run as batch_dry_run,
+        offline_audit, prepare_batch, run_batch,
+    )
+    commands = argparse.ArgumentParser(description="Immutable semantic batch coordinator")
+    sub = commands.add_subparsers(dest="command", required=True)
+
+    def add_execution_options(parser):
+        parser.add_argument("--workers", type=int, choices=(1, 6, 12), default=1)
+        parser.add_argument("--executor")
+        parser.add_argument("--outcome-map", type=Path)
+        parser.add_argument("--sdk-route", choices=("tokenmetro", "jizhi"))
+        parser.add_argument("--model")
+        parser.add_argument("--prompt", type=Path)
+        parser.add_argument("--prompt-identity")
+        parser.add_argument("--source-identity")
+        parser.add_argument("--max-tokens", type=int, default=500000)
+        parser.add_argument("--timeout-seconds", type=float, default=300.0)
+        parser.add_argument("--max-units", type=int)
+        parser.add_argument("--request-budget", type=int)
+        parser.add_argument("--wall-clock-seconds", type=float)
+        parser.add_argument("--stop-on-unknown", action=argparse.BooleanOptionalAction, default=True)
+
+    def execute_child(args, child_root: Path):
+        if args.sdk_route is not None:
+            manifest = json.loads((child_root / "manifest.json").read_bytes())
+            if manifest.get("route") != args.sdk_route:
+                raise ValueError("SDK route differs from immutable batch manifest route")
+        return run_batch(child_root, workers=args.workers,
+                         executor=_load_batch_executor(
+                             args.executor, args.outcome_map, sdk_route=args.sdk_route,
+                             sdk_model=args.model, sdk_prompt=args.prompt,
+                             sdk_prompt_identity=args.prompt_identity,
+                             sdk_source_identity=args.source_identity,
+                             sdk_max_tokens=args.max_tokens,
+                             sdk_timeout_seconds=args.timeout_seconds),
+                         max_units=args.max_units, request_budget=args.request_budget,
+                         wall_clock_seconds=args.wall_clock_seconds,
+                         stop_on_unknown=args.stop_on_unknown)
+    prepare = sub.add_parser("prepare")
+    prepare.add_argument("--root", required=True, type=Path)
+    prepare.add_argument("--units", required=True, type=Path)
+    prepare.add_argument("--route", required=True)
+    prepare.add_argument("--contract", type=Path)
+    dry = sub.add_parser("dry-run")
+    dry.add_argument("--root", required=True, type=Path)
+    run = sub.add_parser("run")
+    run.add_argument("--root", required=True, type=Path)
+    add_execution_options(run)
+    resume = sub.add_parser("resume")
+    resume.add_argument("--root", required=True, type=Path)
+    add_execution_options(resume)
+    rerun = sub.add_parser("rerun")
+    rerun.add_argument("--root", required=True, type=Path)
+    rerun.add_argument("--unit-id", action="append")
+    rerun.add_argument("--state", action="append")
+    rerun.add_argument("--route")
+    add_execution_options(rerun)
+    status = sub.add_parser("status")
+    status.add_argument("--root", required=True, type=Path)
+    audit = sub.add_parser("audit")
+    audit.add_argument("--root", required=True, type=Path)
+    args = commands.parse_args(argv)
+    if args.command == "prepare":
+        units = json.loads(args.units.read_bytes())
+        if isinstance(units, dict):
+            units = units.get("units", units.get("items"))
+        if not isinstance(units, list):
+            raise ValueError("units file must contain a JSON list or units/items object")
+        contract = json.loads(args.contract.read_bytes()) if args.contract else None
+        result = prepare_batch(args.root, units=units, route=args.route, contract=contract)
+    elif args.command == "dry-run":
+        result = batch_dry_run(args.root)
+    elif args.command == "run":
+        if args.sdk_route is not None:
+            manifest = json.loads((args.root / "manifest.json").read_bytes())
+            if manifest.get("route") != args.sdk_route:
+                raise ValueError("SDK route differs from immutable batch manifest route")
+        result = run_batch(args.root, workers=args.workers,
+                           executor=_load_batch_executor(
+                               args.executor, args.outcome_map, sdk_route=args.sdk_route,
+                               sdk_model=args.model, sdk_prompt=args.prompt,
+                               sdk_prompt_identity=args.prompt_identity,
+                               sdk_source_identity=args.source_identity,
+                               sdk_max_tokens=args.max_tokens,
+                               sdk_timeout_seconds=args.timeout_seconds),
+                           max_units=args.max_units, request_budget=args.request_budget,
+                           wall_clock_seconds=args.wall_clock_seconds,
+                           stop_on_unknown=args.stop_on_unknown)
+    elif args.command == "resume":
+        child = create_resume(args.root)
+        result = {"child_root": str(child), "status": "prepared"}
+        if args.executor or args.outcome_map or args.sdk_route:
+            result.update(execute_child(args, child))
+    elif args.command == "rerun":
+        child = create_rerun(args.root, unit_ids=args.unit_id, states=args.state, route=args.route)
+        result = {"child_root": str(child), "status": "prepared"}
+        if args.executor or args.outcome_map or args.sdk_route:
+            result.update(execute_child(args, child))
+    elif args.command == "status":
+        result = aggregate_status(args.root)
+    else:
+        result = offline_audit(args.root)
+    print(canonical_json_bytes(result).decode("utf-8"))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import sys
 
@@ -160,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
         return _semantic_live_replay_main(argv[1:])
     if argv and argv[0] == "semantic-b-preflight":
         return _semantic_b_preflight_main(argv[1:])
+    if argv and argv[0] == "semantic-batch":
+        return _semantic_batch_main(argv[1:])
     parser = argparse.ArgumentParser(description="Read-only profile of one accepted Canonical run")
     parser.add_argument("--manifest", required=True, type=Path, help="Canonical run metadata/manifest.json")
     parser.add_argument("--output", type=Path, help="Optional aggregate JSON output path; Canonical data is never written")

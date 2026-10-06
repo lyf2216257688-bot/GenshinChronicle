@@ -1934,6 +1934,275 @@ def run_sdk_route_canary(
     return terminal
 
 
+def run_sdk_single_route_attempt(
+    stem: Path,
+    *,
+    route: str,
+    unit: Mapping[str, Any],
+    prompt: Mapping[str, Any],
+    prompt_identity: str,
+    source_identity: str | None,
+    run_identity: str,
+    attempt_number: int,
+    model: str = "deepseek-v4.1-flash",
+    max_tokens: int = 500000,
+    timeout_seconds: float = 300.0,
+    environment: Mapping[str, str] | None = None,
+    api_key: str | None = None,
+    transport: Any = None,
+) -> dict[str, Any]:
+    """Execute one explicit route attempt for the immutable batch coordinator.
+
+    This is intentionally single-route and no-retry.  It writes only within
+    the supplied attempt directory; the caller owns the batch manifest and
+    lineage.  Generic HTTP/transport failures remain execution-unknown.
+    """
+    import openai
+
+    if route not in ROUTE_PROFILES:
+        raise ValueError("unsupported semantic route")
+    values = os.environ if environment is None else environment
+    profile = route_profile(route, values, require_environment=True)
+    key = api_key or values.get(profile.api_key_env)
+    if not isinstance(key, str) or not key or model != profile.model_id:
+        raise ValueError("route credential or model is invalid")
+    payload = unit.get("payload")
+    if not isinstance(payload, Mapping) or semantic_input_identity(payload) != unit.get("semantic_input_identity"):
+        raise ValueError("semantic input identity mismatch")
+    if max_tokens <= 0 or timeout_seconds <= 0:
+        raise ValueError("invalid route operating point")
+    logical_body = {"model": model, "messages": [
+        {"role": "system", "content": canonical_json_bytes(prompt).decode("utf-8")},
+        {"role": "user", "content": canonical_json_bytes(payload).decode("utf-8")},
+    ], "max_tokens": max_tokens, "stream": True}
+    body = _wire_body_for_surface(logical_body, profile.api_surface)
+    unit_id = str(unit["compilation_unit_id"])
+    request_identity = sha256_json({
+        "source_identity": source_identity, "prompt_identity": prompt_identity,
+        "schema_identity": SEMANTIC_OUTPUT_SCHEMA_IDENTITY, "compilation_unit_id": unit_id,
+        "semantic_input_identity": unit["semantic_input_identity"], "model": model,
+        "messages": logical_body["messages"], "payload": payload,
+        "stream": True, "max_tokens": max_tokens, "generation_parameters": {},
+    })
+    stem = Path(stem)
+    stem.mkdir(parents=True, exist_ok=True)
+    artifacts: dict[str, Any] = {"request": _write_once(stem / "request.json", canonical_json_bytes(body))}
+    issued_path = stem / "issued.json"
+    if issued_path.exists():
+        issued = _read(issued_path)
+        if issued.get("unit_id") != unit_id or issued.get("run_identity") != run_identity or issued.get("attempt_number") != attempt_number:
+            raise ValueError("batch issued identity mismatch")
+    else:
+        _json_once(stem / "issued.json", {
+            "run_identity": run_identity, "unit_id": unit_id, "attempt_number": attempt_number,
+            "request_identity": request_identity, "wire_request_identity": sha256_json(body),
+            "route": route, "route_config_identity": profile.config_identity, "issued_at": _now(),
+        })
+    stream_writer = _JsonlArtifactWriter(stem / "stream.jsonl", stem.parents[2])
+    started = time.monotonic()
+    status: int | None = None
+    headers: dict[str, str] = {}
+    wire_count = 0
+    raw: bytes | None = None
+    provider_id: str | None = None
+    finish_reason: str | None = None
+    usage: Any = None
+    visible_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    done_tracker: _DoneTrackingStream | None = None
+    response_terminal = False
+    stream_complete = False
+    error_type: str | None = None
+    error_message: str | None = None
+
+    def on_request(request: httpx.Request) -> None:
+        nonlocal wire_count
+        wire_count += 1
+        if wire_count != 1 or json.loads(request.content) != body or key.encode() in request.content:
+            raise ValueError("SDK wire request differs from frozen batch request")
+        artifacts["wire_request"] = _write_once(stem / "wire_request.bin", request.content)
+        artifacts["request_metadata"] = _json_once(stem / "request_metadata.json", {
+            "method": request.method, "url": str(request.url), "route": route,
+            "headers": {name: request.headers[name] for name in ("accept", "content-type") if name in request.headers},
+        })
+
+    def on_response(response: httpx.Response) -> None:
+        nonlocal status, headers, raw, done_tracker
+        status = response.status_code
+        headers = {name: response.headers[name] for name in ("retry-after", "x-request-id", "content-type") if name in response.headers}
+        if status == 200:
+            done_tracker = _DoneTrackingStream(response.stream)
+            if response.is_stream_consumed:
+                done_tracker.observe(response.content)
+            response.stream = done_tracker
+        else:
+            raw = response.read()
+            if key.encode() in raw:
+                raise ValueError("provider response contains configured credential")
+            artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
+
+    try:
+        with httpx.Client(transport=transport, event_hooks={"request": [on_request], "response": [on_response]}) as client_transport:
+            with openai.OpenAI(base_url=profile.base_url, api_key=key, max_retries=0,
+                               timeout=timeout_seconds, http_client=client_transport) as client:
+                if profile.api_surface == "responses":
+                    stream = client.responses.create(**body)
+                else:
+                    stream = client.chat.completions.create(**body)
+                for chunk in stream:
+                    data = _chunk_mapping(chunk)
+                    if key.encode() in canonical_json_bytes(data):
+                        raise ValueError("provider stream echoed configured credential")
+                    stream_writer.append(data)
+                    identifier = data.get("id")
+                    if isinstance(identifier, str):
+                        provider_id = identifier
+                    chunk_usage = data.get("usage")
+                    if isinstance(chunk_usage, Mapping):
+                        usage = dict(chunk_usage)
+                    if profile.api_surface == "responses":
+                        value, reasoning, event_finish, event_usage, event_id, terminal = _responses_event_parts(data)
+                        if value:
+                            visible_parts.append(value)
+                        if reasoning:
+                            reasoning_parts.append(reasoning)
+                        if event_finish is not None:
+                            finish_reason = event_finish
+                        if event_usage is not None:
+                            usage = event_usage
+                        if event_id is not None:
+                            provider_id = event_id
+                        response_terminal = response_terminal or terminal
+                    else:
+                        choices = data.get("choices")
+                        if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
+                            value, reasoning = _stream_delta(choices[0])
+                            visible_parts.append(value)
+                            reasoning_parts.append(reasoning)
+                            if isinstance(choices[0].get("finish_reason"), str):
+                                finish_reason = choices[0]["finish_reason"]
+    except (openai.APITimeoutError, openai.APIConnectionError) as exc:
+        error_type, error_message = type(exc).__name__, _redact(str(exc), (key,))
+    except openai.APIStatusError as exc:
+        error_type, error_message = type(exc).__name__, _redact(str(exc), (key,))
+        status = exc.status_code
+    except Exception as exc:
+        error_type, error_message = type(exc).__name__, _redact(str(exc), (key,))
+
+    if wire_count != 1 or "wire_request" not in artifacts:
+        raise ValueError("SDK attempt accounting is ambiguous")
+    stream_complete = (finish_reason is not None and
+                       (response_terminal if profile.api_surface == "responses"
+                        else done_tracker is not None and done_tracker.saw_done))
+    if status == 200 and stream_complete and error_type is None:
+        raw = _stream_envelope(provider_id, "".join(visible_parts), "".join(reasoning_parts), finish_reason, usage)
+        if key.encode() in raw:
+            raise ValueError("provider response echoed configured credential")
+        artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
+    disposition = "execution_unknown"
+    execution_certainty = "unknown"
+    failure_class: str | None = None
+    validation: Any = None
+    if status == 200 and stream_complete and error_type is None:
+        execution_certainty = "complete"
+        if finish_reason == "stop":
+            try:
+                normalized, _content, _parsed, validation = _validate_raw_response(
+                    _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"],
+                    segment_metadata=semantic_segment_binding_metadata(payload))
+                validate_b_v2_navigation_references(normalized)
+                artifacts["validation"] = _json_once(stem / "validation.json", validation)
+                artifacts["canonical_output"] = _json_once(stem / "canonical_output.json", normalized)
+                disposition = "accepted_for_local_contract"
+            except SemanticResponseValidationError as exc:
+                artifacts["validation"] = _json_once(stem / "validation.json", exc.diagnostics)
+                disposition = "local_correctness_reject"
+            except ValueError as exc:
+                artifacts["validation"] = _json_once(stem / "validation.json", {"error": str(exc)})
+                disposition = "local_correctness_reject"
+        else:
+            disposition, failure_class = "local_correctness_reject", "output_budget"
+    elif status == 403 and route == "tokenmetro" and _policy_403_pre_generation(
+            raw, status, chunk_count=stream_writer.chunk_count, reasoning_chars=len("".join(reasoning_parts)),
+            visible_chars=len("".join(visible_parts)), usage=usage, finish_reason=finish_reason):
+        disposition, execution_certainty, failure_class = "provider_terminal_failure", "not_started", "pre_generation_reject"
+    if error_type is not None:
+        artifacts["sdk_error"] = _json_once(stem / "sdk_error.json", {
+            "type": error_type, "message": error_message, "http_status": status})
+    stream_descriptor = stream_writer.descriptor()
+    if stream_descriptor is not None:
+        artifacts["stream"] = stream_descriptor
+    terminal = {
+        "run_identity": run_identity, "unit_id": unit_id, "attempt_number": attempt_number,
+        "request_identity": request_identity, "wire_request_identity": sha256_json(body),
+        "route": route, "route_config_identity": profile.config_identity,
+        "http_status": status, "sdk_error_type": error_type, "finish_reason": finish_reason,
+        "provider_request_id": provider_id, "response_headers": headers,
+        "usage": usage if usage is not None else "UNKNOWN", "usage_normalized": _normalize_usage(usage),
+        "latency_ms": round((time.monotonic() - started) * 1000, 3),
+        "stream_complete": stream_complete, "stream_chunk_count": stream_writer.chunk_count,
+        "execution_state": "complete" if execution_certainty == "complete" else ("not_started" if execution_certainty == "not_started" else "unknown"),
+        "execution_certainty": execution_certainty, "failure_class": failure_class,
+        "disposition": disposition, "artifacts": artifacts, "terminal_at": _now(),
+    }
+    _json_once(stem / "terminal.json", terminal)
+    return terminal
+
+
+def make_sdk_batch_executor(*, route: str, model: str, prompt: Mapping[str, Any],
+                            prompt_identity: str, source_identity: str | None = None,
+                            max_tokens: int = 500000, timeout_seconds: float = 300.0,
+                            environment: Mapping[str, str] | None = None,
+                            api_key: str | None = None, transport: Any = None):
+    """Build the worker-local explicit-route executor used by semantic-batch."""
+    def execute(unit: Mapping[str, Any], stem: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
+        contract = manifest.get("contract")
+        if not isinstance(contract, Mapping):
+            raise ValueError("batch manifest contract is required for SDK execution")
+        if not isinstance(source_identity, str) or not source_identity:
+            raise ValueError("batch SDK execution requires source identity")
+        prompt_digest = sha256_json(prompt)
+        required = {
+            "model": model,
+            "prompt_identity": prompt_identity,
+            "prompt_sha256": prompt_digest,
+            "source_identity": source_identity,
+            "schema_identity": SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+            "route": route,
+        }
+        if any(contract.get(key) != value for key, value in required.items()):
+            raise ValueError("batch SDK execution contract identity mismatch")
+        if contract.get("prompt_identity") != prompt_digest:
+            raise ValueError("batch prompt content does not match declared prompt identity")
+        values = os.environ if environment is None else environment
+        profile = route_profile(route, values, require_environment=False)
+        if contract.get("route_config_identity") != profile.config_identity:
+            raise ValueError("batch route configuration identity is missing or changed")
+        if contract.get("api_surface") != profile.api_surface:
+            raise ValueError("batch route API surface is missing or changed")
+        try:
+            return run_sdk_single_route_attempt(
+                stem, route=route, unit=unit, prompt=prompt, prompt_identity=prompt_identity,
+                source_identity=source_identity, run_identity=str(manifest["identity"]),
+                attempt_number=int(Path(stem).name.split("-")[-1]), model=model,
+                max_tokens=max_tokens, timeout_seconds=timeout_seconds, environment=environment,
+                api_key=api_key, transport=transport)
+        except ValueError as exc:
+            # A failure before the issued boundary is a local correctness
+            # reject. Once issued.json exists, the coordinator records the
+            # exception as execution-unknown instead.
+            if not (Path(stem) / "issued.json").exists():
+                return {
+                    "disposition": "local_correctness_reject",
+                    "execution_certainty": "not_started",
+                    "failure_class": "local_preflight",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                }
+            raise
+    return execute
+
+
 def replay_sdk_route_attempt(root: Path, unit_id: str, attempt_number: int,
                              expected_segment_ids: Sequence[str]) -> dict[str, Any]:
     """Revalidate a preserved route-pair response without loading credentials or network."""
