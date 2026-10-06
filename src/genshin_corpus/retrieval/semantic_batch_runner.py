@@ -622,8 +622,22 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
             "wall_clock_seconds": wall_clock_seconds,
         })
         futures: dict[Future[dict[str, Any]], str] = {}
+        harvested: set[Future[dict[str, Any]]] = set()
         next_index = 0
-        with ThreadPoolExecutor(max_workers=workers) as pool:
+        pool = ThreadPoolExecutor(max_workers=workers)
+        try:
+            def harvest_future(future: Future[dict[str, Any]], unit_id: str) -> dict[str, Any] | None:
+                if future.cancelled() or future in harvested or not future.done():
+                    return None
+                record = future.result()
+                harvested.add(future)
+                if not any(existing.get("unit_id") == unit_id for existing in records):
+                    records.append(record)
+                    _append_jsonl(root / "progress.jsonl", {
+                        "event": "unit_finished", "at": _now(), **record,
+                    })
+                return record
+
             def submit_more() -> None:
                 nonlocal next_index
                 while len(futures) < workers and next_index < len(selected):
@@ -640,13 +654,11 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
                 while futures:
                     done, _ = wait(tuple(futures), return_when=FIRST_COMPLETED)
                     for future in done:
-                        futures.pop(future, None)
-                        record = future.result()
-                        records.append(record)
-                        _append_jsonl(root / "progress.jsonl", {
-                            "event": "unit_finished", "at": _now(), **record,
-                        })
-                        if stop_on_unknown and record["state"] == UNKNOWN:
+                        unit_id = futures.pop(future, None)
+                        if unit_id is None:
+                            raise ValueError("completed batch future is not indexed")
+                        record = harvest_future(future, unit_id)
+                        if record is not None and stop_on_unknown and record["state"] == UNKNOWN:
                             stop_event.set()
                     submit_more()
             except KeyboardInterrupt:
@@ -657,16 +669,25 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
                 # Running workers are allowed to finish their current
                 # attempt; no new units are submitted and the root remains
                 # immutable after this invocation.
+                for future, unit_id in list(futures.items()):
+                    harvest_future(future, unit_id)
+        finally:
+            # A console interrupt can arrive while ThreadPoolExecutor is
+            # joining workers. Keep draining safely so issued attempts can
+            # persist terminal evidence without exposing a traceback.
+            for future in futures:
+                future.cancel()
+            while True:
+                try:
+                    pool.shutdown(wait=True)
+                    break
+                except KeyboardInterrupt:
+                    interrupted = True
+                    stop_event.set()
+                    for future in futures:
+                        future.cancel()
             for future, unit_id in list(futures.items()):
-                if future.cancelled():
-                    continue
-                if future.done():
-                    record = future.result()
-                    if not any(existing.get("unit_id") == unit_id for existing in records):
-                        records.append(record)
-                        _append_jsonl(root / "progress.jsonl", {
-                            "event": "unit_finished", "at": _now(), **record,
-                        })
+                harvest_future(future, unit_id)
         _write_indexes(root, records)
         summary = aggregate_status(root)
         if interrupted:
@@ -680,6 +701,9 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
         else:
             run_status = "complete"
         summary.update({"status": run_status,
+                        "interruption_requested": interrupted,
+                        "resume_available": bool(interrupted and summary["states"].get(PENDING)),
+                        "next_action": "resume" if interrupted and summary["states"].get(PENDING) else None,
                         "provider_attempts_this_invocation": issued,
                         "started_at": datetime.fromtimestamp(time.time() - (time.monotonic() - started), timezone.utc).isoformat()})
         _append_jsonl(root / "progress.jsonl", {

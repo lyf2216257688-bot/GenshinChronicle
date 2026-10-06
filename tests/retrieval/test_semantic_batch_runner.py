@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import io
 import tempfile
 import threading
 import time
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +34,7 @@ from genshin_corpus.retrieval.semantic_sdk_runner import make_sdk_batch_executor
 from genshin_corpus.retrieval.semantic_tokenmetro_profile import route_profile
 from genshin_corpus.retrieval.semantic_compiler_u1 import SEMANTIC_OUTPUT_SCHEMA_IDENTITY, SEMANTIC_OUTPUT_SCHEMA_VERSION
 from genshin_corpus.retrieval.__main__ import _semantic_batch_main
+import genshin_corpus.retrieval.__main__ as retrieval_main
 import genshin_corpus.retrieval.semantic_batch_runner as semantic_batch_runner_module
 
 
@@ -276,6 +279,141 @@ class SemanticBatchRunnerTests(unittest.TestCase):
         (child / "manifest.json").write_text(json.dumps(child_manifest), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "identity"):
             aggregate_status(self.root)
+
+    def test_interrupt_drains_inflight_and_leaves_remaining_pending(self) -> None:
+        self.make_root()
+        started = threading.Event()
+        release = threading.Event()
+        seen = []
+
+        def execute(unit, *_):
+            seen.append(unit["compilation_unit_id"])
+            started.set()
+            self.assertTrue(release.wait(5))
+            return AttemptOutcome(ACCEPTED, "complete")
+
+        def interrupt_wait(futures, *args, **kwargs):
+            self.assertTrue(started.wait(5))
+            release.set()
+            raise KeyboardInterrupt
+
+        with patch.object(semantic_batch_runner_module, "wait", side_effect=interrupt_wait):
+            result = run_batch(self.root, workers=1, executor=execute)
+
+        self.assertEqual(seen, ["u1"])
+        self.assertEqual(result["status"], "interrupted")
+        self.assertTrue(result["interruption_requested"])
+        self.assertTrue(result["resume_available"])
+        self.assertEqual(result["next_action"], "resume")
+        self.assertEqual(result["states"].get(ACCEPTED), 1)
+        self.assertEqual(result["states"].get(PENDING), 1)
+        self.assertEqual(aggregate_status(self.root)["states"].get(ACCEPTED), 1)
+        self.assertEqual(offline_audit(self.root)["status"], "INCOMPLETE")
+        self.assertEqual((self.root / "status.json").exists(), True)
+
+    def test_interrupt_workers_gt_one_does_not_submit_after_cancel(self) -> None:
+        self.root = Path(self.tmp.name) / "batch-workers"
+        prepare_batch(self.root, units=[unit(f"u{i}") for i in range(8)], route="tokenmetro")
+        started = []
+        release = threading.Event()
+
+        def execute(u, *_):
+            started.append(u["compilation_unit_id"])
+            self.assertTrue(release.wait(5))
+            return AttemptOutcome(ACCEPTED, "complete")
+
+        def interrupt_wait(*_args, **_kwargs):
+            deadline = time.monotonic() + 5
+            while len(started) < 6 and time.monotonic() < deadline:
+                time.sleep(0.001)
+            release.set()
+            raise KeyboardInterrupt
+
+        with patch.object(semantic_batch_runner_module, "wait", side_effect=interrupt_wait):
+            result = run_batch(self.root, workers=6, executor=execute)
+
+        self.assertEqual(len(started), 6)
+        self.assertEqual(result["status"], "interrupted")
+        self.assertTrue(result["resume_available"])
+        self.assertEqual(result["states"].get(ACCEPTED), 6)
+        self.assertEqual(result["states"].get(PENDING), 2)
+
+    def test_late_drained_unknown_is_harvested_once_into_indexes(self) -> None:
+        self.make_root()
+        started = threading.Event()
+        release = threading.Event()
+        drain_started = threading.Event()
+        original_pool = semantic_batch_runner_module.ThreadPoolExecutor
+
+        class DrainPool(original_pool):
+            def shutdown(self, wait=True, *, cancel_futures=False):
+                drain_started.set()
+                release.set()
+                return super().shutdown(wait=wait, cancel_futures=cancel_futures)
+
+        def execute(unit, stem, _manifest):
+            (stem / "issued.json").write_text(json.dumps({
+                "unit_id": unit["compilation_unit_id"], "attempt_number": 1,
+            }), encoding="utf-8")
+            started.set()
+            self.assertTrue(release.wait(5))
+            return AttemptOutcome(UNKNOWN, "unknown", failure_class="timeout", error_message="late")
+
+        def interrupt_wait(*_args, **_kwargs):
+            self.assertTrue(started.wait(5))
+            self.assertFalse(drain_started.is_set())
+            raise KeyboardInterrupt
+
+        with patch.object(semantic_batch_runner_module, "ThreadPoolExecutor", DrainPool), \
+                patch.object(semantic_batch_runner_module, "wait", side_effect=interrupt_wait):
+            result = run_batch(self.root, workers=1, executor=execute)
+
+        self.assertTrue(drain_started.is_set())
+        self.assertEqual(result["states"].get(UNKNOWN), 1)
+        self.assertEqual(result["states"].get(PENDING), 1)
+        progress = [json.loads(line) for line in (self.root / "progress.jsonl").read_text(encoding="utf-8").splitlines()]
+        finished = [row for row in progress if row.get("event") == "unit_finished"]
+        self.assertEqual(len(finished), 1)
+        self.assertEqual(finished[0]["state"], UNKNOWN)
+        errors = (self.root / "errors.jsonl").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("execution_unknown", (self.root / "error.log").read_text(encoding="utf-8"))
+        self.assertEqual(aggregate_status(self.root)["states"].get(UNKNOWN), 1)
+
+    def test_cli_interrupt_returns_130_without_traceback(self) -> None:
+        self.make_root()
+        started = threading.Event()
+        release = threading.Event()
+
+        def execute(*_):
+            started.set()
+            self.assertTrue(release.wait(5))
+            return AttemptOutcome(ACCEPTED, "complete")
+
+        original_loader = retrieval_main._load_batch_executor
+        retrieval_main._load_batch_executor = lambda *_args, **_kwargs: execute
+        output = io.StringIO()
+        error = io.StringIO()
+
+        def interrupt_wait(*_args, **_kwargs):
+            self.assertTrue(started.wait(5))
+            release.set()
+            raise KeyboardInterrupt
+
+        try:
+            with patch.object(semantic_batch_runner_module, "wait", side_effect=interrupt_wait):
+                with redirect_stdout(output), redirect_stderr(error):
+                    code = _semantic_batch_main(["run", "--root", str(self.root), "--executor", "fixture:execute"])
+        finally:
+            retrieval_main._load_batch_executor = original_loader
+
+        self.assertEqual(code, 130)
+        rendered = output.getvalue()
+        self.assertIn('"interruption_requested":true', rendered)
+        self.assertIn('"status":"interrupted"', rendered)
+        self.assertIn('"lineage_head"', rendered)
+        self.assertIn('"next_action":"resume"', rendered)
+        self.assertNotIn("Traceback", rendered + error.getvalue())
 
     def test_local_reject_requires_complete_evidence(self) -> None:
         self.make_root()

@@ -282,7 +282,7 @@ def _semantic_batch_main(argv: list[str]) -> int:
     else:
         result = offline_audit(args.root)
     print(canonical_json_bytes(result).decode("utf-8"))
-    return 0
+    return 130 if result.get("status") == "interrupted" else 0
 
 
 def main(argv: list[str] | None = None) -> int:
