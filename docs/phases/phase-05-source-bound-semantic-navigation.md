@@ -266,7 +266,7 @@ mention. v3 provider-free preflight and replay pass with zero formal/provider/
 network calls. This is a contract and omission-risk repair, not semantic
 acceptance or a model benchmark.
 
-## TokenMetro SDK retry and resume contract
+## Historical TokenMetro SDK retry and resume contract
 
 Formal Phase 05 TokenMetro Chat Completions execution uses the official
 `openai` Python SDK with SDK automatic retries disabled. The direct-HTTP route
@@ -299,6 +299,81 @@ are recorded per invocation and attempt, but can change on resume without
 changing the frozen semantic/request identity. They are operating points,
 not permanent correctness invariants. Local-contract acceptance
 remains separate from human semantic acceptance and active-view eligibility.
+
+This section describes the retained sequential SDK benchmark runner
+`run_sdk_units`. Its transient retry/resume policy is not the semantic-batch
+single-route policy below, nor the route-pair policy.
+
+## Immutable semantic-batch rate control
+
+The semantic-batch coordinator retains separate workers (1, 6, or 12) and a
+minimum dispatch interval. `--min-dispatch-interval-seconds` is finite and
+nonnegative; its default is 0 (no proactive pacing). The thread-safe gate runs
+at the SDK request hook before issued evidence and transport dispatch. It
+controls new request starts, including retries, while previously dispatched
+requests may remain concurrently in flight. It does not serialize generation.
+Explicit custom executors remain a one-provider-attempt callable boundary;
+the coordinator gates their invocation conservatively. They must not perform
+hidden additional provider calls or retries.
+
+Automatic retry defaults to zero. The only eligible error is the observed
+TokenMetro pre-generation TPM rejection: HTTP 429, SDK `RateLimitError`, a
+persisted error-only JSON envelope with exact
+`error.code` or `error.type=RateLimitExceeded.EndpointTPMExceeded`, no unknown
+error fields; the optional `error.param` is absent, `null`, or the observed
+empty string only; and zero stream chunks, visible/reasoning characters,
+usage, or finish reason. Any other 429, generation evidence, timeout, connection/read
+failure, partial stream, or ambiguous execution remains `execution_unknown`
+and cannot authorize automatic retry. The exact pre-generation policy 403
+remains a terminal failure in this single-route path and never authorizes a
+route change here. This predicate is client evidence for execution certainty;
+provider billing remains UNKNOWN when usage/cost evidence is absent.
+
+`--rate-limit-max-retries` defaults to 0 and permits 0 through 4 retries per
+logical unit within this root. An eligible rejection honors a finite
+`Retry-After` number or HTTP date within the configured cap; missing/invalid
+headers use bounded exponential backoff. The configurable defaults are
+`--rate-limit-backoff-initial-seconds=1`,
+`--rate-limit-backoff-multiplier=2` (at least 1), and
+`--rate-limit-backoff-cap-seconds=30`. Timing values must be finite and
+nonnegative. A qualifying rejection schedules a shared cooldown for all new
+dispatches; its retry also passes through the global pacing gate. Exhaustion
+stops new dispatches and produces `blocked`, preserving the terminal rejection
+and draining already issued attempts. These numbers are adjustable operating
+points, not channel capacity claims or permanent speed limits.
+
+The gate atomically reserves one request-budget slot for each provider attempt,
+including every retry. Thus 429, 429, success uses three calls and three
+immutable attempt directories. SDK automatic retries remain disabled.
+Reservations before a local dispatch/persistence failure are conservative:
+they cannot allow an extra call, while issued evidence remains the attempt
+accounting authority. The summary exposes both issued attempts and reservations.
+Wall-clock includes pacing/backoff and local preparation; expiry prevents new
+dispatches but does not interrupt an issued request's safe persistence/drain.
+Ctrl+C stops dispatches and interruptible waits, drains issued attempts, writes
+the structured interrupted summary, and retains CLI exit code 130.
+
+The existing immutable manifest identity continues to bind route, API surface,
+model, prompt, schema, source and frozen units. At first execution, the root
+freezes a write-once `execution_config.json` using the same canonical JSON hash
+mechanism, bound to that manifest identity. It binds workers, pacing, complete
+retry policy/predicate version, request/max-unit/wall-clock budgets,
+stop-on-unknown and SDK output ceiling/timeout. Progress, dispatch, issued and
+terminal evidence bind its execution identity. An executed root is never reused;
+an explicit continuation/rerun child may freeze a different operating point.
+Ordinary resume selects only never-issued units; retry exhaustion, an unknown
+attempt or a terminal rejection needs an explicit rerun child. Pre-dispatch
+request artifacts without issued or terminal evidence do not override earlier
+terminal state or consume provider attempts.
+
+Each attempt preserves request/wire/response/stream evidence plus dispatch
+ordinal/timing and an immutable retry decision with eligibility, reason, delay,
+delay source and scheduled/exhausted disposition. Interrupted/budget-stopped
+retries also retain `retry_stopped.json`. Progress and error indexes expose
+per-attempt and final unit states. Offline audit verifies identity, hashes,
+safe retry predicates, retry ordering/delay, dispatch ordinals/pacing and
+budget/accounting consistency without provider calls. Historical roots lacking
+the new execution artifacts remain readable under their original contract.
 
 ## DeepSeek route-pair contract
 

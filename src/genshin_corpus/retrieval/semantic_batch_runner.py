@@ -13,6 +13,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import threading
@@ -33,7 +34,55 @@ LOCAL_REJECT = "local_correctness_reject"
 TERMINAL_FAILURE = "provider_terminal_failure"
 UNKNOWN = "execution_unknown"
 
-SAFE_RERUN_FAILURES = {"pre_generation_reject"}
+SAFE_RERUN_FAILURES = {"pre_generation_reject", "pre_generation_rate_limit"}
+
+
+class DispatchStopped(RuntimeError):
+    """No provider call is permitted beyond this boundary."""
+
+
+class _DispatchGate:
+    def __init__(self, *, interval: float, budget: int | None, deadline: float | None,
+                 stop: threading.Event, started: float) -> None:
+        self.interval, self.budget, self.deadline, self.stop = interval, budget, deadline, stop
+        self.started = started
+        self.lock = threading.Lock()
+        self.next_start = 0.0
+        self.calls = 0
+
+    def acquire(self) -> dict[str, Any]:
+        while True:
+            with self.lock:
+                now = time.monotonic()
+                if (self.stop.is_set() or self.budget is not None and self.calls >= self.budget
+                        or self.deadline is not None and now >= self.deadline):
+                    raise DispatchStopped("dispatch stopped by interrupt, failure, or runtime budget")
+                delay = max(0.0, self.next_start - now)
+                if not delay:
+                    self.calls += 1
+                    self.next_start = now + self.interval
+                    return {"provider_call_ordinal": self.calls, "dispatch_at": _now(),
+                            "dispatch_elapsed_seconds": now - self.started}
+                if self.deadline is not None:
+                    delay = min(delay, self.deadline - now)
+            self.stop.wait(min(delay, 0.05))
+
+    def cooldown(self, delay: float) -> None:
+        with self.lock:
+            self.next_start = max(self.next_start, time.monotonic() + delay)
+
+
+def _safe_retry(root: Path, terminal: Mapping[str, Any]) -> bool:
+    from .semantic_sdk_runner import _verify_artifacts, safe_rate_limit_retry
+    artifacts = terminal.get("artifacts", {})
+    descriptor = artifacts.get("response") if isinstance(artifacts, Mapping) else None
+    if not isinstance(descriptor, Mapping):
+        return False
+    _verify_artifacts(root, artifacts)
+    return (terminal.get("disposition") == TERMINAL_FAILURE
+            and terminal.get("execution_certainty") == "not_started"
+            and terminal.get("failure_class") == "pre_generation_rate_limit"
+            and safe_rate_limit_retry(terminal, (root / str(descriptor["path"])).read_bytes()))
 
 
 def _now() -> str:
@@ -359,6 +408,8 @@ def state_for_unit(root: Path, unit: Mapping[str, Any]) -> str:
             raise ValueError("provider-omitted unit has provider attempts")
         return OMITTED
     attempts = _attempt_dirs(root, str(unit["compilation_unit_id"]))
+    attempts = [attempt for attempt in attempts
+                if (attempt / "issued.json").exists() or (attempt / "terminal.json").exists()]
     if not attempts:
         return PENDING
     terminal = _read_attempt(root, attempts[-1])
@@ -549,16 +600,28 @@ def dry_run(root: Path) -> dict[str, Any]:
 
 def run_batch(root: Path, *, workers: int = 1, executor: Executor,
               max_units: int | None = None, request_budget: int | None = None,
-              wall_clock_seconds: float | None = None, stop_on_unknown: bool = True) -> dict[str, Any]:
+              wall_clock_seconds: float | None = None, stop_on_unknown: bool = True,
+              min_dispatch_interval_seconds: float = 0.0, rate_limit_max_retries: int = 0,
+              rate_limit_backoff_initial_seconds: float = 1.0,
+              rate_limit_backoff_multiplier: float = 2.0,
+              rate_limit_backoff_cap_seconds: float = 30.0) -> dict[str, Any]:
     """Run selected units in one immutable root using a bounded worker pool."""
     if workers not in {1, 6, 12}:
         raise ValueError("workers must be one of 1, 6, or 12")
-    if max_units is not None and max_units < 0:
+    if max_units is not None and (type(max_units) is not int or max_units < 0):
         raise ValueError("max_units cannot be negative")
-    if request_budget is not None and request_budget < 0:
+    if request_budget is not None and (type(request_budget) is not int or request_budget < 0):
         raise ValueError("request_budget cannot be negative")
-    if wall_clock_seconds is not None and wall_clock_seconds < 0:
+    if wall_clock_seconds is not None and (not math.isfinite(wall_clock_seconds) or wall_clock_seconds < 0):
         raise ValueError("wall_clock_seconds cannot be negative")
+    for value in (min_dispatch_interval_seconds, rate_limit_backoff_initial_seconds,
+                  rate_limit_backoff_multiplier, rate_limit_backoff_cap_seconds):
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("rate control values must be finite and nonnegative")
+    if type(rate_limit_max_retries) is not int or not 0 <= rate_limit_max_retries <= 4:
+        raise ValueError("rate_limit_max_retries must be between zero and four")
+    if rate_limit_backoff_multiplier < 1:
+        raise ValueError("rate_limit_backoff_multiplier must be at least one")
     root = Path(root)
     manifest = _load_manifest(root)
     lineage_roots, _ = _lineage_roots(root)
@@ -576,63 +639,145 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
     records: list[dict[str, Any]] = []
     stop_event = threading.Event()
     interrupted = False
+    gate = _DispatchGate(interval=min_dispatch_interval_seconds, budget=request_budget,
+                         deadline=started + wall_clock_seconds if wall_clock_seconds is not None else None,
+                         stop=stop_event, started=started)
+    execution_contract = {
+        "schema_version": "semantic-batch-execution-1",
+        "run_identity": manifest["identity"], "workers": workers,
+        "min_dispatch_interval_seconds": min_dispatch_interval_seconds,
+        "rate_limit_retry": {"predicate": "tokenmetro-pre-generation-tpm-429-1",
+                             "max_retries": rate_limit_max_retries,
+                             "initial_seconds": rate_limit_backoff_initial_seconds,
+                             "multiplier": rate_limit_backoff_multiplier,
+                             "cap_seconds": rate_limit_backoff_cap_seconds},
+        "max_units": max_units, "request_budget": request_budget,
+        "wall_clock_seconds": wall_clock_seconds, "stop_on_unknown": stop_on_unknown,
+        "executor_parameters": dict(getattr(executor, "execution_parameters", {})),
+    }
+    execution_identity = sha256_json(execution_contract)
 
-    def invoke(unit_id: str) -> dict[str, Any]:
+    def invoke(unit_id: str) -> dict[str, Any] | None:
         nonlocal issued
         unit = units[unit_id]
-        number = len(_attempt_dirs(root, unit_id)) + 1
-        stem = root / "units" / _unit_key(unit_id) / f"attempt-{number:03d}"
-        stem.mkdir(parents=True, exist_ok=False)
-        try:
-            executor_result = executor(unit, stem, manifest)
-            raw = _normalize_outcome(executor_result)
-        except Exception as exc:
-            issued_boundary = (stem / "issued.json").exists()
-            raw = AttemptOutcome(
-                UNKNOWN if issued_boundary else LOCAL_REJECT,
-                "unknown" if issued_boundary else "not_started",
-                failure_class="executor_exception" if issued_boundary else "local_preflight",
-                error_type=type(exc).__name__, error_message=str(exc))
-        terminal_path = stem / "terminal.json"
-        if terminal_path.exists():
-            terminal = _read(terminal_path)
-            if terminal.get("unit_id") != unit_id or terminal.get("attempt_number") != number:
-                raise ValueError("executor terminal identity mismatch")
-        else:
-            terminal = {"unit_id": unit_id, "attempt_number": number,
-                        "run_identity": manifest["identity"],
-                        "issued": (stem / "issued.json").exists(),
-                        **raw.as_dict(), "terminal_at": _now()}
-            _write_once(terminal_path, terminal)
-        with issued_lock:
-            issued += int((stem / "issued.json").exists())
-        return {"unit_id": unit_id, "attempt_number": number, "state": raw.disposition,
-                "execution_certainty": terminal.get("execution_certainty", raw.execution_certainty),
-                "failure_class": terminal.get("failure_class", raw.failure_class),
-                "error_message": terminal.get("error_message", raw.error_message)}
+        attempts: list[dict[str, Any]] = []
+        for retry_index in range(rate_limit_max_retries + 1):
+            number = len(_attempt_dirs(root, unit_id)) + 1
+            stem = root / "units" / _unit_key(unit_id) / f"attempt-{number:03d}"
+            metadata: dict[str, Any] = {}
+
+            def dispatch() -> dict[str, Any]:
+                metadata.update(gate.acquire(), execution_config_identity=execution_identity,
+                                retry_index=retry_index)
+                _write_once(stem / "dispatch.json", metadata)
+                return metadata
+
+            try:
+                if getattr(executor, "supports_dispatch_control", False):
+                    stem.mkdir(parents=True, exist_ok=False)
+                    executor_result = executor(unit, stem, manifest, before_dispatch=dispatch)
+                else:
+                    stem.mkdir(parents=True, exist_ok=False)
+                    dispatch()
+                    executor_result = executor(unit, stem, manifest)
+                raw = _normalize_outcome(executor_result)
+            except DispatchStopped as exc:
+                if attempts:
+                    stopped = {"reason": str(exc), "at": _now()}
+                    _write_once(root / "units" / _unit_key(unit_id) /
+                                f"attempt-{attempts[-1]['attempt_number']:03d}" / "retry_stopped.json", stopped)
+                    attempts[-1]["retry_stopped"] = stopped
+                break
+            except Exception as exc:
+                issued_boundary = (stem / "issued.json").exists()
+                raw = AttemptOutcome(
+                    UNKNOWN if issued_boundary else LOCAL_REJECT,
+                    "unknown" if issued_boundary else "not_started",
+                    failure_class="executor_exception" if issued_boundary else "local_preflight",
+                    error_type=type(exc).__name__, error_message=str(exc))
+            terminal_path = stem / "terminal.json"
+            if terminal_path.exists():
+                terminal = _read(terminal_path)
+                if (terminal.get("unit_id") != unit_id or terminal.get("attempt_number") != number
+                        or terminal.get("run_identity") != manifest["identity"]):
+                    raise ValueError("executor terminal identity mismatch")
+            else:
+                terminal = {"unit_id": unit_id, "attempt_number": number,
+                            "run_identity": manifest["identity"],
+                            "issued": (stem / "issued.json").exists(),
+                            **raw.as_dict(), **metadata, "terminal_at": _now()}
+                _write_once(terminal_path, terminal)
+            with issued_lock:
+                issued += int((stem / "issued.json").exists())
+            safe = (stem / "issued.json").exists() and _safe_retry(root, terminal)
+            decision: dict[str, Any] = {"safe": safe, "retry_index": retry_index,
+                                        "reason": "pre_generation_rate_limit" if safe else None,
+                                        "delay_seconds": 0.0, "delay_source": None,
+                                        "decision": "not_eligible"}
+            if safe:
+                from .semantic_sdk_runner import _retry_after
+                delay = _retry_after(terminal.get("response_headers", {}), rate_limit_backoff_cap_seconds)
+                decision.update(delay_source="retry_after" if delay is not None else "bounded_backoff")
+                if delay is None:
+                    delay = rate_limit_backoff_initial_seconds
+                    for _ in range(retry_index):
+                        delay = min(rate_limit_backoff_cap_seconds, delay * rate_limit_backoff_multiplier)
+                    delay = min(rate_limit_backoff_cap_seconds, delay)
+                decision.update(delay_seconds=delay,
+                                decision="retry_scheduled" if retry_index < rate_limit_max_retries else "retry_exhausted")
+            if decision["decision"] == "retry_scheduled":
+                decision["scheduled_elapsed_seconds"] = time.monotonic() - started
+                gate.cooldown(decision["delay_seconds"])
+            _write_once(stem / "retry.json", decision)
+            record = {"unit_id": unit_id, "attempt_number": number, "state": raw.disposition,
+                      "execution_certainty": terminal.get("execution_certainty", raw.execution_certainty),
+                      "failure_class": terminal.get("failure_class", raw.failure_class),
+                      "error_message": terminal.get("error_message", raw.error_message),
+                      "provider_issued": (stem / "issued.json").exists(), **decision}
+            attempts.append(record)
+            if safe and retry_index < rate_limit_max_retries:
+                continue
+            if safe or stop_on_unknown and raw.disposition == UNKNOWN:
+                stop_event.set()
+            break
+        if not attempts:
+            return None
+        return {**attempts[-1], "attempt_count": len(attempts), "attempt_records": attempts}
 
     with _RunLock(root):
         locked_lineage_roots, _ = _lineage_roots(root)
         if locked_lineage_roots[-1].resolve() != root.resolve():
             raise ValueError("batch root is not the current lineage head; run the continuation child")
         _assert_fresh_execution_root(root)
+        config = {"identity": execution_identity, "contract": execution_contract}
+        config_path = root / "execution_config.json"
+        if config_path.exists():
+            if _read(config_path) != config:
+                raise ValueError("immutable execution configuration changed")
+        else:
+            _write_once(config_path, config)
         _append_jsonl(root / "progress.jsonl", {
             "event": "run_started", "at": _now(), "workers": workers,
             "selected_units": len(selected), "request_budget": request_budget,
             "wall_clock_seconds": wall_clock_seconds,
+            "execution_config_identity": execution_identity,
         })
-        futures: dict[Future[dict[str, Any]], str] = {}
-        harvested: set[Future[dict[str, Any]]] = set()
+        futures: dict[Future[dict[str, Any] | None], str] = {}
+        harvested: set[Future[dict[str, Any] | None]] = set()
         next_index = 0
         pool = ThreadPoolExecutor(max_workers=workers)
         try:
-            def harvest_future(future: Future[dict[str, Any]], unit_id: str) -> dict[str, Any] | None:
+            def harvest_future(future: Future[dict[str, Any] | None], unit_id: str) -> dict[str, Any] | None:
                 if future.cancelled() or future in harvested or not future.done():
                     return None
                 record = future.result()
                 harvested.add(future)
+                if record is None:
+                    return None
                 if not any(existing.get("unit_id") == unit_id for existing in records):
                     records.append(record)
+                    for attempt in record["attempt_records"]:
+                        _append_jsonl(root / "progress.jsonl", {"event": "attempt_finished", "at": _now(), **attempt})
                     _append_jsonl(root / "progress.jsonl", {
                         "event": "unit_finished", "at": _now(), **record,
                     })
@@ -641,7 +786,7 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
             def submit_more() -> None:
                 nonlocal next_index
                 while len(futures) < workers and next_index < len(selected):
-                    if stop_event.is_set() or (request_budget is not None and next_index >= request_budget):
+                    if stop_event.is_set() or (request_budget is not None and gate.calls >= request_budget):
                         return
                     if wall_clock_seconds is not None and time.monotonic() - started >= wall_clock_seconds:
                         return
@@ -649,10 +794,10 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
                     next_index += 1
                     futures[pool.submit(invoke, unit_id)] = unit_id
 
-            submit_more()
             try:
+                submit_more()
                 while futures:
-                    done, _ = wait(tuple(futures), return_when=FIRST_COMPLETED)
+                    done, _ = wait(tuple(futures), timeout=0.1, return_when=FIRST_COMPLETED)
                     for future in done:
                         unit_id = futures.pop(future, None)
                         if unit_id is None:
@@ -694,6 +839,8 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
             run_status = "interrupted"
         elif summary["states"].get(UNKNOWN):
             run_status = "stopped_unknown"
+        elif summary["states"].get(TERMINAL_FAILURE):
+            run_status = "blocked"
         elif summary["states"].get(PENDING):
             run_status = "partial"
         elif summary["states"].get(LOCAL_REJECT) or summary["states"].get(TERMINAL_FAILURE):
@@ -705,6 +852,8 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
                         "resume_available": bool(interrupted and summary["states"].get(PENDING)),
                         "next_action": "resume" if interrupted and summary["states"].get(PENDING) else None,
                         "provider_attempts_this_invocation": issued,
+                        "execution_config_identity": execution_identity,
+                        "dispatch_reservations": gate.calls,
                         "started_at": datetime.fromtimestamp(time.time() - (time.monotonic() - started), timezone.utc).isoformat()})
         _append_jsonl(root / "progress.jsonl", {
             "event": "run_finished", "at": _now(), "status": summary["status"],
@@ -717,6 +866,52 @@ def run_batch(root: Path, *, workers: int = 1, executor: Executor,
 def offline_audit(root: Path) -> dict[str, Any]:
     status = aggregate_status(Path(root))
     authority_complete = True
+    configs: dict[Path, Mapping[str, Any]] = {}
+    for value in status["lineage_roots"]:
+        candidate = Path(value)
+        path = candidate / "execution_config.json"
+        if path.exists():
+            config = _read(path)
+            if (config.get("identity") != sha256_json(config.get("contract"))
+                    or config["contract"].get("run_identity") != _load_manifest(candidate)["identity"]):
+                raise ValueError("execution configuration identity mismatch")
+            configs[candidate] = config
+            progress_path = candidate / "progress.jsonl"
+            if progress_path.exists():
+                progress = [json.loads(line) for line in progress_path.read_bytes().splitlines()]
+                starts = [row for row in progress if row.get("event") == "run_started"]
+                if len(starts) != 1 or starts[0].get("execution_config_identity") != config["identity"]:
+                    raise ValueError("execution configuration is not bound to run start")
+            dispatches = []
+            for dispatch_path in candidate.glob("units/*/attempt-*/dispatch.json"):
+                dispatch = _read(dispatch_path)
+                if dispatch.get("execution_config_identity") != config["identity"]:
+                    raise ValueError("dispatch execution configuration changed")
+                dispatches.append(dispatch)
+            dispatches.sort(key=lambda row: row["provider_call_ordinal"])
+            if [row["provider_call_ordinal"] for row in dispatches] != list(range(1, len(dispatches) + 1)):
+                raise ValueError("provider call ordinals are ambiguous")
+            budget = config["contract"]["request_budget"]
+            if budget is not None and len(dispatches) > budget:
+                raise ValueError("dispatch count exceeds request budget")
+            for previous, current in zip(dispatches, dispatches[1:]):
+                if (current["dispatch_elapsed_seconds"] - previous["dispatch_elapsed_seconds"] + 1e-9
+                        < config["contract"]["min_dispatch_interval_seconds"]):
+                    raise ValueError("dispatch interval violates immutable policy")
+            local_issued = sum(1 for _ in candidate.glob("units/*/attempt-*/issued.json"))
+            saved_status = candidate / "status.json"
+            if saved_status.exists():
+                saved = _read(saved_status)
+                if (saved.get("execution_config_identity") != config["identity"]
+                        or saved.get("provider_attempts_this_invocation") != local_issued
+                        or saved.get("dispatch_reservations") != len(dispatches)):
+                    raise ValueError("status provider accounting differs from attempt authority")
+        elif (candidate / "progress.jsonl").exists():
+            rows = [json.loads(line) for line in (candidate / "progress.jsonl").read_bytes().splitlines()]
+            if any(row.get("execution_config_identity") is not None for row in rows):
+                raise ValueError("immutable execution configuration is missing")
+    attempts_total = 0
+    retries_total = 0
     for unit_id, info in status["units"].items():
         candidate = Path(info["root"])
         unit = _unit_map(_load_manifest(candidate)).get(unit_id)
@@ -726,16 +921,59 @@ def offline_audit(root: Path) -> dict[str, Any]:
                 issued_path = attempt_dir / "issued.json"
                 terminal_path = attempt_dir / "terminal.json"
                 if not issued_path.exists() and not terminal_path.exists():
-                    authority_complete = False
                     continue
                 if not terminal_path.exists():
                     authority_complete = False
                     continue
                 terminal = _read(terminal_path)
+                attempts_total += int(issued_path.exists())
                 if (terminal.get("run_identity") != _load_manifest(candidate).get("identity")
                         or terminal.get("unit_id") != unit_id
                         or terminal.get("attempt_number") != int(attempt_dir.name.split("-")[-1])):
                     raise ValueError("attempt authority identity mismatch")
+                config = configs.get(candidate)
+                dispatch_path = attempt_dir / "dispatch.json"
+                retry_path = attempt_dir / "retry.json"
+                if config is not None and issued_path.exists():
+                    if not dispatch_path.exists() or not retry_path.exists():
+                        authority_complete = False
+                    else:
+                        dispatch, retry = _read(dispatch_path), _read(retry_path)
+                        policy = config["contract"]["rate_limit_retry"]
+                        if (dispatch.get("execution_config_identity") != config["identity"]
+                                or dispatch.get("retry_index") != int(attempt_dir.name.split("-")[-1]) - 1
+                                or retry.get("retry_index") != dispatch.get("retry_index")
+                                or type(dispatch.get("provider_call_ordinal")) is not int
+                                or dispatch["provider_call_ordinal"] < 1):
+                            raise ValueError("dispatch provenance mismatch")
+                        if retry.get("safe") != _safe_retry(candidate, terminal):
+                            raise ValueError("retry predicate evidence mismatch")
+                        issued = _read(issued_path)
+                        if terminal.get("execution_config_identity") is not None:
+                            if (terminal.get("execution_config_identity") != config["identity"]
+                                    or issued.get("execution_config_identity") != config["identity"]
+                                    or terminal.get("provider_call_ordinal") != dispatch["provider_call_ordinal"]
+                                    or issued.get("provider_call_ordinal") != dispatch["provider_call_ordinal"]):
+                                raise ValueError("issued and terminal dispatch provenance differ")
+                        if (not isinstance(retry.get("delay_seconds"), (int, float))
+                                or not math.isfinite(retry["delay_seconds"])
+                                or not 0 <= retry["delay_seconds"] <= policy["cap_seconds"]):
+                            raise ValueError("retry delay is outside immutable policy")
+                        retries_total += int(dispatch["retry_index"] > 0)
+                        if dispatch["retry_index"] > 0:
+                            previous = attempt_dir.parent / f"attempt-{dispatch['retry_index']:03d}"
+                            if (not (previous / "retry.json").exists()
+                                    or _read(previous / "retry.json").get("decision") != "retry_scheduled"
+                                    or not _safe_retry(candidate, _read(previous / "terminal.json"))):
+                                raise ValueError("retry lacks a qualifying prior attempt")
+                            previous_retry = _read(previous / "retry.json")
+                            if (dispatch["dispatch_elapsed_seconds"] + 1e-9
+                                    < previous_retry["scheduled_elapsed_seconds"] + previous_retry["delay_seconds"]):
+                                raise ValueError("retry dispatched before its bounded delay")
+                        expected = ("retry_scheduled" if dispatch["retry_index"] < policy["max_retries"]
+                                    else "retry_exhausted") if retry["safe"] else "not_eligible"
+                        if retry.get("decision") != expected or dispatch["retry_index"] > policy["max_retries"]:
+                            raise ValueError("retry decision exceeds immutable policy")
                 if terminal.get("disposition") == ACCEPTED and not issued_path.exists():
                     authority_complete = False
                 artifacts = terminal.get("artifacts")
@@ -757,7 +995,8 @@ def offline_audit(root: Path) -> dict[str, Any]:
                         "response", "validation", "canonical_output"
                     }.issubset(artifacts):
                         authority_complete = False
-    return {"status": "PASS" if authority_complete else "INCOMPLETE", "authority_complete": authority_complete, **status}
+    return {"status": "PASS" if authority_complete else "INCOMPLETE", "authority_complete": authority_complete,
+            "provider_attempts_total": attempts_total, "automatic_retries_total": retries_total, **status}
 
 
 __all__ = [

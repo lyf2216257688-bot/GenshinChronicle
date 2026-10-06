@@ -7,6 +7,7 @@ from email.utils import parsedate_to_datetime
 import gzip
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -425,7 +426,34 @@ def _retry_after(headers: Mapping[str, str], cap: float) -> float | None:
             seconds = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
         except (TypeError, ValueError, OverflowError):
             return None
-    return min(cap, max(0.0, seconds))
+    return min(cap, max(0.0, seconds)) if math.isfinite(seconds) else None
+
+
+def safe_rate_limit_retry(terminal: Mapping[str, Any], raw: bytes | None) -> bool:
+    """Allow only the observed error-only TokenMetro pre-generation TPM reject."""
+    if (terminal.get("route") != "tokenmetro" or terminal.get("http_status") != 429
+            or terminal.get("sdk_error_type") != "RateLimitError"
+            or terminal.get("stream_chunk_count") != 0
+            or terminal.get("stream_complete") is not False
+            or terminal.get("visible_chars") != 0 or terminal.get("reasoning_chars") != 0
+            or terminal.get("usage") not in (None, "UNKNOWN")
+            or terminal.get("finish_reason") is not None or raw is None):
+        return False
+    try:
+        envelope = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(envelope, Mapping) or set(envelope) != {"error"}:
+        return False
+    error = envelope.get("error")
+    if (not isinstance(error, Mapping)
+            or not set(error) <= {"code", "type", "message", "param"}
+            or error.get("param") not in (None, "")
+            or any(error.get(field) is not None and not isinstance(error[field], str)
+                   for field in ("code", "type", "message"))):
+        return False
+    return any(error.get(field) == "RateLimitExceeded.EndpointTPMExceeded"
+               for field in ("code", "type"))
 
 
 def _attempts(root: Path, unit_key: str, request_identity: str, run_identity: str, unit_id: str) -> list[dict[str, Any]]:
@@ -1950,6 +1978,7 @@ def run_sdk_single_route_attempt(
     environment: Mapping[str, str] | None = None,
     api_key: str | None = None,
     transport: Any = None,
+    before_dispatch: Callable[[], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Execute one explicit route attempt for the immutable batch coordinator.
 
@@ -1992,12 +2021,6 @@ def run_sdk_single_route_attempt(
         issued = _read(issued_path)
         if issued.get("unit_id") != unit_id or issued.get("run_identity") != run_identity or issued.get("attempt_number") != attempt_number:
             raise ValueError("batch issued identity mismatch")
-    else:
-        _json_once(stem / "issued.json", {
-            "run_identity": run_identity, "unit_id": unit_id, "attempt_number": attempt_number,
-            "request_identity": request_identity, "wire_request_identity": sha256_json(body),
-            "route": route, "route_config_identity": profile.config_identity, "issued_at": _now(),
-        })
     stream_writer = _JsonlArtifactWriter(stem / "stream.jsonl", stem.parents[2])
     started = time.monotonic()
     status: int | None = None
@@ -2014,12 +2037,27 @@ def run_sdk_single_route_attempt(
     stream_complete = False
     error_type: str | None = None
     error_message: str | None = None
+    dispatch_metadata: dict[str, Any] = {}
+    dispatch_error: Exception | None = None
 
     def on_request(request: httpx.Request) -> None:
-        nonlocal wire_count
+        nonlocal wire_count, dispatch_error, dispatch_metadata
         wire_count += 1
         if wire_count != 1 or json.loads(request.content) != body or key.encode() in request.content:
             raise ValueError("SDK wire request differs from frozen batch request")
+        if before_dispatch is not None:
+            try:
+                dispatch_metadata = dict(before_dispatch())
+            except Exception as exc:
+                dispatch_error = exc
+                raise
+        if not issued_path.exists():
+            _json_once(issued_path, {
+                "run_identity": run_identity, "unit_id": unit_id, "attempt_number": attempt_number,
+                "request_identity": request_identity, "wire_request_identity": sha256_json(body),
+                "route": route, "route_config_identity": profile.config_identity, "issued_at": _now(),
+                **dispatch_metadata,
+            })
         artifacts["wire_request"] = _write_once(stem / "wire_request.bin", request.content)
         artifacts["request_metadata"] = _json_once(stem / "request_metadata.json", {
             "method": request.method, "url": str(request.url), "route": route,
@@ -2089,6 +2127,8 @@ def run_sdk_single_route_attempt(
     except Exception as exc:
         error_type, error_message = type(exc).__name__, _redact(str(exc), (key,))
 
+    if dispatch_error is not None:
+        raise dispatch_error
     if wire_count != 1 or "wire_request" not in artifacts:
         raise ValueError("SDK attempt accounting is ambiguous")
     stream_complete = (finish_reason is not None and
@@ -2141,10 +2181,16 @@ def run_sdk_single_route_attempt(
         "usage": usage if usage is not None else "UNKNOWN", "usage_normalized": _normalize_usage(usage),
         "latency_ms": round((time.monotonic() - started) * 1000, 3),
         "stream_complete": stream_complete, "stream_chunk_count": stream_writer.chunk_count,
+        "visible_chars": len("".join(visible_parts)), "reasoning_chars": len("".join(reasoning_parts)),
         "execution_state": "complete" if execution_certainty == "complete" else ("not_started" if execution_certainty == "not_started" else "unknown"),
         "execution_certainty": execution_certainty, "failure_class": failure_class,
         "disposition": disposition, "artifacts": artifacts, "terminal_at": _now(),
+        **dispatch_metadata,
     }
+    terminal["safe_rate_limit_retry"] = safe_rate_limit_retry(terminal, raw)
+    if terminal["safe_rate_limit_retry"]:
+        terminal.update(disposition="provider_terminal_failure", execution_certainty="not_started",
+                        execution_state="not_started", failure_class="pre_generation_rate_limit")
     _json_once(stem / "terminal.json", terminal)
     return terminal
 
@@ -2155,7 +2201,7 @@ def make_sdk_batch_executor(*, route: str, model: str, prompt: Mapping[str, Any]
                             environment: Mapping[str, str] | None = None,
                             api_key: str | None = None, transport: Any = None):
     """Build the worker-local explicit-route executor used by semantic-batch."""
-    def execute(unit: Mapping[str, Any], stem: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
+    def execute(unit: Mapping[str, Any], stem: Path, manifest: Mapping[str, Any], *, before_dispatch=None) -> dict[str, Any]:
         contract = manifest.get("contract")
         if not isinstance(contract, Mapping):
             raise ValueError("batch manifest contract is required for SDK execution")
@@ -2180,13 +2226,16 @@ def make_sdk_batch_executor(*, route: str, model: str, prompt: Mapping[str, Any]
             raise ValueError("batch route configuration identity is missing or changed")
         if contract.get("api_surface") != profile.api_surface:
             raise ValueError("batch route API surface is missing or changed")
+        for name, value in (("max_tokens", max_tokens), ("timeout_seconds", timeout_seconds)):
+            if name in contract and contract[name] != value:
+                raise ValueError("batch SDK operating point differs from immutable contract")
         try:
             return run_sdk_single_route_attempt(
                 stem, route=route, unit=unit, prompt=prompt, prompt_identity=prompt_identity,
                 source_identity=source_identity, run_identity=str(manifest["identity"]),
                 attempt_number=int(Path(stem).name.split("-")[-1]), model=model,
                 max_tokens=max_tokens, timeout_seconds=timeout_seconds, environment=environment,
-                api_key=api_key, transport=transport)
+                api_key=api_key, transport=transport, before_dispatch=before_dispatch)
         except ValueError as exc:
             # A failure before the issued boundary is a local correctness
             # reject. Once issued.json exists, the coordinator records the
@@ -2200,6 +2249,8 @@ def make_sdk_batch_executor(*, route: str, model: str, prompt: Mapping[str, Any]
                     "error_message": str(exc),
                 }
             raise
+    execute.supports_dispatch_control = True
+    execute.execution_parameters = {"max_tokens": max_tokens, "timeout_seconds": timeout_seconds}
     return execute
 
 

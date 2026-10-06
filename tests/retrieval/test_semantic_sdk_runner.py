@@ -20,6 +20,8 @@ from genshin_corpus.retrieval.semantic_openai_chat_adapter import OpenAIChatComp
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _policy_403_pre_generation,
     _responses_request_body,
+    _retry_after,
+    safe_rate_limit_retry,
     audit_sdk_route_integrity,
     frozen_v5_gate_units,
     replay_sdk_route_attempt,
@@ -80,6 +82,54 @@ class SdkRunnerTest(unittest.TestCase):
         self.assertEqual((first / "raw_response.bin").read_bytes(), b"temporarily unavailable")
         self.assertEqual(json.loads((second / "terminal.json").read_bytes())["disposition"], "accepted_for_local_contract")
         self.assertEqual(self.run_units([], retries=2)[0]["provider_attempts_this_invocation"], 0)
+
+    def test_batch_safe_rate_limit_predicate_is_narrow_and_generation_free(self):
+        terminal = {"route": "tokenmetro", "http_status": 429, "sdk_error_type": "RateLimitError",
+                    "stream_chunk_count": 0, "stream_complete": False, "visible_chars": 0,
+                    "reasoning_chars": 0, "usage": "UNKNOWN", "finish_reason": None}
+        raw = canonical_json_bytes({"error": {
+            "message": "inference exceeds tpm/rpm limit",
+            "type": "rate_limit_error",
+            "param": "",
+            "code": "RateLimitExceeded.EndpointTPMExceeded",
+        }})
+        self.assertTrue(safe_rate_limit_retry(terminal, raw))
+        absent_param = json.loads(raw)
+        absent_param["error"].pop("param")
+        self.assertTrue(safe_rate_limit_retry(terminal, canonical_json_bytes(absent_param)))
+        null_param = json.loads(raw)
+        null_param["error"]["param"] = None
+        self.assertTrue(safe_rate_limit_retry(terminal, canonical_json_bytes(null_param)))
+        for changed in ({"http_status": 503}, {"sdk_error_type": "APIConnectionError"},
+                        {"stream_chunk_count": 1}, {"stream_complete": True}, {"visible_chars": 1},
+                        {"reasoning_chars": 1}, {"usage": {}}, {"usage": {"output_tokens": 0}},
+                        {"finish_reason": "stop"}, {"route": "jizhi"}):
+            self.assertFalse(safe_rate_limit_retry({**terminal, **changed}, raw))
+        for envelope in ({"error": {"code": "rate_limit"}},
+                         {"error": {"code": "RateLimitExceeded.EndpointTPMExceeded", "content": "partial"}},
+                         {"error": {"code": "RateLimitExceeded.EndpointTPMExceeded"}, "output": []},
+                         {"error": {"code": "RateLimitExceeded.EndpointTPMExceeded"}, "usage": {}},
+                         {"error": {"code": "RateLimitExceeded.EndpointTPMExceeded"}, "choices": []}):
+            self.assertFalse(safe_rate_limit_retry(terminal, canonical_json_bytes(envelope)))
+        self.assertFalse(safe_rate_limit_retry(terminal, b"capacity exhausted"))
+        self.assertFalse(safe_rate_limit_retry(terminal, None))
+        nonempty_param = canonical_json_bytes({"error": {
+            "message": "inference exceeds tpm/rpm limit",
+            "type": "rate_limit_error",
+            "param": "anything-nonempty",
+            "code": "RateLimitExceeded.EndpointTPMExceeded",
+        }})
+        self.assertFalse(safe_rate_limit_retry(terminal, nonempty_param))
+
+    def test_retry_after_invalid_and_date_headers(self):
+        from datetime import datetime, timezone
+        from email.utils import format_datetime
+        self.assertIsNone(_retry_after({"retry-after": "NaN"}, 30))
+        self.assertIsNone(_retry_after({"retry-after": "inf"}, 30))
+        self.assertIsNone(_retry_after({"retry-after": "invalid"}, 30))
+        self.assertIsNone(_retry_after({}, 30))
+        future = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() + 120, timezone.utc)
+        self.assertEqual(_retry_after({"retry-after": format_datetime(future)}, 30), 30)
 
     def test_429_retry_after_is_bounded(self):
         delays = []

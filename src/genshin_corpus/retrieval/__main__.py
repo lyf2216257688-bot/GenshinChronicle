@@ -200,6 +200,11 @@ def _semantic_batch_main(argv: list[str]) -> int:
         parser.add_argument("--request-budget", type=int)
         parser.add_argument("--wall-clock-seconds", type=float)
         parser.add_argument("--stop-on-unknown", action=argparse.BooleanOptionalAction, default=True)
+        parser.add_argument("--min-dispatch-interval-seconds", type=float, default=0.0)
+        parser.add_argument("--rate-limit-max-retries", type=int, default=0)
+        parser.add_argument("--rate-limit-backoff-initial-seconds", type=float, default=1.0)
+        parser.add_argument("--rate-limit-backoff-multiplier", type=float, default=2.0)
+        parser.add_argument("--rate-limit-backoff-cap-seconds", type=float, default=30.0)
 
     def execute_child(args, child_root: Path):
         if args.sdk_route is not None:
@@ -216,7 +221,12 @@ def _semantic_batch_main(argv: list[str]) -> int:
                              sdk_timeout_seconds=args.timeout_seconds),
                          max_units=args.max_units, request_budget=args.request_budget,
                          wall_clock_seconds=args.wall_clock_seconds,
-                         stop_on_unknown=args.stop_on_unknown)
+                         stop_on_unknown=args.stop_on_unknown,
+                         min_dispatch_interval_seconds=args.min_dispatch_interval_seconds,
+                         rate_limit_max_retries=args.rate_limit_max_retries,
+                         rate_limit_backoff_initial_seconds=args.rate_limit_backoff_initial_seconds,
+                         rate_limit_backoff_multiplier=args.rate_limit_backoff_multiplier,
+                         rate_limit_backoff_cap_seconds=args.rate_limit_backoff_cap_seconds)
     prepare = sub.add_parser("prepare")
     prepare.add_argument("--root", required=True, type=Path)
     prepare.add_argument("--units", required=True, type=Path)
@@ -266,7 +276,12 @@ def _semantic_batch_main(argv: list[str]) -> int:
                                sdk_timeout_seconds=args.timeout_seconds),
                            max_units=args.max_units, request_budget=args.request_budget,
                            wall_clock_seconds=args.wall_clock_seconds,
-                           stop_on_unknown=args.stop_on_unknown)
+                           stop_on_unknown=args.stop_on_unknown,
+                           min_dispatch_interval_seconds=args.min_dispatch_interval_seconds,
+                           rate_limit_max_retries=args.rate_limit_max_retries,
+                           rate_limit_backoff_initial_seconds=args.rate_limit_backoff_initial_seconds,
+                           rate_limit_backoff_multiplier=args.rate_limit_backoff_multiplier,
+                           rate_limit_backoff_cap_seconds=args.rate_limit_backoff_cap_seconds)
     elif args.command == "resume":
         child = create_resume(args.root)
         result = {"child_root": str(child), "status": "prepared"}

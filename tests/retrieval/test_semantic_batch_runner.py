@@ -513,6 +513,304 @@ class SemanticBatchRunnerTests(unittest.TestCase):
         result = run_batch(self.root, workers=1, executor=lambda *_: (_ for _ in ()).throw(ValueError("bad request")), max_units=1)
         self.assertEqual(result["states"].get(LOCAL_REJECT), 1)
 
+    def sdk_executor(self, handler):
+        return make_sdk_batch_executor(
+            route="tokenmetro", model="deepseek-v4.1-flash", prompt={"version": "fixture"},
+            prompt_identity=sha256_json({"version": "fixture"}), source_identity="source",
+            environment={"TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
+                         "TOKENMETRO_API_KEY": "tokenmetro-secret"},
+            transport=httpx.MockTransport(handler))
+
+    def sdk_success(self, request):
+        payload = json.loads(json.loads(request.content)["messages"][1]["content"])
+        output = {"schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION, "items": [],
+                  "segment_coverage": [{"segment_id": s["segment_id"], "disposition": "covered", "reason": None}
+                                       for s in payload["segments"]]}
+        rows = [{"id": "fixture", "choices": [{"index": 0, "delta": {"content": json.dumps(output)}, "finish_reason": None}]},
+                {"id": "fixture", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}]
+        stream = b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in rows) + b"data: [DONE]\n\n"
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream, request=request)
+
+    def sdk_rate_limit(self, request, **kwargs):
+        return httpx.Response(429, json={"error": {
+            "message": "inference exceeds tpm/rpm limit",
+            "type": "rate_limit_error",
+            "param": "",
+            "code": "RateLimitExceeded.EndpointTPMExceeded",
+        }},
+                              request=request, **kwargs)
+
+    def test_pacing_single_worker_and_real_sdk_dispatch(self):
+        self.make_root()
+        starts = []
+        def handler(request):
+            starts.append(time.monotonic())
+            return self.sdk_success(request)
+        result = run_batch(self.root, workers=1, executor=self.sdk_executor(handler),
+                           min_dispatch_interval_seconds=0.08)
+        self.assertEqual(result["status"], "complete")
+        self.assertGreaterEqual(starts[1] - starts[0], 0.075)
+        self.assertEqual(result["provider_attempts_this_invocation"], 2)
+
+    def test_zero_interval_and_pacing_allow_six_and_twelve_workers_inflight(self):
+        for workers, interval in ((6, 0.0), (12, 0.0), (6, 0.08), (12, 0.08)):
+            with self.subTest(workers=workers, interval=interval):
+                self.root = Path(self.tmp.name) / f"workers-{workers}-{interval}"
+                self.make_root()
+                starts = []
+                both_started = threading.Event()
+                lock = threading.Lock()
+                def handler(request):
+                    with lock:
+                        starts.append(time.monotonic())
+                        if len(starts) == 2:
+                            both_started.set()
+                    self.assertTrue(both_started.wait(5), "executor became serial")
+                    return self.sdk_success(request)
+                result = run_batch(self.root, workers=workers, executor=self.sdk_executor(handler),
+                                   min_dispatch_interval_seconds=interval)
+                self.assertEqual(result["status"], "complete")
+                if interval:
+                    self.assertGreaterEqual(starts[1] - starts[0], interval - 0.005)
+                self.assertEqual(offline_audit(self.root)["provider_attempts_total"], 2)
+
+    def test_safe_429_retries_preserve_all_attempts_and_accounting(self):
+        self.make_root()
+        calls = []
+        def handler(request):
+            calls.append(time.monotonic())
+            return self.sdk_rate_limit(request) if len(calls) < 3 else self.sdk_success(request)
+        result = run_batch(self.root, workers=1, executor=self.sdk_executor(handler), max_units=1,
+                           request_budget=3, rate_limit_max_retries=2,
+                           rate_limit_backoff_initial_seconds=0.02, rate_limit_backoff_cap_seconds=0.1)
+        self.assertEqual((len(calls), result["provider_attempts_this_invocation"]), (3, 3))
+        attempts = sorted((self.root / "units").rglob("attempt-*"))
+        self.assertEqual(len(attempts), 3)
+        decisions = [json.loads((p / "retry.json").read_bytes()) for p in attempts]
+        self.assertEqual([d["decision"] for d in decisions], ["retry_scheduled", "retry_scheduled", "not_eligible"])
+        self.assertEqual([d["delay_seconds"] for d in decisions], [0.02, 0.04, 0.0])
+        audit = offline_audit(self.root)
+        self.assertEqual((audit["status"], audit["provider_attempts_total"], audit["automatic_retries_total"]), ("PASS", 3, 2))
+        progress = [json.loads(line) for line in (self.root / "progress.jsonl").read_bytes().splitlines()]
+        self.assertEqual(len([r for r in progress if r["event"] == "attempt_finished"]), 3)
+
+    def test_retry_exhaustion_stops_before_next_unit(self):
+        self.make_root()
+        calls = []
+        def handler(request):
+            calls.append(request)
+            return self.sdk_rate_limit(request)
+        result = run_batch(self.root, workers=1, executor=self.sdk_executor(handler),
+                           rate_limit_max_retries=1, rate_limit_backoff_initial_seconds=0)
+        self.assertEqual((len(calls), result["status"], result["states"].get(PENDING)), (2, "blocked", 1))
+        self.assertEqual(aggregate_status(self.root)["units"]["u1"]["state"], TERMINAL_FAILURE)
+        self.assertEqual(offline_audit(self.root)["automatic_retries_total"], 1)
+        child = create_resume(self.root)
+        self.assertEqual(json.loads((child / "manifest.json").read_bytes())["selected_unit_ids"], ["u2"])
+
+    def test_retries_share_request_budget_under_concurrency(self):
+        for workers in (1, 6, 12):
+            self.root = Path(self.tmp.name) / f"retry-budget-{workers}"
+            self.make_root()
+            calls = []
+            def handler(request):
+                calls.append(request)
+                return self.sdk_rate_limit(request)
+            result = run_batch(self.root, workers=workers, executor=self.sdk_executor(handler),
+                               request_budget=2, rate_limit_max_retries=4,
+                               rate_limit_backoff_initial_seconds=0)
+            self.assertEqual((len(calls), result["provider_attempts_this_invocation"]), (2, 2))
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(offline_audit(self.root)["provider_attempts_total"], 2)
+
+    def test_retry_after_cap_and_fallback_backoff(self):
+        self.make_root()
+        calls = []
+        def handler(request):
+            calls.append(time.monotonic())
+            return self.sdk_rate_limit(request, headers={"retry-after": "999"}) if len(calls) == 1 else self.sdk_success(request)
+        run_batch(self.root, workers=1, executor=self.sdk_executor(handler), max_units=1,
+                  rate_limit_max_retries=1, rate_limit_backoff_cap_seconds=0.08)
+        first = next((self.root / "units").rglob("attempt-001"))
+        decision = json.loads((first / "retry.json").read_bytes())
+        self.assertEqual((decision["delay_source"], decision["delay_seconds"]), ("retry_after", 0.08))
+        self.assertGreaterEqual(calls[1] - calls[0], 0.08)
+
+    def test_ambiguous_429_timeout_connection_and_partial_stream_do_not_retry(self):
+        cases = [lambda r: httpx.Response(429, json={"error": {"code": "unknown_rate_limit"}}, request=r),
+                 lambda r: httpx.Response(429, json={"error": {"code": "RateLimitExceeded.EndpointTPMExceeded"}, "usage": {}}, request=r),
+                 lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("after send", request=r)),
+                 lambda r: (_ for _ in ()).throw(httpx.ConnectError("ambiguous", request=r)),
+                 lambda r: httpx.Response(200, headers={"content-type": "text/event-stream"},
+                                          content=b'data: {"choices":[{"index":0,"delta":{"content":"partial"}}]}\n\n', request=r)]
+        for index, response in enumerate(cases):
+            self.root = Path(self.tmp.name) / f"unknown-{index}"
+            self.make_root()
+            calls = []
+            def handler(request):
+                calls.append(request)
+                return response(request)
+            result = run_batch(self.root, workers=1, executor=self.sdk_executor(handler), rate_limit_max_retries=4)
+            self.assertEqual((len(calls), result["status"], result["states"].get(UNKNOWN)), (1, "stopped_unknown", 1))
+            self.assertEqual(offline_audit(self.root)["automatic_retries_total"], 0)
+            child = create_resume(self.root)
+            self.assertEqual(json.loads((child / "manifest.json").read_bytes())["selected_unit_ids"], ["u2"])
+
+    def test_wall_clock_includes_pacing_and_retry_wait(self):
+        for retry in (False, True):
+            self.root = Path(self.tmp.name) / f"wall-{retry}"
+            self.make_root()
+            calls = []
+            def handler(request):
+                calls.append(request)
+                return self.sdk_rate_limit(request) if retry else self.sdk_success(request)
+            result = run_batch(self.root, workers=1, executor=self.sdk_executor(handler),
+                               wall_clock_seconds=0.2, min_dispatch_interval_seconds=10,
+                               rate_limit_max_retries=2, rate_limit_backoff_initial_seconds=10)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(result["states"].get(PENDING), 1)
+
+    def test_interrupt_during_pacing_and_backoff_returns_130(self):
+        for retry in (False, True):
+            self.root = Path(self.tmp.name) / f"interrupt-wait-{retry}"
+            self.make_root()
+            calls = []
+            waiting = threading.Event()
+            original_acquire = semantic_batch_runner_module._DispatchGate.acquire
+            def acquire(gate):
+                if gate.calls:
+                    waiting.set()
+                return original_acquire(gate)
+            def handler(request):
+                calls.append(request)
+                return self.sdk_rate_limit(request) if retry else self.sdk_success(request)
+            original_wait = semantic_batch_runner_module.wait
+            def interrupt(futures, **kwargs):
+                if waiting.is_set():
+                    raise KeyboardInterrupt
+                return original_wait(futures, **kwargs)
+            output = io.StringIO()
+            with patch.object(semantic_batch_runner_module._DispatchGate, "acquire", acquire), \
+                    patch.object(semantic_batch_runner_module, "wait", side_effect=interrupt), \
+                    patch.object(retrieval_main, "_load_batch_executor", return_value=self.sdk_executor(handler)), \
+                    redirect_stdout(output):
+                code = _semantic_batch_main(["run", "--root", str(self.root), "--executor", "fixture:execute",
+                                            "--min-dispatch-interval-seconds", "10", "--rate-limit-max-retries", "2",
+                                            "--rate-limit-backoff-initial-seconds", "10"])
+            self.assertEqual((code, len(calls)), (130, 1))
+            self.assertIn('"status":"interrupted"', output.getvalue())
+            child = create_resume(self.root)
+            self.assertEqual(json.loads((child / "manifest.json").read_bytes())["selected_unit_ids"], ["u2"])
+
+    def test_execution_configuration_is_immutable_and_continuation_can_change_point(self):
+        self.make_root()
+        run_batch(self.root, workers=1, executor=self.sdk_executor(self.sdk_success), request_budget=1,
+                  min_dispatch_interval_seconds=0.08, rate_limit_max_retries=2)
+        config_bytes = (self.root / "execution_config.json").read_bytes()
+        config = json.loads(config_bytes)
+        self.assertEqual(config["contract"]["rate_limit_retry"]["max_retries"], 2)
+        child = create_resume(self.root)
+        run_batch(child, workers=12, executor=self.sdk_executor(self.sdk_success), min_dispatch_interval_seconds=0)
+        self.assertEqual((self.root / "execution_config.json").read_bytes(), config_bytes)
+        self.assertEqual(json.loads((child / "execution_config.json").read_bytes())["contract"]["workers"], 12)
+        self.assertEqual(offline_audit(child)["status"], "PASS")
+
+    def test_rate_control_invalid_values_fail_before_execution(self):
+        self.make_root()
+        for options in ({"min_dispatch_interval_seconds": -1}, {"min_dispatch_interval_seconds": float("nan")},
+                        {"rate_limit_max_retries": 5}, {"rate_limit_backoff_multiplier": 0.5},
+                        {"rate_limit_backoff_cap_seconds": float("inf")}):
+            with self.assertRaises(ValueError):
+                run_batch(self.root, executor=lambda *_: self.fail("executor called"), **options)
+        self.assertFalse((self.root / "execution_config.json").exists())
+
+    def test_zero_request_budget_never_enters_sdk_transport(self):
+        self.make_root()
+        result = run_batch(self.root, workers=12,
+                           executor=self.sdk_executor(lambda _: self.fail("provider called")),
+                           request_budget=0, rate_limit_max_retries=4)
+        self.assertEqual((result["provider_attempts_this_invocation"], result["states"][PENDING]), (0, 2))
+
+    def test_rate_limit_exhaustion_cancels_workers_waiting_for_dispatch(self):
+        self.make_root()
+        calls = []
+        def handler(request):
+            calls.append(request)
+            return self.sdk_rate_limit(request)
+        result = run_batch(self.root, workers=6, executor=self.sdk_executor(handler),
+                           min_dispatch_interval_seconds=10, rate_limit_max_retries=0)
+        self.assertEqual((len(calls), result["status"], result["states"][PENDING]), (1, "blocked", 1))
+
+    def test_execution_configuration_change_is_rejected_after_freeze(self):
+        self.make_root()
+        with patch.object(semantic_batch_runner_module, "_append_jsonl", side_effect=OSError("before run start")):
+            with self.assertRaises(OSError):
+                run_batch(self.root, executor=self.sdk_executor(self.sdk_success),
+                          min_dispatch_interval_seconds=1)
+        with self.assertRaisesRegex(ValueError, "immutable execution configuration changed"):
+            run_batch(self.root, executor=self.sdk_executor(self.sdk_success), min_dispatch_interval_seconds=0)
+
+    def test_audit_rejects_retry_dispatch_and_accounting_tampering(self):
+        mutations = ("config", "missing_config", "ordinal", "retry", "status")
+        for mutation in mutations:
+            self.root = Path(self.tmp.name) / f"tamper-{mutation}"
+            self.make_root()
+            calls = []
+            def handler(request):
+                calls.append(request)
+                return self.sdk_rate_limit(request) if len(calls) == 1 else self.sdk_success(request)
+            run_batch(self.root, executor=self.sdk_executor(handler), max_units=1,
+                      rate_limit_max_retries=1, rate_limit_backoff_initial_seconds=0)
+            first = next((self.root / "units").rglob("attempt-001"))
+            if mutation == "missing_config":
+                (self.root / "execution_config.json").unlink()
+            else:
+                path = {"config": self.root / "execution_config.json", "ordinal": first / "dispatch.json",
+                        "retry": first / "retry.json", "status": self.root / "status.json"}[mutation]
+                value = json.loads(path.read_bytes())
+                if mutation == "config":
+                    value["contract"]["workers"] = 12
+                elif mutation == "ordinal":
+                    value["provider_call_ordinal"] = 999
+                elif mutation == "retry":
+                    value["safe"] = False
+                else:
+                    value["provider_attempts_this_invocation"] = 1
+                path.write_bytes(json.dumps(value).encode())
+            with self.assertRaises(ValueError):
+                offline_audit(self.root)
+
+    def test_responses_batch_safe_retry_keeps_explicit_route_and_surface(self):
+        environment = {"TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
+                       "TOKENMETRO_API_KEY": "tokenmetro-secret", "TOKENMETRO_API_SURFACE": "responses"}
+        prompt = {"version": "fixture"}
+        profile = route_profile("tokenmetro", environment)
+        prepare_batch(self.root, units=[unit("u1")], route="tokenmetro", contract={
+            "model": profile.model_id, "prompt_identity": sha256_json(prompt), "prompt_sha256": sha256_json(prompt),
+            "source_identity": "source", "schema_identity": SEMANTIC_OUTPUT_SCHEMA_IDENTITY,
+            "route": "tokenmetro", "api_surface": "responses", "route_config_identity": profile.config_identity})
+        calls = []
+        def handler(request):
+            self.assertEqual(str(request.url), "https://tokenmetro.fixture/v1/responses")
+            body = json.loads(request.content)
+            self.assertEqual(set(body), {"model", "instructions", "input", "max_output_tokens", "stream"})
+            calls.append(request)
+            if len(calls) < 3:
+                return self.sdk_rate_limit(request)
+            output = {"schema_version": SEMANTIC_OUTPUT_SCHEMA_VERSION, "items": [],
+                      "segment_coverage": [{"segment_id": "u1", "disposition": "covered", "reason": None}]}
+            rows = [{"type": "response.output_text.delta", "delta": json.dumps(output)},
+                    {"type": "response.completed", "response": {"id": "fixture", "status": "completed"}}]
+            stream = b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in rows) + b"data: [DONE]\n\n"
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream, request=request)
+        executor = make_sdk_batch_executor(route="tokenmetro", model=profile.model_id, prompt=prompt,
+                                           prompt_identity=sha256_json(prompt), source_identity="source",
+                                           environment=environment, transport=httpx.MockTransport(handler))
+        result = run_batch(self.root, executor=executor, rate_limit_max_retries=2,
+                           rate_limit_backoff_initial_seconds=0, request_budget=3)
+        self.assertEqual((result["status"], result["provider_attempts_this_invocation"]), ("complete", 3))
+        self.assertEqual(offline_audit(self.root)["automatic_retries_total"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,25 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
+The user-authorized semantic-batch runtime work unit adds provider-free rate
+control to the existing immutable concurrent runner. It retains workers 1/6/12,
+never-issued-only continuation, explicit unknown reruns, interrupt drain and
+CLI exit 130. New dispatch pacing defaults to 0; bounded automatic retry
+defaults to 0 and is opt-in only for the exact persisted pre-generation
+TokenMetro TPM 429 predicate. Retry attempts consume the real request budget
+and retain separate evidence. Execution operating points are frozen per root;
+a new continuation/rerun child is required to change them. The durable contract
+is in the Phase05 specification's immutable semantic-batch rate-control section.
+This work authorizes no provider/network call, full-corpus execution, semantic
+acceptance, fallback expansion, production/default model change, commit or push.
+The immediate runtime next action is actual review, followed only by separately
+authorized bounded live canary validation; cheap-channel capacity and real
+safe-retry behavior remain unverified by this provider-free work.
+Focused batch/SDK/Prompt/B-revision/two-stage verification passed 123/123.
+Retrieval discovery passed 636/637 with network connections blocked; the sole
+error is the existing absent local GTE `model.safetensors` dependency.
+Compileall and diff-check passed. These are runtime/mechanical checks only.
+
 **Phase 05 - Source-Bound Semantic Navigation (DeepSeek V4.1 Flash selected as
 the Semantic Compiler production-model candidate; the TokenMetro primary /
 Jizhi fallback SDK mechanism is structurally ready, with same-payload
@@ -577,6 +596,11 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
+The runtime next action is actual review of the provider-free semantic-batch
+rate-control work unit described above. The following bounded research gates
+remain semantic acceptance dependencies; they do not authorize a live retry or
+full build through the new runtime.
+
 The latest bounded architecture decision follows the failed v5 point1 recall
 gate: preserve an immutable recall-oriented candidate ledger and derive a
 compact navigation view over it, rather than rewriting it into a shorter fact
@@ -876,10 +900,11 @@ The verified local runtime currently exists at
 `.local/tokenmetro-openai-sdk-20260924` and imports `openai` 3.19.2 and
 `httpx` 0.28.1. `requirements-phase05-tokenmetro.txt` records the minimal
 rebuild dependency pins without credentials. SDK execution records a logical
-unit separately from each provider attempt; the current default is an initial
-request plus at most two
-bounded transient retries per invocation, with identity-checked resume and
-immutable attempt evidence. This is an engineering operating point, not a
+unit separately from each provider attempt. The retained historical sequential
+`run_sdk_units` benchmark path uses an initial request plus at most two bounded
+transient retries per invocation, with identity-checked resume and immutable
+attempt evidence. Semantic-batch uses the separate zero-retry default and narrow
+opt-in pre-generation TPM 429 policy described above. This is an engineering operating point, not a
 semantic acceptance or a new paid-run authorization. Prompt v2, output schema,
 and the prior r1/r2 evidence roots remain unchanged.
 The DeepSeek route-pair entry point is separate from that historical single-
