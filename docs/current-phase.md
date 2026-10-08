@@ -18,9 +18,7 @@ a new continuation/rerun child is required to change them. The durable contract
 is in the Phase05 specification's immutable semantic-batch rate-control section.
 This work authorizes no provider/network call, full-corpus execution, semantic
 acceptance, fallback expansion, production/default model change, commit or push.
-The immediate runtime next action is actual review, followed only by separately
-authorized bounded live canary validation; cheap-channel capacity and real
-safe-retry behavior remain unverified by this provider-free work.
+The provider-free semantic-batch rate-control work unit passed final actual review and was committed as `45a268a`. A fresh 2-unit cheap-channel canary at `D:/Batch4_review/p05-semantic-batch-cheap-rate-canary-20261007-r1` issued exactly one TokenMetro request and stopped fail-closed. The attempt returned HTTP 429 `RateLimitExceeded.EndpointRPMExceeded`, with zero stream chunks, UNKNOWN usage, and no generation evidence; it was therefore not eligible for the narrow TPM-only automatic retry. Final lineage state is one `execution_unknown` plus one `pending_never_issued`; audit authority is complete. Cheap-channel rate-control live validation is PARTIAL / paused on current provider capacity. Do not resume, rerun, or reuse this immutable root.
 Focused batch/SDK/Prompt/B-revision/two-stage verification passed 123/123.
 Retrieval discovery passed 636/637 with network connections blocked; the sole
 error is the existing absent local GTE `model.safetensors` dependency.
@@ -596,8 +594,7 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
-The runtime next action is actual review of the provider-free semantic-batch
-rate-control work unit described above. The following bounded research gates
+The immediate next work unit is provider-free historical-200 same-sample semantic adjudication using the already completed comparison packet and existing quality research evidence. The goal is to identify real semantic regression/failure classes and then decide the minimum useful suspect-detection/selective-repair seam. No new provider run, 200-unit rerun, Full Semantic Build, or production Navi/KG activation is implied. The following bounded research gates
 remain semantic acceptance dependencies; they do not authorize a live retry or
 full build through the new runtime.
 
