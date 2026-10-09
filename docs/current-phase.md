@@ -7,17 +7,26 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
-The user-authorized semantic-batch runtime work unit adds provider-free rate
-control to the existing immutable concurrent runner. It retains workers 1/6/12,
-never-issued-only continuation, explicit unknown reruns, interrupt drain and
-CLI exit 130. New dispatch pacing defaults to 0; bounded automatic retry
-defaults to 0 and is opt-in only for the exact persisted pre-generation
-TokenMetro TPM 429 predicate. Retry attempts consume the real request budget
-and retain separate evidence. Execution operating points are frozen per root;
-a new continuation/rerun child is required to change them. The durable contract
-is in the Phase05 specification's immutable semantic-batch rate-control section.
-This work authorizes no provider/network call, full-corpus execution, semantic
-acceptance, fallback expansion, production/default model change, commit or push.
+The current authorized work unit is provider-free evidence preparation for a
+small semantic-quality review over the immutable 2026-10-04 historical-200
+atomic outputs. The 6+6 research/validation packet is prepared at the new
+evidence root referenced below. This work preserves mechanical verdicts and
+source/output identities without assigning semantic labels. It authorizes no
+provider/network calls, reruns, repairs, production contract changes, semantic
+acceptance, or push.
+
+The preceding user-authorized semantic-batch runtime work unit added
+provider-free rate control to the existing immutable concurrent runner. It
+retains workers 1/6/12, never-issued-only continuation, explicit unknown
+reruns, interrupt drain and CLI exit 130. New dispatch pacing defaults to 0;
+bounded automatic retry defaults to 0 and is opt-in only for the exact
+persisted pre-generation TokenMetro TPM 429 predicate. Retry attempts consume
+the real request budget and retain separate evidence. Execution operating
+points are frozen per root; a new continuation/rerun child is required to
+change them. The durable contract is in the Phase05 specification's immutable
+semantic-batch rate-control section. This work remains complete at its current
+partial live-validation boundary; do not resume, rerun, or reuse its immutable
+cheap-channel root.
 The provider-free semantic-batch rate-control work unit passed final actual review and was committed as `45a268a`. A fresh 2-unit cheap-channel canary at `D:/Batch4_review/p05-semantic-batch-cheap-rate-canary-20261007-r1` issued exactly one TokenMetro request and stopped fail-closed. The attempt returned HTTP 429 `RateLimitExceeded.EndpointRPMExceeded`, with zero stream chunks, UNKNOWN usage, and no generation evidence; it was therefore not eligible for the narrow TPM-only automatic retry. Final lineage state is one `execution_unknown` plus one `pending_never_issued`; audit authority is complete. Cheap-channel rate-control live validation is PARTIAL / paused on current provider capacity. Do not resume, rerun, or reuse this immutable root.
 Focused batch/SDK/Prompt/B-revision/two-stage verification passed 123/123.
 Retrieval discovery passed 636/637 with network connections blocked; the sole
@@ -594,9 +603,16 @@ governs only its historical benchmark path.
 
 ## Immediate next gate
 
-The immediate next work unit is provider-free historical-200 same-sample semantic adjudication using the already completed comparison packet and existing quality research evidence. The goal is to identify real semantic regression/failure classes and then decide the minimum useful suspect-detection/selective-repair seam. No new provider run, 200-unit rerun, Full Semantic Build, or production Navi/KG activation is implied. The following bounded research gates
-remain semantic acceptance dependencies; they do not authorize a live retry or
-full build through the new runtime.
+The 2026-10-04 historical-200 evidence packet is prepared at
+`data/retrieval/p05-w2-atomic-quality-evidence-20261008-r2/index.json` with
+integrity result `integrity-check.json`. It contains six research and six
+disjoint validation samples, balanced across mechanical PASS/FAIL and dialogue,
+task-relation, and structured-material inputs. The packet preserves the exact
+historical source payload, frozen canonical output, attempt provenance, and
+versioned mechanical verdict; it contains no semantic adjudication. An
+independent review remains the next bounded action. No new provider run,
+200-unit rerun, repair, Full Semantic Build, production Navi/KG activation, or
+semantic acceptance is implied.
 
 The latest bounded architecture decision follows the failed v5 point1 recall
 gate: preserve an immutable recall-oriented candidate ledger and derive a
@@ -1178,6 +1194,20 @@ which 3 are analyzer-specific. Selective review, repair, stronger-model
 escalation, thresholds, and any new quality schema are not frozen; the next
 implementation decision depends on this report and does not authorize live
 execution.
+
+### Semantic-quality evidence preparation (2026-10-08)
+
+The provider-free evidence preparation is recorded at
+`docs/research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md` with
+the auditable index at
+`data/retrieval/p05-w2-atomic-quality-evidence-20261008-r2/index.json` and
+the 12-row integrity check beside it. The six validation IDs have no overlap
+with the finite prior-review exclusion ledger; its limitation is recorded in
+`prior-review-exclusion-ledger.json`. The older
+`p05-w2-semantic-quality-review-v01-20261008-r1/review.json` is a separate
+2026-09-27 non-atomic review artifact and is not current evidence for this
+historical-200 packet. No semantic correctness, threshold, production
+eligibility, or Navi/KG conclusion follows from the preparation step.
 
 ### Historical Phase 04 recovery gate
 
