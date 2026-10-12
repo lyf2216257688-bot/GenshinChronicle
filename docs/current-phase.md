@@ -7,19 +7,49 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
-The user-authorized P05-Navi-E1 work unit implements provider-free local
-exploration tools, recorded/fake decisions, replay checkpoints, explicit review
-projection to topic hierarchy, and isolated P05-W1/Formal Deferred wiring.
-Its scope is tool/evidence mechanics only: no model/API/network calls, no KG
-relations, no production/default changes, no commit/push, and no E2 execution.
-The implementation and evidence are recorded at
+The current user-authorized work unit is **P05-Navi-E2**, a single-case
+DeepSeek-driven source exploration from `3429:s7:u3`. E1 is PASS/CLOSED at
+`main@4ff3887`; its tools and source bindings are reused without a new E1 run.
+E2 is isolated and bounded: at most 6 model rounds, 8 searches, 12 reads,
+8 pages, 20,000 Canonical body characters and 30,000 total model tokens.
+Provider/network calls are authorized only for this case. No automatic retry,
+fallback, corpus rebuild, production/default change, commit or push is authorized.
+Clues and memory remain `unverified_hypothesis_not_fact`; no active Navi view,
+KG edge, semantic acceptance or production acceptance follows from this run.
+Oracle sources are excluded from model inputs and used only in post-run review.
+The original r1/r2 E2 checkpoint is **PARTIAL / STOPPED**. The parent r1 reached a pre-dispatch
+token-projection stop; r2 inherited its actions and budgets after compacting
+the model-facing search projection. Exactly two DeepSeek calls used 13,048
+provider tokens; one accepted decision issued six searches, but the second
+call ended at `finish_reason=length` with reasoning only. No new source was
+read and no autonomous stop was observed. Final offline audit and 89/89
+focused tests PASS are mechanical evidence, not semantic/product acceptance.
+Run evidence and accounting caveats are in
+`docs/research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md`.
+The user separately authorized one minimal r2 continuation in a new immutable
+child root. It inherits all completed actions and terminal usage, counts the
+failed r2 request toward the six-call ceiling, and uses one short action per
+model decision with a 4,096-token output reservation inside the unchanged
+30,000-token total. No undocumented provider thinking parameter is used.
+The r3/r4 continuation is now **PARTIAL / EXECUTION UNKNOWN / STOPPED**.
+Two autonomous read decisions reached `3226:s1:u1` and `3470:s3:u2` through
+existing search-hit coordinates. The fifth cumulative request has an issued
+record but no terminal; it must not be reissued. Cumulative accounting is
+5 issued calls, 4 terminals, 19,273 known tokens plus one UNKNOWN usage,
+6 searches, 3 reads, 3 pages and 9,354 delivered Canonical body characters.
+Known tokens plus the unresolved request's reserved ceiling total 28,640;
+this is a dispatch bound, not measured total usage. No new clue, material
+qualification or autonomous stop was observed. Final provider-free affected
+tests passed 96/96; evidence is in
+`docs/research/phase-05/p05-navi-e2-continuation-20261012.md`.
+No further provider request is authorized by this stopped continuation.
+E3 remains NOT AUTHORIZED / gate NOT READY. Immediate next: independent
+review of the continuation evidence; do not resume or enter E3 automatically.
+
+E1 implementation/evidence remain in
 `docs/research/phase-05/p05-navi-e1-tools-wiring-20261011.md`.
-Focused checks passed 102/102; the real-source r3 smoke passed with one novel
-direct navigation RU visible in the final Packet. Human semantic review remains
-PENDING: unreviewed output is inactive and the smoke's active view is explicitly
-`accepted_for_fixture_test`, never curated or production accepted. The immediate
-next action is user review; model autonomy, relevance, answer gain and E2 remain
-UNKNOWN / NOT AUTHORIZED.
+Its 102/102 focused tests and r3 real-source mechanical smoke are accepted
+mechanical evidence; semantic/product acceptance remains OPEN.
 
 The preceding provider-free historical-200 6+6 quality-review evidence packet
 remains prepared and unchanged. Its evidence preparation assigned no semantic
@@ -614,7 +644,10 @@ remains the accepted Hybrid Top20 control; neither permits a silent fallback.
 W7 amendments govern only their completed W7 lineage; the W1 benchmark contract
 governs only its historical benchmark path.
 
-## Immediate next gate
+## Separate historical-200 review gate
+
+This gate applies to the preceding historical inventory only. The current E2
+next action and stopped status are owned by the active-work-unit section above.
 
 The 2026-10-04 historical-200 evidence packet is prepared at
 `data/retrieval/p05-w2-atomic-quality-evidence-20261008-r2/index.json` with

@@ -136,6 +136,38 @@ sources, Assembly input, formal admission dispositions and final Packet
 visibility separately. It makes no relevance, model-autonomy or answer-
 improvement claim.
 
+## P05-Navi-E2 single-case experiment boundary
+
+E2 uses the E1 local tools with model-selected search/read/clue/stop decisions.
+This opt-in experiment is limited to one source-bound case, at most 6 model
+rounds, 8 searches, 12 reads, 8 pages, 20,000 Canonical body characters and
+30,000 total provider tokens. Serialized tool-response characters are accounted
+separately. Each dispatch requires a conservative UTF-8-byte input reservation
+plus the output ceiling; UNKNOWN usage blocks the next dispatch. The byte
+reservation is not a measured model tokenizer or a cost estimate.
+
+Requests, wire identities, issued records, streamed responses, terminal usage,
+decisions, actions and checkpoint snapshots are persisted. No automatic retry
+or fallback is permitted. An unresolved issued request is never reissued.
+Completed local actions/decisions may be recovered. A pre-dispatch token
+projection stop may continue in a new child root with the same case and
+budgets, retaining parent identity, completed actions and cumulative usage;
+it does not restart the budget. A separately user-authorized child may continue
+from a resolved length/empty-visible terminal; it must rederive cumulative
+usage/calls from immutable issued/terminal evidence, including failed requests.
+The six-call ceiling includes those failed requests. One-short-action output
+and a changed per-call output reservation are explicit child operating points,
+not a total-budget reset or automatic retry. Any subsequent terminal failure
+stops that continuation. Full receipts remain preserved when the
+model-facing projection omits metadata or visibly truncates snippets.
+
+All model clues and memory retain `unverified_hypothesis_not_fact`. No E2 result
+creates an active view, KG edge, human semantic acceptance or production
+acceptance. Reference oracle sources are withheld until post-run review, unless
+independently returned by the allowed tools. E2 is exploration evidence only;
+formal Phase04-versus-Navi Packet/answer comparison remains separately
+reviewed and authorized.
+
 ## P05-W2-U1 provider-free boundary
 
 The first W2 implementation work unit is provider-free. It materializes a

@@ -49,7 +49,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   these remain evaluation mechanics only and are not the production/default
   path. Phase 05 navigation orchestration and route lineage live here; the
   E1 recorded exploration/checkpoints and the opt-in real-source mechanical
-  smoke also live here; they contain no model transport or production Agent. The
+  smoke also live here; E1 contains no model transport or production Agent.
+  `navi_e2_experiment.py` is the opt-in single-case model exploration runner;
+  it reuses E1 tools and SDK evidence helpers without creating active views. The
   package does not redefine semantic candidate/admission or Assembly policies
   owned by `retrieval/`, and it does not redefine provider contracts owned by
   `generation/`.
