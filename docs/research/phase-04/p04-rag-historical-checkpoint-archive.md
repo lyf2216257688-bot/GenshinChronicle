@@ -1010,3 +1010,15 @@ owned by `docs/current-phase.md`.
   (`phase04: make local bge the default reranker`) integrated the default-local
   BGE implementation into `main`. The separate historical experiment branch
   remains out of `main`.
+
+## 2026-09-21 - Block B Targeted Semantic Gate Live and Recovery Lineage
+
+This dated entry preserves the unique Block B Targeted Semantic Gate live attempt
+and recovery attempts lineage previously held in `docs/current-phase.md`:
+
+- **Block B Kernel Status**: provider-free bounded adaptive kernel passed actual review (structural only).
+- **First Nine-Case Live Attempt (2026-09-19)**: mechanically inconclusive historical evidence under `.local/p04-targeted-semantic-gate-live-20260919-172106`. Adaptive round 0 failed at the replay identity seam for all 9 cases; nine shared round-0 Block A/Packet artifacts and baseline Generation occurrences were persisted; assessor/supplemental evidence was not produced.
+- **Replay Identity Root Cause & Repair**: confirmed and repaired (ACTUAL REVIEW PASS). Parent recovery reuse was live-confirmed; nine parent round-0 and baseline occurrences accepted for read-only recovery reuse. Assessor output-contract repair, failure observability, raw-response persistence, and offline parser replay all passed actual review. Assessor prompt schema/version is `phase04-evidence-assessor-prompt-0.3` / `0.3` (prompt identity `a8a0d8b544df10120cd2de126e5d1f6cc03fd364535da7cb6a12df781a7f2505`, execution-config `ee839f755e0bba7450ace072640c610bfb259e240bc614428505442daf33d50b`).
+- **Recovery Attempt #1 (2026-09-20 12:41)**: stopped at Q011 on the old assessor contract after one consumed assessor occurrence under `.local/p04-targeted-semantic-gate-recovery-20260920-124155`. That occurrence is not retroactively accepted as semantic evidence.
+- **Recovery Attempt #2 (2026-09-20 22:56)**: under `.local/p04-targeted-semantic-gate-recovery-20260920-225645-72d9270772e0`. Q011 was the first `RemoteDisconnected` mechanical failure with no response/parser artifact; external controller erroneously continued. Q015-Q068 are diagnostic-only; Q052 recorded second diagnostic `RemoteDisconnected`; seven v0.3 responses were parse-valid but occurred after the violated stop boundary. All nine parent occurrences were reused with zero repeated work.
+- **Execution-Control & Transport Repair**: ACTUAL REVIEW PASS (batch stop propagation, producer-to-validator consistency, replay dual identity, Bailian/Qwen embedding failure normalization, accounting completeness). Blocker for a new recovery is NONE. Any future recovery requires a new unique output root, immutable-parent reuse, current v0.3 assessor, and explicit authorization; another recovery is NOT authorized. Block B semantic improvement and adoption remain UNKNOWN, NOT ACCEPTED, and non-production.
