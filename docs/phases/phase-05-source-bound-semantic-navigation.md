@@ -101,6 +101,41 @@ It does not prove real-provider extraction quality, automatic semantic assertion
 correctness, corpus-scale hierarchy/graph quality, final-answer improvement,
 Q058 repair, or production/default adoption.
 
+## P05-Navi-E1 local exploration boundary
+
+E1 is an opt-in, provider-free tool and evidence-wiring experiment, not an
+Agent or a production selector. Local lexical search reuses existing scoring;
+RU reads verify the bound Canonical manifest/record and the deterministic RU
+projection. Context is limited to requested units and explicit same-component
+ordinal neighbors. Dialogue graphs remain source structure, without inferred
+speaker/branch semantics. Truncation and omitted ranges must remain visible;
+partial receipts cannot receive E1 active review acceptance.
+
+Recorded actions persist request identity, completed responses, read receipts,
+unverified clues and hard round/search/read/candidate/context budgets. Context
+counts the serialized Unicode characters of complete delivered tool responses,
+including metadata. Recovery requires identical inputs, policy and decisions;
+completed actions are not reissued. This local-only replay contract authorizes
+no provider transport or provider recovery behavior.
+
+Navigation groups are topic items only. Explicit human review binds the exact
+group and completed checkpoint, records source qualification and narrative
+caveats, and may result in `curated_recorded`. Missing reviews remain inactive.
+An explicit mechanical-fixture opt-in permits `accepted_for_fixture_test`
+only; it never substitutes for human semantic acceptance or production
+eligibility. The real-source smoke uses this fixture route and produces a
+separate pending human-review request.
+
+Optional scoped RU/Assembly loading verifies the complete artifact and retains
+all occurrences of selected records. Scope is recorded in the prepared-context
+build manifest and exposed by the E1 wiring audit; it is not a field in the
+formal Packet build projection and is not a new corpus identity. The navigation
+RU index must include scoped page companions that unchanged Formal Deferred
+Assembly may expose. The experiment reports baseline overlap, search hits, read
+sources, Assembly input, formal admission dispositions and final Packet
+visibility separately. It makes no relevance, model-autonomy or answer-
+improvement claim.
+
 ## P05-W2-U1 provider-free boundary
 
 The first W2 implementation work unit is provider-free. It materializes a

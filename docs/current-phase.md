@@ -7,13 +7,23 @@ its detailed lookup-only archive is linked there and is not current authority.
 
 ## Active phase and work unit
 
-The current authorized work unit is provider-free evidence preparation for a
-small semantic-quality review over the immutable 2026-10-04 historical-200
-atomic outputs. The 6+6 research/validation packet is prepared at the new
-evidence root referenced below. This work preserves mechanical verdicts and
-source/output identities without assigning semantic labels. It authorizes no
-provider/network calls, reruns, repairs, production contract changes, semantic
-acceptance, or push.
+The user-authorized P05-Navi-E1 work unit implements provider-free local
+exploration tools, recorded/fake decisions, replay checkpoints, explicit review
+projection to topic hierarchy, and isolated P05-W1/Formal Deferred wiring.
+Its scope is tool/evidence mechanics only: no model/API/network calls, no KG
+relations, no production/default changes, no commit/push, and no E2 execution.
+The implementation and evidence are recorded at
+`docs/research/phase-05/p05-navi-e1-tools-wiring-20261011.md`.
+Focused checks passed 102/102; the real-source r3 smoke passed with one novel
+direct navigation RU visible in the final Packet. Human semantic review remains
+PENDING: unreviewed output is inactive and the smoke's active view is explicitly
+`accepted_for_fixture_test`, never curated or production accepted. The immediate
+next action is user review; model autonomy, relevance, answer gain and E2 remain
+UNKNOWN / NOT AUTHORIZED.
+
+The preceding provider-free historical-200 6+6 quality-review evidence packet
+remains prepared and unchanged. Its evidence preparation assigned no semantic
+labels, and no historical rerun, repair or semantic acceptance follows from E1.
 
 The preceding user-authorized semantic-batch runtime work unit added
 provider-free rate control to the existing immutable concurrent runner. It
@@ -108,7 +118,9 @@ The unified historical-200 audit therefore records 9 pure-media omissions,
 Lineage and hashes are recorded in
 `D:/Batch4_review/p05-w2-atomic-inventory-audit-20261004-r1/lineage-audit.json`.
 These source-quote and predicate failures keep v0.7 inventory validation open;
-compact navigation plus official RU backcheck is not yet authorized.
+compact navigation of that historical inventory plus official RU backcheck remains
+unauthorized. The separately authorized E1 tools/recorded real-source fixture
+does not repair, consume or promote the historical-200 inventory.
 Production/default selectors and the Full Semantic Build remain unchanged.
 
 P05-W1 implementation is MECHANICAL CONTRACT PASS, with actual-review
@@ -117,7 +129,8 @@ visibility, hierarchy hop/node/edge/candidate bounds and route audit evidence,
 and deterministic build
 identity. Its checked-in
 fixture is a provider-free contract fixture, not a real Genshin story slice;
-real-story-slice acceptance remains OPEN. The approved P05-W2-U1 provider-free
+real-story mechanical smoke is complete, while real-story semantic/product
+acceptance remains OPEN. The approved P05-W2-U1 provider-free
 projection, source-unit profiling, bounded sample, semantic-output envelope,
 and identity/accounting contract is COMPLETE. The corrected immutable artifact
 root is `data/retrieval/p05-w2-u1-provider-free-20260922-r5` (semantic build

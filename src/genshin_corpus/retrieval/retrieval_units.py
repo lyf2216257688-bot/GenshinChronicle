@@ -859,10 +859,25 @@ def load_retrieval_units(
     build_manifest_path: Path,
     *,
     timings: dict[str, float] | None = None,
+    selected_unit_ids: Iterable[str] | None = None,
+    selected_record_ids: Iterable[str] | None = None,
 ) -> tuple[Mapping[str, Any], list[Mapping[str, Any]]]:
-    """Load a completed RU artifact and verify every recorded content hash."""
+    """Load a completed RU artifact and verify every recorded content hash.
+
+    Optional scope verifies/scans the same complete artifact but retains only
+    requested occurrences or complete records. Its read_scope is explicit;
+    this is a lookup, not a new RU build or a production selector.
+    """
 
     build_manifest_path = Path(build_manifest_path)
+    if selected_unit_ids is not None and selected_record_ids is not None:
+        raise RetrievalUnitError("select units or records, not both")
+    selected = selected_unit_ids if selected_unit_ids is not None else selected_record_ids
+    if isinstance(selected, (str, bytes)):
+        raise RetrievalUnitError("scoped selection requires an identity collection")
+    scope = None if selected is None else set(selected)
+    if scope is not None and (not scope or any(not isinstance(v, str) or not v for v in scope)):
+        raise RetrievalUnitError("scoped RU selection must contain non-empty identities")
     manifest_started = perf_counter()
     manifest = _read_json(build_manifest_path, "Retrieval Unit manifest")
     if timings is not None:
@@ -893,8 +908,29 @@ def load_retrieval_units(
         return descriptor, path, body
 
     descriptor, path, _ = artifact_body("retrieval_units")
-    rows = _read_gzip_jsonl(path, "Retrieval Unit artifact", timings=timings, timing_key="retrieval_units_decompress_and_parse")
-    if descriptor.get("row_count") != len(rows):
+    if scope is None:
+        rows = _read_gzip_jsonl(path, "Retrieval Unit artifact", timings=timings, timing_key="retrieval_units_decompress_and_parse")
+        observed_count = len(rows)
+    else:
+        rows = []
+        observed_count = 0
+        found: set[str] = set()
+        seen_unit_ids: set[str] = set()
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for observed_count, line in enumerate(handle, 1):
+                row = _mapping(json.loads(line), "scoped RU row")
+                if row.get("schema_version") != RETRIEVAL_UNIT_SCHEMA_VERSION or not isinstance(row.get("unit_id"), str):
+                    raise RetrievalUnitError(f"invalid Retrieval Unit row {observed_count}")
+                if row["unit_id"] in seen_unit_ids:
+                    raise RetrievalUnitError("duplicate Retrieval Unit identity")
+                seen_unit_ids.add(row["unit_id"])
+                key = row["unit_id"] if selected_unit_ids is not None else row.get("source", {}).get("canonical_address", {}).get("record_id")
+                if key in scope:
+                    rows.append(row)
+                    found.add(key)
+        if found != scope:
+            raise RetrievalUnitError("scoped RU identities absent from verified snapshot")
+    if descriptor.get("row_count") != observed_count:
         raise RetrievalUnitError("Retrieval Unit artifact accounting mismatch")
     skip_descriptor, skip_path, _ = artifact_body("skip_ledger")
     skips = _read_gzip_jsonl(skip_path, "Retrieval Unit skip ledger", timings=timings, timing_key="skip_ledger_decompress_and_parse")
@@ -913,4 +949,7 @@ def load_retrieval_units(
             raise RetrievalUnitError(f"invalid Retrieval Unit row {index}")
     if timings is not None:
         timings["row_validation"] = perf_counter() - row_validation_started
+    if scope is not None:
+        manifest = dict(manifest)
+        manifest["read_scope"] = {"unit_ids" if selected_unit_ids is not None else "record_ids": sorted(scope), "retained_row_count": len(rows), "verified_artifact_row_count": observed_count}
     return manifest, rows

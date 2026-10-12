@@ -9,6 +9,7 @@ Packet.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
 from collections import defaultdict
@@ -172,6 +173,7 @@ class _PreparedAssemblyState:
     dialogue_neighbors: Mapping[tuple[Any, ...], Mapping[str, tuple[str, ...]]]
     canonical_input_json: bytes
     retrieval_unit_schema_version: Any
+    read_scope_json: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, eq=False)
@@ -195,6 +197,7 @@ class PreparedAssemblyContext:
             "build_identity": self.retrieval_unit_build_identity,
             "canonical_input": json.loads(state.canonical_input_json),
             "retrieval_unit_schema_version": state.retrieval_unit_schema_version,
+            **({"read_scope": json.loads(state.read_scope_json)} if state.read_scope_json is not None else {}),
         })
 
 
@@ -417,14 +420,20 @@ def prepare_evidence_assembly_context(
     retrieval_unit_manifest_path: Path,
     *,
     diagnostics: EvidenceAssemblyDiagnostics | None = None,
+    selected_record_ids: Iterable[str] | None = None,
 ) -> PreparedAssemblyContext:
-    """Load and validate one RU snapshot, then build query-independent lookups."""
+    """Load and validate one RU snapshot, then build query-independent lookups.
+
+    An explicit record scope retains all RU occurrences of selected pages and
+    exposes the scope in build_manifest. The default remains the full snapshot.
+    """
 
     started = perf_counter()
     load_started = perf_counter()
     build_manifest, units = load_retrieval_units(
         retrieval_unit_manifest_path,
         timings=None if diagnostics is None else diagnostics.preparation_seconds,
+        selected_record_ids=selected_record_ids,
     )
     if diagnostics is not None:
         diagnostics.preparation_seconds["load_and_validate"] = perf_counter() - load_started
@@ -499,8 +508,24 @@ def prepare_evidence_assembly_context(
         dialogue_neighbors=MappingProxyType({key: MappingProxyType(value) for key, value in dialogue_neighbors.items()}),
         canonical_input_json=canonical_input_json,
         retrieval_unit_schema_version=build_manifest.get("retrieval_unit_schema_version"),
+        read_scope_json=canonical_json_bytes(build_manifest["read_scope"]) if "read_scope" in build_manifest else None,
     )
     return context
+
+
+def retrieval_unit_ids(prepared_context: PreparedAssemblyContext) -> tuple[str, ...]:
+    """Source IDs in this verified context, including scoped page companions."""
+    return tuple(_prepared_state(prepared_context).units_by_id)
+
+
+def retrieval_unit_records(
+    prepared_context: PreparedAssemblyContext, unit_ids: Iterable[str],
+) -> dict[str, Mapping[str, Any]]:
+    """Detached rows for bounded downstream source-binding checks."""
+    requested = list(unit_ids)
+    retrieval_unit_texts(prepared_context, requested)
+    state = _prepared_state(prepared_context)
+    return {unit_id: deepcopy(state.units_by_id[unit_id]) for unit_id in requested}
 
 
 def retrieval_unit_texts(

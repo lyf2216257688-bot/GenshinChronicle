@@ -28,7 +28,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   source-bound semantic-build/view primitives; lexical, local Dense, and
   deterministic candidate retrieval; reranking adapters/primitives
   and rank fusion; Formal Deferred Evidence Assembly; and rebuildable local
-  materialization, comparison, parity, and bounded research tooling. The
+  materialization, comparison, parity, and bounded research tooling.
+  `navi_exploration.py` owns the local E1 search/source-read tools and explicit
+  review-to-topic projection. The
   existence of an experiment runner does not authorize its execution, and an
   adapter's existence does not establish the current default. It owns no UI
   lifecycle or Generation provider contract, is not a serving system, and does
@@ -46,6 +48,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   opt-in targeted-gate assessor adapter/parser and review persistence seam;
   these remain evaluation mechanics only and are not the production/default
   path. Phase 05 navigation orchestration and route lineage live here; the
+  E1 recorded exploration/checkpoints and the opt-in real-source mechanical
+  smoke also live here; they contain no model transport or production Agent. The
   package does not redefine semantic candidate/admission or Assembly policies
   owned by `retrieval/`, and it does not redefine provider contracts owned by
   `generation/`.
