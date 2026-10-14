@@ -197,10 +197,12 @@ class GteFull70GateTests(unittest.TestCase):
 
     def test_manifest_run_identity_must_be_present(self):
         manifest = self._manifest(())
-        manifest["model"] = gate._expected_model_identity()
+        dummy_model = {"model": gate.MODEL_ID, "revision": gate.MODEL_REVISION}
+        manifest["model"] = dummy_model
         manifest["run_identity"] = ""
-        with self.assertRaisesRegex(gate.GteFull70GateError, "run identity mismatch"):
-            gate._validate_recovery_manifest(self.root, manifest)
+        with patch.object(gate, "_expected_model_identity", return_value=dummy_model):
+            with self.assertRaisesRegex(gate.GteFull70GateError, "run identity mismatch"):
+                gate._validate_recovery_manifest(self.root, manifest)
 
     def test_source_is_offline_local_only_and_has_no_online_fallback_or_default_change(self):
         source = Path(gate.__file__).read_text(encoding="utf-8")

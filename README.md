@@ -10,6 +10,7 @@ Official sources
     -> Parsed
     -> Canonical
     -> Retrieval / RAG
+    -> Source-Bound Semantic Navigation
 ```
 
 The project intentionally separates:
@@ -23,12 +24,11 @@ Those are different layers and must not be collapsed into one schema.
 ## Current status
 
 Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
-**CLOSED**. Phase 04's first end-to-end RAG baseline is implemented,
-materialized, and measured over the accepted 16,437-record OBC `zh-cn`
-Canonical snapshot. It includes Retrieval Units, BM25, accepted Qwen Dense,
-RRF
-Hybrid, deterministic Evidence Assembly, Evidence Packets, and
-provider-neutral Generation contracts.
+**CLOSED**. Phase 04 Block A is **CLOSED / FROZEN / ADOPTED** per `docs/current-phase.md`
+over the accepted 16,437-record OBC `zh-cn` Canonical snapshot. It includes
+Retrieval Units, BM25, accepted Qwen Dense, RRF Hybrid, deterministic Evidence
+Assembly, Evidence Packets, and provider-neutral Generation contracts.
+Phase 05 — Source-Bound Semantic Navigation is the **ACTIVE** phase.
 
 Read `docs/current-phase.md` for the sole current production/default Dense,
 historical challenger, reranker, attribution, authorization, and immediate-next
@@ -38,6 +38,7 @@ Start here:
 
 - `AGENTS.md` — repository-wide working rules for Codex
 - `docs/current-phase.md` — current status and immediate next action
+- `docs/phases/phase-05-source-bound-semantic-navigation.md` — Phase 05 semantic navigation boundary and RU candidate contract
 - `docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md` — Phase 04 RAG v1 contract and historical plan
 - `docs/research/phase-04/p04-rag-historical-checkpoint-register.md` — compact Phase 04 checkpoint index and evidence pointers
 - `docs/architecture-overview.md` — long-term architecture, intentionally high-level
@@ -60,10 +61,13 @@ docs/
 │   ├── phase-01-raw-collection.md
 │   ├── phase-02-parsed-schema.md
 │   ├── phase-03-canonical-schema.md
-│   └── phase-04-*.md
+│   ├── phase-04-*.md
+│   └── phase-05-source-bound-semantic-navigation.md
 ├── research/
 │   ├── phase-01/
-│   └── phase-04/
+│   ├── phase-03/
+│   ├── phase-04/
+│   └── phase-05/
 └── decisions/
     └── README.md
 
@@ -79,7 +83,10 @@ src/
 
 data/
 ├── README.md
-└── raw/
+├── raw/
+├── parsed/
+├── canonical/
+└── retrieval/
 
 tests/
 ├── collector/
@@ -104,14 +111,14 @@ generated-data roots; the latter is not a serving-system contract.
 The local Streamlit frontend is an optional presentation layer over the
 single-question RAG backend. The default local-BGE production path must use
 the validated Python 3.12 runtime at
-`D:\GenshinChronicle\.local\gte-reranker-runtime\Scripts\python.exe`, which
+`.\.local\gte-reranker-runtime\Scripts\python.exe`, which
 contains Streamlit `1.63.0`. Expose `src` on `PYTHONPATH`, provide the pinned
 local BGE snapshot, leave the reranker selector unset, and run:
 
 ```powershell
-$runtime = 'D:\GenshinChronicle\.local\gte-reranker-runtime\Scripts\python.exe'
+$runtime = '.\.local\gte-reranker-runtime\Scripts\python.exe'
 $env:PYTHONPATH = (Resolve-Path src)
-$env:GENSHIN_BGE_RERANKER_MODEL_ROOT = 'D:\GenshinChronicle\.local\models\bge-reranker-v2-m3\953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e'
+$env:GENSHIN_BGE_RERANKER_MODEL_ROOT = (Resolve-Path '.\.local\models\bge-reranker-v2-m3\953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e')
 Remove-Item Env:GENSHIN_RERANKER_BACKEND -ErrorAction SilentlyContinue
 & $runtime -m streamlit run src/genshin_corpus/ui/streamlit_app.py
 ```

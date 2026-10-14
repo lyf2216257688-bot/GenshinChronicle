@@ -11,8 +11,8 @@ features are optional layers, not requirements of the foundational phases.
 SOURCE / RAW
     -> PARSED
     -> CANONICAL
-    -> DERIVED RETRIEVAL
-    -> RAG query-time answers
+    -> DERIVED RETRIEVAL / RAG
+    -> SOURCE-BOUND SEMANTIC NAVIGATION
 ```
 
 ### 1. Source / Raw

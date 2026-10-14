@@ -53,7 +53,7 @@ semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **active; first end-to-end baseline implemented and measured**
+Status: **closed / adopted (Block A adopted per `docs/current-phase.md`)**
 
 The first end-to-end baseline now includes rebuildable Retrieval Units,
 BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence

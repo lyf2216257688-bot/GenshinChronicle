@@ -1,5 +1,9 @@
 # Phase 03 Batch 5A — Representative Acceptance Evidence
 
+> Historical research note: records Batch 5A small-sample evidence.
+> Batch 5B and Phase 03 Canonical Corpus (16,437 records) were subsequently fully closed and adopted.
+> Current production status is owned solely by `docs/current-phase.md`.
+
 This note records small-sample acceptance evidence for the completed Phase 03
 Canonical contracts, OBC projector, and local run pipeline. It is evidence for
 Batch 5A only; it does not change the project-status owner in

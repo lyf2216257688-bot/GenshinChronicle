@@ -333,6 +333,29 @@ mention. v3 provider-free preflight and replay pass with zero formal/provider/
 network calls. This is a contract and omission-risk repair, not semantic
 acceptance or a model benchmark.
 
+The opt-in experiment `phase05-w2-b-json-object-0.4` introduces prompt version
+`phase05-w2-b-json-object-prompt-0.4`. It defines a bounded stage inventory task
+instructing the extractor to build a complete inventory of every independently
+stated, source-supported record across topics, mentions, facts, events, and
+relations while preserving material changes.
+
+The opt-in experiment `phase05-w2-b-json-object-0.5` introduces prompt version
+`phase05-w2-b-json-object-prompt-0.5`. It bounds the inventory to independently
+navigable claims, scanning every supplied stage completely to extract concrete
+topics, identities, goals, state changes, events, explicit relationships, and
+epistemically qualified facts, avoiding fragmenting every descriptive or poetic
+clause into a standalone item while maintaining complete stage review recall.
+Both v4 and v5 operate under the unchanged output schema and
+`local_strict_json_schema_source_binding_minimality` acceptance authority.
+
+### Navi E2 exploration checkpoint status
+
+As authoritative in `docs/current-phase.md`, autonomous exploration under P05-Navi-E2
+is paused and checkpointed at `main@b5ffbb6`. E1 mechanical tool wiring passed
+completely; E2 cumulative issued 5 calls (4 terminals, 1 unresolved recorded as
+`EXECUTION UNKNOWN` with reissue prohibited). No further provider or network
+calls are authorized in this paused state.
+
 ## Historical TokenMetro SDK retry and resume contract
 
 Formal Phase 05 TokenMetro Chat Completions execution uses the official

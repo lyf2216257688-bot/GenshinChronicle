@@ -41,3 +41,10 @@ Prefer evidence gathering and implementation over accumulating ADRs. API
 discoveries and scoped experiment results belong in the applicable research
 note until verified and promoted into a durable phase contract or an ADR when
 the decision is costly or hard to reverse.
+
+## ADR Index
+
+| ADR | Title | Status | Date | Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| [ADR-0001](adr-0001-obc-content-id-contract.md) | MiHoYo OBC `content_id` Stable Content Key Contract | accepted | 2026-09-15 | Phase 01 / Raw Acquisition |
+

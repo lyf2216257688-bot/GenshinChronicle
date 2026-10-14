@@ -26,8 +26,8 @@ Dense document embeddings 与 row mapping，随后在 frozen benchmark-v0.3 上
 - Dense evaluation SHA-256:
   `e758096daf385099fd0588e466430033d0a0e52787c9be6e56b3d1987ac0da5f`
 
-The evaluator was `D:\GenshinChronicle\.local\w6_dense_evaluate.py`, run with
-`D:\python\python.exe` and `.local\w6-runtime`. It used
+The evaluator was `.\.local\w6_dense_evaluate.py`, run with
+`python` and `.local\w6-runtime`. It used
 `local_files_only=True`, the query-only instruction
 `为这个句子生成表示以用于检索相关文章：`，FP32 L2-normalized query vectors,
 and existing document vectors only.

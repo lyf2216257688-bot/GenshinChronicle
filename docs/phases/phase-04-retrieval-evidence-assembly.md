@@ -1,6 +1,6 @@
 # Phase 04 — Retrieval / Evidence Assembly
 
-Status: **ACTIVE — durable Phase 04 architecture boundary and historical
+Status: **CLOSED / FROZEN (Block A adopted per docs/current-phase.md) — durable Phase 04 architecture boundary and historical
 P04-W1 contract; current work-unit status is owned by
 `docs/current-phase.md`**
 

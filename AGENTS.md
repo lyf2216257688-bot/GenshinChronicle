@@ -4,9 +4,12 @@
 Build a reliable, auditable research corpus for official Genshin Impact text.
 The long-term pipeline is:
 
-`Raw -> Parsed -> Canonical -> Retrieval/RAG`
+`Raw -> Parsed -> Canonical -> Retrieval/RAG -> Source-Bound Semantic Navigation`
 
-AI Semantic / Knowledge layers are explicitly deferred until real corpus data and RAG results justify them.
+Derived layers must remain strictly grounded in verified source evidence. High-level
+semantic exploration is permitted only within approved, bounded phase contracts;
+unconstrained global claim extraction, ungrounded knowledge graphs, and treating
+model interpretations as canonical facts remain prohibited.
 
 ## Active scope
 
@@ -26,24 +29,34 @@ If a requested task conflicts with the active phase, stop and call out the confl
 
 ## Layer boundaries
 
-Parsed remains source-specific, deterministic, and auditable. It preserves
-meaningful source structure, ordering, hierarchy, Raw traceability, and
-unsupported/unknown content.
-
-Canonical may establish a stable research document representation only within
-the approved current-phase contract. It must preserve traceability through
-Parsed to Raw, keep source evidence separate from semantic normalization, and
-must not silently invent identity, provenance, content role, dialogue
-semantics, or semantic equivalence.
+- **Parsed**: source-specific, deterministic, and auditable. It preserves
+  meaningful source structure, ordering, hierarchy, Raw traceability, and
+  unsupported/unknown content.
+- **Canonical**: establishes a stable research document representation within
+  the approved contract. It must preserve traceability through Parsed to Raw,
+  keep source evidence separate from semantic normalization, and must not
+  silently invent identity, provenance, content role, dialogue semantics, or
+  semantic equivalence.
+- **Derived Retrieval / RAG**: Retrieval Units and Evidence Packets derive
+  citation and evidence identity from Canonical lineage, not embedding chunk
+  identity. Evidence Packets are provider-neutral, deterministic evidence
+  interfaces; Generation consumes them without owning retrieval or assembly policy.
+  RAG answers are query results and must not automatically become Canonical facts.
+- **Semantic Navigation**: derived views (such as hierarchy navigation and
+  event/relation graphs) remain non-authoritative structures grounded strictly
+  in verified Retrieval Units and Canonical lineage. Model quotes or claims do
+  not constitute provenance; navigation traces are audit data and are not
+  Generation-visible input. Model outputs or navigation traces must never
+  contaminate Canonical evidence.
 
 ## Hard constraints
-Raw/Collector constraints below remain binding whenever Raw acquisition or Collector behavior is touched, even though Phase 01 is closed.
+Raw/Collector constraints below remain binding whenever Raw acquisition or Collector behavior is touched, regardless of active phase.
 
 - Raw API responses are immutable evidence: do not rewrite, normalize, prune, or overwrite them.
 - Locale must remain configurable and must not be hard-coded; current production locale/source are owned by `docs/current-phase.md`.
 - Discover from official structures: channel tree -> channel listings -> content inventory -> detail responses.
 - Do not brute-force candidate content identifiers (including historically observed `content_id` values).
-- Treat the stable retrievable content key as evidence-driven: it must come from a contract verified and promoted into the current Phase specification. Phase 01 currently uses the verified `content_id` contract; do not treat that as a permanent assumption about future API versions.
+- Treat the stable retrievable content key as evidence-driven: it must come from a verified contract promoted into the phase specification (such as the verified `content_id` contract); do not treat that as a permanent assumption about future API versions.
 - Within one crawl run/content inventory, if the same verified stable content key belongs to multiple channels, fetch its detail once and preserve all channel memberships. This is run-level deduplication only: later crawl runs must be allowed to observe/fetch the item again so source changes can be detected.
 - Preserve discovery responses as Raw data, not only final detail responses.
 - Support resumability, bounded retry, explicit failure records, and an auditable run manifest.
@@ -57,34 +70,28 @@ Raw/Collector constraints below remain binding whenever Raw acquisition or Colle
   disposition in an auditable form; silent evidence destruction and invented semantics are
   not permitted.
 
-## Deferred and separately authorized layers
+## Out-of-scope and separately authorized layers
 
-Phase 04 Retrieval, Evidence Assembly, and provider-neutral Generation
-contracts exist. Do not treat that implementation as authority to freeze or
-expand adjacent layers. Unless the current phase explicitly authorizes them,
-do **not** prematurely implement or freeze:
+Existing implementations and active phase experiments do not constitute authority to expand adjacent layers. Unless explicitly authorized by the active phase specification and approved in `docs/current-phase.md`, do **not** prematurely implement or freeze:
 
-- Canonical entity or alias normalization
-- a production Dense model switch or new embedding operating point
-- vector databases, ANN, or rerankers
-- Retrieval/RAG reruns, optimization, or prompt/provider expansion
-- AI semantic / claim extraction
-- knowledge graph / semantic layer
-- UI
+- Global entity or alias normalization across distinct sources or snapshots
+- Vector databases, ANN serving engines, or external serving infrastructures
+- Arbitrary model switches, unverified prompt/provider expansions, or unauthorized retrieval operating points
+- Unconstrained global claim extraction or ungrounded knowledge graphs
+- Complex full-stack serving UI beyond repository presentation tools
+- Autonomous unconstrained web agents or unmonitored crawler runs
+- Promoting AI-generated assertions, interpretations, or RAG answers to Canonical status
 
-Source/upstream evidence remains preserved and auditable by its owner; each
-derived layer follows its explicit contract. Unsupported or non-indexable
-material may be skipped only through explicit audited, fail-closed handling.
-Never guess unsupported semantics or silently discard material whose contract
-requires accounting.
+Source and upstream evidence remain preserved and auditable by their respective owners; each derived layer follows its explicit, fail-closed contract. Unsupported or non-indexable material may be skipped only through explicit audited handling. Never guess unsupported semantics or silently discard material whose contract requires accounting.
 
-Future directories or abstractions should not be created merely because they appear in the long-term architecture.
+Future directories, abstractions, or layers must not be created merely because they appear in the long-term architecture overview.
 
 ## Documentation maintenance
 
 - One fact has one primary documentation owner. `docs/current-phase.md` owns
-  concise present state; phase specifications own durable phase contracts; and
-  research notes own scoped experiment and review facts.
+  concise present state and serves as the Project Documentation Router; phase
+  specifications own durable phase contracts; and research notes own scoped
+  experiment and review facts.
 - When a cohesive work unit changes current phase/status, production/default
   behavior, authorization/adoption, durable architecture, repository layout or
   package responsibility, or data-root responsibility, identify and update

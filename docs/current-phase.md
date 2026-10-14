@@ -6,16 +6,16 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: `main@b5ffbb6` (2026-10-12, `phase05: checkpoint Navi E2 partial exploration`).
-- **Working Tree Baseline**: Checkpoint `b5ffbb6` plus known user `.gitignore` delta (`/%SystemDrive%/`, `/codex-temp-locked/`, `/p01ea-test-temp/`, `/tmp*/`). Fresh Git status check required before any state-changing operations.
+- **Current Checkpoint**: `main@e529bbb` (2026-10-12, `docs: establish project memory router v1`).
+- **Working Tree Baseline**: Checkpoint `e529bbb` plus known user `.gitignore` delta (`/%SystemDrive%/`, `/codex-temp-locked/`, `/p01ea-test-temp/`, `/tmp*/`). Fresh Git status check required before any state-changing operations.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Project Memory Router v1 closure** (Slimming current authority to concise state, establishing repository documentation router, and archiving unique historical evidence without duplication).
-- **Immediate Next Action**: Complete and verify Project Memory Router v1 closure (mechanical test pass, diff/hygiene check, and commit readiness).
+- **Active Work Unit**: **Documentation Audit & Hygiene Remediation** (Resolving governance friction, reconciling phase documentation, and maintaining test/corpus integrity; Project Memory Router v1 closed at `e529bbb`).
+- **Immediate Next Action**: Complete and verify documentation audit remediations (P0–P1 items, test suite 100% pass, and git hygiene).
 
 ### Paused Product Workstream (P05-Navi-E2)
 - **Scope**: Single-case DeepSeek-driven source exploration from `3429:s7:u3`.
