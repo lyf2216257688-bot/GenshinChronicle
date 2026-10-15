@@ -389,18 +389,20 @@ def build_atomic_inventory_manifest(
     source_identity = gate_manifest["contract"].get("source_identity")
     if not isinstance(source_identity, str) or not source_identity:
         raise ValueError("v5 gate source identity is missing")
+    operating = gate_manifest["contract"]["operating_point"]
+    primary_config = operating.get("primary_route_config", {"api_surface": "responses"})
+    fallback_config = operating.get("fallback_route_config", {"api_surface": "chat_completions"})
+    if primary_config.get("api_surface") != "responses":
+        raise ValueError("new atomic inventory manifest requires primary route Responses API surface")
     rows = []
     for unit in selected:
         messages = [
             {"role": "system", "content": canonical_json_bytes(prompt).decode("utf-8")},
             {"role": "user", "content": canonical_json_bytes(unit["payload"]).decode("utf-8")},
         ]
-        operating = gate_manifest["contract"]["operating_point"]
         logical_body = {"model": operating["model"], "messages": messages,
                         "max_tokens": operating["max_tokens"], "stream": True,
                         **operating["generation_parameters"]}
-        primary_config = operating.get("primary_route_config", {"api_surface": "chat_completions"})
-        fallback_config = operating.get("fallback_route_config", {"api_surface": "chat_completions"})
         body = _wire_body_for_surface(logical_body, primary_config["api_surface"])
         fallback_body = _wire_body_for_surface(logical_body, fallback_config["api_surface"])
         request_identity = sha256_json({
@@ -446,6 +448,11 @@ def build_historical_atomic_inventory_manifest(
     expected_source = gate_manifest["contract"].get("source_identity")
     if historical_contract.get("source_identity") != expected_source:
         raise ValueError("historical source identity differs from current semantic build")
+    operating = gate_manifest["contract"]["operating_point"]
+    primary_config = operating.get("primary_route_config", {"api_surface": "responses"})
+    fallback_config = operating.get("fallback_route_config", {"api_surface": "chat_completions"})
+    if primary_config.get("api_surface") != "responses":
+        raise ValueError("historical atomic inventory manifest requires primary route Responses API surface")
     source_manifest = json.loads(current_source_manifest_path.read_bytes())
     if not isinstance(source_manifest.get("semantic_build_identity"), str):
         raise ValueError("current source manifest semantic build identity is missing")
@@ -537,7 +544,6 @@ def build_historical_atomic_inventory_manifest(
                 "provider_payload": payload,
             }
     prompt = atomic_inventory_prompt_contract()
-    operating = gate_manifest["contract"]["operating_point"]
     rows = []
     for old_unit, request_path, payload, sid in request_rows:
         current = current_units[sid]
@@ -552,8 +558,6 @@ def build_historical_atomic_inventory_manifest(
         logical_body = {"model": operating["model"], "messages": messages,
                         "max_tokens": operating["max_tokens"], "stream": True,
                         **operating["generation_parameters"]}
-        primary_config = operating.get("primary_route_config", {"api_surface": "chat_completions"})
-        fallback_config = operating.get("fallback_route_config", {"api_surface": "chat_completions"})
         body = _wire_body_for_surface(logical_body, primary_config["api_surface"])
         fallback_body = _wire_body_for_surface(logical_body, fallback_config["api_surface"])
         request_identity = sha256_json({
@@ -923,6 +927,10 @@ def main() -> None:
         manifest = load_atomic_inventory_manifest(args.manifest)
         contract = manifest["contract"]
         operating = contract["operating_point"]
+        if operating.get("primary_route_config", {}).get("api_surface") != "responses":
+            raise ValueError("atomic-run requires primary route Responses API surface; chat_completions is not authorized for new runs")
+        if os.environ.get("TOKENMETRO_API_SURFACE") == "chat_completions":
+            raise ValueError("atomic-run requires runtime Responses API surface; chat_completions is not authorized for new runs")
         for route, key in (("tokenmetro", "primary_route_config"), ("jizhi", "fallback_route_config")):
             if route_profile(route, os.environ, require_environment=True).safe_dict() != operating[key]:
                 raise ValueError("runtime route differs from frozen atomic operating point")
@@ -978,6 +986,10 @@ def main() -> None:
         manifest = load_two_stage_manifest(args.manifest)
         contract = manifest["contract"]
         operating = contract["operating_point"]
+        if operating.get("primary_route_config", {}).get("api_surface") != "responses":
+            raise ValueError("two-stage run requires primary route Responses API surface; chat_completions is not authorized for new runs")
+        if os.environ.get("TOKENMETRO_API_SURFACE") == "chat_completions":
+            raise ValueError("two-stage run requires runtime Responses API surface; chat_completions is not authorized for new runs")
         for route, key in (("tokenmetro", "primary_route_config"), ("jizhi", "fallback_route_config")):
             if route_profile(route, os.environ, require_environment=True).safe_dict() != operating[key]:
                 raise ValueError("runtime route differs from the frozen operating point")

@@ -115,13 +115,16 @@ class TwoStageExperimentTest(unittest.TestCase):
         def handler(request):
             body = json.loads(request.content)
             calls.append(body)
-            self.assertEqual(body["max_tokens"], 300000)
-            self.assertEqual(json.loads(body["messages"][1]["content"])["segments"], self.payload["segments"])
-            self.assertIn("two_stage_context", json.loads(body["messages"][1]["content"]))
-            chunk = {"id": "mock", "object": "chat.completion.chunk", "model": "deepseek-v4.1-flash",
-                     "choices": [{"index": 0, "delta": {"content": json.dumps(self.inventory)}, "finish_reason": "stop"}],
-                     "usage": {"prompt_tokens": 1, "completion_tokens": 2}}
-            stream = ("data: " + json.dumps(chunk) + "\n\ndata: [DONE]\n\n").encode()
+            self.assertEqual(body["max_output_tokens"], 300000)
+            self.assertEqual(json.loads(body["input"])["segments"], self.payload["segments"])
+            self.assertIn("two_stage_context", json.loads(body["input"]))
+            events = [
+                {"type": "response.created", "response": {"id": "mock", "status": "in_progress"}},
+                {"type": "response.output_text.delta", "delta": json.dumps(self.inventory)},
+                {"type": "response.completed", "response": {"id": "mock", "status": "completed",
+                                                            "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}}},
+            ]
+            stream = b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in events) + b"data: [DONE]\n\n"
             return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream)
 
         result = run_sdk_route_pair(
@@ -248,6 +251,153 @@ class TwoStageExperimentTest(unittest.TestCase):
         self.assertEqual(manifest["contract"]["prompt"], prompt)
         self.assertEqual(manifest["contract"]["units"][0]["payload"], self.payload)
         self.assertEqual(manifest["contract"]["operating_point"]["max_tokens"], 300000)
+
+    def test_atomic_manifest_rejects_chat_completions_primary_surface(self):
+        gate_chat = deepcopy(self.gate)
+        gate_chat["contract"]["operating_point"]["primary_route_config"] = {"api_surface": "chat_completions"}
+        with patch("genshin_corpus.retrieval.semantic_two_stage_experiment.frozen_v5_gate_units", return_value=(gate_chat, [self.unit])):
+            with self.assertRaises(ValueError) as ctx:
+                build_atomic_inventory_manifest(gate_manifest_path=self.gate_path, gate_manifest=gate_chat, unit_indexes=(0,))
+            self.assertIn("requires primary route Responses API surface", str(ctx.exception))
+
+    def test_atomic_run_rejects_chat_completions_primary_surface(self):
+        from genshin_corpus.retrieval.semantic_two_stage_experiment import main
+        manifest_path = self.root / "chat_manifest.json"
+        manifest_content = {
+            "identity": "fake-id",
+            "contract": {
+                "schema_version": "phase05-w2-atomic-inventory-manifest-0.1",
+                "operating_point": {
+                    "model": "deepseek-v4.1-flash",
+                    "primary_route": "tokenmetro",
+                    "fallback_route": "jizhi",
+                    "primary_route_config": {"api_surface": "chat_completions"},
+                    "fallback_route_config": {"api_surface": "chat_completions"},
+                    "max_tokens": 1000,
+                    "timeout_seconds": 30.0,
+                    "generation_parameters": {},
+                },
+                "prompt": {},
+                "prompt_identity": "p-id",
+                "source_identity": "s-id",
+                "units": [],
+            }
+        }
+        manifest_path.write_bytes(canonical_json_bytes(manifest_content))
+        with patch("sys.argv", ["semantic_two_stage_experiment.py", "atomic-run", "--manifest", str(manifest_path), "--output-root", str(self.root / "atomic_out")]):
+            with patch("genshin_corpus.retrieval.semantic_two_stage_experiment.load_atomic_inventory_manifest", return_value=manifest_content):
+                with self.assertRaises(ValueError) as ctx:
+                    main()
+                self.assertIn("requires primary route Responses API surface", str(ctx.exception))
+
+    def test_two_stage_run_rejects_chat_completions_primary_surface(self):
+        from genshin_corpus.retrieval.semantic_two_stage_experiment import main
+        manifest_path = self.root / "two_stage_chat_manifest.json"
+        manifest_content = {
+            "identity": "fake-id",
+            "contract": {
+                "schema_version": "phase05-w2-two-stage-gate-manifest-0.1",
+                "operating_point": {
+                    "model": "deepseek-v4.1-flash",
+                    "primary_route": "tokenmetro",
+                    "fallback_route": "jizhi",
+                    "primary_route_config": {"api_surface": "chat_completions"},
+                    "fallback_route_config": {"api_surface": "chat_completions"},
+                    "max_tokens": 1000,
+                    "timeout_seconds": 30.0,
+                    "generation_parameters": {},
+                },
+                "stage_b": {"units": [], "prompt": {"version": "v2"}, "prompt_identity": "p-id"},
+            }
+        }
+        manifest_path.write_bytes(canonical_json_bytes(manifest_content))
+        with patch("sys.argv", ["semantic_two_stage_experiment.py", "run", "--manifest", str(manifest_path), "--output-root", str(self.root / "two_stage_out")]):
+            with patch("genshin_corpus.retrieval.semantic_two_stage_experiment.load_two_stage_manifest", return_value=manifest_content):
+                with self.assertRaises(ValueError) as ctx:
+                    main()
+                self.assertIn("requires primary route Responses API surface", str(ctx.exception))
+
+    def test_atomic_run_rejects_chat_completions_in_environment(self):
+        from genshin_corpus.retrieval.semantic_two_stage_experiment import main
+        manifest_path = self.root / "responses_manifest.json"
+        manifest_content = {
+            "identity": "fake-id",
+            "contract": {
+                "schema_version": "phase05-w2-atomic-inventory-manifest-0.1",
+                "operating_point": {
+                    "model": "deepseek-v4.1-flash",
+                    "primary_route": "tokenmetro",
+                    "fallback_route": "jizhi",
+                    "primary_route_config": {"api_surface": "responses"},
+                    "fallback_route_config": {"api_surface": "chat_completions"},
+                    "max_tokens": 1000,
+                    "timeout_seconds": 30.0,
+                    "generation_parameters": {},
+                },
+                "prompt": {},
+                "prompt_identity": "p-id",
+                "source_identity": "s-id",
+                "units": [],
+            }
+        }
+        manifest_path.write_bytes(canonical_json_bytes(manifest_content))
+        with patch.dict("os.environ", {"TOKENMETRO_API_SURFACE": "chat_completions"}):
+            with patch("sys.argv", ["semantic_two_stage_experiment.py", "atomic-run", "--manifest", str(manifest_path), "--output-root", str(self.root / "atomic_out2")]):
+                with patch("genshin_corpus.retrieval.semantic_two_stage_experiment.load_atomic_inventory_manifest", return_value=manifest_content):
+                    with self.assertRaises(ValueError) as ctx:
+                        main()
+                    self.assertIn("runtime Responses API surface", str(ctx.exception))
+
+    def test_two_stage_run_rejects_chat_completions_in_environment(self):
+        from genshin_corpus.retrieval.semantic_two_stage_experiment import main
+        manifest_path = self.root / "two_stage_responses_manifest.json"
+        manifest_content = {
+            "identity": "fake-id",
+            "contract": {
+                "schema_version": "phase05-w2-two-stage-gate-manifest-0.1",
+                "operating_point": {
+                    "model": "deepseek-v4.1-flash",
+                    "primary_route": "tokenmetro",
+                    "fallback_route": "jizhi",
+                    "primary_route_config": {"api_surface": "responses"},
+                    "fallback_route_config": {"api_surface": "chat_completions"},
+                    "max_tokens": 1000,
+                    "timeout_seconds": 30.0,
+                    "generation_parameters": {},
+                },
+                "stage_b": {"units": [], "prompt": {"version": "v2"}, "prompt_identity": "p-id"},
+            }
+        }
+        manifest_path.write_bytes(canonical_json_bytes(manifest_content))
+        with patch.dict("os.environ", {"TOKENMETRO_API_SURFACE": "chat_completions"}):
+            with patch("sys.argv", ["semantic_two_stage_experiment.py", "run", "--manifest", str(manifest_path), "--output-root", str(self.root / "two_stage_out2")]):
+                with patch("genshin_corpus.retrieval.semantic_two_stage_experiment.load_two_stage_manifest", return_value=manifest_content):
+                    with self.assertRaises(ValueError) as ctx:
+                        main()
+                    self.assertIn("runtime Responses API surface", str(ctx.exception))
+
+    def test_historical_atomic_manifest_rejects_chat_completions_primary_surface(self):
+        import gzip
+        from genshin_corpus.retrieval.semantic_two_stage_experiment import build_historical_atomic_inventory_manifest
+        hist_dir = self.root / "hist_run"
+        hist_dir.mkdir(parents=True, exist_ok=True)
+        (hist_dir / "manifest.json").write_bytes(canonical_json_bytes({"contract": {"source_identity": "fixture-source", "units": []}}))
+        source_dir = self.root / "source_dir"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        source_manifest = source_dir / "manifest.json"
+        source_manifest.write_bytes(canonical_json_bytes({"semantic_build_identity": "fixture-source"}))
+        (source_dir / "compilation_units.jsonl.gz").write_bytes(gzip.compress(b""))
+        (source_dir / "projection_sidecar.jsonl.gz").write_bytes(gzip.compress(b""))
+        gate_chat = deepcopy(self.gate)
+        gate_chat["contract"]["operating_point"]["primary_route_config"] = {"api_surface": "chat_completions"}
+        with self.assertRaises(ValueError) as ctx:
+            build_historical_atomic_inventory_manifest(
+                historical_run_root=hist_dir,
+                current_source_manifest_path=source_manifest,
+                gate_manifest_path=self.gate_path,
+                gate_manifest=gate_chat,
+            )
+        self.assertIn("requires primary route Responses API surface", str(ctx.exception))
 
 
 if __name__ == "__main__":

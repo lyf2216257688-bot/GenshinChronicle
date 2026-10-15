@@ -56,7 +56,8 @@ class SemanticBatchRunnerTests(unittest.TestCase):
         self.root = Path(self.tmp.name) / "batch"
 
     def make_root(self) -> None:
-        route_identity = route_profile("tokenmetro", {"TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1"}).config_identity
+        route_identity = route_profile("tokenmetro", {"TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
+                                                       "TOKENMETRO_API_SURFACE": "chat_completions"}).config_identity
         prepare_batch(self.root, units=[unit("u1"), unit("u2"), unit("media", omitted=True)], route="tokenmetro",
                       contract={"model": "deepseek-v4.1-flash", "prompt_identity": sha256_json({"version": "fixture"}),
                                 "prompt_sha256": sha256_json({"version": "fixture"}), "source_identity": "source",
@@ -457,6 +458,7 @@ class SemanticBatchRunnerTests(unittest.TestCase):
             prompt_identity=sha256_json({"version": "fixture"}), source_identity="source", environment={
                 "TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
                 "TOKENMETRO_API_KEY": "tokenmetro-secret",
+                "TOKENMETRO_API_SURFACE": "chat_completions",
             }, transport=httpx.MockTransport(lambda request: httpx.Response(
                 200, headers={"content-type": "text/event-stream"}, content=stream, request=request)))
         result = run_batch(self.root, workers=1, executor=executor, max_units=1)
@@ -475,6 +477,7 @@ class SemanticBatchRunnerTests(unittest.TestCase):
             prompt_identity=sha256_json({"version": "fixture"}), source_identity="source", environment={
                 "TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
                 "TOKENMETRO_API_KEY": "tokenmetro-secret",
+                "TOKENMETRO_API_SURFACE": "chat_completions",
             }, transport=httpx.MockTransport(lambda request: httpx.Response(
                 503, text="temporarily unavailable", request=request)))
         result = run_batch(self.root, workers=1, executor=executor, max_units=1)
@@ -518,7 +521,8 @@ class SemanticBatchRunnerTests(unittest.TestCase):
             route="tokenmetro", model="deepseek-v4.1-flash", prompt={"version": "fixture"},
             prompt_identity=sha256_json({"version": "fixture"}), source_identity="source",
             environment={"TOKENMETRO_BASE_URL": "https://tokenmetro.fixture/v1",
-                         "TOKENMETRO_API_KEY": "tokenmetro-secret"},
+                         "TOKENMETRO_API_KEY": "tokenmetro-secret",
+                         "TOKENMETRO_API_SURFACE": "chat_completions"},
             transport=httpx.MockTransport(handler))
 
     def sdk_success(self, request):

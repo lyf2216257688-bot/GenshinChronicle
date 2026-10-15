@@ -657,6 +657,7 @@ class SdkRunnerTest(unittest.TestCase):
         with unittest.mock.patch.dict(os.environ, {
             "TOKENMETRO_BASE_URL": "https://tokenmetro.com/v1",
             "JIZHI_BASE_URL": "https://jizhiapi.site/v1",
+            "TOKENMETRO_API_SURFACE": "chat_completions",
         }, clear=False), unittest.mock.patch.object(sdk, "run_sdk_units", side_effect=fake_run):
             self.assertEqual(sdk.main(argv), 0)
         self.assertEqual(captured["prompt_identity"], "e28273ded5d649e59e2d3143ce1549d490d8c540b581998d2dad9ae4fdda27c3")
@@ -703,6 +704,7 @@ class SdkRunnerTest(unittest.TestCase):
             "JIZHI_BASE_URL": "https://jizhi.fixture/v1",
             "TOKENMETRO_API_KEY": "tokenmetro-secret",
             "JIZHI_API_KEY": "jizhi-secret",
+            "TOKENMETRO_API_SURFACE": "chat_completions",
         }
 
     def _stream_body(self, name="s1", *, reasoning="", finish="stop"):
@@ -1114,6 +1116,29 @@ class SdkRunnerTest(unittest.TestCase):
         self.assertEqual(second["provider_attempts_this_invocation"], 0)
         self.assertEqual(called, ["tokenmetro", "jizhi"])
         self.assertEqual(first["counters"]["jizhi_fallback_failures"], 1)
+
+    def test_responses_primary_route_blocks_jizhi_chat_fallback(self):
+        environment = dict(self._route_environment())
+        environment["TOKENMETRO_API_SURFACE"] = "responses"
+        called = []
+
+        def primary(request):
+            called.append("tokenmetro")
+            return httpx.Response(403, json={"error": {"code": "content_policy_violation"}}, request=request)
+
+        def fallback(request):
+            called.append("jizhi")
+            return httpx.Response(200, json={}, request=request)
+
+        kwargs = {
+            "units": [unit("s1")], "prompt": {"version": "v2"},
+            "prompt_identity": "fixture-v2", "source_identity": "fixture-source",
+            "environment": environment,
+            "transports": {"tokenmetro": httpx.MockTransport(primary), "jizhi": httpx.MockTransport(fallback)},
+        }
+        result = run_sdk_route_pair(self.root, **kwargs)
+        self.assertEqual(result["status"], "blocked_unsupported_fallback_surface")
+        self.assertEqual(called, ["tokenmetro"])
 
 
 if __name__ == "__main__":

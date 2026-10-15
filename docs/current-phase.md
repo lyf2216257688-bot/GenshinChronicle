@@ -14,18 +14,17 @@ this document maintains the concise present state, operational baselines, and bo
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Documentation Audit & Hygiene Remediation** (Resolving governance friction, reconciling phase documentation, and maintaining test/corpus integrity; Project Memory Router v1 closed at `e529bbb`).
-- **Immediate Next Action**: Complete and verify documentation audit remediations (P0–P1 items, test suite 100% pass, and git hygiene).
+- **Active Work Unit**: **Phase 05 Responses API Migration & Audit Remediation** (Phase 05 offline transition to Responses API, budget ceiling expansion for new immutable runs, and audit remediation completed; Project Memory Router v1 closed at `e529bbb`).
+- **Immediate Next Action**: Retain offline auditability, keep live calls unauthorized, and await operator authorization for future live experiments.
 
 ### Paused Product Workstream (P05-Navi-E2)
 - **Scope**: Single-case DeepSeek-driven source exploration from `3429:s7:u3`.
 - **Status**: **PAUSED / PARTIAL / CHECKPOINTED** at `b5ffbb6`.
   - Prior E1: PASS / CLOSED at `main@4ff3887` (tools and source bindings reused).
-  - Original E2 r1/r2: PARTIAL / STOPPED (pre-dispatch token projection stop; 2 calls, 13,048 tokens).
-  - Minimal r2 continuation r3/r4: PARTIAL / EXECUTION UNKNOWN / STOPPED (3 calls added; cumulative 5 issued calls, 4 terminals, 1 unresolved call without terminal recorded strictly as `EXECUTION UNKNOWN` and **must NOT be reissued**; 19,273 known tokens + 1 UNKNOWN; 6 searches, 3 reads, 3 pages, 9,354 delivered Canonical characters).
+  - Original E2 r1/r2: PARTIAL / STOPPED (frozen at 30,000 total / 2,048 output tokens Chat Completions contract; 2 calls, 13,048 tokens).
+  - Minimal r2 continuation r3/r4: PARTIAL / EXECUTION UNKNOWN / STOPPED (frozen at 30,000 total / 4,096 output tokens Chat Completions contract; 3 calls added; cumulative 5 issued calls, 4 terminals, 1 unresolved call without terminal recorded strictly as `EXECUTION UNKNOWN` and **must NOT be reissued**; 19,273 known tokens + 1 UNKNOWN; 6 searches, 3 reads, 3 pages, 9,354 delivered Canonical characters).
+  - New execution baseline: Responses API protocol with research ceiling up to 100,000 total / 8,192 output tokens for new immutable runs; historical runs r1–r4 remain immutable.
   - Clues = 0; memory remains `unverified_hypothesis_not_fact`. No active Navi view, KG edge, or semantic acceptance.
-  - Final provider-free affected tests passed 96/96 (E2 23 + E1 tools 25 + SDK 48).
-  - Evidence: [`docs/research/phase-05/p05-navi-e2-continuation-20261012.md`](research/phase-05/p05-navi-e2-continuation-20261012.md).
   - Subsequent Phase E3: **NOT READY / NOT AUTHORIZED**.
   - No further provider/network calls authorized for E2 in this paused state.
 

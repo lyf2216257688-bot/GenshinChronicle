@@ -136,15 +136,18 @@ def _responses_request_body(chat_body: Mapping[str, Any]) -> dict[str, Any]:
     user_content = user.get("content")
     if not isinstance(system_content, str) or not isinstance(user_content, str):
         raise ValueError("Responses route message content must be strings")
+    max_output = chat_body.get("max_output_tokens", chat_body.get("max_tokens"))
+    if not isinstance(max_output, int) or max_output <= 0:
+        raise ValueError("Responses route requires positive max_tokens or max_output_tokens")
     body: dict[str, Any] = {
         "model": chat_body["model"],
         "instructions": system_content,
         "input": user_content,
-        "max_output_tokens": chat_body["max_tokens"],
+        "max_output_tokens": max_output,
         "stream": True,
     }
     for key, value in chat_body.items():
-        if key not in {"model", "messages", "max_tokens", "stream"}:
+        if key not in {"model", "messages", "max_tokens", "max_output_tokens", "stream", "stream_options"}:
             body[key] = value
     return body
 
@@ -866,6 +869,8 @@ def run_sdk_units(
             started = time.monotonic()
             error_type: str | None = None
             error_message: str | None = None
+            if transport is None:
+                raise ValueError("historical SDK runner is not authorized for live execution; new runs must use Responses API")
             try:
                 with httpx.Client(transport=transport, event_hooks={"request": [on_request], "response": [on_response]}) as http_client:
                     with openai.OpenAI(base_url=BASE_URL, api_key=api_key, max_retries=0,
@@ -1440,6 +1445,10 @@ def run_sdk_route_pair(
                     if profile.api_surface == "responses":
                         stream = client.responses.create(**route_body)
                     else:
+                        if transport is None:
+                            raise ValueError("live route-pair execution requires Responses API surface; chat_completions is not authorized for live requests")
+                        if role == "fallback" and profiles[primary_route].api_surface == "responses":
+                            raise ValueError("fallback route does not support Responses API; cannot silently fall back to Chat Completions")
                         stream = client.chat.completions.create(**route_body)
                     for chunk in stream:
                         data = _chunk_mapping(chunk)
@@ -1607,6 +1616,11 @@ def run_sdk_route_pair(
         checkpoint("partial", 0)
 
     issued_now = 0
+    if transports is None or transports.get(primary_route) is None:
+        if values.get("TOKENMETRO_API_SURFACE") == "chat_completions":
+            raise ValueError("TOKENMETRO_API_SURFACE=chat_completions is not authorized for live execution")
+        if profiles[primary_route].api_surface != "responses":
+            raise ValueError("live route-pair execution requires Responses API surface; chat_completions is not authorized for live requests")
     for unit in prepared:
         history = history_cache[unit["unit_id"]]
         if unit.get("provider_omitted"):
@@ -1619,6 +1633,8 @@ def run_sdk_route_pair(
         role = "fallback" if history else "primary"
         if route == "jizhi" and not (keys.get(route) or values.get(profiles[route].api_key_env)):
             return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
+        if route == "jizhi" and profiles[primary_route].api_surface == "responses" and profiles["jizhi"].api_surface != "responses":
+            return checkpoint("blocked_unsupported_fallback_surface", issued_now, unit["unit_id"])
         terminal = run_attempt(unit, route=route, role=role, number=len(history) + 1)
         record_attempt(unit, terminal)
         issued_now += 1
@@ -1629,6 +1645,8 @@ def run_sdk_route_pair(
         if terminal.get("fallback_eligible"):
             if not (keys.get("jizhi") or values.get(profiles["jizhi"].api_key_env)):
                 return checkpoint("blocked_missing_fallback_credential", issued_now, unit["unit_id"])
+            if profiles[primary_route].api_surface == "responses" and profiles["jizhi"].api_surface != "responses":
+                return checkpoint("blocked_unsupported_fallback_surface", issued_now, unit["unit_id"])
             fallback = run_attempt(unit, route="jizhi", role="fallback", number=2)
             record_attempt(unit, fallback)
             issued_now += 1
@@ -1888,6 +1906,8 @@ def run_sdk_route_canary(
                 raise ValueError("canary response contains credential")
             artifacts["raw_error"] = _write_once(stem / "raw_error.bin", raw_error)
 
+    if transport is None:
+        raise ValueError("historical route canary is not authorized for live execution; new runs must use Responses API")
     try:
         with httpx.Client(transport=transport, event_hooks={"request": [on_request], "response": [on_response]}) as http_client:
             with openai.OpenAI(base_url=profile.base_url, api_key=key, max_retries=0,
@@ -2086,6 +2106,8 @@ def run_sdk_single_route_attempt(
                 if profile.api_surface == "responses":
                     stream = client.responses.create(**body)
                 else:
+                    if transport is None:
+                        raise ValueError("historical chat_completions surface is not authorized for live execution; new runs must use Responses API")
                     stream = client.chat.completions.create(**body)
                 for chunk in stream:
                     data = _chunk_mapping(chunk)

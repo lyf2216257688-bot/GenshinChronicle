@@ -33,7 +33,7 @@ class SemanticRouteProfile:
     base_url: str
     base_url_env: str
     api_key_env: str
-    api_surface: str = "chat_completions"
+    api_surface: str = "responses"
 
     def __post_init__(self) -> None:
         if self.route not in {"tokenmetro", "jizhi"}:
@@ -70,11 +70,13 @@ ROUTE_PROFILES: Mapping[str, SemanticRouteProfile] = {
         route="tokenmetro", provider="TokenMetro", model_id="deepseek-v4.1-flash",
         base_url=TOKENMETRO_BASE_URL, base_url_env="TOKENMETRO_BASE_URL",
         api_key_env="TOKENMETRO_API_KEY",
+        api_surface="responses",
     ),
     "jizhi": SemanticRouteProfile(
         route="jizhi", provider="Jizhi", model_id="deepseek-v4.1-flash",
         base_url=JIZHI_BASE_URL, base_url_env="JIZHI_BASE_URL",
         api_key_env="JIZHI_API_KEY",
+        api_surface="chat_completions",
     ),
 }
 

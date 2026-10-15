@@ -19,6 +19,7 @@ from genshin_corpus.retrieval.navi_exploration import (
 from genshin_corpus.retrieval.semantic_tokenmetro_profile import route_profile
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _DoneTrackingStream, _JsonlArtifactWriter, _chunk_mapping, _stream_delta, _normalize_usage,
+    _responses_event_parts,
 )
 from .navi_experiment import _validate_action, _resolve_read, _save as _e1_save
 
@@ -125,15 +126,17 @@ class E2Budget:
     reads: int = 12
     pages: int = 8
     canonical_chars: int = 20000
-    total_tokens: int = 30000
-    output_tokens: int = 2048
+    total_tokens: int = 100000
+    output_tokens: int = 8192
     tool_response_chars: int = 100000
 
     def __post_init__(self):
         for v in asdict(self).values():
             if isinstance(v, bool) or not isinstance(v, int) or v <= 0:
                 raise ExplorationError("budget must be positive integers")
-        if self.rounds > 6 or self.searches > 8 or self.reads > 12 or self.pages > 8 or self.canonical_chars > 20000 or self.total_tokens > 30000:
+        if (self.rounds > 6 or self.searches > 8 or self.reads > 12 or self.pages > 8
+                or self.canonical_chars > 20000 or self.total_tokens > 100000
+                or self.output_tokens > 8192):
             raise ExplorationError("E2 single-case hard ceiling exceeded")
 
 
@@ -211,31 +214,104 @@ def model_result(result):
     }
 
 
+def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
+    try:
+        dec = json.loads(visible_text)
+        if not isinstance(dec, dict):
+            return False
+        if mode == "single_action":
+            if dec.get("action") not in {"search", "read", "clue", "stop"}:
+                return False
+            _validate_action(dec)
+            if dec.get("action") in {"clue", "stop"}:
+                text_or_reason = dec.get("text") if dec.get("action") == "clue" else dec.get("reason")
+                if not isinstance(text_or_reason, str) or len(text_or_reason) > 500:
+                    return False
+            return True
+        elif mode == "batch":
+            if set(dec) != {"actions", "memory", "rationale"}:
+                return False
+            acts = dec.get("actions")
+            if not isinstance(acts, list) or not (1 <= len(acts) <= 6):
+                return False
+            for a in acts:
+                if not isinstance(a, dict):
+                    return False
+                _validate_action(a)
+            mem = dec.get("memory")
+            if (not isinstance(mem, dict)
+                    or set(mem) != {"status", "text"}
+                    or mem.get("status") != HYPOTHESIS
+                    or not isinstance(mem.get("text"), str)
+                    or len(mem["text"]) > 1600):
+                return False
+            rat = dec.get("rationale")
+            if not isinstance(rat, str) or len(rat) > 1500:
+                return False
+            return True
+        return False
+    except Exception:
+        return False
+
+
 class E2SDK:
     """Existing SDK route/helpers, with an E2 decision protocol instead of atomic extraction."""
-    def __init__(self, route='tokenmetro', transport=None):
+    def __init__(self, route='tokenmetro', transport=None, environment=None):
         import openai
-        self.profile = route_profile(route, require_environment=True)
-        if self.profile.api_surface != 'chat_completions':
-            raise ExplorationError('E2 v1 requires configured Chat Completions; no guessed dialect')
-        if not os.environ.get(self.profile.api_key_env):
+        env = dict(os.environ if environment is None else environment)
+        surface = env.get('TOKENMETRO_API_SURFACE')
+        if surface == 'chat_completions':
+            raise ExplorationError('E2 requires configured Responses API surface; chat_completions is not authorized for new runs')
+        if route == 'tokenmetro':
+            env.setdefault('TOKENMETRO_API_SURFACE', 'responses')
+        self.profile = route_profile(route, env, require_environment=True)
+        if self.profile.api_surface != 'responses':
+            raise ExplorationError('E2 requires configured Responses API surface; no guessed dialect')
+        if not env.get(self.profile.api_key_env):
             raise ExplorationError('configured credential absent')
+        self.env = env
         self.transport = transport
-        self.config = {'adapter': 'p05-navi-e2-sdk-chat-0.1', 'route': self.profile.safe_dict(),
+        self.config = {'adapter': 'p05-navi-e2-sdk-responses-0.1', 'route': self.profile.safe_dict(),
                        'sdk_version': openai.__version__, 'max_retries': 0, 'fallback': False,
-                       'stream': True, 'include_usage': True, 'timeout_seconds': 180}
+                       'stream': True, 'include_usage': False, 'timeout_seconds': 180}
 
-    def __call__(self, stem, body, run_identity):
+    def __call__(self, stem, body, run_identity, *, decision_mode: str | None = None):
         import httpx
         import openai
-        key = os.environ[self.profile.api_key_env]
+        key = self.env[self.profile.api_key_env]
         stem.mkdir(parents=True, exist_ok=True)
+        if 'messages' in body and 'instructions' not in body:
+            sys_m = ""
+            usr_m = ""
+            for m in body.get('messages', []):
+                if isinstance(m, Mapping):
+                    if m.get('role') == 'system':
+                        sys_m = m.get('content', '')
+                    elif m.get('role') == 'user':
+                        usr_m = m.get('content', '')
+            norm_body = {
+                'model': body['model'],
+                'instructions': sys_m,
+                'input': usr_m,
+                'stream': True,
+                'max_output_tokens': body.get('max_output_tokens', body.get('max_tokens', 8192)),
+            }
+            for k, v in body.items():
+                if k not in {'messages', 'max_tokens', 'stream_options', 'instructions', 'input', 'max_output_tokens', 'stream'}:
+                    norm_body[k] = v
+            body = norm_body
+        else:
+            body = dict(body)
+            body.pop('stream_options', None)
+            if 'max_tokens' in body and 'max_output_tokens' not in body:
+                body['max_output_tokens'] = body.pop('max_tokens')
         once(stem / 'request.json', body)
         writer = _JsonlArtifactWriter(stem / 'stream.jsonl', stem.parent.parent)
         observation = {'calls': 0, 'http_status': None, 'headers': {}}
         tracker = None
         started = time.monotonic()
         content, reasoning, usage, finish = [], [], None, None
+        response_terminal = False
         def request_hook(req):
             observation['calls'] += 1
             if observation['calls'] != 1 or json.loads(req.content) != body or key.encode() in req.content:
@@ -260,23 +336,54 @@ class E2SDK:
         try:
             with httpx.Client(transport=self.transport, event_hooks={'request': [request_hook], 'response': [response_hook]}) as http_client:
                 with openai.OpenAI(base_url=self.profile.base_url, api_key=key, max_retries=0, timeout=180, http_client=http_client) as client:
-                    for chunk in client.chat.completions.create(**body):
+                    for chunk in client.responses.create(**body):
                         data = _chunk_mapping(chunk)
                         if key in json.dumps(data): raise ExplorationError('credential echo')
                         writer.append(data)
-                        if isinstance(data.get('usage'), Mapping): usage = data['usage']
-                        choices = data.get('choices', [])
-                        if choices:
-                            visible, thought = _stream_delta(choices[0])
-                            content.append(visible); reasoning.append(thought)
-                            if choices[0].get('finish_reason') is not None: finish = choices[0]['finish_reason']
+                        if data.get("type") == "error":
+                            err_obj = data.get("error") if isinstance(data.get("error"), Mapping) else data
+                            err_msg = str(err_obj.get("message", "Responses stream error")) if isinstance(err_obj, Mapping) else str(err_obj)
+                            error = {'type': 'ResponsesStreamError', 'message': err_msg.replace(key, '[REDACTED]')[:1500]}
+                        elif data.get("type") == "response.failed" and error is None:
+                            resp = data.get("response") if isinstance(data.get("response"), Mapping) else {}
+                            err_obj = resp.get("error") or data.get("error") or "Responses stream failed"
+                            err_msg = str(err_obj.get("message", err_obj)) if isinstance(err_obj, Mapping) else str(err_obj)
+                            error = {'type': 'ResponsesFailedError', 'message': err_msg.replace(key, '[REDACTED]')[:1500]}
+                        value, thought, event_finish, event_usage, event_id, is_term = _responses_event_parts(data)
+                        if value: content.append(value)
+                        if thought: reasoning.append(thought)
+                        if event_finish is not None: finish = event_finish
+                        if event_usage is not None: usage = event_usage
+                        if is_term: response_terminal = True
         except Exception as exc:
             error = {'type': type(exc).__name__, 'message': str(exc).replace(key, '[REDACTED]')[:1500]}
-        stream_complete = bool(tracker and tracker.saw_done and finish is not None and error is None)
-        complete = stream_complete and finish == 'stop'
+        if isinstance(usage, Mapping):
+            usage = dict(usage)
+            inp = usage.get("input_tokens", usage.get("prompt_tokens"))
+            out = usage.get("output_tokens", usage.get("completion_tokens"))
+            if "total_tokens" not in usage and isinstance(inp, int) and isinstance(out, int) and not isinstance(inp, bool) and not isinstance(out, bool):
+                usage["total_tokens"] = inp + out
+        has_reliable_usage = (
+            isinstance(usage, Mapping)
+            and isinstance(usage.get("total_tokens"), int)
+            and not isinstance(usage.get("total_tokens"), bool)
+            and usage["total_tokens"] >= 0
+        )
+        stream_complete = bool(finish is not None and response_terminal and error is None)
+        visible_text = ''.join(content)
+        complete = bool(stream_complete and finish == 'stop' and visible_text.strip() and has_reliable_usage)
+        if decision_mode is None:
+            instructions = body.get("instructions", "")
+            single_action_prompt = canonical_json_bytes(SINGLE_ACTION_PROMPT).decode("utf-8")
+            if instructions == single_action_prompt:
+                decision_mode = "single_action"
+            else:
+                decision_mode = "batch"
+        decision_valid = _is_valid_decision_content(visible_text, mode=decision_mode) if complete else False
+        decision_complete = bool(complete and decision_valid)
         terminal = observation | {'run_identity': run_identity, 'finish_reason': finish, 'complete': complete,
-            'stream_complete':stream_complete, 'decision_complete':complete,
-            'content': ''.join(content), 'reasoning': ''.join(reasoning), 'usage': usage or 'UNKNOWN',
+            'stream_complete': stream_complete, 'decision_complete': decision_complete,
+            'content': visible_text, 'reasoning': ''.join(reasoning), 'usage': usage or 'UNKNOWN',
             'usage_normalized': _normalize_usage(usage), 'error': error,
             'latency_ms': round((time.monotonic() - started)*1000, 3), 'stream': writer.descriptor(),
             'actual_cost': 'UNKNOWN', 'currency': 'UNKNOWN'}
@@ -393,6 +500,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             'binding': {'question': question, 'ru_build_identity': tools.ru_identity, 'tools_identity': tools.identity},
             'status': 'running', 'events': [], 'available_ids': [start_ru], 'read_sources': [], 'pages': [], 'pending_clues': [],
             'memory': {'status': HYPOTHESIS, 'text': ''}, 'model_rounds': 0, 'provider_calls': 0, 'pending_round': None,
+            'accepted_decisions': 0,
             'semantic_acceptance_status': 'not_accepted',
             'used': {'reads':0, 'searches':0, 'canonical_chars':0, 'tool_response_chars':0, 'tokens':0, 'token_reservations':0},
             'budget': asdict(budget)}
@@ -436,23 +544,32 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
                         'memory':state['memory'], 'new_tool_results': [{'action_index':e['round'],'action':e['action'],'result':model_result(e['result'])} for e in state['events'][last:]]}
                     payload['remaining']['total_tokens'] = budget.total_tokens-state['used']['tokens']
                     if single_action_continuation: payload=short_payload(state,question,budget)
-                    messages = [{'role':'system','content':canonical_json_bytes(config['prompt']).decode()}, {'role':'user','content':canonical_json_bytes(payload).decode()}]
+                    instructions = canonical_json_bytes(config['prompt']).decode('utf-8')
+                    input_text = canonical_json_bytes(payload).decode('utf-8')
                     # UTF8 byte ceiling + 256 framing tokens; conservative, not a model tokenizer estimate.
-                    reserve = sum(len(m['content'].encode('utf-8')) for m in messages) + 256 + budget.output_tokens
+                    reserve = len(instructions.encode('utf-8')) + len(input_text.encode('utf-8')) + 256 + budget.output_tokens
                     if state['used']['tokens'] + reserve > budget.total_tokens:
                         raise ExplorationBudgetExceeded('token dispatch reservation ceiling')
                     state['pending_round'] = n
                     _save(root, state)
-                    body = {'model':provider.config['route']['model_id'], 'messages':messages, 'stream':True,
-                            'stream_options':{'include_usage':True}, 'max_tokens':budget.output_tokens}
-                    once(stem / 'input-accounting.json', {'input_utf8_token_upper_bound':reserve-budget.output_tokens, 'reserved_tokens':reserve, 'delivered_until':len(state['events'])})
-                    terminal = provider(stem, body, identity)
+                    body = {'model': provider.config['route']['model_id'], 'instructions': instructions,
+                            'input': input_text, 'stream': True, 'max_output_tokens': budget.output_tokens}
+                    once(stem / 'input-accounting.json', {'input_utf8_token_upper_bound': reserve - budget.output_tokens, 'reserved_tokens': reserve, 'delivered_until': len(state['events'])})
+                    exp_mode = "single_action" if single_action_continuation else "batch"
+                    try:
+                        terminal = provider(stem, body, identity, decision_mode=exp_mode)
+                    except TypeError:
+                        terminal = provider(stem, body, identity)
                 if 'terminal_identity' in terminal and terminal['terminal_identity'] != sha256_json({k:v for k,v in terminal.items() if k != 'terminal_identity'}): raise ExplorationError('terminal integrity mismatch')
                 if not terminal['complete']: raise ExplorationError('provider partial/failure; no retry')
+                if not terminal.get('decision_complete', True): raise ExplorationError('decision does not conform to exploration mode schema')
                 usage = terminal.get('usage')
                 total = usage.get('total_tokens') if isinstance(usage, dict) else None
                 if not isinstance(total,int) or isinstance(total,bool) or total < 0: raise ExplorationError('provider total usage UNKNOWN; stop')
-                decision = json.loads(terminal['content'])
+                try:
+                    decision = json.loads(terminal['content'])
+                except (json.JSONDecodeError, TypeError) as exc:
+                    raise ExplorationError('provider returned invalid action JSON') from exc
                 if single_action_continuation:
                     _validate_action(decision)
                     if decision.get('action') in {'clue','stop'} and len(decision.get('text',decision.get('reason','')))>500: raise ExplorationError('single action text bound')
@@ -492,7 +609,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
                 state['next_action'] = i+1
                 _save(root, state)
                 if state['status'] == 'stopped': break
-            if single_action_continuation: state['accepted_decisions']+=1
+            state['accepted_decisions'] = state.get('accepted_decisions', 0) + 1
             state['model_rounds'] = n+1; state['pending_round'] = None
             _save(root, state)
         if state['status'] == 'running': state['status'] = 'round_budget_exhausted'

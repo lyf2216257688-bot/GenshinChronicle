@@ -1,4 +1,5 @@
 """Small E2 fixtures; no full corpus or provider required."""
+from dataclasses import asdict
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -6,6 +7,7 @@ from unittest.mock import patch
 from tests.retrieval.test_navi_exploration import NaviExplorationTests
 from genshin_corpus.rag.navi_e2_experiment import (
     E2Budget, HYPOTHESIS, run_exploration, once, E2SDK, body_chars, model_result, lineage_accounting, short_payload,
+    SINGLE_ACTION_PROMPT,
 )
 from genshin_corpus.retrieval.navi_exploration import ExplorationError
 from genshin_corpus.canonical.fingerprints import sha256_json
@@ -93,7 +95,7 @@ class E2Tests(NaviExplorationTests):
     def test_projection_continuation_preserves_total_budgets(self):
         first=FakeDecisions([decision([{'action':'search','query':'library','top_k':2}])])
         def big(result):
-            return {'oversized_search_response':'x'*40000} if 'hits' in result else model_result(result)
+            return {'oversized_search_response':'x'*120000} if 'hits' in result else model_result(result)
         with patch('genshin_corpus.rag.navi_e2_experiment.model_result',side_effect=big):
             parent=self.run_e2(first)
         self.assertEqual(parent['status'],'budget_exhausted');self.assertEqual(parent['model_rounds'],1)
@@ -164,7 +166,7 @@ class E2Tests(NaviExplorationTests):
     def test_single_action_context_stop_child_keeps_accepted_decisions(self):
         self.partial_parent()
         f=FakeDecisions([{'action':'read','unit_id':self.uid,'max_chars':20000}])
-        def huge(*args,**kwargs):return {'oversized':'x'*40000}
+        def huge(*args,**kwargs):return {'oversized':'x'*120000}
         with patch('genshin_corpus.rag.navi_e2_experiment.short_payload',side_effect=huge):
             first=run_exploration(self.tools,start_ru=self.uid,output_root=self.root/'blocked',provider=f,
                 question=self.question,parent_root=self.root/'e2',single_action_continuation=True,budget=E2Budget(output_tokens=4096))
@@ -200,30 +202,210 @@ class E2Tests(NaviExplorationTests):
     def test_sdk_429_preserves_failure_without_retry(self):
         import httpx
         transport=httpx.MockTransport(lambda req:httpx.Response(429,json={'error':{'message':'fixture rate limit','code':'RateLimitExceeded.EndpointRPMExceeded'}}))
-        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'chat_completions'}):
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             p=E2SDK(transport=transport)
-            t=p(self.root/'sdk429/rounds/00',{'model':'deepseek-v4.1-flash','messages':[{'role':'user','content':'fixture'}],'stream':True,'max_tokens':100},'fixture')
+            t=p(self.root/'sdk429/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete']);self.assertEqual(t['calls'],1);self.assertEqual(t['http_status'],429)
         self.assertTrue((self.root/'sdk429/rounds/00/raw-error.bin').exists())
     def test_sdk_incomplete_stream_preserved(self):
         import httpx
-        wire='data: '+json.dumps({'choices':[{'delta':{'content':'partial'},'finish_reason':None}]})+'\n\n'
+        wire='data: '+json.dumps({'type':'response.output_text.delta','delta':'partial'})+'\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
-        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'chat_completions'}):
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             p=E2SDK(transport=transport)
-            t=p(self.root/'sdkpartial/rounds/00',{'model':'deepseek-v4.1-flash','messages':[{'role':'user','content':'fixture'}],'stream':True,'max_tokens':100},'fixture')
+            t=p(self.root/'sdkpartial/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete']);self.assertEqual(t['content'],'partial');self.assertIsNotNone(t['stream'])
     def test_sdk_stream_usage_and_wire_evidence(self):
         import httpx
-        chunks=[{'choices':[{'delta':{'content':json.dumps(decision([{'action':'stop','reason':'stop'}]))},'finish_reason':None}]},
-                {'choices':[{'delta':{},'finish_reason':'stop'}], 'usage':{'prompt_tokens':20,'completion_tokens':10,'total_tokens':30}}]
+        chunks=[{'type':'response.reasoning_text.delta','delta':'thinking'},
+                {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
+                {'type':'response.completed','response':{'id':'resp_1','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
-        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'chat_completions'}):
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdk/rounds/00',{'model':'deepseek-v4.1-flash','messages':[{'role':'user','content':'fixture'}],'stream':True,'stream_options':{'include_usage':True},'max_tokens':100},'fixture')
+            t=provider(self.root/'sdk/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertTrue(t['complete']); self.assertEqual(t['calls'],1); self.assertEqual(t['usage']['total_tokens'],30)
+        self.assertEqual(t['reasoning'],'thinking')
+        meta = json.loads((self.root/'sdk/rounds/00/request-metadata.json').read_text())
+        self.assertTrue(meta['url'].endswith('/responses'))
         self.assertNotIn('fixture-secret',(self.root/'sdk/rounds/00/request-metadata.json').read_text())
+    def test_sdk_in_stream_error_event_captured(self):
+        import httpx
+        chunks=[{'type':'error','error':{'message':'provider internal rate error','code':'rate_limit'}}]
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
+            provider=E2SDK(transport=transport)
+            t=provider(self.root/'sdkerr/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+        self.assertFalse(t['complete'])
+        self.assertIn(t['error']['type'], ('ResponsesStreamError', 'APIError'))
+        self.assertIn('provider internal rate error',t['error']['message'])
+    def test_sdk_response_failed_event_captured(self):
+        import httpx
+        chunks=[{'type':'response.failed','response':{'id':'resp_fail','error':{'message':'safety check reject'}}}]
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
+            provider=E2SDK(transport=transport)
+            t=provider(self.root/'sdkfailed/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+        self.assertFalse(t['complete'])
+        self.assertEqual(t['error']['type'],'ResponsesFailedError')
+        self.assertIn('safety check reject',t['error']['message'])
+    def test_sdk_rejects_chat_completions_surface(self):
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'chat_completions'}):
+            with self.assertRaises(ExplorationError) as ctx:
+                E2SDK()
+            self.assertIn('Responses API surface',str(ctx.exception))
+    def test_sdk_rejects_unsupported_route(self):
+        with patch.dict('os.environ',{'JIZHI_API_KEY':'fixture-secret','JIZHI_BASE_URL':'https://example.invalid/v1'}):
+            with self.assertRaises(ExplorationError) as ctx:
+                E2SDK(route='jizhi')
+            self.assertIn('Responses API surface',str(ctx.exception))
+    def test_sdk_empty_visible_content_fails(self):
+        import httpx
+        chunks=[{'type':'response.reasoning_text.delta','delta':'only thought, no visible output'},
+                {'type':'response.completed','response':{'id':'resp_empty','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
+            provider=E2SDK(transport=transport)
+            t=provider(self.root/'sdkempty/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+        self.assertFalse(t['complete'])
+        self.assertEqual(t['content'],'')
+        self.assertEqual(t['reasoning'],'only thought, no visible output')
+    def test_sdk_missing_usage_fails_complete(self):
+        import httpx
+        chunks=[{'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
+                {'type':'response.completed','response':{'id':'resp_no_usage'}}]
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
+        with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
+            provider=E2SDK(transport=transport)
+            t=provider(self.root/'sdknousage/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+        self.assertFalse(t['complete'])
+        self.assertTrue(bool(t['content']))
+    def test_exploration_invalid_action_json_fails(self):
+        class BadJsonProvider:
+            def __init__(self):
+                self.config={'route':{'model_id':'deepseek-v4.1-flash'}}
+            def __call__(self, stem, body, identity):
+                return {'calls': 1, 'http_status': 200, 'headers': {}, 'run_identity': identity,
+                        'finish_reason': 'stop', 'complete': True, 'content': 'not valid json',
+                        'usage': {'total_tokens': 100}, 'usage_normalized': {}}
+        state = run_exploration(self.tools, start_ru=self.uid, output_root=self.root/'bad_json_run',
+                                provider=BadJsonProvider(), question=self.question)
+        self.assertEqual(state['status'], 'partial')
+        self.assertEqual(state['error']['type'], 'ExplorationError')
+        self.assertIn('invalid action JSON', state['error']['message'])
+    def test_budget_hard_ceiling_assertions(self):
+        b=E2Budget(total_tokens=100000,output_tokens=8192)
+        self.assertEqual(b.total_tokens,100000)
+        self.assertEqual(b.output_tokens,8192)
+        with self.assertRaises(ExplorationError):
+            E2Budget(total_tokens=100001)
+        with self.assertRaises(ExplorationError):
+            E2Budget(output_tokens=8193)
+    def test_continuation_rejects_upgrading_legacy_budget(self):
+        parent_dir=self.root/'legacy_parent'
+        parent_dir.mkdir(parents=True)
+        legacy_budget=E2Budget(total_tokens=30000,output_tokens=2048)
+        config={'runner':'p05-navi-e2-0.1','question':self.question,'start_ru':self.uid,
+                'tools_identity':self.tools.identity,'ru_build_identity':self.tools.ru_identity,
+                'inputs':{k:str(getattr(self.tools,k)) for k in ('canonical_path','ru_path','lexical_path')},
+                'prompt':SINGLE_ACTION_PROMPT,'single_action_continuation':True,
+                'budget':asdict(legacy_budget),'provider':{'route':{'model_id':'fake'},'adapter':'fake'}}
+        parent_identity=sha256_json(config)
+        parent_state={
+            'schema_version':'p05-navi-e2-session-0.1','run_identity':parent_identity,
+            'binding':{'question':self.question,'ru_build_identity':self.tools.ru_identity,'tools_identity':self.tools.identity},
+            'status':'budget_exhausted','termination':'token dispatch reservation ceiling',
+            'events':[],'available_ids':[self.uid],'read_sources':[],'pages':[],'pending_clues':[],
+            'memory':{'status':HYPOTHESIS,'text':''},'model_rounds':1,'provider_calls':1,'pending_round':None,
+            'semantic_acceptance_status':'not_accepted',
+            'used':{'reads':0,'searches':0,'canonical_chars':0,'tool_response_chars':0,'tokens':200,'token_reservations':200},
+            'budget':asdict(legacy_budget),
+        }
+        parent_state['checkpoint_identity']=sha256_json(parent_state)
+        (parent_dir/'session.json').write_text(json.dumps(parent_state),encoding='utf-8')
+        (parent_dir/'config.json').write_text(json.dumps(config),encoding='utf-8')
+        with self.assertRaises(ExplorationError) as ctx:
+            run_exploration(self.tools,start_ru=self.uid,output_root=self.root/'child_upgraded',
+                            provider=FakeDecisions([]),question=self.question,parent_root=parent_dir,
+                            single_action_continuation=True,budget=E2Budget(output_tokens=4096))
+        self.assertIn('parent hard budgets cannot reset/change',str(ctx.exception))
+
+    def test_sdk_decision_complete_distinguishes_valid_vs_invalid_json(self):
+        import httpx
+        valid_chunk = [{'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
+                       {'type':'response.completed','response':{'id':'resp_valid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
+        invalid_chunk = [{'type':'response.output_text.delta','delta':'this is definitely not valid json'},
+                         {'type':'response.completed','response':{'id':'resp_invalid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
+        wire_valid = ''.join('data: '+json.dumps(c)+'\n\n' for c in valid_chunk)+'data: [DONE]\n\n'
+        wire_invalid = ''.join('data: '+json.dumps(c)+'\n\n' for c in invalid_chunk)+'data: [DONE]\n\n'
+        env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
+        p_valid = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_valid)), environment=env)
+        t_valid = p_valid(self.root/'sdk_valid/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1')
+        self.assertTrue(t_valid['complete'])
+        self.assertTrue(t_valid['decision_complete'])
+        p_invalid = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_invalid)), environment=env)
+        t_invalid = p_invalid(self.root/'sdk_invalid/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2')
+        self.assertTrue(t_invalid['complete'])
+        self.assertFalse(t_invalid['decision_complete'])
+
+    def test_sdk_decision_complete_mode_mismatch_fails_decision_complete(self):
+        import httpx
+        env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
+        single_action_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
+            {'type':'response.output_text.delta','delta':json.dumps({'action':'search','query':'test','top_k':3})},
+            {'type':'response.completed','response':{'id':'resp_single','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
+        ]) + 'data: [DONE]\n\n'
+        batch_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
+            {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'search','query':'test','top_k':3}]))},
+            {'type':'response.completed','response':{'id':'resp_batch','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
+        ]) + 'data: [DONE]\n\n'
+
+        p1 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
+        t1 = p1(self.root/'sdk_mismatch_1/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1', decision_mode='batch')
+        self.assertTrue(t1['complete'])
+        self.assertFalse(t1['decision_complete'])
+
+        p2 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=batch_wire)), environment=env)
+        t2 = p2(self.root/'sdk_mismatch_2/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2', decision_mode='single_action')
+        self.assertTrue(t2['complete'])
+        self.assertFalse(t2['decision_complete'])
+
+        p3 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
+        t3 = p3(self.root/'sdk_mismatch_3/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id3', decision_mode='single_action')
+        self.assertTrue(t3['complete'])
+        self.assertTrue(t3['decision_complete'])
+
+    def test_run_exploration_rejects_schema_mismatch_without_incrementing_accepted_decisions(self):
+        class SingleActionFakeProvider:
+            config = {'route': {'model_id': 'deepseek-v4.1-flash'}}
+            def __call__(self, stem, body, run_identity, *, decision_mode=None):
+                stem.mkdir(parents=True, exist_ok=True)
+                text = json.dumps({'action': 'search', 'query': 'q', 'top_k': 3})
+                t = {
+                    'run_identity': run_identity, 'calls': 1, 'complete': True,
+                    'stream_complete': True, 'decision_complete': False,
+                    'content': text, 'reasoning': '', 'finish_reason': 'stop',
+                    'usage': {'input_tokens': 10, 'output_tokens': 10, 'total_tokens': 20},
+                    'usage_normalized': {'input_tokens': 10, 'output_tokens': 10, 'total_tokens': 20},
+                    'error': None, 'latency_ms': 10.0, 'stream': {}, 'actual_cost': 'UNKNOWN', 'currency': 'UNKNOWN',
+                }
+                t['terminal_identity'] = sha256_json(t)
+                once(stem / 'terminal.json', t)
+                return t
+
+        out = self.root / 'schema_mismatch_run'
+        state = run_exploration(self.tools, start_ru=self.uid, output_root=out,
+                                provider=SingleActionFakeProvider(), question=self.question)
+        self.assertEqual(state['status'], 'partial')
+        self.assertEqual(state['error']['type'], 'ExplorationError')
+        self.assertIn('decision does not conform to exploration mode schema', state['error']['message'])
+        self.assertEqual(state.get('accepted_decisions', 0), 0)
+        self.assertFalse((out / 'rounds' / '00' / 'decision.json').exists())
 
 # Do not rerun inherited E1 cases as if they were new E2 tests.
 for name in dir(NaviExplorationTests):

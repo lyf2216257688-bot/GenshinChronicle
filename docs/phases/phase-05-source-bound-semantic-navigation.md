@@ -140,11 +140,17 @@ improvement claim.
 
 E2 uses the E1 local tools with model-selected search/read/clue/stop decisions.
 This opt-in experiment is limited to one source-bound case, at most 6 model
-rounds, 8 searches, 12 reads, 8 pages, 20,000 Canonical body characters and
-30,000 total provider tokens. Serialized tool-response characters are accounted
-separately. Each dispatch requires a conservative UTF-8-byte input reservation
-plus the output ceiling; UNKNOWN usage blocks the next dispatch. The byte
-reservation is not a measured model tokenizer or a cost estimate.
+rounds, 8 searches, 12 reads, 8 pages, 20,000 Canonical body characters,
+and an authorized provider budget (up to 100,000 total provider tokens and
+8,192 output tokens per round for new immutable Responses API executions; historical
+runs remain frozen under their respective Chat Completions contracts: r1/r2 at 30,000 total
+/ 2,048 output tokens, and single-action continuation r3/r4 at 30,000 total / 4,096 output tokens).
+Serialized tool-response characters are accounted separately. Each dispatch
+requires a conservative UTF-8-byte input reservation plus the output ceiling;
+UNKNOWN usage blocks the next dispatch. The byte reservation is an upper-bound
+guard, not a measured model tokenizer or a cost estimate. New runs communicate
+via the Responses API; historical Chat Completions request forms remain
+reconstructible for offline identity and audit verification.
 
 Requests, wire identities, issued records, streamed responses, terminal usage,
 decisions, actions and checkpoint snapshots are persisted. No automatic retry
