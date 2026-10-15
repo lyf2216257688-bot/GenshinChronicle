@@ -6,27 +6,51 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: `main@e529bbb` (2026-10-12, `docs: establish project memory router v1`).
-- **Working Tree Baseline**: Checkpoint `e529bbb` plus known user `.gitignore` delta (`/%SystemDrive%/`, `/codex-temp-locked/`, `/p01ea-test-temp/`, `/tmp*/`). Fresh Git status check required before any state-changing operations.
+- **Current Checkpoint**: Prior baseline `main@7e230d8` (2026-10-15); this commit checkpoints the four-model Responses integration and the `gpt-6-luna` story exploration runs (r1/r2).
+- **Working Tree Baseline**: Working tree verified clean before commit; no push authorized.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Responses API Migration & Audit Remediation** (Phase 05 offline transition to Responses API, budget ceiling expansion for new immutable runs, and audit remediation completed; Project Memory Router v1 closed at `e529bbb`).
-- **Immediate Next Action**: Retain offline auditability, keep live calls unauthorized, and await operator authorization for future live experiments.
+- **Active Work Unit**: **Phase 05 Navi E2 Single-Case Autonomous Story Exploration (`gpt-6-luna` Run 2)** (2026-10-15: single immutable run `data/retrieval/p05-navi-e2-gpt6luna-20261015-r2` executed; 5 provider calls, 24,886 known tokens + 1 UNKNOWN call, 0 retries; 7 reads across 5 pages, 17,656 Canonical characters delivered, 5 searches; stopped fail-closed at round 4 dispatch due to provider network connection error; 143/143 offline audit PASS, 915/915 unittest PASS. Formal autonomous E2 status is **PARTIAL**; E3 remains **NOT READY / NOT AUTHORIZED**).
+- **Immediate Next Action**: Review committed Phase 05 Navi E2 story exploration evidence and research reports; await operator authorization for subsequent phase steps. No push authorized. No further live exploration requests, retries, or protocol probes are authorized. Prior GLM/DeepSeek UNKNOWN attempts and the r2 round 4 UNKNOWN attempt remain unresolved and must never be resumed/reissued.
 
-### Paused Product Workstream (P05-Navi-E2)
-- **Scope**: Single-case DeepSeek-driven source exploration from `3429:s7:u3`.
-- **Status**: **PAUSED / PARTIAL / CHECKPOINTED** at `b5ffbb6`.
-  - Prior E1: PASS / CLOSED at `main@4ff3887` (tools and source bindings reused).
-  - Original E2 r1/r2: PARTIAL / STOPPED (frozen at 30,000 total / 2,048 output tokens Chat Completions contract; 2 calls, 13,048 tokens).
-  - Minimal r2 continuation r3/r4: PARTIAL / EXECUTION UNKNOWN / STOPPED (frozen at 30,000 total / 4,096 output tokens Chat Completions contract; 3 calls added; cumulative 5 issued calls, 4 terminals, 1 unresolved call without terminal recorded strictly as `EXECUTION UNKNOWN` and **must NOT be reissued**; 19,273 known tokens + 1 UNKNOWN; 6 searches, 3 reads, 3 pages, 9,354 delivered Canonical characters).
-  - New execution baseline: Responses API protocol with research ceiling up to 100,000 total / 8,192 output tokens for new immutable runs; historical runs r1–r4 remain immutable.
-  - Clues = 0; memory remains `unverified_hypothesis_not_fact`. No active Navi view, KG edge, or semantic acceptance.
-  - Subsequent Phase E3: **NOT READY / NOT AUTHORIZED**.
-  - No further provider/network calls authorized for E2 in this paused state.
+### Autonomous Story Exploration Checkpoint (Run 2: `gpt-6-luna` 2026-10-15)
+
+- Immutable run root: `data/retrieval/p05-navi-e2-gpt6luna-20261015-r2` (run identity: `7bca0ea7d50355024c85da3456dd46920c182fe5f2d311897c5171713814d689`).
+- Detailed findings and evaluation in the [GPT-6-Luna E2 Story Exploration Report (Run 2)](research/phase-05/p05-navi-e2-gpt6luna-story-exploration-r2-20261015.md).
+- Model & route: `gpt-6-luna` / `tokenmetro` via Responses API (`https://tokenmetro.com/v1/responses`).
+- Starting anchor verified: `3429:s7:u3` (RU `d9fed651...`, Ema dialogue in 《龙蛇藏归辑录》).
+- Fix verification: Model 100% adopted formal `unit_id` references for all 6 autonomous reads, completely eliminating the r1 coordinate ambiguity.
+- Autonomous trajectory: Model executed 4 complete decision rounds; autonomously read 7 units across 5 independent pages:
+  - `3429` (龙蛇藏归辑录 - 剧情对话, RU `d9fed...`)
+  - `3470` (白夜国馆藏 - 《白夜国地理水文考》第三卷 RU `ffdaf...` 及图书描述 RU `834db...`)
+  - `508883` (白夜国 - 势力/神明 RU `ed35...` 及重要事件/改造文化 RU `6be0...`)
+  - `3918` (乌帽子 - NPC对话 RU `4e18...`)
+  - `3205` (露子【巫女】 - NPC对话 RU `3ea8...`)
+- Rigorous source qualification: Model differentiated NPC testimony (Ema, Eboshi, Tsuyuko), in-game geographical treatise (《白夜国地理水文考》), editorial wiki compilation (`508883`), and noted the thematic conflict between Sangonomiya's policy of institutional forgetting vs. Eboshi's preservation of truth; strictly maintained `unverified_hypothesis_not_fact` memory status.
+- Termination: Round 04 dispatch encountered `APIConnectionError` (`EXECUTION UNKNOWN`, `complete=false`); system safely stopped fail-closed without retry or fallback.
+- Cumulative resource usage: 5 issued calls (4 RESOLVED, 1 UNKNOWN), 0 retries, 0 fallbacks; **24,886 known total tokens** (22,682 input, 2,204 output, 94 reasoning) + 1 UNKNOWN; 17,656 Canonical body characters; 72,364 tool response characters; actual cost/currency UNKNOWN.
+- Offline audit: **143/143 checks PASS** (`offline-audit-summary.json`), **915/915 repository unit tests PASS**, zero credential leaks. E2 remains PARTIAL.
+
+### Autonomous Story Exploration Checkpoint (Run 1: `gpt-6-luna` 2026-10-15)
+
+- Immutable run root: `data/retrieval/p05-navi-e2-gpt6luna-20261015-r1` (run identity: `02144d3952c666f3c4f15e89edb393ccd53e6888c4819a9e3c71b189dcb17555`).
+- Detailed findings in [GPT-6-Luna E2 Story Exploration Report (Run 1)](research/phase-05/p05-navi-e2-gpt6luna-story-exploration-20261015.md).
+- Status: PARTIAL / STOPPED (stopped fail-closed at round 2 action execution due to hit coordinate ambiguity; 14,882 tokens, 107/107 audit PASS). Frozen.
+
+### Four-model protocol checkpoint (2026-10-15 follow-up CLOSED)
+
+- Original frozen root: `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1` (initial 2 PASS / 2 BLOCKED). New root: `data/retrieval/p05-navi-e2-responses-followup-20261015-r2`; detailed results in the [E2 follow-up report](research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md#2026-10-15-jizhi-glm-and-deepseek-follow-up).
+- `gpt-6-luna` / `tokenmetro`: authentication / Responses / E2 four-action gates PASS (r1); returned model `gpt-6-luna`; cumulative 1 request, 770 known tokens.
+- `qwen3.8-flash` / `tokenmetro_qwen`: all three gates PASS (r1); returned model `qwen3.8-flash`; independent runtime credential; cumulative 1 request, 1,297 known tokens.
+- `glm-5.3-flash` / **`jizhi_glm`**: all three gates PASS (new r2 independent credential, `NAVI_GLM_API_KEY` / `NAVI_GLM_BASE_URL`, `https://jizhiapi.site/v1/responses`); returned model `glm-5.3-flash`; new 1 request, 807 tokens; cumulative 2 requests (historical TokenMetro 503 usage remains UNKNOWN). Historical TokenMetro GLM selection is no longer executable for new E2 runs.
+- `deepseek-v4.1-flash` / `jizhi`: all three gates PASS (new r2 operator-authorized diagnostic); returned model `deepseek-v4.1-flash`; new 1 request, 854 tokens; cumulative 2 requests (historical HTTP 524 usage remains UNKNOWN).
+- Both new streams ended `response.completed` / `status=completed`; visible decision output accepted, no provider reasoning text/token breakdown supplied (NOT_PROVIDED / UNKNOWN). No formal corpus tools executed.
+- Follow-up authorization allowed only 1 new request per selected model / 2 total; both are consumed. Combined: **6/12 issued** (GPT/Qwen 1/3 each; GLM/DeepSeek 2/3 each), 0 retries/fallbacks/Chat Completions/tool executions; **3,728 known tokens + 2 historical UNKNOWN requests**; actual cost/currency UNKNOWN.
+- Offline follow-up: **292 tests PASS**, **222 integrity checks PASS**; original campaign's 72 inventoried files and historical E2 r1-r4 110 files unchanged. Four-model protocol first stage is COMPLETE; synthetic action checks do not change formal E2 PARTIAL or establish research/semantic PASS. No commit/push.
 
 ### Parallel / Secondary Gates (Non-blocking)
 - **Historical-200 6+6 Quality Review**: Prepared and frozen at `data/retrieval/p05-w2-atomic-quality-evidence-20261008-r2/index.json` (report: [`docs/research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md`](research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md)). Awaiting independent offline review.
@@ -54,7 +78,7 @@ The production corpus scope is `zh-cn` MiHoYo OBC. Upstream foundation layers ar
 ## 3. Strict Authorization Boundary
 
 - **Query Seam**: Arbitrary Dense/Hybrid queries use Qwen synchronous query seam (`role=query`, dimension 2048, dense-only). Fail-closed on missing credentials or transport errors.
-- **Provider Calls**: Authorized ONLY when explicitly granted in the active work unit. No automatic retry or route fallback.
+- **Provider Calls**: Authorized ONLY when explicitly granted in the active work unit. For new E2 execution, explicit model AND matching route are required; no default or fallback. SDK retries are disabled. Application retry is bounded to at most 3 attempts on the same route/model, only for the exact proven pre-generation TokenMetro TPM 429 rejection; uncertain execution is never retried. Historical experiment policies remain frozen.
 - **Audit Lineage**: Every provider request and raw response must be preserved immutably.
 - **Corpus Integrity**: No silent rewriting, normalization, or pruning of Raw or Canonical evidence.
 - **Scope Discipline**: No premature adoption of Vector DB, ANN, KG, AI Semantic Extraction, or UI expansion.
@@ -81,7 +105,8 @@ One fact has one primary documentation owner. Consult the primary owners below r
 | **Phase 04 Historical Archive** | [`docs/research/phase-04/p04-rag-historical-checkpoint-archive.md`](research/phase-04/p04-rag-historical-checkpoint-archive.md) | Historical narrative and Block B recovery lineage archive |
 | **Phase 05 Navigation Spec** | [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md) | Phase 05 durable boundary, RU candidates, and semantic navigation contract |
 | **Phase 05 Navi E1 (Tools)** | [`docs/research/phase-05/p05-navi-e1-tools-wiring-20261011.md`](research/phase-05/p05-navi-e1-tools-wiring-20261011.md) | Mechanical tool bindings, real-source fixture, and smoke test results |
-| **Phase 05 Navi E2 (Run 1-2)** | [`docs/research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md`](research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md) | Initial autonomous exploration r1/r2 execution report |
-| **Phase 05 Navi E2 (Continuation)** | [`docs/research/phase-05/p05-navi-e2-continuation-20261012.md`](research/phase-05/p05-navi-e2-continuation-20261012.md) | r3/r4 continuation report and terminal accounting |
+| **Phase 05 Navi E2 (Run 1-2)** | [`docs/research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md`](research/phase-05/p05-navi-e2-autonomous-exploration-20261012.md) | Historical r1/r2 exploration plus 2026-10-15 four-model Responses protocol follow-up |
+| **Phase 05 Navi E2 (GPT-6-Luna Run 1)** | [`docs/research/phase-05/p05-navi-e2-gpt6luna-story-exploration-20261015.md`](research/phase-05/p05-navi-e2-gpt6luna-story-exploration-20261015.md) | Single-case autonomous story exploration report using `gpt-6-luna` (Run 1, coordinate stop) |
+| **Phase 05 Navi E2 (GPT-6-Luna Run 2)** | [`docs/research/phase-05/p05-navi-e2-gpt6luna-story-exploration-r2-20261015.md`](research/phase-05/p05-navi-e2-gpt6luna-story-exploration-r2-20261015.md) | Single-case autonomous story exploration report using `gpt-6-luna` (Run 2, unit_id fix, 7 reads / 5 pages, network stop) |
 | **Phase 05 Quality Review (6+6)** | [`docs/research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md`](research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md) | 12-sample atomic quality review evidence packet and index |
 | **Phase 05 Unique Archive** | [`docs/research/phase-05/p05-unique-historical-archive-20261012.md`](research/phase-05/p05-unique-historical-archive-20261012.md) | 200-unit Responses live/continuation run and cheap canary archive |

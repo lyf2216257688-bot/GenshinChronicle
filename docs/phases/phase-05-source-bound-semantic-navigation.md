@@ -153,8 +153,15 @@ via the Responses API; historical Chat Completions request forms remain
 reconstructible for offline identity and audit verification.
 
 Requests, wire identities, issued records, streamed responses, terminal usage,
-decisions, actions and checkpoint snapshots are persisted. No automatic retry
-or fallback is permitted. An unresolved issued request is never reissued.
+decisions, actions and checkpoint snapshots are persisted. New E2 execution
+requires both an explicit logical model and matching route. There is no default
+model, cross-route/model fallback, or protocol fallback. SDK retries are disabled.
+Application retry is limited to at most 3 attempts on the same route/model for
+the exact evidence-backed, error-only, pre-generation TokenMetro TPM 429 rejection.
+Each issued attempt consumes the call ceiling and has an immutable terminal;
+retry reservation is bounded by remaining call/token budgets. Other errors stop.
+An unresolved issued request is EXECUTION UNKNOWN and is never reissued. Historical
+r1-r4 no-retry contracts and Chat Completions identities remain unchanged.
 Completed local actions/decisions may be recovered. A pre-dispatch token
 projection stop may continue in a new child root with the same case and
 budgets, retaining parent identity, completed actions and cumulative usage;
@@ -173,6 +180,54 @@ acceptance. Reference oracle sources are withheld until post-run review, unless
 independently returned by the allowed tools. E2 is exploration evidence only;
 formal Phase04-versus-Navi Packet/answer comparison remains separately
 reviewed and authorized.
+
+### E2 multi-model Responses boundary (2026-10-15)
+
+The E2 Responses seam supports only the explicit pairs `gpt-6-luna` /
+`tokenmetro`, `glm-5.3-flash` / `jizhi_glm`, `qwen3.8-flash` /
+`tokenmetro_qwen`, and `deepseek-v4.1-flash` / `jizhi`. The Qwen route has
+an independent credential slot even though its confirmed Base URL shares
+TokenMetro's hostname. The later operator-selected Jizhi GLM route also has an
+independent `NAVI_GLM_API_KEY` / `NAVI_GLM_BASE_URL` slot; it cannot use the
+DeepSeek Jizhi key or the historical GLM TokenMetro key. Historical route configs
+remain frozen for offline audit. An explicit new operator authorization may
+create a separate bounded diagnostic campaign while leaving prior UNKNOWN
+requests unresolved and never resuming/reissuing them. Its immutable authorization
+binds the verified prior campaign manifest and counts all prior issued calls
+against the same total/per-model ceilings; UNKNOWN in the new campaign stops
+that model. This exception does not authorize autonomous research recovery. Runtime Base URLs must match the confirmed route;
+credentials are runtime environment material, never identities or artifacts.
+Archived semantic SDK live dispatch (including automatic TokenMetro-to-Jizhi
+fallback) is retired; those runner paths accept offline MockTransport only.
+Frozen request reconstruction, hashing and read-only replay remain available.
+No wire alias is guessed. Returned model identity, Responses terminal status,
+visible text, provider reasoning events, usage and E2 decision validity are
+recorded separately. Missing/inconsistent usage, empty text, invalid actions,
+failed/incomplete terminals and indeterminate execution stop fail closed.
+Provider reasoning summaries are identified as summaries; absent reasoning is
+NOT_PROVIDED, not fabricated private reasoning. All models share E2 prompts,
+actions, memory, source binding, budgets and checkpoint rules.
+
+New batch and single-action continuation prompts direct reads through the exact
+formal `unit_id` supplied by seed/search; both normal and compact candidate
+projections retain that ID. `model_round` counts model requests and
+`action_index` identifies a global tool action; neither is a read source ID.
+The executor still requires seed/search admission and verified RU/Canonical
+binding within the unchanged read/page/character budgets. Legacy `hit.round`
+remains a zero-based global action offset (not a model round), paired with a
+zero-based candidate `index`; its parser and rejection of invalid/non-search
+coordinates remain unchanged for historical compatibility. New prompts and
+requests receive new immutable identities; frozen requests are not regenerated.
+
+A protocol probe uses a small synthetic fixture and validates ordered
+search/read/clue/stop output through the E2 validator plus fixture reference
+checks. It executes no tools, reads no Canonical corpus, and establishes no
+autonomous research or semantic quality acceptance. Its campaign contract fixes
+3 issued requests per logical model / 12 overall, counts retries and unresolved
+requests, and stops the affected channel on execution uncertainty. Successful
+HTTP authentication, Responses protocol and E2 action protocol are separate
+acceptance gates. Current authorization/results belong to current-phase.md and
+the E2 experiment report; E2 remains PARTIAL and E3 requires separate authorization.
 
 ## P05-W2-U1 provider-free boundary
 
@@ -356,18 +411,24 @@ Both v4 and v5 operate under the unchanged output schema and
 
 ### Navi E2 exploration checkpoint status
 
-As authoritative in `docs/current-phase.md`, autonomous exploration under P05-Navi-E2
-is paused and checkpointed at `main@b5ffbb6`. E1 mechanical tool wiring passed
+At the historical `main@b5ffbb6` checkpoint, autonomous P05-Navi-E2
+exploration was paused and checkpointed. E1 mechanical tool wiring passed
 completely; E2 cumulative issued 5 calls (4 terminals, 1 unresolved recorded as
-`EXECUTION UNKNOWN` with reissue prohibited). No further provider or network
-calls are authorized in this paused state.
+`EXECUTION UNKNOWN` with reissue prohibited). This frozen accounting does not
+include later synthetic protocol probes. Present authorization and immediate
+next action are owned exclusively by `docs/current-phase.md`.
 
 ## Historical TokenMetro SDK retry and resume contract
 
-Formal Phase 05 TokenMetro Chat Completions execution uses the official
+The following pre-2026-10-15 execution contract is retained for immutable
+identity, offline fixtures and read-only replay only; it cannot authorize new
+live execution. New execution follows the E2 Responses contract above.
+
+Historical Phase 05 TokenMetro Chat Completions execution used the official
 `openai` Python SDK with SDK automatic retries disabled. The direct-HTTP route
-requires explicit opt-in for live invocation through both CLI and programmatic
-APIs. Its offline request construction, parsing, and replay remain available.
+required explicit opt-in for live invocation through both CLI and programmatic
+APIs. Its real network opener is now retired even with that former opt-in;
+injected fixture openers, offline request construction, parsing, and replay remain available.
 A logical compilation unit may have several provider attempts;
 the attempt number, request identity, latency, HTTP/SDK terminal, provider
 request ID when available, usage, retry classification, sanitized request,
@@ -401,6 +462,10 @@ This section describes the retained sequential SDK benchmark runner
 single-route policy below, nor the route-pair policy.
 
 ## Immutable semantic-batch rate control
+
+This retained coordinator/ledger contract supports offline audit and fixtures.
+Its archived SDK live bridge is retired; the policies below are not new E2
+execution selectors and do not override the explicit Responses route contract.
 
 The semantic-batch coordinator retains separate workers (1, 6, or 12) and a
 minimum dispatch interval. `--min-dispatch-interval-seconds` is finite and
@@ -471,9 +536,13 @@ safe retry predicates, retry ordering/delay, dispatch ordinals/pacing and
 budget/accounting consistency without provider calls. Historical roots lacking
 the new execution artifacts remain readable under their original contract.
 
-## DeepSeek route-pair contract
+## Historical DeepSeek route-pair contract
 
-The production candidate route is TokenMetro with Jizhi as an explicit,
+This pre-2026-10-15 contract is retained for offline request reconstruction,
+fixture testing and replay only. Live route-pair dispatch and all automatic
+cross-provider fallback are retired for new execution.
+
+The historical production candidate route was TokenMetro with Jizhi as an explicit,
 conservative fallback for the same `deepseek-v4.1-flash` model. Route profiles
 are loaded at runtime from `TOKENMETRO_BASE_URL`/`TOKENMETRO_API_KEY` and
 `JIZHI_BASE_URL`/`JIZHI_API_KEY`; only route names, safe configuration

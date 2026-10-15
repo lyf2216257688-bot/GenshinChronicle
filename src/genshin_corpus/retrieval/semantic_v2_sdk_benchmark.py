@@ -28,6 +28,7 @@ from .semantic_live_runner import (
 )
 from .semantic_openai_chat_adapter import OpenAIChatCompletionsAdapter
 from .semantic_v2_comparison import MODELS, ORDINALS, _frozen
+from .semantic_sdk_runner import _historical_transport_only
 
 
 BASE_URL = "https://tokenmetro.com/v1"
@@ -231,6 +232,8 @@ def gate(root: Path, ordinal: int) -> dict[str, Any]:
 
 
 def run_one(root: Path, model: str, ordinal: int) -> dict[str, Any]:
+    # Retain historical construction/review code, but close its live entry.
+    _historical_transport_only(None)
     if model not in MODELS or ordinal not in ORDINALS:
         raise ValueError("model or ordinal outside frozen benchmark")
     report = _read(root / "preflight.json")

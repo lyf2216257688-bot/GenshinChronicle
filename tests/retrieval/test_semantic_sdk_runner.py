@@ -692,7 +692,7 @@ class SdkRunnerTest(unittest.TestCase):
         self.assertFalse(self.root.exists())
         self.assertEqual(invoked, [])
         self.assertFalse(create_adapter(config, {config.api_key_env: "fixture-secret"}).legacy_live_enabled)
-        self.assertTrue(load_adapter(config.adapter_factory, config,
+        self.assertFalse(load_adapter(config.adapter_factory, config,
                                      {config.api_key_env: "fixture-secret"},
                                      allow_legacy_live=True).legacy_live_enabled)
         with self.assertRaisesRegex(ValueError, "explicit opt-in"):

@@ -1,5 +1,7 @@
 # P05-Navi-E2 单案例真实模型自主探索
 
+前文是 2026-10-12 r1/r2 的冻结历史记录，历史“当前/下一步”均限定于该检查点；2026-10-15 四模型协议验证见文末独立后续记录。当前授权以 `docs/current-phase.md` 为准。
+
 日期：2026-10-12（Asia/Shanghai）。起始 Git：`main@4ff3887d8972bf5fda351415d915c7f172417657`，工作区干净。E1 PASS/CLOSED，仅复用工具和来源校验，没有重跑 real smoke；未进入 E3。
 
 ## 结论与五项验收问题
@@ -82,3 +84,83 @@ oracle 仅在结束后对照 `p05-navi-representative-cases-20261010.json`：
 - 尚未验证：新来源价值、书籍叙事性质处理、有效 clue、多轮 read 路径、模型主动 stop、复杂中断后的真实 live 恢复、费用、问答收益。fake tests 不是模型语义验收。
 
 建议独立 review 先确认 partial 状态及累计记账，再决定是否另行授权同一案例的新 operating point：需处理 reasoning 占满输出 ceiling 与搜索候选上下文开销，保留原问题/起点及累计 lineage。**当前不满足进入 E3 的条件，本轮停止，不自动调用 provider、commit 或 push。**
+
+
+## 2026-10-15 Four-model Responses protocol validation
+
+本节记录第一次 r1 协议检查点。其 2/4 状态及当时下一步是历史事实，后续新授权的 Jizhi GLM / DeepSeek 结果见下节；当前状态以 `docs/current-phase.md` 为准。
+
+本工作单元从干净的 `main@7e230d868d289f351c4c5a0050e08c6f6168e3d4` 开始。实现和离线验收完成；四组真实通道各发出一次请求，结果 **2 PASS / 2 BLOCKED**。要求“四模型均成功”的第一阶段 **NOT COMPLETE**。外部阻断已经记录，不把 HTTP 200、Mock PASS 或本次合成动作成功写成正式 Navi E2 自主研究 PASS。没有 commit/push，没有启动正式剧情研究或 E3；正式 E2 仍为 PARTIAL。
+
+### 接入与不可变运行约束
+
+`E2SDK` 继续使用现有 E2 prompt、batch / single-action 校验、E1 工具、source binding、memory、预算和 checkpoint。新增显式逻辑模型/路由映射，没有默认模型；缺失、不合法或不匹配的选择在派发前拒绝。路由身份记录 logical model、wire model、provider、Base URL、`/responses` 路径、credential slot 名称和 API surface，不包含凭据。TokenMetro 与独立 TokenMetro Qwen 即使共享 hostname，身份和凭据槽仍相互独立。
+
+| 逻辑模型 | route | 已确认 Base URL | runtime credential / URL slots |
+|---|---|---|---|
+| `gpt-6-luna` | `tokenmetro` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` / `TOKENMETRO_BASE_URL` |
+| `glm-5.3-flash` | `tokenmetro` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` / `TOKENMETRO_BASE_URL` |
+| `qwen3.8-flash` | `tokenmetro_qwen` | `https://tokenmetro.com/v1` | `NAVI_QWEN_API_KEY` / `NAVI_QWEN_BASE_URL` |
+| `deepseek-v4.1-flash` | `jizhi` | `https://jizhiapi.site/v1` | `JIZHI_API_KEY` / `JIZHI_BASE_URL` |
+
+GPT/GLM 使用本机既有 TokenMetro 环境配置，DeepSeek 使用本机既有 Jizhi 环境配置。新 Qwen 凭据仅经内存/标准输入进入子进程运行时环境，没有写入本地配置文件、源码、Git、日志或实验文件；既有通道的密钥没有复制到 Qwen 槽。Base URL 在派发前按已确认地址校验。wire ID 先作为明确候选发送，只有成功终态返回身份一致才记为 verified；没有 `/models` 请求、猜别名或试其他地址。
+
+SDK `max_retries=0`。应用层最多 3 attempts，只对已有证据支持的 error-only、生成前 TokenMetro `429 / RateLimitExceeded.EndpointTPMExceeded` 有界重试，且必须同一路由/模型/请求。每次 issued、raw error/stream、terminal、usage、retry 决策独立保留；重试消耗 call ceiling 和 token reservation。普通 429、403、5xx、断流、超时、执行不确定、无 usage、空正文或动作失败不会自动重试。原先的 `TypeError` 兼容分支已改为派发前检查 callable signature，避免派发后异常触发第二次调用。新路径无跨模型、跨供应商或旧协议 fallback。历史 SDK live entry points 和 TokenMetro→Jizhi 自动 fallback 已关闭，MockTransport / fixture opener、请求重建、hash 和只读 replay 保留；旧 SDK benchmark 的 live 入口已退役。Phase04 百炼生产链未修改。
+
+新研究预算仍为 100,000 total / 8,192 output ceiling；本次探测每次仅配置 2,048 output ceiling，未消费正式 E2 轮数或历史预算。历史 r1-r4 的 Chat Completions 请求、hash、冻结配置、父子约束及旧 DeepSeek UNKNOWN 请求完全保留。新增 runner 恢复会检查每个 nested attempt、聚合 terminal、wire 与 stream hash，不能用新模型/路由接续冻结父运行。
+
+### 真实请求、三层门禁与用量
+
+证据根：`data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`。每模型目录为 `<logical-model>/probe-01/`。四组均 POST 到各自 Base URL 下的 `/responses`；只有两个成功通道验证了该路径的完整 Responses 能力。
+
+输入是同一份小型合成图书管理员情景，要求输出有序 `search/read/clue/stop` batch，使用固定 synthetic RU 标识。返回先经过现有 E2 batch validator，再验证 read/clue 引用绑定、memory hypothesis 和动作顺序。没有执行任何 search/read/clue 工具，没有加载 Canonical、启动连续搜索或执行剧情研究。这验证动作协议和合成引用一致性，不能替代真实 source binding 或研究语义验收。
+
+| 模型 / wire model sent | 返回 model | route / 请求数 | 鉴权门禁 | Responses / E2 动作门禁 | terminal / 结果 | input / output / total tokens |
+|---|---|---|---|---|---|---|
+| `gpt-6-luna` | `gpt-6-luna` | `tokenmetro` / 1 | PASS | PASS / PASS | `response.completed`, status=`completed`; **PASS** | 570 / 200 / **770** |
+| `glm-5.3-flash` | UNKNOWN | `tokenmetro` / 1 | UNKNOWN | FAIL / FAIL（未达到成功门禁） | HTTP 503 `model_not_found`; 无 Responses terminal; **BLOCKED / EXECUTION UNKNOWN** | UNKNOWN |
+| `qwen3.8-flash` | `qwen3.8-flash` | `tokenmetro_qwen` / 1 | PASS | PASS / PASS | `response.completed`, status=`completed`; **PASS** | 585 / 712 / **1,297** |
+| `deepseek-v4.1-flash` | UNKNOWN | `jizhi` / 1 | UNKNOWN | FAIL / FAIL（未达到成功门禁） | HTTP 524 origin timeout; 无 Responses terminal; **BLOCKED / EXECUTION UNKNOWN** | UNKNOWN |
+
+GLM 错误明确报告当前 distributor 分组没有该模型的可用 channel，但没有服务商返回模型身份或 Responses 终态。这个结果不能证明模型全局不存在，也不能证明账号鉴权或该通道的 Responses 支持已经通过。没有改名、换密钥、换组、换供应商或重发。Jizhi 返回 Cloudflare HTTP 524 错误载体，称 origin 未在代理窗口内返回完整响应；这是服务端载体的报告，不是对具体生成执行或上游内部故障的独立确认。即使载体写有 retryable=true，也不覆盖本工作单元的 UNKNOWN 禁止重发规则。两通道均停止；未向未经确认地址发送凭据。
+
+GPT 报告 reasoning_tokens=36，包含在 output=200 中，没有提供 reasoning 文本，因此 reasoning 文本为 NOT_PROVIDED。Qwen 提供 `response.reasoning_summary_text.delta`，与可见决策正文分别保存；reasoning summary 不冒充完整私有推理链，未报告 reasoning token 分项，因此该分项 UNKNOWN。两个成功响应的 input+output=total 校验通过。累计 **4/12 issued（每模型 1/3）**，0 自动重试、0 fallback、0 Chat Completions；已知 **2,067 tokens + 2 次 UNKNOWN**。实际总量、费用及币种均 UNKNOWN，未访问账单，不用估价替代实际费用。
+
+### 可复核产物与离线验收
+
+- Campaign `authorization.json` 固定四组映射与 3/model、12/overall 上限；派发门禁扫描 issued，包括失败/未完成请求，UNKNOWN 阻止同通道后续派发，其他通道可独立验证。
+- 每模型 `config.json` 保存非敏感 provider/request 配置与 run identity；`rounds/00/attempts/01/` 保存 request、wire、issued、允许的 header metadata、`stream.jsonl.gz` 或 `raw-error.bin`、独立 terminal；`rounds/00/terminal.json` 聚合 attempt identities；`action-validation.json` 与 `report.json` 保存实际结果。失败通道未伪造流或终态。
+- `protocol-integrity-review.py` 为只读复核入口，直接打印结果，不写文件或联网。冻结结果 `protocol-integrity-review.json`：**163 checks PASS**；涵盖 run/request/wire/terminal/stream、返回 model/usage、动作 replay、预算与无工具执行，以及 `historical-before.json` 中 r1-r4 **110 个文件 hash/bytes 全部保持不变**。
+- 最终 offline suites：E2、E1、SDK、semantic batch、历史 live runner fixture、RAG W1/W2、Generation/measure，**289/289 PASS**；命令与退出码为 `offline-test-command-final.json`，日志 `offline-tests-closeout.log`。所有测试均为 provider-free。早期 `offline-tests.log` / `offline-tests-final.log` 保留为中间检查点，不能替代最终日志。最终适配器对四份真实冻结响应的 MockTransport 离线重放也全部一致（`offline-final-adapter-replay.json`，0 provider calls），包括终态 usage、正文一致性和失败通道的 UNKNOWN。
+- 最终实现额外补齐了 raw-error hash、流事件 wall-clock deadline、terminal-only visible/reasoning summary、仅采信 terminal usage、流正文与终态正文一致性及不可变 provider config 防篡改。这些收尾通过离线测试；没有为元数据/审计改动重发已完成或 UNKNOWN 的真实请求。真实证据保持原字节，不补写历史 terminal 字段。
+- `credential-audit.json`、`validation.json` 与 `artifact-manifest.json` 分别保存凭据扫描、最终编译/diff/source-hash 验证及本 campaign 产物清单；凭据扫描也检查压缩流展开后的内容，不输出密钥或密钥指纹。
+
+本工作单元的实现、必要测试、四通道实际尝试和文档收尾已完成；要求四模型均成功的第一阶段仍因 GLM/Jizhi 的外部阻断未完成。没有剩余自动派发任务，不把尚有预算理解为重试授权。下一步只保留审查与外部路由问题处理；进一步独立探测需要新的明确授权并遵守 UNKNOWN 不重发。正式 E2 PARTIAL、无 active Navi view/KG/semantic acceptance、E3 NOT AUTHORIZED 均不变。
+
+
+## 2026-10-15 Jizhi GLM and DeepSeek follow-up
+
+用户后续明确报告 DeepSeek 上游故障并要求再测，同时提供新的独立 GLM 凭据及确认地址 `https://jizhiapi.site/v1`。据此只新增 **DeepSeek 1 次 + GLM 1 次**独立合成 Responses 协议请求；没有恢复或重发 r1 的 UNKNOWN 请求，没有增加正式研究授权。新 root 为 `data/retrieval/p05-navi-e2-responses-followup-20261015-r2/`。其 `authorization.json` 固定原 campaign root 和 manifest SHA-256、每模型新增 1 次 / 总新增 2 次上限，同时将原 4 次 issued 纳入 3/model、12/overall 累计约束。探测 input 明确带有新的诊断授权身份，run/request identity 与旧请求不同；历史 UNKNOWN 仍未解决。
+
+GLM 当前映射改为 **`glm-5.3-flash` / `jizhi_glm`**，使用 `NAVI_GLM_API_KEY` / `NAVI_GLM_BASE_URL` 独立槽。新凭据经不回显的交互输入进入进程环境，仅发送到已确认的 Jizhi `/v1/responses`，不写配置文件或实验文件；未使用 DeepSeek 的 Jizhi 密钥。旧 `glm-5.3-flash` / `tokenmetro` 已从可执行 E2 映射移除，冻结 r1 中该历史配置未改写。其余三组路由保持原配置。本次没有使用任何旧协议或模型/供应商 fallback。
+
+| 模型 | 路由 / 实际 wire & returned model | HTTP / Responses terminal | 鉴权 / Responses / E2 动作 | 新增请求数 | input / output / total |
+|---|---|---|---|---:|---|
+| GLM | `jizhi_glm` / `glm-5.3-flash` | 200 / `response.completed`, `status=completed` | PASS / PASS / PASS | 1 | 610 / 197 / **807** |
+| DeepSeek | `jizhi` / `deepseek-v4.1-flash` | 200 / `response.completed`, `status=completed` | PASS / PASS / PASS | 1 | 620 / 234 / **854** |
+
+两组均真实 POST 到 `https://jizhiapi.site/v1/responses`，服务商返回 model 与 wire 配置一致。相同短合成输入下，返回的 batch JSON 通过现有 E2 决策校验及四动作顺序、read/clue fixture 引用绑定和 memory hypothesis 校验。stream、正文、terminal 与 usage 均完整保存，input+output=total 校验通过。服务商未提供 reasoning 文本或 reasoning token 分项：分别记 NOT_PROVIDED / UNKNOWN，不能推断服务端未推理。SDK 和应用层本次均为最多 1 attempt；没有重试、隐式换路由或 Chat Completions，没有工具执行、Canonical 回读或白夜国研究。
+
+本次新增 **2 次请求 / 1,661 tokens**。合并原 r1：GPT 1/3、Qwen 1/3、GLM 2/3、DeepSeek 2/3，累计 **6/12 issued**，**3,728 已知 tokens + 2 次历史 UNKNOWN**；费用、币种和包含旧请求的实际总 token 仍 UNKNOWN。新成功不抹去原 GLM 503、DeepSeek 524 证据，也不把旧 UNKNOWN 改为已完成。
+
+结合 r1 GPT/Qwen 成功证据，**四逻辑模型 Responses/action 协议第一阶段 4/4 PASS / COMPLETE**（GLM 当前采用新 Jizhi 独立路由）。这不是四模型研究质量对比、正式 E2 自主研究 PASS 或 E3 准入。正式 E2 保持 PARTIAL，E3 NOT AUTHORIZED。所有请求已停止，没有 commit/push。
+
+### Follow-up validation and review
+
+- `offline-tests.log` / `offline-test-command.json`：**292/292 provider-free tests PASS**，覆盖 E2/Responses、新 GLM 独立凭据拒绝、旧 GLM 路由拒绝、新授权边界/累计计数/先前文件篡改拒绝、E1、SDK、batch、历史 fixture、RAG W1/W2、Generation/measure。没有使用真密钥做测试 fixture。
+- `integrity-review.py` 为只读复核入口（打印结果，不写文件或联网）；结果 `integrity-review.json` **222 checks PASS**。重新校验原 campaign manifest 所列 **72 文件**和历史 E2 r1-r4 **110 文件**完全不变；验证新 authorization/config/request/wire/issued/terminal/SSE hash、返回身份、usage、动作 replay 及累计预算。
+- 原 r1 审计脚本保持冻结；它导入当时的模型映射，不应将当前 GLM 映射套入其历史 route 判断。新 follow-up 审计按持久化历史配置和冻结 manifest 校验原证据，不修改旧脚本或旧结果。
+- 每模型 `config.json`、`rounds/00/attempts/01/`、聚合 terminal、`action-validation.json` 和 `report.json` 保留完整独立证据。`glm-credential-audit.json` 记录新凭据在本轮证据中的扫描（含 gzip 展开）PASS，无密钥或指纹输出。
+- `validation.json` 和 `artifact-manifest.json` 记录最终源码/文档 hashes、compile/diff 检查、运行结果和产物清单。前一轮源码快照保持原样，本轮保存独立新快照。
+
+此次明确授权只支持新的独立诊断，不创建自动越过 UNKNOWN 的通用恢复机制，也不允许重置预算。后续 provider 请求或正式 E2 剧情研究需要另行明确授权。

@@ -89,11 +89,12 @@ class OpenAIChatCompletionsAdapter:
         self._config = config
         self._api_key = api_key
         self._opener = urlopen if opener is None else opener
+        self._injected_opener = opener is not None
         self._allow_legacy_live = allow_legacy_live is True
 
     @property
     def legacy_live_enabled(self) -> bool:
-        return self._allow_legacy_live
+        return self._allow_legacy_live and self._injected_opener
 
     def build_request_body(self, request: SemanticProviderRequest) -> bytes:
         if request.config != self._config:
@@ -132,6 +133,8 @@ class OpenAIChatCompletionsAdapter:
     def invoke(self, request: SemanticProviderRequest) -> SemanticProviderResponse:
         if not self._allow_legacy_live:
             raise SemanticLiveRunnerError("legacy direct-HTTP live invocation requires explicit opt-in")
+        if not self._injected_opener:
+            raise SemanticLiveRunnerError("historical Chat Completions live dispatch retired; use E2 Responses")
         body = self.build_request_body(request)
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
         if self._config.user_agent is not None:

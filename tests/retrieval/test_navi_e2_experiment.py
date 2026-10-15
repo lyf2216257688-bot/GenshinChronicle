@@ -7,7 +7,7 @@ from unittest.mock import patch
 from tests.retrieval.test_navi_exploration import NaviExplorationTests
 from genshin_corpus.rag.navi_e2_experiment import (
     E2Budget, HYPOTHESIS, run_exploration, once, E2SDK, body_chars, model_result, lineage_accounting, short_payload,
-    SINGLE_ACTION_PROMPT,
+    SINGLE_ACTION_PROMPT, PROMPT, execute_action,
 )
 from genshin_corpus.retrieval.navi_exploration import ExplorationError
 from genshin_corpus.canonical.fingerprints import sha256_json
@@ -113,6 +113,97 @@ class E2Tests(NaviExplorationTests):
         r=model_result({'mode':'local','query':'test','hits':[hit]})
         self.assertEqual(r['hits'][0]['unit_id'],self.uid);self.assertEqual(len(r['hits'][0]['snippet']),80)
         self.assertEqual(r['hits'][0]['snippet_omitted_chars'],130)
+    def test_new_prompts_use_ru_identity_in_both_modes(self):
+        for prompt in (PROMPT, SINGLE_ACTION_PROMPT):
+            self.assertIn('unit_id', prompt['tools']['read'])
+            self.assertNotIn('hit:', json.dumps(prompt, ensure_ascii=False))
+            self.assertIn('model_round', prompt['tools']['read'])
+
+    def test_short_search_retains_formal_ids_for_multiple_candidates(self):
+        self.partial_parent()
+        state=json.loads((self.root/'e2/session.json').read_text())
+        state['delivered_until']=0
+        original=next(e for e in state['events'] if e['action']['action']=='search')
+        compact=next(e['result'] for e in short_payload(state,self.question,E2Budget())['new_tool_results'] if 'hits' in e['result'])
+        self.assertGreaterEqual(len(compact['hits']),2)
+        for shown, full in zip(compact['hits'],original['result']['hits']):
+            self.assertEqual(shown['unit_id'],full['unit_id'])
+            self.assertNotIn('hit',shown)
+            self.assertLessEqual(len(shown['snippet']),60)
+
+    def test_batch_round_three_reads_search_actions_five_and_six_by_id(self):
+        outer=self
+        class FromVisibleIds(FakeDecisions):
+            def __call__(sub,stem,body,identity):
+                payload=json.loads(body['input'])
+                if sub.calls==2:
+                    outer.assertEqual(payload['model_round'],3)
+                    searches=[e for e in payload['new_tool_results'] if 'hits' in e['result']]
+                    outer.assertEqual([e['action_index'] for e in searches],[5,6])
+                    sub.decisions.append(decision([
+                        {'action':'read','unit_id':e['result']['hits'][0]['unit_id'],'max_chars':20000}
+                        for e in searches]+[{'action':'stop','reason':'fixture done'}]))
+                return super().__call__(stem,body,identity)
+        fake=FromVisibleIds([
+            decision([{'action':'search','query':'library','top_k':2},
+                      {'action':'search','query':'legend','top_k':2},
+                      {'action':'clue','text':'hypothesis','source_unit_ids':[self.uid]}]),
+            decision([{'action':'read','unit_id':self.uid,'max_chars':20000},
+                      {'action':'search','query':'Library 0','top_k':2},
+                      {'action':'search','query':'Library 1','top_k':2}])])
+        state=self.run_e2(fake)
+        self.assertEqual(state['status'],'stopped')
+        self.assertEqual(state['used']['reads'],4)  # seed plus three reads
+        self.assertEqual([e['action']['action'] for e in state['events'][5:7]],['search','search'])
+
+    def test_single_action_reads_multiple_visible_ids_and_legacy_coordinates(self):
+        self.partial_parent()
+        outer=self
+        class ReadVisible(FakeDecisions):
+            def __call__(sub,stem,body,identity):
+                if sub.calls==0:
+                    payload=json.loads(body['input'])
+                    search=next(e for e in payload['new_tool_results'] if 'hits' in e['result'])
+                    hits=search['result']['hits']
+                    reference=({'hit':{'round':search['action_index'],'index':1}} if legacy
+                               else {'unit_id':hits[1]['unit_id']})
+                    sub.decisions=[{'action':'read','unit_id':hits[0]['unit_id'],'max_chars':20000},
+                                   {'action':'read',**reference,'max_chars':20000},
+                                   {'action':'stop','reason':'done'}]
+                    outer.assertNotEqual(search['action_index'],3)  # next model call is 3
+                return super().__call__(stem,body,identity)
+        for legacy in (False,True):
+            with self.subTest(legacy=legacy):
+                state=run_exploration(self.tools,start_ru=self.uid,output_root=self.root/f'short-{legacy}',provider=ReadVisible([]),
+                    question=self.question,parent_root=self.root/'e2',single_action_continuation=True,budget=E2Budget(output_tokens=4096))
+                self.assertEqual(state['status'],'stopped')
+                self.assertEqual(state['used']['reads'],3)
+
+    def test_batch_legacy_hit_keeps_global_action_semantics(self):
+        fake=FakeDecisions([
+            decision([{'action':'clue','text':'hypothesis','source_unit_ids':[self.uid]},
+                      {'action':'search','query':'library','top_k':2}]),
+            decision([{'action':'read','hit':{'round':2,'index':i},'max_chars':20000} for i in (0,1)]
+                     +[{'action':'stop','reason':'done'}])])
+        state=self.run_e2(fake)
+        self.assertEqual(state['status'],'stopped')
+        self.assertEqual(state['used']['reads'],3)
+
+    def test_invalid_references_still_fail_before_read(self):
+        self.partial_parent()
+        state=json.loads((self.root/'e2/session.json').read_text())
+        search=next(e for e in state['events'] if e['action']['action']=='search')
+        execute_action(self.tools,state,{'action':'clue','text':'hypothesis','source_unit_ids':[self.uid]},E2Budget())
+        bad=[{'hit':{'round':0,'index':0}},  # seed read is not search
+             {'hit':{'round':len(state['events'])-1,'index':0}},  # clue is not search
+             {'hit':{'round':-1,'index':0}}, {'hit':{'round':True,'index':0}},
+             {'hit':{'round':999,'index':0}}, {'hit':{'round':search['round'],'index':999}},
+             {'hit':{'action_index':search['round'],'index':0}},
+             {'unit_id':'not-provided'}, {'unit_id':''}]
+        for reference in bad:
+            with self.subTest(reference=reference), patch.object(self.tools,'read',side_effect=AssertionError('invalid read dispatched')):
+                with self.assertRaises(ExplorationError):
+                    execute_action(self.tools,state,{'action':'read',**reference},E2Budget())
     def partial_parent(self):
         f=FakeDecisions([decision([{'action':'search','query':'library','top_k':2}]), decision([{'action':'stop','reason':'done'}])])
         class Length(FakeDecisions):
@@ -203,92 +294,92 @@ class E2Tests(NaviExplorationTests):
         import httpx
         transport=httpx.MockTransport(lambda req:httpx.Response(429,json={'error':{'message':'fixture rate limit','code':'RateLimitExceeded.EndpointRPMExceeded'}}))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            p=E2SDK(transport=transport)
-            t=p(self.root/'sdk429/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            p=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=p(self.root/'sdk429/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete']);self.assertEqual(t['calls'],1);self.assertEqual(t['http_status'],429)
-        self.assertTrue((self.root/'sdk429/rounds/00/raw-error.bin').exists())
+        self.assertTrue((self.root/'sdk429/rounds/00/attempts/01/raw-error.bin').exists())
     def test_sdk_incomplete_stream_preserved(self):
         import httpx
         wire='data: '+json.dumps({'type':'response.output_text.delta','delta':'partial'})+'\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            p=E2SDK(transport=transport)
-            t=p(self.root/'sdkpartial/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            p=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=p(self.root/'sdkpartial/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete']);self.assertEqual(t['content'],'partial');self.assertIsNotNone(t['stream'])
     def test_sdk_stream_usage_and_wire_evidence(self):
         import httpx
         chunks=[{'type':'response.reasoning_text.delta','delta':'thinking'},
                 {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
-                {'type':'response.completed','response':{'id':'resp_1','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
+                {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_1','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdk/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=provider(self.root/'sdk/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertTrue(t['complete']); self.assertEqual(t['calls'],1); self.assertEqual(t['usage']['total_tokens'],30)
         self.assertEqual(t['reasoning'],'thinking')
-        meta = json.loads((self.root/'sdk/rounds/00/request-metadata.json').read_text())
+        meta = json.loads((self.root/'sdk/rounds/00/attempts/01/request-metadata.json').read_text())
         self.assertTrue(meta['url'].endswith('/responses'))
-        self.assertNotIn('fixture-secret',(self.root/'sdk/rounds/00/request-metadata.json').read_text())
+        self.assertNotIn('fixture-secret',(self.root/'sdk/rounds/00/attempts/01/request-metadata.json').read_text())
     def test_sdk_in_stream_error_event_captured(self):
         import httpx
         chunks=[{'type':'error','error':{'message':'provider internal rate error','code':'rate_limit'}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdkerr/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=provider(self.root/'sdkerr/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete'])
         self.assertIn(t['error']['type'], ('ResponsesStreamError', 'APIError'))
         self.assertIn('provider internal rate error',t['error']['message'])
     def test_sdk_response_failed_event_captured(self):
         import httpx
-        chunks=[{'type':'response.failed','response':{'id':'resp_fail','error':{'message':'safety check reject'}}}]
+        chunks=[{'type':'response.failed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_fail','error':{'message':'safety check reject'}}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdkfailed/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=provider(self.root/'sdkfailed/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete'])
         self.assertEqual(t['error']['type'],'ResponsesFailedError')
         self.assertIn('safety check reject',t['error']['message'])
     def test_sdk_rejects_chat_completions_surface(self):
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'chat_completions'}):
             with self.assertRaises(ExplorationError) as ctx:
-                E2SDK()
+                E2SDK(route='tokenmetro', model='gpt-6-luna', )
             self.assertIn('Responses API surface',str(ctx.exception))
     def test_sdk_rejects_unsupported_route(self):
         with patch.dict('os.environ',{'JIZHI_API_KEY':'fixture-secret','JIZHI_BASE_URL':'https://example.invalid/v1'}):
             with self.assertRaises(ExplorationError) as ctx:
-                E2SDK(route='jizhi')
-            self.assertIn('Responses API surface',str(ctx.exception))
+                E2SDK(route='jizhi', model='gpt-6-luna')
+            self.assertIn('matching route',str(ctx.exception))
     def test_sdk_empty_visible_content_fails(self):
         import httpx
         chunks=[{'type':'response.reasoning_text.delta','delta':'only thought, no visible output'},
-                {'type':'response.completed','response':{'id':'resp_empty','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
+                {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_empty','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdkempty/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=provider(self.root/'sdkempty/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete'])
         self.assertEqual(t['content'],'')
         self.assertEqual(t['reasoning'],'only thought, no visible output')
     def test_sdk_missing_usage_fails_complete(self):
         import httpx
         chunks=[{'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
-                {'type':'response.completed','response':{'id':'resp_no_usage'}}]
+                {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_no_usage'}}]
         wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
-            provider=E2SDK(transport=transport)
-            t=provider(self.root/'sdknousage/rounds/00',{'model':'deepseek-v4.1-flash','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
+            provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
+            t=provider(self.root/'sdknousage/rounds/00',{'model':'gpt-6-luna','instructions':'inst','input':'fixture','stream':True,'max_output_tokens':100},'fixture')
         self.assertFalse(t['complete'])
         self.assertTrue(bool(t['content']))
     def test_exploration_invalid_action_json_fails(self):
         class BadJsonProvider:
             def __init__(self):
-                self.config={'route':{'model_id':'deepseek-v4.1-flash'}}
+                self.config={'route':{'model_id':'gpt-6-luna'}}
             def __call__(self, stem, body, identity):
                 return {'calls': 1, 'http_status': 200, 'headers': {}, 'run_identity': identity,
                         'finish_reason': 'stop', 'complete': True, 'content': 'not valid json',
@@ -338,18 +429,18 @@ class E2Tests(NaviExplorationTests):
     def test_sdk_decision_complete_distinguishes_valid_vs_invalid_json(self):
         import httpx
         valid_chunk = [{'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
-                       {'type':'response.completed','response':{'id':'resp_valid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
+                       {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_valid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
         invalid_chunk = [{'type':'response.output_text.delta','delta':'this is definitely not valid json'},
-                         {'type':'response.completed','response':{'id':'resp_invalid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
+                         {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_invalid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
         wire_valid = ''.join('data: '+json.dumps(c)+'\n\n' for c in valid_chunk)+'data: [DONE]\n\n'
         wire_invalid = ''.join('data: '+json.dumps(c)+'\n\n' for c in invalid_chunk)+'data: [DONE]\n\n'
         env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
-        p_valid = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_valid)), environment=env)
-        t_valid = p_valid(self.root/'sdk_valid/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1')
+        p_valid = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_valid)), environment=env)
+        t_valid = p_valid(self.root/'sdk_valid/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1')
         self.assertTrue(t_valid['complete'])
         self.assertTrue(t_valid['decision_complete'])
-        p_invalid = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_invalid)), environment=env)
-        t_invalid = p_invalid(self.root/'sdk_invalid/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2')
+        p_invalid = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_invalid)), environment=env)
+        t_invalid = p_invalid(self.root/'sdk_invalid/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2')
         self.assertTrue(t_invalid['complete'])
         self.assertFalse(t_invalid['decision_complete'])
 
@@ -358,31 +449,31 @@ class E2Tests(NaviExplorationTests):
         env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
         single_action_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
             {'type':'response.output_text.delta','delta':json.dumps({'action':'search','query':'test','top_k':3})},
-            {'type':'response.completed','response':{'id':'resp_single','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
+            {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_single','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
         ]) + 'data: [DONE]\n\n'
         batch_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
             {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'search','query':'test','top_k':3}]))},
-            {'type':'response.completed','response':{'id':'resp_batch','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
+            {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_batch','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
         ]) + 'data: [DONE]\n\n'
 
-        p1 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
-        t1 = p1(self.root/'sdk_mismatch_1/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1', decision_mode='batch')
+        p1 = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
+        t1 = p1(self.root/'sdk_mismatch_1/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1', decision_mode='batch')
         self.assertTrue(t1['complete'])
         self.assertFalse(t1['decision_complete'])
 
-        p2 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=batch_wire)), environment=env)
-        t2 = p2(self.root/'sdk_mismatch_2/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2', decision_mode='single_action')
+        p2 = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=batch_wire)), environment=env)
+        t2 = p2(self.root/'sdk_mismatch_2/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id2', decision_mode='single_action')
         self.assertTrue(t2['complete'])
         self.assertFalse(t2['decision_complete'])
 
-        p3 = E2SDK(transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
-        t3 = p3(self.root/'sdk_mismatch_3/rounds/00', {'model':'deepseek-v4.1-flash','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id3', decision_mode='single_action')
+        p3 = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
+        t3 = p3(self.root/'sdk_mismatch_3/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id3', decision_mode='single_action')
         self.assertTrue(t3['complete'])
         self.assertTrue(t3['decision_complete'])
 
     def test_run_exploration_rejects_schema_mismatch_without_incrementing_accepted_decisions(self):
         class SingleActionFakeProvider:
-            config = {'route': {'model_id': 'deepseek-v4.1-flash'}}
+            config = {'route': {'model_id': 'gpt-6-luna'}}
             def __call__(self, stem, body, run_identity, *, decision_mode=None):
                 stem.mkdir(parents=True, exist_ok=True)
                 text = json.dumps({'action': 'search', 'query': 'q', 'top_k': 3})
@@ -406,6 +497,46 @@ class E2Tests(NaviExplorationTests):
         self.assertIn('decision does not conform to exploration mode schema', state['error']['message'])
         self.assertEqual(state.get('accepted_decisions', 0), 0)
         self.assertFalse((out / 'rounds' / '00' / 'decision.json').exists())
+
+    def test_type_error_after_dispatch_does_not_invoke_provider_twice(self):
+        class RaisesTypeError(FakeDecisions):
+            def __call__(sub, stem, body, identity, *, decision_mode=None):
+                sub.calls += 1
+                once(stem/'issued.json', {'run_identity': identity})
+                raise TypeError('fixture error after issuance')
+        provider = RaisesTypeError([])
+        state = self.run_e2(provider)
+        self.assertEqual(provider.calls, 1)
+        self.assertEqual(state['status'], 'partial')
+        self.assertEqual(state['provider_audit']['usage_unknown_calls'], 1)
+
+    @patch('genshin_corpus.rag.navi_e2_experiment.time.sleep')
+    def test_sdk_retries_count_against_research_budget_and_offline_recovery(self, sleep):
+        import httpx
+        from tests.retrieval.test_navi_e2_responses import response
+        issued = []
+        def handler(req):
+            issued.append(req)
+            if len(issued) == 1:
+                return httpx.Response(429, json={'error': {'code': 'RateLimitExceeded.EndpointTPMExceeded'}})
+            return response(text=json.dumps(decision([{'action':'stop','reason':'fixture complete'}])))
+        provider = E2SDK('tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(handler),
+            environment={'TOKENMETRO_API_KEY':'fixture-secret', 'TOKENMETRO_BASE_URL':'https://example.invalid/v1'})
+        state = self.run_e2(provider)
+        self.assertEqual(state['status'], 'stopped')
+        self.assertEqual(state['provider_calls'], 2)
+        self.assertEqual(state['model_rounds'], 2)
+        self.assertEqual(state['provider_audit']['retry_calls'], 1)
+        self.assertEqual(state['provider_audit']['usage_unknown_calls'], 0)
+        self.assertEqual(state['used']['tokens'], 20)
+        self.assertEqual(lineage_accounting(self.root/'e2')['calls'], 2)
+        self.assertEqual(self.run_e2(provider)['checkpoint_identity'], state['checkpoint_identity'])
+        self.assertEqual(len(issued), 2)
+        path = self.root/'e2/rounds/00/attempts/02/terminal.json'
+        value = json.loads(path.read_text('utf-8')); value['content'] = 'tampered'
+        path.write_text(json.dumps(value), encoding='utf-8')
+        with self.assertRaisesRegex(ExplorationError, 'integrity'):
+            self.run_e2(provider)
 
 # Do not rerun inherited E1 cases as if they were new E2 tests.
 for name in dir(NaviExplorationTests):

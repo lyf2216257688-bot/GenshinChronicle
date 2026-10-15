@@ -51,7 +51,12 @@ the immediate next action are owned by `docs/current-phase.md`.
   E1 recorded exploration/checkpoints and the opt-in real-source mechanical
   smoke also live here; E1 contains no model transport or production Agent.
   `navi_e2_experiment.py` is the opt-in single-case model exploration runner;
-  it reuses E1 tools and SDK evidence helpers without creating active views. The
+  it reuses E1 tools and SDK evidence helpers without creating active views.
+  `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
+  `navi_e2_protocol_probe.py` owns bounded synthetic Responses/action canaries
+  and their campaign request ceilings, without invoking corpus tools. Archived
+  retrieval SDK execution paths are restricted to offline MockTransport;
+  historical request construction and read-only replay remain available. The
   package does not redefine semantic candidate/admission or Assembly policies
   owned by `retrieval/`, and it does not redefine provider contracts owned by
   `generation/`.

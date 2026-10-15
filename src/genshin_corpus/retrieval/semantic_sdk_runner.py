@@ -52,6 +52,12 @@ V5_GATE_SCHEMA_VERSION = "phase05-w2-v5-live-gate-manifest-0.1"
 V5_GATE_RESPONSES_SCHEMA_VERSION = "phase05-w2-v5-live-gate-manifest-0.2"
 
 
+def _historical_transport_only(transport: Any) -> None:
+    """Frozen runner contracts remain exercisable offline, never live fallbacks."""
+    if not isinstance(transport, httpx.MockTransport):
+        raise ValueError('historical Phase05 SDK live dispatch retired; use explicit E2 Responses model/route')
+
+
 def _chunk_mapping(chunk: Any) -> dict[str, Any]:
     """Convert an SDK stream chunk to a secret-free JSON-compatible mapping."""
 
@@ -843,6 +849,7 @@ def run_sdk_units(
             wire_count = 0
 
             def on_request(request: httpx.Request) -> None:
+                _historical_transport_only(transport)
                 nonlocal wire_count
                 wire_count += 1
                 if wire_count != 1 or json.loads(request.content) != unit["body"]:
@@ -1411,6 +1418,7 @@ def run_sdk_route_pair(
         sdk_error_details: dict[str, str] = {}
 
         def on_request(request: httpx.Request) -> None:
+            _historical_transport_only((transports or {}).get(route))
             nonlocal wire_count
             wire_count += 1
             if wire_count != 1 or json.loads(request.content) != route_body:
@@ -1886,6 +1894,7 @@ def run_sdk_route_canary(
     first_visible_ms: float | None = None
 
     def on_request(request: httpx.Request) -> None:
+        _historical_transport_only(transport)
         nonlocal wire_count
         wire_count += 1
         if wire_count != 1 or json.loads(request.content) != body or key.encode() in request.content:
@@ -2061,6 +2070,7 @@ def run_sdk_single_route_attempt(
     dispatch_error: Exception | None = None
 
     def on_request(request: httpx.Request) -> None:
+        _historical_transport_only(transport)
         nonlocal wire_count, dispatch_error, dispatch_metadata
         wire_count += 1
         if wire_count != 1 or json.loads(request.content) != body or key.encode() in request.content:

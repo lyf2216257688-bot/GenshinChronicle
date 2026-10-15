@@ -44,6 +44,17 @@ Evidence Packet resolved to official Retrieval Units and Canonical lineage.
 The root can hold the local production materialization baseline, but is not a
 serving-system, vector-database, or permanent source-of-truth contract.
 
+The E2 four-model Responses protocol evidence uses a separate immutable campaign
+root, `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`. Its
+authorization, per-model probe configs, issued attempts, raw error/SSE evidence,
+terminal usage, action validation, and offline audit are synthetic protocol
+evidence, not formal autonomous research or Canonical material. Runtime API
+credentials never belong in this root. The independently authorized follow-up
+root `data/retrieval/p05-navi-e2-responses-followup-20261015-r2/` binds the frozen
+original campaign manifest and counts its issued requests cumulatively. It holds
+new Jizhi GLM/DeepSeek probes, not resume/replay or a resolution of earlier UNKNOWN
+requests. Historical E2 r1-r4 and original protocol roots stay immutable.
+
 Experiment-specific, review-only, provider, or challenger evidence that is
 kept under `.local/` remains outside this data-root contract and must not be
 promoted to tracked data merely because it informs a later decision.

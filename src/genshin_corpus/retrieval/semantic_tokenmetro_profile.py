@@ -1,8 +1,10 @@
-"""Explicit Phase 05 provider route profiles.
+"""Historical Phase 05 extraction route profiles.
 
 The semantic compiler owns neither provider selection nor fallback policy.  The
 small profiles in this module are the persisted, secret-free description of the
-two OpenAI-compatible DeepSeek routes used by the SDK runner.
+two OpenAI-compatible DeepSeek routes used by the archived SDK runner. New E2
+Responses execution uses rag.navi_e2_routes; historical request identities and
+read-only replay continue to use these frozen profiles.
 """
 
 from __future__ import annotations

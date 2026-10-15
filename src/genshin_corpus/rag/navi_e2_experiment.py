@@ -16,10 +16,10 @@ from genshin_corpus.collector.storage import atomic_write
 from genshin_corpus.retrieval.navi_exploration import (
     LocalExplorationTools, ExplorationError, ExplorationBudgetExceeded, response_chars,
 )
-from genshin_corpus.retrieval.semantic_tokenmetro_profile import route_profile
+from .navi_e2_routes import e2_route, E2_ROUTES
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _DoneTrackingStream, _JsonlArtifactWriter, _chunk_mapping, _stream_delta, _normalize_usage,
-    _responses_event_parts,
+    _responses_event_parts, safe_rate_limit_retry, _retry_after,
 )
 from .navi_experiment import _validate_action, _resolve_read, _save as _e1_save
 
@@ -31,7 +31,7 @@ PROMPT = {
     "output": "仅输出JSON对象：{actions:[...],memory:{status:'unverified_hypothesis_not_fact',text:'有界工作记忆'},rationale:'选择或停止理由'}。每轮1至6个顺序动作，可组合search/read/clue/stop。",
     "tools": {
         "search": "{action:'search',query:自主选取的字符串(<=160字符),top_k:1..5}。本地Lexical，无Hybrid或网页。",
-        "read": "{action:'read',unit_id:已返回搜索结果的正式RU ID,max_chars:1..20000,neighbors:0或1}，或hit:{round:全局动作序号,index:搜索结果序号(0起)}。只回读真实Canonical，截断可见。",
+        "read": "{action:'read',unit_id:原样复制候选或seed提供的正式RU ID,max_chars:1..20000,neighbors:0或1}。两种上下文均使用unit_id引用来源；model_round是模型请求轮次，action_index是全局动作编号，均不是RU ID。只回读真实Canonical，截断可见。",
         "clue": "{action:'clue',text:<=1000字符的待核实线索,source_unit_ids:[已读RU]}。",
         "stop": "{action:'stop',reason:<=1000字符}。来源或预算足够时主动停止；不要为了凑轮数继续。",
     },
@@ -42,7 +42,7 @@ PROMPT = {
 SINGLE_ACTION_PROMPT = {
     "task": "继续同一有界研究问题，自主选择下一步。只输出一个很短的JSON动作，不要解释或总结。",
     "authority": PROMPT['authority'],
-    "output": "直接输出search/read/clue/stop动作对象，不包actions/memory/rationale。read可用hit:{round:全局搜索动作号,index:候选序号}。clue.text或stop.reason最多500字。无需凑齐动作，材料不足可注明并停止。",
+    "output": "直接输出search/read/clue/stop动作对象，不包actions/memory/rationale。read.unit_id原样复制候选或seed提供的正式RU ID。clue.text或stop.reason最多500字。无需凑齐动作，材料不足可注明并停止。",
     "tools": PROMPT['tools'],
     "limits": "一次只能一个动作。read后请在clue中注明材料属性、作者/说话者、推测与史料限制；不把候选片段当作完整已读来源。clue始终是unverified_hypothesis_not_fact。剩余轮数或材料足够时自主stop。",
 }
@@ -65,7 +65,7 @@ def lineage_accounting(root):
     inherited=lineage_accounting(state['parent']['root']) if state.get('parent') else {'calls':0,'tokens':0,'reservations':0,'terminals':[]}
     calls,tokens,reservations=inherited['calls'],inherited['tokens'],inherited['reservations']
     terminals=list(inherited['terminals'])
-    for issued_path in sorted(root.glob('rounds/*/issued.json')):
+    for issued_path in sorted(root.glob('rounds/**/issued.json')):
         stem=issued_path.parent
         if not (stem/'terminal.json').exists(): raise ExplorationError('unresolved parent issued request')
         terminal=json.loads((stem/'terminal.json').read_text('utf-8'))
@@ -76,9 +76,12 @@ def lineage_accounting(root):
         if issued['request_identity'] != sha256_json(request) or request!=json.loads((stem/'wire-request.json').read_text('utf-8')):
             raise ExplorationError('parent request/wire integrity')
         total=terminal.get('usage',{}).get('total_tokens') if isinstance(terminal.get('usage'),dict) else None
+        if terminal.get('retry_eligible') and terminal.get('execution_state') == 'NOT_STARTED': total=0
         if isinstance(total,bool) or not isinstance(total,int) or total<0: raise ExplorationError('parent usage UNKNOWN')
         calls+=1;tokens+=total
-        reservations+=json.loads((stem/'input-accounting.json').read_text('utf-8'))['reserved_tokens']
+        accounting = stem/'input-accounting.json'
+        if not accounting.exists(): accounting = stem.parent.parent/'input-accounting.json'
+        reservations+=json.loads(accounting.read_text('utf-8'))['reserved_tokens']
         terminals.append({'root':str(root),'round':stem.name,'total_tokens':total,'finish_reason':terminal['finish_reason']})
     return {'calls':calls,'tokens':tokens,'reservations':reservations,'terminals':terminals}
 
@@ -88,13 +91,13 @@ def short_payload(state, question, budget):
     for event in state['events'][state.get('delivered_until',0):]:
         result=event['result']
         if 'hits' in result:
-            # IDs remain in the immutable receipts; model may use actual hit coordinates.
+            # Match batch-mode read identity; never make model/action numbers locators.
             result={'query':result['query'],'hits':[{
-                'hit':{'round':event['round'],'index':i},
+                'unit_id':h['unit_id'],
                 'title':h['record_context']['record_title'],'section':h['record_context']['section_name'],
                 'kind':h['canonical_address']['canonical_unit_kind'],'snippet':h['snippet'][:60],
                 'snippet_omitted_chars':h['snippet_omitted_chars']+max(0,len(h['snippet'])-60),
-            } for i,h in enumerate(result['hits'])]}
+            } for h in result['hits']]}
         elif 'canonical_payload' in result:
             result={k:result[k] for k in ('unit_id','ru_text','partial','omitted_chars','context_scope','omitted_component_unit_count','source_binding_status')}
             original=event['result']
@@ -153,15 +156,44 @@ def _save(root, state):
     return state
 
 
+def verify_response_attempts(stem):
+    """Verify new nested attempts without changing legacy request/hash rules."""
+    paths = sorted((stem/'attempts').glob('*/issued.json'))
+    if not paths: return
+    aggregate = json.loads((stem/'terminal.json').read_text('utf-8'))
+    identities = []
+    for path in paths:
+        issued = json.loads(path.read_text('utf-8'))
+        request = json.loads(path.with_name('request.json').read_text('utf-8'))
+        wire = json.loads(path.with_name('wire-request.json').read_text('utf-8'))
+        terminal = json.loads(path.with_name('terminal.json').read_text('utf-8'))
+        if (issued['run_identity'] != aggregate['run_identity'] or request != wire
+                or issued['request_identity'] != sha256_json(request)
+                or terminal['terminal_identity'] != sha256_json({k:v for k,v in terminal.items() if k != 'terminal_identity'})):
+            raise ExplorationError('Responses attempt integrity mismatch')
+        descriptor = terminal.get('stream')
+        if descriptor:
+            stream_path = path.parent/'stream.jsonl.gz'
+            if sha256(stream_path.read_bytes()).hexdigest() != descriptor['sha256']:
+                raise ExplorationError('Responses stream integrity mismatch')
+        raw_descriptor = terminal.get('raw_error')
+        if raw_descriptor and sha256(path.with_name('raw-error.bin').read_bytes()).hexdigest() != raw_descriptor['sha256']:
+            raise ExplorationError('Responses raw error integrity mismatch')
+        identities.append(terminal['terminal_identity'])
+    if aggregate.get('attempt_identities') != identities or aggregate['calls'] != len(paths):
+        raise ExplorationError('Responses aggregate attempt mismatch')
+
+
 def reconcile_provider_accounting(root, state):
-    issued = list(root.glob('rounds/*/issued.json'))
-    terminals = [json.loads(p.read_text('utf-8')) for p in root.glob('rounds/*/terminal.json')]
+    issued = list(root.glob('rounds/**/issued.json'))
+    terminals = [json.loads(p.with_name('terminal.json').read_text('utf-8')) for p in issued if p.with_name('terminal.json').exists()]
     inherited=state.get('parent')
     parent=json.loads((root/'parent-checkpoint.json').read_text('utf-8')) if inherited else None
     inherited_account=state.get('inherited_accounting')
     inherited_calls=inherited_account['calls'] if inherited_account else parent['provider_calls'] if parent else 0
     state['provider_calls'] = len(issued)+inherited_calls
-    totals = [t.get('usage', {}).get('total_tokens') if isinstance(t.get('usage'), dict) else None for t in terminals]
+    totals = [0 if t.get('retry_eligible') and t.get('execution_state') == 'NOT_STARTED'
+              else t.get('usage', {}).get('total_tokens') if isinstance(t.get('usage'), dict) else None for t in terminals]
     known=sum(v for v in totals if isinstance(v,int))+(inherited_account['tokens'] if inherited_account else parent['provider_audit']['known_total_tokens'] if parent else 0)
     state['used']['tokens']=known
     if inherited_account:
@@ -171,7 +203,9 @@ def reconcile_provider_accounting(root, state):
         'terminal_count':len(terminals)+(inherited_account['calls'] if inherited_account else parent['provider_audit']['terminal_count'] if parent else 0),
         'known_total_tokens':known,
         'usage_unknown_calls':sum(not isinstance(v,int) for v in totals) + max(0,len(issued)-len(terminals))+(0 if inherited_account else parent['provider_audit']['usage_unknown_calls'] if parent else 0),
-        'actual_cost':'UNKNOWN', 'currency':'UNKNOWN', 'retry_calls':0, 'fallback_calls':0}
+        'actual_cost':'UNKNOWN', 'currency':'UNKNOWN',
+        'retry_calls':sum(max(0, len(list(p.glob('attempts/*/issued.json')))-1) for p in (root/'rounds').glob('*')),
+        'fallback_calls':0}
 
 
 def body_chars(receipt):
@@ -222,7 +256,7 @@ def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
         if mode == "single_action":
             if dec.get("action") not in {"search", "read", "clue", "stop"}:
                 return False
-            _validate_action(dec)
+            _validate_e2_action(dec)
             if dec.get("action") in {"clue", "stop"}:
                 text_or_reason = dec.get("text") if dec.get("action") == "clue" else dec.get("reason")
                 if not isinstance(text_or_reason, str) or len(text_or_reason) > 500:
@@ -237,7 +271,7 @@ def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
             for a in acts:
                 if not isinstance(a, dict):
                     return False
-                _validate_action(a)
+                _validate_e2_action(a)
             mem = dec.get("memory")
             if (not isinstance(mem, dict)
                     or set(mem) != {"status", "text"}
@@ -254,67 +288,125 @@ def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
         return False
 
 
+def _validate_e2_action(action):
+    """Validate bounded E2 argument shapes before claiming action protocol success."""
+    _validate_action(action)
+    def integer(value, low, high):
+        return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+    kind = action['action']
+    if kind == 'search':
+        valid = (isinstance(action.get('query'), str) and 1 <= len(action['query'].strip()) <= 160
+                 and integer(action.get('top_k', 5), 1, 5))
+    elif kind == 'read':
+        reference = action.get('unit_id')
+        hit = action.get('hit')
+        valid = ((isinstance(reference, str) and bool(reference)) if 'unit_id' in action else
+            isinstance(hit, dict) and set(hit) == {'round', 'index'}
+            and all(integer(v, 0, 100000) for v in hit.values()))
+        valid = valid and integer(action.get('max_chars', 20000), 1, 20000) and integer(action.get('neighbors', 0), 0, 1)
+    elif kind == 'clue':
+        valid = (isinstance(action.get('text'), str) and 1 <= len(action['text']) <= 1000
+            and isinstance(action.get('source_unit_ids'), list) and bool(action['source_unit_ids'])
+            and all(isinstance(uid, str) and bool(uid) for uid in action['source_unit_ids']))
+    else:
+        valid = isinstance(action.get('reason'), str) and 1 <= len(action['reason']) <= 1000
+    if not valid:
+        raise ExplorationError('invalid bounded E2 action arguments')
+
+
 class E2SDK:
     """Existing SDK route/helpers, with an E2 decision protocol instead of atomic extraction."""
-    def __init__(self, route='tokenmetro', transport=None, environment=None):
+    def __init__(self, route=None, *, model=None, transport=None, environment=None, max_attempts=3, before_dispatch=None):
         import openai
         env = dict(os.environ if environment is None else environment)
-        surface = env.get('TOKENMETRO_API_SURFACE')
-        if surface == 'chat_completions':
-            raise ExplorationError('E2 requires configured Responses API surface; chat_completions is not authorized for new runs')
-        if route == 'tokenmetro':
-            env.setdefault('TOKENMETRO_API_SURFACE', 'responses')
-        self.profile = route_profile(route, env, require_environment=True)
-        if self.profile.api_surface != 'responses':
-            raise ExplorationError('E2 requires configured Responses API surface; no guessed dialect')
-        if not env.get(self.profile.api_key_env):
-            raise ExplorationError('configured credential absent')
+        self.profile = e2_route(model, route, env, offline=transport is not None)
+        if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 3:
+            raise ExplorationError('attempt ceiling must be 1..3')
+        self.max_attempts = max_attempts
         self.env = env
         self.transport = transport
-        self.config = {'adapter': 'p05-navi-e2-sdk-responses-0.1', 'route': self.profile.safe_dict(),
+        self.before_dispatch = before_dispatch
+        self.config = {'adapter': 'p05-navi-e2-sdk-responses-0.2', 'route': self.profile.safe_dict(),
                        'sdk_version': openai.__version__, 'max_retries': 0, 'fallback': False,
-                       'stream': True, 'include_usage': False, 'timeout_seconds': 180}
+                       'stream': True, 'include_usage': False, 'timeout_seconds': 180,
+                       'max_attempts': max_attempts, 'retry_policy': 'exact_tokenmetro_pre_generation_tpm_429_only'}
+        self._config_identity = sha256_json(self.config)
 
-    def __call__(self, stem, body, run_identity, *, decision_mode: str | None = None):
+    def __call__(self, stem, body, run_identity, *, decision_mode=None, attempt_limit=None):
+        """Persist every attempt. An interrupted wrapper is never automatically resumed."""
+        if (sha256_json(self.config) != self._config_identity
+                or self.config['route'] != self.profile.safe_dict() or self.max_attempts != self.config['max_attempts']):
+            raise ExplorationError('immutable provider configuration changed')
+        stem = Path(stem)
+        limit = self.max_attempts if attempt_limit is None else min(self.max_attempts, attempt_limit)
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ExplorationError('attempt budget exhausted')
+        if body.get('model') != self.profile.model_id or body.get('stream') is not True:
+            raise ExplorationError('request model/stream differs from immutable route')
+        if 'messages' in body or 'max_tokens' in body or 'stream_options' in body:
+            raise ExplorationError('new E2 execution requires native Responses request')
+        if set(body) - {'model', 'instructions', 'input', 'stream', 'max_output_tokens'}:
+            raise ExplorationError('unverified Responses parameter')
+        if any(value in canonical_json_bytes(body).decode('utf-8')
+               for name, value in self.env.items() if name.endswith('_API_KEY') and value):
+            raise ExplorationError('credential in request body')
+        output = body.get('max_output_tokens')
+        if isinstance(output, bool) or not isinstance(output, int) or not 1 <= output <= 8192:
+            raise ExplorationError('invalid output ceiling')
+        if stem.exists() and any(stem.iterdir()):
+            # Runner may have prepared the input reservation before dispatch.
+            if set(p.name for p in stem.iterdir()) != {'input-accounting.json'}:
+                raise ExplorationError('existing attempt evidence; no automatic reissue')
+        once(stem / 'request.json', body)
+        attempts = []
+        for number in range(1, limit + 1):
+            attempt = self._attempt(stem / 'attempts' / f'{number:02d}', body, run_identity,
+                                    decision_mode=decision_mode)
+            attempts.append(attempt)
+            if not attempt['retry_eligible'] or number == limit:
+                break
+            delay = _retry_after(attempt['headers'], 30) or min(2 ** (number - 1), 30)
+            once(stem / 'attempts' / f'{number:02d}' / 'retry.json', {
+                'same_model': self.profile.model_id, 'same_route': self.profile.route,
+                'delay_seconds': delay, 'next_attempt': number + 1})
+            time.sleep(delay)
+        terminal = dict(attempts[-1])
+        terminal.pop('terminal_identity', None)
+        terminal.update(calls=sum(t['calls'] for t in attempts), retry_calls=len(attempts)-1,
+                        attempt_identities=[t['terminal_identity'] for t in attempts])
+        terminal['terminal_identity'] = sha256_json(terminal)
+        once(stem / 'terminal.json', terminal)
+        return terminal
+
+    def _attempt(self, stem, body, run_identity, *, decision_mode=None):
         import httpx
         import openai
         key = self.env[self.profile.api_key_env]
         stem.mkdir(parents=True, exist_ok=True)
-        if 'messages' in body and 'instructions' not in body:
-            sys_m = ""
-            usr_m = ""
-            for m in body.get('messages', []):
-                if isinstance(m, Mapping):
-                    if m.get('role') == 'system':
-                        sys_m = m.get('content', '')
-                    elif m.get('role') == 'user':
-                        usr_m = m.get('content', '')
-            norm_body = {
-                'model': body['model'],
-                'instructions': sys_m,
-                'input': usr_m,
-                'stream': True,
-                'max_output_tokens': body.get('max_output_tokens', body.get('max_tokens', 8192)),
-            }
-            for k, v in body.items():
-                if k not in {'messages', 'max_tokens', 'stream_options', 'instructions', 'input', 'max_output_tokens', 'stream'}:
-                    norm_body[k] = v
-            body = norm_body
-        else:
-            body = dict(body)
-            body.pop('stream_options', None)
-            if 'max_tokens' in body and 'max_output_tokens' not in body:
-                body['max_output_tokens'] = body.pop('max_tokens')
         once(stem / 'request.json', body)
-        writer = _JsonlArtifactWriter(stem / 'stream.jsonl', stem.parent.parent)
+        artifact_root = stem.parents[3]
+        writer = _JsonlArtifactWriter(stem / 'stream.jsonl', artifact_root)
         observation = {'calls': 0, 'http_status': None, 'headers': {}}
         tracker = None
         started = time.monotonic()
         content, reasoning, usage, finish = [], [], None, None
         response_terminal = False
+        response_status, terminal_event, response_id = None, None, None
+        returned_models = set()
+        reasoning_kinds = set()
+        terminal_count = 0
+        secrets = tuple(v for k, v in self.env.items() if k.endswith('_API_KEY') and v)
+        def sensitive(value):
+            return any(secret in value for secret in secrets)
+        def redact(value):
+            for secret in secrets:
+                value = value.replace(secret, '[REDACTED]')
+            return value
         def request_hook(req):
+            if self.before_dispatch is not None: self.before_dispatch()
             observation['calls'] += 1
-            if observation['calls'] != 1 or json.loads(req.content) != body or key.encode() in req.content:
+            if (observation['calls'] != 1 or json.loads(req.content) != body
+                    or sensitive(req.content.decode()) or str(req.url) != self.profile.base_url + '/responses'):
                 raise ExplorationError('wire identity/accounting mismatch')
             once(stem / 'issued.json', {'run_identity': run_identity, 'request_identity': sha256_json(body),
                                       'issued_at': datetime.now(timezone.utc).isoformat()})
@@ -323,23 +415,31 @@ class E2SDK:
                   'headers': {n: req.headers[n] for n in ('content-type', 'accept') if n in req.headers}})
         def response_hook(res):
             nonlocal tracker
-            observation.update(http_status=res.status_code, headers={n: res.headers[n] for n in ('retry-after', 'x-request-id', 'content-type') if n in res.headers})
+            observation.update(http_status=res.status_code, headers={n: redact(res.headers[n]) for n in ('retry-after', 'x-request-id', 'content-type') if n in res.headers})
             if res.status_code == 200:
                 tracker = _DoneTrackingStream(res.stream)
                 if res.is_stream_consumed: tracker.observe(res.content)
                 res.stream = tracker
             else:
                 raw = res.read()
-                if key.encode() in raw: raise ExplorationError('credential echo')
+                if sensitive(raw.decode('utf-8', errors='replace')): raise ExplorationError('credential echo')
                 atomic_write(stem / 'raw-error.bin', raw)
         error = None
         try:
             with httpx.Client(transport=self.transport, event_hooks={'request': [request_hook], 'response': [response_hook]}) as http_client:
                 with openai.OpenAI(base_url=self.profile.base_url, api_key=key, max_retries=0, timeout=180, http_client=http_client) as client:
                     for chunk in client.responses.create(**body):
+                        if time.monotonic() - started > self.config['timeout_seconds']:
+                            raise ExplorationError('Responses wall-clock deadline; execution indeterminate')
                         data = _chunk_mapping(chunk)
-                        if key in json.dumps(data): raise ExplorationError('credential echo')
+                        if sensitive(json.dumps(data)): raise ExplorationError('credential echo')
                         writer.append(data)
+                        resp = data.get('response') if isinstance(data.get('response'), Mapping) else {}
+                        if isinstance(resp.get('model'), str): returned_models.add(resp['model'])
+                        if data.get('type') in {'response.reasoning_text.delta', 'response.reasoning_summary_text.delta'}:
+                            reasoning_kinds.add(data['type'])
+                        if response_terminal:
+                            raise ExplorationError('event after Responses terminal')
                         if data.get("type") == "error":
                             err_obj = data.get("error") if isinstance(data.get("error"), Mapping) else data
                             err_msg = str(err_obj.get("message", "Responses stream error")) if isinstance(err_obj, Mapping) else str(err_obj)
@@ -353,25 +453,54 @@ class E2SDK:
                         if value: content.append(value)
                         if thought: reasoning.append(thought)
                         if event_finish is not None: finish = event_finish
-                        if event_usage is not None: usage = event_usage
-                        if is_term: response_terminal = True
+                        # Provisional usage from created/in-progress events cannot
+                        # stand in for missing terminal accounting.
+                        if is_term: usage = event_usage
+                        if is_term:
+                            response_terminal = True
+                            terminal_count += 1
+                            terminal_event = data.get('type')
+                            response_status = resp.get('status')
+                            response_id = event_id
+                            final_text = [part['text'] for item in (resp.get('output') or [])
+                                    if isinstance(item, Mapping) and item.get('type') == 'message'
+                                    for part in (item.get('content') or [])
+                                    if isinstance(part, Mapping) and part.get('type') == 'output_text' and isinstance(part.get('text'), str)]
+                            if content and final_text and ''.join(content) != ''.join(final_text):
+                                raise ExplorationError('terminal visible text disagrees with streamed deltas')
+                            # Accept terminal-only text only when no deltas were supplied.
+                            if not content: content.extend(final_text)
+                            if not reasoning:
+                                summaries = [part['text'] for item in (resp.get('output') or [])
+                                    if isinstance(item, Mapping) and item.get('type') == 'reasoning'
+                                    for part in (item.get('summary') or [])
+                                    if isinstance(part, Mapping) and part.get('type') == 'summary_text' and isinstance(part.get('text'), str)]
+                                reasoning.extend(summaries)
+                                if summaries: reasoning_kinds.add('response.reasoning_summary_text.terminal')
         except Exception as exc:
-            error = {'type': type(exc).__name__, 'message': str(exc).replace(key, '[REDACTED]')[:1500]}
+            error = {'type': type(exc).__name__, 'message': redact(str(exc))[:1500]}
         if isinstance(usage, Mapping):
             usage = dict(usage)
             inp = usage.get("input_tokens", usage.get("prompt_tokens"))
             out = usage.get("output_tokens", usage.get("completion_tokens"))
             if "total_tokens" not in usage and isinstance(inp, int) and isinstance(out, int) and not isinstance(inp, bool) and not isinstance(out, bool):
                 usage["total_tokens"] = inp + out
-        has_reliable_usage = (
-            isinstance(usage, Mapping)
-            and isinstance(usage.get("total_tokens"), int)
-            and not isinstance(usage.get("total_tokens"), bool)
-            and usage["total_tokens"] >= 0
-        )
+        has_reliable_usage = (isinstance(usage, Mapping)
+            and all(isinstance(usage.get(k), int) and not isinstance(usage[k], bool) and usage[k] >= 0
+                    for k in ('input_tokens', 'output_tokens', 'total_tokens'))
+            and usage['total_tokens'] == usage['input_tokens'] + usage['output_tokens'])
+        if has_reliable_usage:
+            details = usage.get('output_tokens_details') or {}
+            reasoning_tokens = details.get('reasoning_tokens')
+            if reasoning_tokens is not None:
+                has_reliable_usage = (isinstance(reasoning_tokens, int) and not isinstance(reasoning_tokens, bool)
+                                      and 0 <= reasoning_tokens <= usage['output_tokens'])
         stream_complete = bool(finish is not None and response_terminal and error is None)
         visible_text = ''.join(content)
-        complete = bool(stream_complete and finish == 'stop' and visible_text.strip() and has_reliable_usage)
+        model_verified = returned_models == {self.profile.model_id}
+        protocol_success = bool(stream_complete and terminal_count == 1 and finish == 'stop'
+                                and response_status == 'completed' and model_verified and has_reliable_usage)
+        complete = bool(protocol_success and visible_text.strip())
         if decision_mode is None:
             instructions = body.get("instructions", "")
             single_action_prompt = canonical_json_bytes(SINGLE_ACTION_PROMPT).decode("utf-8")
@@ -387,6 +516,25 @@ class E2SDK:
             'usage_normalized': _normalize_usage(usage), 'error': error,
             'latency_ms': round((time.monotonic() - started)*1000, 3), 'stream': writer.descriptor(),
             'actual_cost': 'UNKNOWN', 'currency': 'UNKNOWN'}
+        terminal.update(logical_model=self.profile.logical_model, route=self.profile.route,
+            wire_model=self.profile.model_id, returned_models=sorted(returned_models), model_verified=model_verified,
+            response_id=response_id, terminal_event=terminal_event, response_status=response_status,
+            responses_protocol_success=protocol_success, reasoning_event_types=sorted(reasoning_kinds),
+            reasoning_availability='provided' if reasoning else 'NOT_PROVIDED',
+            execution_state='RESOLVED' if response_terminal else 'EXECUTION UNKNOWN',
+            retry_eligible=False)
+        raw = (stem / 'raw-error.bin').read_bytes() if (stem / 'raw-error.bin').exists() else None
+        retry_probe = dict(route='tokenmetro' if self.profile.route == 'tokenmetro_qwen' else self.profile.route,
+            http_status=observation['http_status'], sdk_error_type=error['type'] if error else None,
+            stream_chunk_count=writer.chunk_count, stream_complete=stream_complete,
+            visible_chars=len(visible_text), reasoning_chars=len(terminal['reasoning']), usage=usage,
+            finish_reason=finish)
+        terminal['retry_eligible'] = safe_rate_limit_retry(retry_probe, raw)
+        terminal['raw_error'] = {'sha256': sha256(raw).hexdigest(), 'byte_count': len(raw)} if raw is not None else None
+        if terminal['retry_eligible']:
+            terminal['execution_state'] = 'NOT_STARTED'
+        elif observation['http_status'] in {400, 401, 403, 404, 422} and not writer.chunk_count:
+            terminal['execution_state'] = 'REJECTED'
         terminal['terminal_identity'] = sha256_json(terminal)
         once(stem / 'terminal.json', terminal)
         return terminal
@@ -473,6 +621,9 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             if parent['budget']!=asdict(budget): raise ExplorationError('parent budget mismatch')
             if parent.get('pending_round') is not None: raise ExplorationError('unresolved parent dispatch')
         if parent['binding'] != {'question':question,'ru_build_identity':tools.ru_identity,'tools_identity':tools.identity}: raise ExplorationError('parent scope mismatch')
+        parent_config=json.loads((parent_root/'config.json').read_text('utf-8'))
+        if parent_config['provider'] != provider.config:
+            raise ExplorationError('parent model/route/provider configuration cannot change')
         config['parent']={'root':str(parent_root),'run_identity':parent['run_identity'],'checkpoint_identity':parent['checkpoint_identity']}
     identity = sha256_json(config)
     if (root / 'session.json').exists():
@@ -485,6 +636,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             if path.stem != checkpoint.get('checkpoint_identity') or checkpoint['checkpoint_identity'] != sha256_json({k:v for k,v in checkpoint.items() if k!='checkpoint_identity'}):
                 raise ExplorationError('immutable checkpoint integrity mismatch')
         for path in root.glob('rounds/*/terminal.json'):
+            verify_response_attempts(path.parent)
             terminal=json.loads(path.read_text('utf-8'))
             if 'terminal_identity' in terminal and terminal['terminal_identity'] != sha256_json({k:v for k,v in terminal.items() if k!='terminal_identity'}):
                 raise ExplorationError('terminal integrity mismatch')
@@ -531,7 +683,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             n = state['model_rounds']
             stem = root / 'rounds' / f'{n:02d}'
             if not (stem / 'decision.json').exists():
-                if (stem / 'issued.json').exists():
+                if (stem / 'terminal.json').exists() or (stem / 'issued.json').exists():
                     # Only a complete terminal can recover; never reissue unresolved dispatch.
                     if not (stem / 'terminal.json').exists(): raise ExplorationError('unresolved issued request; no automatic reissue')
                     terminal = json.loads((stem / 'terminal.json').read_text('utf-8'))
@@ -556,10 +708,17 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
                             'input': input_text, 'stream': True, 'max_output_tokens': budget.output_tokens}
                     once(stem / 'input-accounting.json', {'input_utf8_token_upper_bound': reserve - budget.output_tokens, 'reserved_tokens': reserve, 'delivered_until': len(state['events'])})
                     exp_mode = "single_action" if single_action_continuation else "batch"
-                    try:
-                        terminal = provider(stem, body, identity, decision_mode=exp_mode)
-                    except TypeError:
-                        terminal = provider(stem, body, identity)
+                    # Inspect the seam before dispatch: a TypeError after dispatch
+                    # must never cause a second provider invocation.
+                    import inspect
+                    kwargs = {}
+                    parameters = inspect.signature(provider).parameters
+                    if 'decision_mode' in parameters: kwargs['decision_mode'] = exp_mode
+                    if 'attempt_limit' in parameters:
+                        kwargs['attempt_limit'] = min(budget.rounds-state['provider_calls'],
+                            (budget.total_tokens-state['used']['tokens']) // reserve)
+                    terminal = provider(stem, body, identity, **kwargs)
+                verify_response_attempts(stem)
                 if 'terminal_identity' in terminal and terminal['terminal_identity'] != sha256_json({k:v for k,v in terminal.items() if k != 'terminal_identity'}): raise ExplorationError('terminal integrity mismatch')
                 if not terminal['complete']: raise ExplorationError('provider partial/failure; no retry')
                 if not terminal.get('decision_complete', True): raise ExplorationError('decision does not conform to exploration mode schema')
@@ -587,7 +746,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             accounting = json.loads((stem / 'input-accounting.json').read_text('utf-8'))
             if state.get('applied_round') != n:
                 state['provider_calls'] += terminal['calls']; state['used']['tokens'] += terminal['usage']['total_tokens']
-                state['used']['token_reservations'] += accounting['reserved_tokens']
+                state['used']['token_reservations'] += accounting['reserved_tokens'] * terminal['calls']
                 state['delivered_until'] = accounting['delivered_until']
                 state['memory'] = decision['memory']; state['applied_round'] = n; state['next_action'] = 0
                 if state['used']['tokens'] > budget.total_tokens: raise ExplorationBudgetExceeded('provider token usage ceiling')
@@ -610,7 +769,7 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
                 _save(root, state)
                 if state['status'] == 'stopped': break
             state['accepted_decisions'] = state.get('accepted_decisions', 0) + 1
-            state['model_rounds'] = n+1; state['pending_round'] = None
+            state['model_rounds'] = max(n+1, state['provider_calls']); state['pending_round'] = None
             _save(root, state)
         if state['status'] == 'running': state['status'] = 'round_budget_exhausted'
     except ExplorationBudgetExceeded as exc:
@@ -628,10 +787,12 @@ def main():
     for name in ('canonical_manifest','ru_manifest','lexical_manifest','start_ru','output_root'): p.add_argument('--'+name.replace('_','-'), required=True)
     p.add_argument('--parent-root')
     p.add_argument('--single-action-continuation',action='store_true')
-    p.add_argument('--route',choices=('tokenmetro','jizhi'), default='tokenmetro')
+    p.add_argument('--route',choices=sorted({r for m,r in E2_ROUTES}), required=True)
+    p.add_argument('--model',choices=sorted({m for m,r in E2_ROUTES}), required=True)
     a=p.parse_args()
+    provider=E2SDK(a.route, model=a.model)
     tools=LocalExplorationTools(Path(a.canonical_manifest),Path(a.ru_manifest),Path(a.lexical_manifest))
-    state=run_exploration(tools,start_ru=a.start_ru,output_root=Path(a.output_root),provider=E2SDK(a.route),parent_root=a.parent_root,
+    state=run_exploration(tools,start_ru=a.start_ru,output_root=Path(a.output_root),provider=provider,parent_root=a.parent_root,
                           single_action_continuation=a.single_action_continuation,
                           budget=E2Budget(output_tokens=4096) if a.single_action_continuation else None)
     print(json.dumps({k:state[k] for k in ('run_identity','status','model_rounds','provider_calls','used','pages')},ensure_ascii=False))
