@@ -1,13 +1,21 @@
 """Provider-free route, retry, uncertainty and real-probe harness contracts."""
+import errno
 import json
+import socket
+import ssl
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import httpx
+import httpcore
+import openai
 
-from genshin_corpus.rag.navi_e2_experiment import E2SDK, _is_valid_decision_content
+from genshin_corpus.canonical.fingerprints import sha256_json
+from genshin_corpus.rag.navi_e2_experiment import (
+    E2SDK, _exception_diagnostics, _is_valid_decision_content, verify_response_attempts,
+)
 from genshin_corpus.rag.navi_e2_routes import E2_ROUTES
 from genshin_corpus.rag.navi_e2_protocol_probe import run_probe, FIXTURE_UID, initialize_campaign, campaign_guard, initialize_followup_campaign
 from genshin_corpus.retrieval.navi_exploration import ExplorationError
@@ -124,9 +132,164 @@ class ResponsesTests(unittest.TestCase):
         result = sdk(self.root/'rounds/00', self.body, 'run')
         self.assertEqual(result['execution_state'], 'EXECUTION UNKNOWN')
         self.assertEqual(len(calls), 1)
+        self.assertEqual(result['error']['type'], 'APITimeoutError')
+        self.assertEqual([n['type'] for n in result['error']['diagnostics']['exceptions']],
+                         ['openai.APITimeoutError', 'httpx.ReadTimeout'])
         with self.assertRaises(ExplorationError):
             sdk(self.root/'rounds/00', self.body, 'run')
         self.assertEqual(len(calls), 1)
+
+    def assert_unknown_attempt(self, result, stem):
+        self.assertEqual(result['calls'], 1)
+        self.assertEqual(result['retry_calls'], 0)
+        self.assertEqual(result['execution_state'], 'EXECUTION UNKNOWN')
+        self.assertFalse(result['retry_eligible'])
+        self.assertFalse(result['complete'])
+        self.assertFalse(result['decision_complete'])
+        self.assertEqual(result['usage'], 'UNKNOWN')
+        self.assertEqual(len(list(stem.glob('attempts/*/issued.json'))), 1)
+        self.assertFalse(list(stem.rglob('retry.json')))
+        verify_response_attempts(stem)
+        self.assertEqual(result['terminal_identity'], sha256_json({
+            k: v for k, v in result.items() if k != 'terminal_identity'}))
+
+    @patch('genshin_corpus.rag.navi_e2_experiment.time.sleep')
+    def test_connection_cause_codes_and_safe_audit_without_retry(self, sleep):
+        calls = []
+        private = ('https://user:password@example.invalid/private?token=unknown-token '
+                   'Authorization: Bearer unknown-auth Cookie: session=private-cookie '
+                   'private-request-body ' + ' '.join(self.env[k] for k in self.env if k.endswith('_API_KEY')))
+        def handler(req):
+            calls.append(req)
+            try:
+                raise ConnectionResetError(errno.ECONNRESET, private, 'private-file')
+            except OSError as cause:
+                raise httpx.ConnectError(private, request=req) from cause
+        stem = self.root/'rounds/00'
+        sdk = self.sdk(handler)
+        result = sdk(stem, self.body, 'run')
+        self.assert_unknown_attempt(result, stem)
+        self.assertEqual(len(calls), 1)
+        sleep.assert_not_called()
+        error = result['error']
+        self.assertEqual(error['type'], 'APIConnectionError')
+        self.assertEqual(error['message'], 'Connection error.')
+        diagnostics = error['diagnostics']
+        nodes = diagnostics['exceptions']
+        self.assertEqual([n['type'] for n in nodes], [
+            'openai.APIConnectionError', 'httpx.ConnectError', 'builtins.ConnectionResetError'])
+        self.assertEqual(nodes[0]['cause'], 1)
+        self.assertEqual(nodes[1]['cause'], 2)
+        self.assertEqual(nodes[2]['codes'], {'errno': errno.ECONNRESET})
+        self.assertFalse(diagnostics['truncated'])
+        self.assertEqual(diagnostics['observations'], {
+            'request_hook_observed': True, 'http_response_hook_observed': False,
+            'stream_events_observed': 0, 'responses_terminal_observed': False,
+            'request_hook_proves_server_receipt': False, 'failure_phase': 'UNKNOWN'})
+        for path in self.root.rglob('*'):
+            if path.is_file():
+                raw = path.read_bytes()
+                for secret in (b'password', b'unknown-token', b'unknown-auth', b'private-cookie',
+                               b'private-request-body', b'private-file',
+                               *(v.encode() for k,v in self.env.items() if k.endswith('_API_KEY'))):
+                    self.assertNotIn(secret, raw)
+        with self.assertRaises(ExplorationError):
+            sdk(stem, self.body, 'run')
+        self.assertEqual(len(calls), 1)
+        # New diagnostics are part of the existing immutable attempt hash chain.
+        path = stem/'attempts/01/terminal.json'
+        terminal = json.loads(path.read_text('utf-8'))
+        terminal['error']['diagnostics']['exceptions'][2]['codes']['errno'] = 1
+        path.write_text(json.dumps(terminal), encoding='utf-8')
+        with self.assertRaisesRegex(ExplorationError, 'integrity'):
+            verify_response_attempts(stem)
+
+    def test_connection_without_underlying_exception_is_explicit(self):
+        def handler(req):
+            raise openai.APIConnectionError(request=req, message='private-request-body') from None
+        stem = self.root/'rounds/00'
+        result = self.sdk(handler)(stem, self.body, 'run')
+        self.assert_unknown_attempt(result, stem)
+        nodes = result['error']['diagnostics']['exceptions']
+        self.assertEqual(nodes, [{'type': 'openai.APIConnectionError',
+            'cause': None, 'context': None, 'context_suppressed': True, 'codes': {}}])
+        self.assertNotIn('private-request-body', json.dumps(result))
+        self.assertIsNone(result['http_status'])
+        self.assertIsNone(result['raw_error'])
+
+    def test_stream_disconnect_preserves_response_observation_without_resolution(self):
+        class BrokenStream(httpx.SyncByteStream):
+            def __iter__(self):
+                yield b'data: {"type":"response.created","response":{"id":"r"}}\n\n'
+                raise httpx.ReadError('private-request-body')
+        stem = self.root/'rounds/00'
+        result = self.sdk(lambda req: httpx.Response(200,
+            headers={'content-type':'text/event-stream'}, stream=BrokenStream()))(stem, self.body, 'run')
+        self.assert_unknown_attempt(result, stem)
+        observed = result['error']['diagnostics']['observations']
+        self.assertTrue(observed['request_hook_observed'])
+        self.assertTrue(observed['http_response_hook_observed'])
+        self.assertGreater(observed['stream_events_observed'], 0)
+        self.assertFalse(observed['responses_terminal_observed'])
+        self.assertEqual(result['http_status'], 200)
+        self.assertNotIn('private-request-body', json.dumps(result))
+
+    def test_failure_before_request_hook_has_no_issued_call(self):
+        def blocked():
+            raise httpx.ConnectError('private-request-body Authorization: Bearer unknown-auth')
+        stem = self.root/'rounds/00'
+        result = self.sdk(lambda req: self.fail('must not send'), before_dispatch=blocked)(stem, self.body, 'run')
+        self.assertEqual(result['calls'], 0)
+        self.assertEqual(result['execution_state'], 'EXECUTION UNKNOWN')
+        self.assertFalse(list(stem.rglob('issued.json')))
+        self.assertFalse(result['error']['diagnostics']['observations']['request_hook_observed'])
+        self.assertNotIn('private-request-body', json.dumps(result))
+        self.assertNotIn('unknown-auth', json.dumps(result))
+
+    def test_exception_graph_context_suppression_cycles_limits_and_codes(self):
+        observation = {'calls': 1, 'http_status': None}
+        def snapshot(exc):
+            return _exception_diagnostics(exc, observation, stream_events=0, response_terminal=False)
+        implicit = httpx.ConnectError('private')
+        implicit.__context__ = socket.gaierror(socket.EAI_NONAME, 'private-host')
+        graph = snapshot(implicit)['exceptions']
+        self.assertEqual(graph[0]['context'], 1)
+        self.assertIsNone(graph[0]['cause'])
+        self.assertFalse(graph[0]['context_suppressed'])
+        self.assertEqual(graph[1]['type'], 'socket.gaierror')
+        self.assertEqual(graph[1]['codes'], {'errno': socket.EAI_NONAME})
+        implicit.__suppress_context__ = True
+        implicit.__context__.__cause__ = implicit
+        graph = snapshot(implicit)['exceptions']
+        self.assertEqual(len(graph), 2)
+        self.assertTrue(graph[0]['context_suppressed'])
+        self.assertEqual(graph[1]['cause'], 0)
+        head = tail = ValueError('private')
+        for _ in range(20):
+            tail.__cause__ = ValueError('private')
+            tail = tail.__cause__
+        limited = snapshot(head)
+        self.assertTrue(limited['truncated'])
+        self.assertEqual(len(limited['exceptions']), 16)
+        self.assertEqual(limited['exceptions'][-1]['cause'], 'OMITTED_LIMIT')
+        tls = ssl.SSLCertVerificationError(1, 'private-certificate')
+        tls.verify_code = 20
+        tls.verify_message = 'private-certificate'
+        self.assertEqual(snapshot(tls)['exceptions'][0]['codes'], {'errno': 1, 'verify_code': 20})
+        windows = OSError('private')
+        windows.winerror = 10054
+        self.assertEqual(snapshot(windows)['exceptions'][0]['codes'], {'winerror': 10054})
+        windows.errno = 'private-code'
+        self.assertNotIn('errno', snapshot(windows)['exceptions'][0]['codes'])
+        windows.errno = True
+        self.assertNotIn('errno', snapshot(windows)['exceptions'][0]['codes'])
+        custom = type('private_request_body', (Exception,), {})('private')
+        self.assertEqual(snapshot(custom)['exceptions'][0]['type'], 'UNRECOGNIZED_EXCEPTION')
+        self.assertNotIn('private', json.dumps(snapshot(custom)))
+        core = httpcore.ConnectError('private')
+        core.__cause__ = tls
+        self.assertEqual([n['type'] for n in snapshot(core)['exceptions']],
+                         ['httpcore.ConnectError', 'ssl.SSLCertVerificationError'])
 
     def test_ordinary_429_5xx_policy_and_auth_never_retry_or_fallback(self):
         for status in (429, 500, 502, 503, 403, 401):

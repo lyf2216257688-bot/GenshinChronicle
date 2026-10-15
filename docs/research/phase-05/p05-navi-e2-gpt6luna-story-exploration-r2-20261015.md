@@ -97,6 +97,15 @@
    - 系统严格执行安全契约，未对状态未知的连接异常进行无界重发，未切换 provider 或 fallback；
    - 捕获 `ExplorationError("provider partial/failure; no retry")`，将 session 终态置为 `partial`，完整保存不可变数据。
 
+**历史诊断边界（2026-10-15 离线修复复核）**：上述“网络连接中断”仅指客户端
+`APIConnectionError`，不能定位为服务商或某个网络环节的故障。Round04 的
+`issued.json` / `request-metadata.json` 证明客户端 request hook 已触发；terminal
+只保存 `Connection error.`，`http_status=null`，没有响应或底层 cause/context。
+这不能证明请求已送达服务端，也不能确定服务端是否执行、usage 或实际费用。
+后续离线修复为未来异常增加脱敏原因链与观测字段（契约见
+[Phase05 规范](../../phases/phase-05-source-bound-semantic-navigation.md#e2-multi-model-responses-boundary-2026-10-15)）；
+未补写此历史运行，未重跑请求，原 `EXECUTION UNKNOWN` / PARTIAL 及身份保持不变。
+
 ---
 
 ## 4. 资源消耗与审计核算

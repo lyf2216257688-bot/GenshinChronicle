@@ -314,6 +314,65 @@ def _validate_e2_action(action):
         raise ExplorationError('invalid bounded E2 action arguments')
 
 
+def _exception_diagnostics(exc, observation, *, stream_events, response_terminal):
+    """Bounded exception graph, never exception text/args/requests/tracebacks.
+
+    Both explicit causes and implicit contexts are retained; suppressed contexts
+    are labelled, not promoted to causes. Only known exception classes and
+    numeric OS/TLS codes cross the audit boundary.
+    """
+    import builtins
+    import socket
+    import ssl
+    import httpcore
+    import httpx
+    import openai
+
+    known = {value: value.__module__ + '.' + value.__name__
+             for module in (builtins, socket, ssl, httpcore, httpx, openai)
+             for value in tuple(vars(module).values())
+             if type(value) is type and issubclass(value, BaseException)}
+    known[ExplorationError] = ExplorationError.__module__ + '.ExplorationError'
+    pending, nodes = [exc], []
+    indices = {id(exc): 0}
+    truncated = False
+    for item in pending:
+        node = {'type': known.get(type(item), 'UNRECOGNIZED_EXCEPTION'),
+                'context_suppressed': BaseException.__suppress_context__.__get__(item), 'codes': {}}
+        if isinstance(item, OSError):
+            for name in ('errno', 'winerror', 'verify_code'):
+                # Numeric primitives only; do not stringify arbitrary code fields.
+                try:
+                    value = getattr(item, name, None)
+                except Exception:
+                    value = None
+                if type(value) is int and -(2**31) <= value < 2**31:
+                    node['codes'][name] = value
+        for name in ('cause', 'context'):
+            linked = getattr(BaseException, '__' + name + '__').__get__(item)
+            if linked is None:
+                node[name] = None
+            elif id(linked) in indices:
+                node[name] = indices[id(linked)]
+            elif len(pending) < 16:
+                node[name] = indices[id(linked)] = len(pending)
+                pending.append(linked)
+            else:
+                node[name] = 'OMITTED_LIMIT'
+                truncated = True
+        nodes.append(node)
+    return {'schema': 'e2-exception-diagnostics-v1', 'exceptions': nodes,
+            'truncated': truncated, 'text_policy': 'OMITTED',
+            'observations': {
+                'request_hook_observed': observation['calls'] > 0,
+                'http_response_hook_observed': observation['http_status'] is not None,
+                'stream_events_observed': stream_events,
+                'responses_terminal_observed': response_terminal,
+                'request_hook_proves_server_receipt': False,
+                'failure_phase': 'UNKNOWN',
+            }}
+
+
 class E2SDK:
     """Existing SDK route/helpers, with an E2 decision protocol instead of atomic extraction."""
     def __init__(self, route=None, *, model=None, transport=None, environment=None, max_attempts=3, before_dispatch=None):
@@ -478,7 +537,18 @@ class E2SDK:
                                 reasoning.extend(summaries)
                                 if summaries: reasoning_kinds.add('response.reasoning_summary_text.terminal')
         except Exception as exc:
-            error = {'type': type(exc).__name__, 'message': redact(str(exc))[:1500]}
+            if isinstance(exc, (openai.APIConnectionError, httpx.TransportError, OSError)):
+                diagnostics = _exception_diagnostics(exc, observation,
+                    stream_events=writer.chunk_count, response_terminal=response_terminal)
+                # Transport text can embed URLs, credentials or request bodies;
+                # static summaries keep the existing error interface safe.
+                message = ('Request timed out.' if isinstance(exc, openai.APITimeoutError)
+                           else 'Connection error.' if isinstance(exc, openai.APIConnectionError)
+                           else 'Transport exception text omitted; see diagnostics.')
+                error = {'type': diagnostics['exceptions'][0]['type'].rsplit('.', 1)[-1],
+                         'message': message, 'diagnostics': diagnostics}
+            else:
+                error = {'type': type(exc).__name__, 'message': redact(str(exc))[:1500]}
         if isinstance(usage, Mapping):
             usage = dict(usage)
             inp = usage.get("input_tokens", usage.get("prompt_tokens"))

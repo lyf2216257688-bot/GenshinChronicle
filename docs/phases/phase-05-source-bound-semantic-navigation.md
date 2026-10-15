@@ -208,6 +208,24 @@ Provider reasoning summaries are identified as summaries; absent reasoning is
 NOT_PROVIDED, not fabricated private reasoning. All models share E2 prompts,
 actions, memory, source binding, budgets and checkpoint rules.
 
+For future E2 Responses SDK connection/timeout, HTTPX transport and OS failures,
+`terminal.error.diagnostics` records a bounded exception graph (up to 16 nodes),
+explicit `cause` and implicit `context` links, context suppression, known
+standard-library/SDK/transport exception types and observed signed 32-bit integer
+`errno`, `winerror` or TLS `verify_code` values. Unknown types are labelled
+`UNRECOGNIZED_EXCEPTION`; absent links are null, absent codes are omitted and
+over-budget links are explicitly `OMITTED_LIMIT`. Cycles reuse node indices.
+Transport messages use static summaries: exception text, args, request/response
+objects, URLs, headers, bodies and tracebacks are not diagnostic payloads.
+Client request-hook, HTTP response-hook, stream-event and Responses-terminal
+observations are separate. A request hook is not proof of server receipt;
+failure phase remains UNKNOWN rather than being inferred from an exception name
+or code. These fields are hashed inside the existing immutable attempt terminal
+and aggregate lineage. They do not alter dispatch, retry/fallback eligibility,
+attempt accounting, terminal execution/usage semantics or recovery rules.
+Historical terminals remain valid without diagnostics and are never backfilled;
+missing historical causes cannot be reconstructed by this change.
+
 New batch and single-action continuation prompts direct reads through the exact
 formal `unit_id` supplied by seed/search; both normal and compact candidate
 projections retain that ID. `model_round` counts model requests and

@@ -6,16 +6,16 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: Prior baseline `main@7e230d8` (2026-10-15); this commit checkpoints the four-model Responses integration and the `gpt-6-luna` story exploration runs (r1/r2).
-- **Working Tree Baseline**: Working tree verified clean before commit; no push authorized.
+- **Current Checkpoint**: `main@6755faa` (2026-10-15), the operator's local checkpoint of the four-model Responses integration and `gpt-6-luna` story exploration runs (r1/r2).
+- **Working Tree Baseline**: Verified clean at `6755faa` before this commit checkpoints the offline connection-diagnostics repair; no push authorized.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Navi E2 Single-Case Autonomous Story Exploration (`gpt-6-luna` Run 2)** (2026-10-15: single immutable run `data/retrieval/p05-navi-e2-gpt6luna-20261015-r2` executed; 5 provider calls, 24,886 known tokens + 1 UNKNOWN call, 0 retries; 7 reads across 5 pages, 17,656 Canonical characters delivered, 5 searches; stopped fail-closed at round 4 dispatch due to provider network connection error; 143/143 offline audit PASS, 915/915 unittest PASS. Formal autonomous E2 status is **PARTIAL**; E3 remains **NOT READY / NOT AUTHORIZED**).
-- **Immediate Next Action**: Review committed Phase 05 Navi E2 story exploration evidence and research reports; await operator authorization for subsequent phase steps. No push authorized. No further live exploration requests, retries, or protocol probes are authorized. Prior GLM/DeepSeek UNKNOWN attempts and the r2 round 4 UNKNOWN attempt remain unresolved and must never be resumed/reissued.
+- **Active Work Unit**: **Phase 05 Navi E2 Responses connection-failure audit repair — COMPLETE (offline only)** (2026-10-15, based on `6755faa`): bounded safe exception types/cause/context/codes and client observation fields in future immutable terminals; existing dispatch, retry, accounting and fail-closed rules retained. **69/69 focused tests, 920/920 full-suite tests PASS**, network I/O prohibited during validation; **390 historical files unchanged**, 32 terminal hashes / 14 attempt aggregates verified. Evidence: `data/retrieval/p05-navi-e2-connection-diagnostics-offline-20261015-r1`. Historical GPT-6-Luna r2 remains frozen at 5 calls, 24,886 known tokens + 1 UNKNOWN call, 0 retries, PARTIAL; formal E2 remains **PARTIAL**, E3 **NOT READY / NOT AUTHORIZED**.
+- **Immediate Next Action**: Await operator authorization for subsequent phase steps. No push authorized. No live exploration requests, retries, or protocol probes are authorized. Prior GLM/DeepSeek UNKNOWN attempts and the r2 round 4 UNKNOWN attempt remain unresolved and must never be resumed/reissued.
 
 ### Autonomous Story Exploration Checkpoint (Run 2: `gpt-6-luna` 2026-10-15)
 
