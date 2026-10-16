@@ -35,6 +35,53 @@ Semantic interpretation is not evidence authority. Raw, Parsed, Canonical,
 Retrieval Unit lineage, and the final Evidence Packet retain their existing
 authority boundaries.
 
+### Navi and KG semantic responsibility separation
+
+Rather than forcing both views to consume a monolithic, unverified model
+extraction layer, Navi and KG serve distinct semantic responsibilities:
+- **Navi (Narrative Navigation)**: Focuses on macro-narrative continuity and
+  cross-document exploration across dispersed sources, discovering candidate
+  lore threads and maintaining an inspectable working memory (`unverified_hypothesis_not_fact`)
+  and reading ledger.
+- **KG (Knowledge Graph)**: Focuses on precision-first, conservative local
+  relations, explicit events, and complete dialogue branches. It avoids
+  fabricating causal or identity edges from surface name collisions, unconfirmed
+  dialogue branches, or literary metaphors.
+
+Both views must maintain consistent official source identities (Canonical
+records, Retrieval Units) and resolve back to official source text, while candidate
+leads can be reused on demand across views rather than mandatorily shared. Neither
+upgrades model conjectures or in-game fictional narratives into canonical truth.
+
+#### Navi working memory, narrative unit partitioning, and seed selection (exploratory design directions and audit boundaries)
+
+Three-tier working memory, narrative unit partitioning, and seed selection serve as
+exploratory design directions, cognitive frameworks, and source audit boundaries.
+They do not constitute accepted complete implementations, fixed data structures,
+or sole production rules:
+1. **Three-tier working memory separation**: To prevent context compression from
+   hallucinating causal links or erasing source lineage, Navi distinguishes three
+   functional tiers:
+   - *Short-term tool context*: recently read raw snippets and tool responses;
+   - *Resumable working memory*: candidate narrative threads, doubts, hypotheses,
+     unexplored leads, and coverage blind spots (all explicitly marked
+     `unverified_hypothesis_not_fact`);
+   - *Immutable reading ledger*: exact official Canonical/RU records and locators
+     actually read, preserving uncompressed source audit trails.
+   Context compression or session resumption must never promote an unverified
+   hypothesis into an established fact or erase read-source lineage.
+2. **Narrative unit partitioning and seed selection**:
+   Narrative unit partitioning is explicitly not frozen. It serves as an exploratory
+   container for research rather than a fixed taxonomy or rigid schema. Research
+   indicates narrative units should not be pre-constrained to in-game Quest Trees
+   or sequential task DAGs, because core world lore is widely dispersed across
+   books, map text, artifacts, weapons, and NPC dialogues.
+   Similarly, seed selection explores explicit research questions paired with
+   verified source anchors (seed RUs, e.g. `3429:s7:u3`). It enables bounded
+   multi-entry exploration across regional history, literature sets, or character
+   lore without prematurely freezing a single narrative unit standard or fixed
+   seed schema.
+
 ## Source binding and semantic acceptance
 
 `source_binding_status` and `semantic_acceptance_status` are separate. A
@@ -51,6 +98,38 @@ An LLM quote is not provenance. Stored quotes/spans may be active only when
 mechanically verified against an authoritative representation exposed by the
 current RU/Canonical contract. The implementation must not invent byte/span
 precision.
+
+### Source qualification and four-dimensional textual analysis (research inspiration)
+
+Official Genshin Impact lore is dispersed across archon quests, story quests,
+world quests, commissions, NPC dialogues, in-game books, map inscriptions,
+weapons, artifacts, inventory items, and character stories. OBC pages do not
+map 1:1 to single quests or clean DAGs.
+
+To guide qualitative source evaluation without imposing premature schema rigidity,
+four analytical dimensions continue to serve as research inspiration and qualitative
+analytical perspectives for exploratory prompt design and evidence review:
+1. **Material collection channel (资料栏目)**: Where the text was obtained
+   (e.g., Quest, Books, Map Text, Weapon, Artifact, Inventory). Identifies the
+   carrier module from which the text was extracted.
+2. **Source and text role (来源与文本角色)**: Distinguishes direct in-game official
+   text from wiki editorial notes, strategy commentary, and player research.
+   An official OBC page does NOT mean every block is MiHoYo game canon.
+3. **In-world narrative status (游戏世界内部叙述地位)**: Distinguishes first-hand
+   witness testimony, NPC rumor, official institutional chronicle, in-game
+   novel/folklore/allegory, scholar hypothesis, and poetic verse. The verified
+   physical existence of an in-game book does NOT make its narrative objective
+   world history.
+4. **Narrative utility (叙事价值与用途)**: Distinguishes main-line narrative, regional
+   archaeology, character background, explicit relation evidence, auxiliary
+   corroboration, or pure gameplay/UI description.
+
+**Constraint**: This four-dimensional textual analysis continues to serve
+strictly as research inspiration and qualitative analytical perspectives. It is
+NOT a mandatory classification, required field, or schema that must be evaluated
+or populated for every exploration run; it must not be treated as a required
+extraction template, nor implemented as unapproved database constraints or
+premature schema changes.
 
 ## Ownership
 
@@ -88,6 +167,27 @@ existing baseline answer path is used without navigation. If navigation is
 selected or required and fails, the failure is explicit. The result may only
 follow an existing legal bounded-partial or stop disposition and can never be
 an unqualified full answer.
+
+### Online query-time navigation vs. offline narrative exploration
+
+Phase 05 strictly distinguishes query-time navigation from offline narrative
+exploration:
+- **Online Query-Time Bounded Navigation (P05-W1 contract)**: Operates at
+  retrieval time when an incoming query's round-0 evidence is insufficient. It
+  performs bounded, deterministic traversal over existing, accepted hierarchy
+  and graph views within strict hop, node, edge, and candidate budgets,
+  resolving candidates to official RUs and feeding unchanged Formal Deferred
+  Assembly. It does NOT invoke an unconstrained live LLM agent loop at query time.
+- **Offline Narrative Exploration (E1/E2 research path)**: "Offline narrative
+  exploration" refers strictly to controlled research decoupled from the online
+  retrieval-QA serving chain; "offline" does not mean network-disconnected or
+  running without internet connectivity. Under explicit, separate operator
+  authorization and strict token/call budgets, E2 exploration is permitted to
+  invoke remote model APIs to investigate complex, multi-document lore slices
+  (such as the Byakuyakoku case), discovering candidate narrative connections
+  while recording complete client observations, raw responses, and audit ledgers.
+  Explored candidates remain strictly inactive until verified through explicit
+  source-binding and curated review.
 
 ## P05-W1 evidence boundary
 

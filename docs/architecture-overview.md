@@ -66,7 +66,11 @@ Generation consumes them without owning retrieval or assembly policy.
 Phase 05 adds a rebuildable, source-bound semantic build lineage over
 Canonical-first inputs and verified Retrieval Unit locators. It produces two
 distinct non-authoritative views: a cross-record hierarchy for coarse-to-fine
-navigation and an event/relation graph for bounded lateral traversal. Source
+navigation and an event/relation graph for bounded lateral traversal.
+Rather than forcing both views to consume a monolithic model extraction layer,
+Navi (narrative exploration across dispersed documents) and KG (conservative
+local relations and dialogue branches) maintain distinct semantic responsibilities
+and separate versioning while sharing official source identities. Source
 binding and semantic acceptance are separate states; binding to an RU or
 Canonical lineage does not prove semantic interpretation. Rejected,
 unsupported, ambiguous, or unaccepted items remain auditable and inactive.
@@ -74,8 +78,13 @@ unsupported, ambiguous, or unaccepted items remain auditable and inactive.
 Phase 05 navigation may resolve candidates only through official Retrieval
 Units. Retrieval owns the deterministic candidate/admission primitive feeding
 the unchanged Formal Deferred Assembly; `rag/` owns online decisions and route
-lineage. The final Evidence Packet remains the only citation authority, and
-Generation does not consume semantic navigation traces.
+lineage. Online query-time navigation (P05-W1) is bounded, deterministic
+traversal over accepted views and does not invoke unconstrained live LLM agent
+loops. Multi-turn narrative exploration (E1/E2) operates as offline research
+(controlled research decoupled from the online QA serving chain, not network
+offline; remote model APIs are permitted under separate operator authorization)
+under explicit budgets and human review. The final Evidence Packet remains the only citation
+authority, and Generation does not consume semantic navigation traces.
 
 RAG answers are query results. They must not automatically become Canonical facts.
 
@@ -96,7 +105,7 @@ Canonical/Retrieval responsibilities. Canonical lineage must identify the
 exact Parsed observation and must not fabricate RawRefs for values derived from
 Parsed-run dependencies.
 
-## RAG-first product principle
+## RAG-first product principle & engineering behavior
 
 GenshinChronicle's final product goal is high-quality RAG. Evidence Packets
 provide a free/manual path and an auditable evidence-output layer, but must not
@@ -105,6 +114,11 @@ for Packet convenience. Deterministic query-time ranking, Top-K, finite-budget
 admission, and audited omission are permitted operating-point behavior when
 their disposition is explicit and auditable; they are not claims of improved
 recall, ranking, or context quality.
+
+The repository follows these durable engineering and evaluation principles:
+- **Build → Measure → Optimize**: Construct an end-to-end runnable baseline first, collect real empirical evidence, identify the actual bottleneck, and optimize. Avoid expanding evaluation, benchmark, or governance machinery ahead of a functioning system.
+- **Evaluator as Decision Tool, Not a Product**: Benchmark suites and automated evaluators exist solely to guide specific engineering decisions. When evaluator complexity approaches or exceeds the system under test, conduct a cost/value review. RAG failures prioritize minimal explainable root-cause attribution (`data` / `Retrieval` / `Assembly` / `Generation` / `question-source`) before authorizing optimizations.
+- **Fixed Invariants vs. Parameterized Operating Points**: Correctness invariants (provenance, fail-closed handling, immutability, deterministic ordering, official citation lineage) are non-negotiable. Operational parameters (Top-K thresholds, candidate depths, context budgets, fusion constants, provider/model choices) are versioned operating points, not permanent architectural winners.
 
 ## Current implementation boundary
 
