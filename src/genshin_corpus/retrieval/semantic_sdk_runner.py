@@ -201,6 +201,138 @@ def _responses_event_parts(data: Mapping[str, Any]) -> tuple[str, str, str | Non
     )
 
 
+class _ResponsesDecisionText:
+    """Bind text to output items before selecting a unique formal message.
+
+    Validation is deferred until EOF so malformed identity/content never prevents
+    the caller from persisting the complete observed stream. No text is repaired.
+    """
+
+    def __init__(self) -> None:
+        self.events: list[Mapping[str, Any]] = []
+        self.selection: dict[str, Any] | None = None
+
+    def observe(self, event: Mapping[str, Any]) -> None:
+        if event.get("type") in {
+            "response.output_item.added", "response.output_item.done",
+            "response.content_part.added", "response.content_part.done",
+            "response.output_text.delta", "response.output_text.done",
+            "response.completed", "response.incomplete", "response.failed", "error",
+        } or (self.events and self.events[-1].get("type") in {
+            "response.completed", "response.incomplete", "response.failed"}):
+            self.events.append(event)
+
+    def text(self) -> str:
+        def require(condition: bool, message: str) -> None:
+            if not condition:
+                raise ValueError("Responses decision text: " + message)
+
+        def index(value: Any) -> bool:
+            return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+        terminals = [e for e in self.events if e.get("type") in {
+            "response.completed", "response.incomplete", "response.failed"}]
+        require(len(terminals) == 1 and terminals[0] is self.events[-1], "ambiguous terminal")
+        terminal = terminals[0]
+        response = terminal.get("response")
+        require(isinstance(response, Mapping), "missing terminal response")
+        require(terminal.get("type") == "response.completed" and response.get("status") == "completed",
+                "response not completed")
+        output = response.get("output")
+        require(isinstance(output, list) and bool(output), "missing terminal output identities")
+        identities: dict[str, int] = {}
+        parts: dict[tuple[int, int], str] = {}
+        messages = []
+        for oi, item in enumerate(output):
+            require(isinstance(item, Mapping), "invalid terminal item")
+            iid = item.get("id")
+            require(isinstance(iid, str) and bool(iid) and iid not in identities, "missing/duplicate item id")
+            identities[iid] = oi
+            require(item.get("type") in ("message", "reasoning"), "unsupported output item")
+            if item.get("type") != "message":
+                continue
+            require(item.get("role") == "assistant" and item.get("status") == "completed",
+                    "message role/status not completed assistant")
+            content = item.get("content")
+            require(isinstance(content, list) and bool(content), "missing message content")
+            for ci, part in enumerate(content):
+                require(isinstance(part, Mapping) and part.get("type") == "output_text"
+                        and isinstance(part.get("text"), str), "unsupported message content")
+                parts[oi, ci] = part["text"]
+            messages.append((oi, item))
+
+        deltas: dict[tuple[int, int], list[str]] = {}
+        closed_parts: set[tuple[int, int]] = set()
+        closed_items: set[int] = set()
+        added_items: set[int] = set()
+        done_text: set[tuple[int, int]] = set()
+        for event in self.events[:-1]:
+            kind = event.get("type")
+            require(kind != "error", "stream error")
+            oi = event.get("output_index")
+            require(index(oi) and oi < len(output), "missing/unknown output_index")
+            item = output[oi]
+            if kind in {"response.output_item.added", "response.output_item.done"}:
+                snapshot = event.get("item")
+                require(isinstance(snapshot, Mapping), "missing item snapshot")
+                require(all(snapshot.get(k) == item.get(k) for k in ("id", "type", "role", "phase")),
+                        "item identity/type/role/phase disagrees with terminal")
+                require(oi not in closed_items, "event after item done")
+                if kind == "response.output_item.added":
+                    require(oi not in added_items, "duplicate item added")
+                    added_items.add(oi)
+                else:
+                    closed_items.add(oi)
+                    if item.get("type") == "message":
+                        require(snapshot.get("status") == "completed" and snapshot.get("content") == item.get("content"),
+                                "completed item content disagrees with terminal")
+                continue
+            require(event.get("item_id") == item.get("id") and item.get("type") == "message",
+                    "text item identity disagrees with terminal")
+            require(oi not in closed_items, "text after item done")
+            ci = event.get("content_index")
+            require(index(ci) and (oi, ci) in parts, "missing/unknown content_index")
+            key = (oi, ci)
+            require(key not in closed_parts, "event after content part done")
+            if kind == "response.output_text.delta":
+                require(key not in done_text and isinstance(event.get("delta"), str), "invalid/late delta")
+                deltas.setdefault(key, []).append(event["delta"])
+            elif kind == "response.output_text.done":
+                require(key not in done_text and event.get("text") == parts[key], "done text disagrees with terminal")
+                done_text.add(key)
+            else:
+                part = event.get("part")
+                require(isinstance(part, Mapping) and part.get("type") == "output_text", "unsupported content part")
+                if kind == "response.content_part.done":
+                    require(part.get("text") == parts[key], "content part disagrees with terminal")
+                    closed_parts.add(key)
+                else:
+                    require(kind == "response.content_part.added" and part.get("text") == "",
+                            "invalid content part added")
+        # A stream with any text deltas must deliver every terminal text part.
+        # Terminal-only responses are allowed; partial streaming cannot be filled in.
+        if deltas:
+            require(set(deltas) == set(parts), "stream missing message content")
+            for key, values in deltas.items():
+                require("".join(values) == parts[key], "streamed text disagrees with terminal")
+        candidates = [(oi, item) for oi, item in messages if item.get("phase") == "final_answer"]
+        legacy = len(messages) == 1 and messages[0][1].get("phase") is None
+        if legacy:
+            candidates = messages
+        else:
+            require(all(item.get("phase") in ("commentary", "final_answer") for _, item in messages),
+                    "unknown message phase")
+        require(len(candidates) == 1, "formal decision is not unique")
+        oi, selected = candidates[0]
+        text = "".join(parts[oi, ci] for ci in range(len(selected["content"])))
+        require(bool(text.strip()), "empty formal decision")
+        self.selection = {"output_index": oi, "item_id": selected["id"],
+                          "phase": selected.get("phase"),
+                          "policy": "legacy_single_message" if legacy else "unique_final_answer",
+                          "non_decision_message_ids": [item["id"] for i, item in messages if i != oi]}
+        return text
+
+
 def _stream_envelope(identifier: str | None, visible: str, reasoning: str,
                      finish_reason: str | None, usage: Any) -> bytes:
     """Build the same local Chat Completions envelope used by non-stream validation."""
@@ -1406,6 +1538,7 @@ def run_sdk_route_pair(
         first_chunk_ms: float | None = None
         first_visible_ms: float | None = None
         visible_parts: list[str] = []
+        decision_text = _ResponsesDecisionText()
         reasoning_parts: list[str] = []
         finish_reason: str | None = None
         usage: Any = None
@@ -1480,6 +1613,7 @@ def run_sdk_route_pair(
                         if isinstance(chunk_usage, Mapping):
                             usage = dict(chunk_usage)
                         if profile.api_surface == "responses":
+                            decision_text.observe(data)
                             value, reasoning, event_finish, event_usage, event_id, terminal = _responses_event_parts(data)
                             if value:
                                 visible_parts.append(value)
@@ -1541,6 +1675,13 @@ def run_sdk_route_pair(
         if status is not None and status != 200 and "response" not in artifacts:
             raise ValueError("HTTP error response was not durably persisted")
         visible = "".join(visible_parts)
+        decision_text_error = None
+        if (profile.api_surface == "responses" and status == 200 and stream_complete
+                and finish_reason == "stop" and sdk_error_type is None):
+            try:
+                visible = decision_text.text()
+            except ValueError as exc:
+                decision_text_error = str(exc)
         reasoning = "".join(reasoning_parts)
         chunk_count = stream_writer.chunk_count
         if status == 200 and stream_complete and sdk_error_type is None:
@@ -1567,6 +1708,8 @@ def run_sdk_route_pair(
                 execution_state = "unknown"
             else:
                 try:
+                    if decision_text_error is not None:
+                        raise ValueError(decision_text_error)
                     normalized, _content, _parsed, validation = _validate_raw_response(
                         _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"],
                         segment_metadata=unit.get("segment_metadata"))
@@ -1606,6 +1749,7 @@ def run_sdk_route_pair(
             "latency_ms": elapsed, "first_chunk_latency_ms": first_chunk_ms if first_chunk_ms is not None else "UNKNOWN",
             "first_visible_latency_ms": first_visible_ms if first_visible_ms is not None else "UNKNOWN",
             "stream_complete": stream_complete, "stream_chunk_count": chunk_count,
+            **({"decision_message": decision_text.selection} if profile.api_surface == "responses" else {}),
             "reasoning_chars": len(reasoning), "visible_chars": len(visible),
             "execution_state": execution_state, "fallback_eligible": fallback_eligible,
             "fallback_decision": "eligible" if fallback_eligible else "not_eligible",
@@ -2060,6 +2204,7 @@ def run_sdk_single_route_attempt(
     finish_reason: str | None = None
     usage: Any = None
     visible_parts: list[str] = []
+    decision_text = _ResponsesDecisionText()
     reasoning_parts: list[str] = []
     done_tracker: _DoneTrackingStream | None = None
     response_terminal = False
@@ -2131,6 +2276,7 @@ def run_sdk_single_route_attempt(
                     if isinstance(chunk_usage, Mapping):
                         usage = dict(chunk_usage)
                     if profile.api_surface == "responses":
+                        decision_text.observe(data)
                         value, reasoning, event_finish, event_usage, event_id, terminal = _responses_event_parts(data)
                         if value:
                             visible_parts.append(value)
@@ -2166,8 +2312,16 @@ def run_sdk_single_route_attempt(
     stream_complete = (finish_reason is not None and
                        (response_terminal if profile.api_surface == "responses"
                         else done_tracker is not None and done_tracker.saw_done))
+    visible = "".join(visible_parts)
+    decision_text_error = None
+    if (profile.api_surface == "responses" and status == 200 and stream_complete
+            and finish_reason == "stop" and error_type is None):
+        try:
+            visible = decision_text.text()
+        except ValueError as exc:
+            decision_text_error = str(exc)
     if status == 200 and stream_complete and error_type is None:
-        raw = _stream_envelope(provider_id, "".join(visible_parts), "".join(reasoning_parts), finish_reason, usage)
+        raw = _stream_envelope(provider_id, visible, "".join(reasoning_parts), finish_reason, usage)
         if key.encode() in raw:
             raise ValueError("provider response echoed configured credential")
         artifacts["response"] = _write_once(stem / "raw_response.bin", raw)
@@ -2179,6 +2333,8 @@ def run_sdk_single_route_attempt(
         execution_certainty = "complete"
         if finish_reason == "stop":
             try:
+                if decision_text_error is not None:
+                    raise ValueError(decision_text_error)
                 normalized, _content, _parsed, validation = _validate_raw_response(
                     _PARSER, raw or b"", expected_segment_ids=unit["segment_ids"],
                     segment_metadata=semantic_segment_binding_metadata(payload))
@@ -2213,6 +2369,7 @@ def run_sdk_single_route_attempt(
         "usage": usage if usage is not None else "UNKNOWN", "usage_normalized": _normalize_usage(usage),
         "latency_ms": round((time.monotonic() - started) * 1000, 3),
         "stream_complete": stream_complete, "stream_chunk_count": stream_writer.chunk_count,
+        **({"decision_message": decision_text.selection} if profile.api_surface == "responses" else {}),
         "visible_chars": len("".join(visible_parts)), "reasoning_chars": len("".join(reasoning_parts)),
         "execution_state": "complete" if execution_certainty == "complete" else ("not_started" if execution_certainty == "not_started" else "unknown"),
         "execution_certainty": execution_certainty, "failure_class": failure_class,

@@ -3,6 +3,7 @@ from dataclasses import asdict
 import json
 from pathlib import Path
 from unittest.mock import patch
+from tests.responses_fixture import single_message_events
 
 from tests.retrieval.test_navi_exploration import NaviExplorationTests
 from genshin_corpus.rag.navi_e2_experiment import (
@@ -311,7 +312,7 @@ class E2Tests(NaviExplorationTests):
         chunks=[{'type':'response.reasoning_text.delta','delta':'thinking'},
                 {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
                 {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_1','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
-        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks))+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
@@ -324,7 +325,7 @@ class E2Tests(NaviExplorationTests):
     def test_sdk_in_stream_error_event_captured(self):
         import httpx
         chunks=[{'type':'error','error':{'message':'provider internal rate error','code':'rate_limit'}}]
-        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks))+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
@@ -335,7 +336,7 @@ class E2Tests(NaviExplorationTests):
     def test_sdk_response_failed_event_captured(self):
         import httpx
         chunks=[{'type':'response.failed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_fail','error':{'message':'safety check reject'}}}]
-        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks))+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
@@ -357,7 +358,7 @@ class E2Tests(NaviExplorationTests):
         import httpx
         chunks=[{'type':'response.reasoning_text.delta','delta':'only thought, no visible output'},
                 {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_empty','usage':{'input_tokens':20,'output_tokens':10,'total_tokens':30}}}]
-        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks))+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
@@ -369,7 +370,7 @@ class E2Tests(NaviExplorationTests):
         import httpx
         chunks=[{'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'stop','reason':'stop'}]))},
                 {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_no_usage'}}]
-        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+        wire=''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks))+'data: [DONE]\n\n'
         transport=httpx.MockTransport(lambda req:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))
         with patch.dict('os.environ',{'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}):
             provider=E2SDK(route='tokenmetro', model='gpt-6-luna', transport=transport)
@@ -432,8 +433,8 @@ class E2Tests(NaviExplorationTests):
                        {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_valid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
         invalid_chunk = [{'type':'response.output_text.delta','delta':'this is definitely not valid json'},
                          {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_invalid','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}}]
-        wire_valid = ''.join('data: '+json.dumps(c)+'\n\n' for c in valid_chunk)+'data: [DONE]\n\n'
-        wire_invalid = ''.join('data: '+json.dumps(c)+'\n\n' for c in invalid_chunk)+'data: [DONE]\n\n'
+        wire_valid = ''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(valid_chunk))+'data: [DONE]\n\n'
+        wire_invalid = ''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events(invalid_chunk))+'data: [DONE]\n\n'
         env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
         p_valid = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=wire_valid)), environment=env)
         t_valid = p_valid(self.root/'sdk_valid/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1')
@@ -447,14 +448,14 @@ class E2Tests(NaviExplorationTests):
     def test_sdk_decision_complete_mode_mismatch_fails_decision_complete(self):
         import httpx
         env = {'TOKENMETRO_API_KEY':'fixture-secret','TOKENMETRO_BASE_URL':'https://example.invalid/v1','TOKENMETRO_API_SURFACE':'responses'}
-        single_action_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
+        single_action_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events([
             {'type':'response.output_text.delta','delta':json.dumps({'action':'search','query':'test','top_k':3})},
             {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_single','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
-        ]) + 'data: [DONE]\n\n'
-        batch_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in [
+        ])) + 'data: [DONE]\n\n'
+        batch_wire = ''.join('data: '+json.dumps(c)+'\n\n' for c in single_message_events([
             {'type':'response.output_text.delta','delta':json.dumps(decision([{'action':'search','query':'test','top_k':3}]))},
             {'type':'response.completed','response':{'model':'gpt-6-luna','status':'completed','id':'resp_batch','usage':{'input_tokens':10,'output_tokens':10,'total_tokens':20}}},
-        ]) + 'data: [DONE]\n\n'
+        ])) + 'data: [DONE]\n\n'
 
         p1 = E2SDK(route='tokenmetro', model='gpt-6-luna', transport=httpx.MockTransport(lambda req: httpx.Response(200, headers={'content-type':'text/event-stream'}, content=single_action_wire)), environment=env)
         t1 = p1(self.root/'sdk_mismatch_1/rounds/00', {'model':'gpt-6-luna','instructions':'i','input':'u','stream':True,'max_output_tokens':100}, 'id1', decision_mode='batch')

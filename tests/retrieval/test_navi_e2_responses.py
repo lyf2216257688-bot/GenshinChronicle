@@ -6,6 +6,7 @@ import ssl
 from pathlib import Path
 import tempfile
 import unittest
+from tests.responses_fixture import single_message_events
 from unittest.mock import patch
 
 import httpx
@@ -38,7 +39,7 @@ def response(model='gpt-6-luna', *, usage=None, status='completed', event='respo
             'usage': {'input_tokens': 12, 'output_tokens': 8, 'total_tokens': 20} if usage is None else usage}},
     ]
     return httpx.Response(200, headers={'content-type': 'text/event-stream'},
-        content=''.join('event: '+c['type']+'\ndata: '+json.dumps(c)+'\n\n' for c in chunks))
+        content=''.join('event: '+c['type']+'\ndata: '+json.dumps(c)+'\n\n' for c in single_message_events(chunks)))
 
 
 class ResponsesTests(unittest.TestCase):
@@ -362,7 +363,7 @@ class ResponsesTests(unittest.TestCase):
             'output':[{'type':'message','content':[{'type':'output_text','text':json.dumps(decision())}]},
                       {'type':'reasoning','summary':[{'type':'summary_text','text':'Provider summary.'}]}]}}
         sdk = self.sdk(lambda r: httpx.Response(200,headers={'content-type':'text/event-stream'},
-            content='data: '+json.dumps(event)+'\n\n'))
+            content='data: '+json.dumps(single_message_events([event])[0])+'\n\n'))
         result = sdk(self.root/'rounds/00', self.body, 'run')
         self.assertTrue(result['decision_complete'])
         self.assertEqual(result['reasoning'], 'Provider summary.')
@@ -379,7 +380,7 @@ class ResponsesTests(unittest.TestCase):
             {'type':'response.created','response':{'usage':{'input_tokens':1,'output_tokens':1,'total_tokens':2}}},
             {'type':'response.output_text.delta','delta':json.dumps(decision())},
             {'type':'response.completed','response':{'id':'r','model':'gpt-6-luna','status':'completed'}}]
-        wire=''.join('data: '+json.dumps(event)+'\n\n' for event in events)
+        wire=''.join('data: '+json.dumps(event)+'\n\n' for event in single_message_events(events))
         result = self.sdk(lambda r:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))(
             self.root/'rounds/00',self.body,'run')
         self.assertFalse(result['complete'])
@@ -391,7 +392,7 @@ class ResponsesTests(unittest.TestCase):
             {'type':'response.completed','response':{'id':'r','model':'gpt-6-luna','status':'completed',
                 'usage':{'input_tokens':1,'output_tokens':1,'total_tokens':2},
                 'output':[{'type':'message','content':[{'type':'output_text','text':'different text'}]}]}}]
-        wire=''.join('data: '+json.dumps(event)+'\n\n' for event in events)
+        wire=''.join('data: '+json.dumps(event)+'\n\n' for event in single_message_events(events))
         result = self.sdk(lambda r:httpx.Response(200,headers={'content-type':'text/event-stream'},content=wire))(
             self.root/'rounds/00',self.body,'run')
         self.assertFalse(result['complete'])

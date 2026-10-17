@@ -7,6 +7,7 @@ import gzip
 import os
 import tempfile
 import unittest
+from tests.responses_fixture import single_message_events
 import unittest.mock
 from pathlib import Path
 
@@ -236,7 +237,7 @@ class SdkRunnerTest(unittest.TestCase):
             {"type": "response.completed", "response": {"id": "responses-fixture", "status": "completed",
                                                               "usage": {"input_tokens": 3, "output_tokens": 4}}},
         ]
-        stream = b"".join(b"data: " + json.dumps(event).encode() + b"\n\n" for event in events)
+        stream = b"".join(b"data: " + json.dumps(event).encode() + b"\n\n" for event in single_message_events(events))
         stream += b"data: [DONE]\n\n"
         calls = []
 

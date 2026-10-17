@@ -308,6 +308,33 @@ Provider reasoning summaries are identified as summaries; absent reasoning is
 NOT_PROVIDED, not fabricated private reasoning. All models share E2 prompts,
 actions, memory, source binding, budgets and checkpoint rules.
 
+Responses decision text is bound to `output_index`, `item_id` and
+`content_index`, then checked against the completed terminal output. Item
+identity/type/role/`item.phase`, completed message status, text-done and
+item-done snapshots (when supplied), and each streamed text part must agree;
+agreement of a cross-message concatenation is insufficient. A response with
+any text deltas must supply all terminal message text parts exactly; terminal-only
+text is allowed only when no text deltas were supplied. The decision is the
+unique assistant message with `item.phase=final_answer`; other messages must
+explicitly be `commentary`. A single identified, completed assistant message
+without a phase remains compatible. Multiple unlabelled messages, unknown
+phases, missing/conflicting identities, incomplete or unsupported content,
+and non-unique formal decisions stop fail closed. Phase is not inferred from
+metadata, text validity or message position. The complete selected text still
+passes the existing strict JSON/action/schema checks without substring
+extraction, character removal or repair.
+
+New terminals record `decision_message` (selected index/ID/phase, selection
+policy and excluded message IDs); complete original events, including
+commentary and reasoning, remain in the immutable stream audit. The shared
+semantic SDK Responses paths use the same selection/checks before their own
+unchanged validators; their historical live-dispatch retirement remains in
+force, and message validation rejection cannot enable retry/fallback.
+Chat Completions processing is unchanged. Historical terminals need no new
+field and are never rewritten/backfilled; read-only validation of preserved
+events does not authorize replaying historical requests or actions, continuing
+E2, or adopting semantic conclusions.
+
 For future E2 Responses SDK connection/timeout, HTTPX transport and OS failures,
 `terminal.error.diagnostics` records a bounded exception graph (up to 16 nodes),
 explicit `cause` and implicit `context` links, context suppression, known

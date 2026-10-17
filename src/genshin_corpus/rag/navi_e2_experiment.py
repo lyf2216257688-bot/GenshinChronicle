@@ -19,7 +19,7 @@ from genshin_corpus.retrieval.navi_exploration import (
 from .navi_e2_routes import e2_route, E2_ROUTES
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _DoneTrackingStream, _JsonlArtifactWriter, _chunk_mapping, _stream_delta, _normalize_usage,
-    _responses_event_parts, safe_rate_limit_retry, _retry_after,
+    _responses_event_parts, _ResponsesDecisionText, safe_rate_limit_retry, _retry_after,
 )
 from .navi_experiment import _validate_action, _resolve_read, _save as _e1_save
 
@@ -449,6 +449,7 @@ class E2SDK:
         tracker = None
         started = time.monotonic()
         content, reasoning, usage, finish = [], [], None, None
+        decision_text = _ResponsesDecisionText()
         response_terminal = False
         response_status, terminal_event, response_id = None, None, None
         returned_models = set()
@@ -493,12 +494,13 @@ class E2SDK:
                         data = _chunk_mapping(chunk)
                         if sensitive(json.dumps(data)): raise ExplorationError('credential echo')
                         writer.append(data)
+                        decision_text.observe(data)
                         resp = data.get('response') if isinstance(data.get('response'), Mapping) else {}
                         if isinstance(resp.get('model'), str): returned_models.add(resp['model'])
                         if data.get('type') in {'response.reasoning_text.delta', 'response.reasoning_summary_text.delta'}:
                             reasoning_kinds.add(data['type'])
                         if response_terminal:
-                            raise ExplorationError('event after Responses terminal')
+                            error = {'type': 'ResponsesDecisionTextError', 'message': 'event after Responses terminal'}
                         if data.get("type") == "error":
                             err_obj = data.get("error") if isinstance(data.get("error"), Mapping) else data
                             err_msg = str(err_obj.get("message", "Responses stream error")) if isinstance(err_obj, Mapping) else str(err_obj)
@@ -521,14 +523,6 @@ class E2SDK:
                             terminal_event = data.get('type')
                             response_status = resp.get('status')
                             response_id = event_id
-                            final_text = [part['text'] for item in (resp.get('output') or [])
-                                    if isinstance(item, Mapping) and item.get('type') == 'message'
-                                    for part in (item.get('content') or [])
-                                    if isinstance(part, Mapping) and part.get('type') == 'output_text' and isinstance(part.get('text'), str)]
-                            if content and final_text and ''.join(content) != ''.join(final_text):
-                                raise ExplorationError('terminal visible text disagrees with streamed deltas')
-                            # Accept terminal-only text only when no deltas were supplied.
-                            if not content: content.extend(final_text)
                             if not reasoning:
                                 summaries = [part['text'] for item in (resp.get('output') or [])
                                     if isinstance(item, Mapping) and item.get('type') == 'reasoning'
@@ -565,8 +559,13 @@ class E2SDK:
             if reasoning_tokens is not None:
                 has_reliable_usage = (isinstance(reasoning_tokens, int) and not isinstance(reasoning_tokens, bool)
                                       and 0 <= reasoning_tokens <= usage['output_tokens'])
-        stream_complete = bool(finish is not None and response_terminal and error is None)
         visible_text = ''.join(content)
+        if response_terminal and error is None:
+            try:
+                visible_text = decision_text.text()
+            except ValueError as exc:
+                error = {'type': 'ResponsesDecisionTextError', 'message': str(exc)}
+        stream_complete = bool(finish is not None and response_terminal and error is None)
         model_verified = returned_models == {self.profile.model_id}
         protocol_success = bool(stream_complete and terminal_count == 1 and finish == 'stop'
                                 and response_status == 'completed' and model_verified and has_reliable_usage)
@@ -583,6 +582,7 @@ class E2SDK:
         terminal = observation | {'run_identity': run_identity, 'finish_reason': finish, 'complete': complete,
             'stream_complete': stream_complete, 'decision_complete': decision_complete,
             'content': visible_text, 'reasoning': ''.join(reasoning), 'usage': usage or 'UNKNOWN',
+            'decision_message': decision_text.selection,
             'usage_normalized': _normalize_usage(usage), 'error': error,
             'latency_ms': round((time.monotonic() - started)*1000, 3), 'stream': writer.descriptor(),
             'actual_cost': 'UNKNOWN', 'currency': 'UNKNOWN'}

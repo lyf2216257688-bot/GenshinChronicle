@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 import tempfile
 import unittest
+from tests.responses_fixture import single_message_events
 from unittest.mock import patch
 
 import httpx
@@ -124,7 +125,7 @@ class TwoStageExperimentTest(unittest.TestCase):
                 {"type": "response.completed", "response": {"id": "mock", "status": "completed",
                                                             "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}}},
             ]
-            stream = b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in events) + b"data: [DONE]\n\n"
+            stream = b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in single_message_events(events)) + b"data: [DONE]\n\n"
             return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream)
 
         result = run_sdk_route_pair(

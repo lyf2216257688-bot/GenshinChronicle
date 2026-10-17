@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+from tests.responses_fixture import single_message_events
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -805,7 +806,7 @@ class SemanticBatchRunnerTests(unittest.TestCase):
                       "segment_coverage": [{"segment_id": "u1", "disposition": "covered", "reason": None}]}
             rows = [{"type": "response.output_text.delta", "delta": json.dumps(output)},
                     {"type": "response.completed", "response": {"id": "fixture", "status": "completed"}}]
-            stream = b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in rows) + b"data: [DONE]\n\n"
+            stream = b"".join(b"data: " + json.dumps(row).encode() + b"\n\n" for row in single_message_events(rows)) + b"data: [DONE]\n\n"
             return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream, request=request)
         executor = make_sdk_batch_executor(route="tokenmetro", model=profile.model_id, prompt=prompt,
                                            prompt_identity=sha256_json(prompt), source_identity="source",
