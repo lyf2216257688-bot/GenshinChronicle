@@ -7,7 +7,7 @@ the immediate next action are owned by `docs/current-phase.md`.
 
 - `AGENTS.md`: repository-wide engineering and phase-boundary instructions.
 - `README.md`: project orientation and high-level repository entry point.
-- `docs/`: architecture, phase specifications, research evidence, and decisions.
+- `docs/`: architecture, phase specifications, research evidence, AI model interfaces catalog, and decisions. `docs/model-interfaces.md` owns unified AI model interface documentation, provider endpoints, credential slots, and maintenance instructions.
 - `src/`: importable corpus implementation.
 - `tests/`: deterministic automated tests and checked-in sanitized fixtures.
 - `data/`: local and generated corpus data; it is not source code.
@@ -53,6 +53,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   `navi_e2_experiment.py` is the opt-in single-case model exploration runner;
   it reuses E1 tools and SDK evidence helpers without creating active views.
   `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
+  `model_interfaces_catalog.py` owns the programmatic catalog and consistency
+  checks for active and historical AI model interfaces;
   `navi_e2_protocol_probe.py` owns bounded synthetic Responses/action canaries
   and their campaign request ceilings, without invoking corpus tools. Archived
   retrieval SDK execution paths are restricted to offline MockTransport;

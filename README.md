@@ -56,6 +56,7 @@ README.md
 docs/
 ├── architecture-overview.md
 ├── current-phase.md
+├── model-interfaces.md
 ├── roadmap.md
 ├── phases/
 │   ├── phase-01-raw-collection.md
@@ -128,6 +129,8 @@ when a question is submitted. `evidence_only` requires the Qwen query
 embedding environment but does not inspect Generation credentials. The online
 Qwen reranker is not part of the default path; select it explicitly with
 `GENSHIN_RERANKER_BACKEND=online_qwen` when its credentials are configured.
+For the complete AI model catalog, provider endpoints, credential environment
+variables, and protocol specifications, see `docs/model-interfaces.md`.
 
 ## Data and secrets
 
