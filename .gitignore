@@ -40,3 +40,7 @@ Thumbs.db
 /p01ea-test-temp/
 /tmp*/
 /scripts/
+/.agents/
+/PROJECT.md
+/TEST_INFRA.md
+/TEST_READY.md

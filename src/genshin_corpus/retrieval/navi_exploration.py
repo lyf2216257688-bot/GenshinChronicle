@@ -22,6 +22,16 @@ class ExplorationError(ValueError):
 
 class ExplorationBudgetExceeded(ExplorationError):
     """An action cannot fit the remaining hard budget."""
+    def __init__(
+        self,
+        message: str = "budget exceeded",
+        *,
+        min_required_chars: int | None = None,
+        result: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.min_required_chars = min_required_chars
+        self.result = result
 
 
 @dataclass(frozen=True)
@@ -192,15 +202,32 @@ class LocalExplorationTools:
                 hits.append({**c, "canonical_address": row["source"]["canonical_address"], "record_context": row["source"]["record_context"], "snippet": text[:200], "snippet_omitted_chars": max(0, len(text) - 200)})
         return {"mode": "local_lexical_not_hybrid", "query": query, "hits": hits, "corpus_rows": manifest["row_count"]}
 
-    def read(self, unit_id: str, *, max_chars: int, neighbors: int = 0) -> dict[str, Any]:
-        if not isinstance(max_chars, int) or isinstance(max_chars, bool) or not 1 <= max_chars <= 20000:
+    def read(self, unit_id: str, *, max_chars: int, neighbors: int = 0, fail_on_metadata_budget: bool = True, fail_on_unknown_ru: bool = True) -> dict[str, Any]:
+        if not isinstance(max_chars, int) or isinstance(max_chars, bool) or not 1 <= max_chars <= 2_000_000:
             raise ExplorationError("invalid read budget")
         if not isinstance(neighbors, int) or isinstance(neighbors, bool) or not 0 <= neighbors <= 2:
             raise ExplorationError("invalid neighbor budget")
         try:
-            row = self._load_selected_ru([unit_id])[unit_id]
-        except (KeyError, ru.RetrievalUnitError) as exc:
-            raise ExplorationError("unknown Retrieval Unit") from exc
+            loaded = self._load_selected_ru([unit_id])
+        except ExplorationError as exc:
+            if str(exc) == "scoped RU identities absent from verified snapshot":
+                if not fail_on_unknown_ru:
+                    return {
+                        "error": "unauthorized_or_invalid_unit_id",
+                        "message": "unknown Retrieval Unit",
+                        "requested_unit_id": unit_id,
+                    }
+                raise ExplorationError("unknown Retrieval Unit") from exc
+            raise
+        if unit_id not in loaded:
+            if not fail_on_unknown_ru:
+                return {
+                    "error": "unauthorized_or_invalid_unit_id",
+                    "message": "unknown Retrieval Unit",
+                    "requested_unit_id": unit_id,
+                }
+            raise ExplorationError("unknown Retrieval Unit")
+        row = loaded[unit_id]
         address = row["source"]["canonical_address"]
         entry = self.by_record.get(address["record_id"])
         if entry is None:
@@ -244,8 +271,20 @@ class LocalExplorationTools:
             "source_binding_status": "verified", "semantic_acceptance_status": "not_accepted",
             "serialization": "canonical_json_unicode_characters_including_metadata",
         }
-        if response_chars(result) > max_chars:
-            raise ExplorationBudgetExceeded("read metadata cannot fit context budget")
+        min_envelope = response_chars(result)
+        if min_envelope > max_chars:
+            if fail_on_metadata_budget:
+                raise ExplorationBudgetExceeded(
+                    "read metadata cannot fit context budget",
+                    min_required_chars=min_envelope,
+                    result=result,
+                )
+            error_result = dict(result)
+            error_result["error"] = "read_budget_too_small"
+            error_result["message"] = "read metadata cannot fit context budget"
+            error_result["requested_max_chars"] = max_chars
+            error_result["min_required_max_chars"] = min_envelope
+            return error_result
         # Fit the entire delivered response, including locator and truncation
         # metadata. Canonical payload is a visible prefix when truncated.
         low, high = 0, len(visible) + len(canonical_text)

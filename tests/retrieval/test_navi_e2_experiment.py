@@ -1,5 +1,6 @@
 """Small E2 fixtures; no full corpus or provider required."""
 from dataclasses import asdict
+from hashlib import sha256
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -7,11 +8,11 @@ from tests.responses_fixture import single_message_events
 
 from tests.retrieval.test_navi_exploration import NaviExplorationTests
 from genshin_corpus.rag.navi_e2_experiment import (
-    E2Budget, HYPOTHESIS, run_exploration, once, E2SDK, body_chars, model_result, lineage_accounting, short_payload,
-    SINGLE_ACTION_PROMPT, PROMPT, execute_action,
+    E2Budget, E2ResearchBudget, HYPOTHESIS, run_exploration, once, E2SDK, body_chars, model_result, lineage_accounting, short_payload,
+    SINGLE_ACTION_PROMPT, PROMPT, execute_action, main,
 )
-from genshin_corpus.retrieval.navi_exploration import ExplorationError
-from genshin_corpus.canonical.fingerprints import sha256_json
+from genshin_corpus.retrieval.navi_exploration import ExplorationError, ExplorationBudgetExceeded, LocalExplorationTools
+from genshin_corpus.canonical.fingerprints import sha256_json, canonical_json_bytes
 
 
 class FakeDecisions:
@@ -538,6 +539,396 @@ class E2Tests(NaviExplorationTests):
         path.write_text(json.dumps(value), encoding='utf-8')
         with self.assertRaisesRegex(ExplorationError, 'integrity'):
             self.run_e2(provider)
+
+    def test_small_read_budget_recovers_with_action_error_and_does_not_abort_session(self):
+        observed_payloads = []
+        class RecoveringDecisions(FakeDecisions):
+            def __call__(sub, stem, body, identity, *args, **kwargs):
+                observed_payloads.append(json.loads(body['input']))
+                return super().__call__(stem, body, identity)
+
+        fake = RecoveringDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 10},
+                {'action': 'search', 'query': 'library', 'top_k': 2},
+            ]),
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 20000},
+                {'action': 'stop', 'reason': 'recovered from small read budget'},
+            ]),
+        ])
+
+        state = self.run_e2(fake)
+        self.assertEqual(state['status'], 'stopped')
+        self.assertEqual(state['model_rounds'], 2)
+        self.assertEqual(fake.calls, 2)
+        read_events = [e for e in state['events'] if e['action']['action'] == 'read']
+        self.assertEqual(len(read_events), 3)  # seed read + small read + successful read
+        small_read = read_events[1]
+        self.assertEqual(small_read['result'].get('error'), 'read_budget_too_small')
+        self.assertEqual(small_read['result'].get('requested_max_chars'), 10)
+        self.assertGreater(small_read['result'].get('min_required_max_chars'), 100)
+        self.assertIn('unit_id', small_read['result'])
+        self.assertIn('ru_text_sha256', small_read['result'])
+        self.assertIn('canonical_payload_sha256', small_read['result'])
+        self.assertIn('source', small_read['result'])
+
+        round_1_input = observed_payloads[1]
+        new_results = round_1_input['new_tool_results']
+        read_result_payload = next(r for r in new_results if r['action_index'] == 1)['result']
+        self.assertEqual(read_result_payload['error'], 'read_budget_too_small')
+        self.assertEqual(read_result_payload['requested_max_chars'], 10)
+        self.assertEqual(read_result_payload['min_required_max_chars'], small_read['result']['min_required_max_chars'])
+        self.assertEqual(read_result_payload.get('source_role'), small_read['result']['source']['content_role'])
+        self.assertEqual(read_result_payload.get('source_provenance'), small_read['result']['source']['provenance'])
+
+        self.assertEqual(state['used']['reads'], 3)
+        seed_chars = body_chars(read_events[0]['result'])
+        success_chars = body_chars(read_events[2]['result'])
+        self.assertEqual(state['used']['canonical_chars'], seed_chars + success_chars)
+        self.assertEqual(self.run_e2(fake)['checkpoint_identity'], state['checkpoint_identity'])
+
+    def test_single_action_read_small_budget_recovers_to_next_round(self):
+        self.partial_parent()
+        fake = FakeDecisions([
+            {'action': 'read', 'unit_id': self.uid, 'max_chars': 10},
+            {'action': 'read', 'unit_id': self.uid, 'max_chars': 20000},
+            {'action': 'stop', 'reason': 'recovered in single action mode'},
+        ])
+        state = run_exploration(
+            self.tools, start_ru=self.uid, output_root=self.root / 'single_action_recovery',
+            provider=fake, question=self.question, parent_root=self.root / 'e2',
+            single_action_continuation=True, budget=E2Budget(output_tokens=4096),
+        )
+        self.assertEqual(state['status'], 'stopped')
+        self.assertEqual(fake.calls, 3)
+
+    def test_e2_research_budget_profile_and_ceilings(self):
+        b_res = E2ResearchBudget()
+        self.assertEqual(b_res.profile, "research")
+        self.assertEqual(b_res.rounds, 20)
+        self.assertEqual(b_res.searches, 30)
+        self.assertEqual(b_res.reads, 50)
+        self.assertEqual(b_res.pages, 30)
+        self.assertEqual(b_res.canonical_chars, 100_000)
+        self.assertEqual(b_res.total_tokens, 250_000)
+        self.assertEqual(b_res.output_tokens, 8192)
+        self.assertEqual(b_res.tool_response_chars, 500_000)
+
+        b_res2 = E2Budget.research(rounds=30, canonical_chars=200_000)
+        self.assertEqual(b_res2.profile, "research")
+        self.assertEqual(b_res2.rounds, 30)
+        self.assertEqual(b_res2.canonical_chars, 200_000)
+        self.assertEqual(b_res2.total_tokens, 250_000)
+
+        with self.assertRaises(ExplorationError):
+            E2Budget(rounds=7)
+        with self.assertRaises(ExplorationError):
+            E2Budget(total_tokens=100_001)
+        with self.assertRaises(ExplorationError):
+            E2Budget(canonical_chars=20_001)
+        with self.assertRaises(ExplorationError):
+            E2Budget(tool_response_chars=100_001)
+
+        b_high = E2ResearchBudget(
+            rounds=50, searches=100, reads=200, pages=100,
+            canonical_chars=500_000, total_tokens=2_000_000,
+            output_tokens=8192, tool_response_chars=2_000_000,
+        )
+        self.assertEqual(b_high.rounds, 50)
+        self.assertEqual(b_high.total_tokens, 2_000_000)
+
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(rounds=51)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(searches=101)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(reads=201)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(pages=101)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(canonical_chars=500_001)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(total_tokens=2_000_001)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(output_tokens=8193)
+        with self.assertRaises(ExplorationError):
+            E2ResearchBudget(tool_response_chars=2_000_001)
+
+        fake = FakeDecisions([decision([{'action': 'stop', 'reason': 'research stop'}])])
+        state = self.run_e2(fake, name='e2_research', budget=b_res)
+        self.assertEqual(state['status'], 'stopped')
+        self.assertEqual(state['budget']['profile'], 'research')
+        self.assertEqual(state['budget']['canonical_chars'], 100_000)
+        config = json.loads((self.root / 'e2_research/config.json').read_text('utf-8'))
+        self.assertEqual(config['budget']['profile'], 'research')
+        resumed = self.run_e2(fake, name='e2_research', budget=b_res)
+        self.assertEqual(resumed['checkpoint_identity'], state['checkpoint_identity'])
+
+    def test_read_large_max_chars_and_sequence_under_research_budget(self):
+        fake = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 50000},
+                {'action': 'stop', 'reason': 'large read completed'},
+            ]),
+        ])
+        state = self.run_e2(fake, name='e2_large_read', budget=E2ResearchBudget())
+        self.assertEqual(state['status'], 'stopped')
+        read_event = next(e for e in state['events'] if e['round'] == 1 and e['action']['action'] == 'read')
+        self.assertNotIn('error', read_event['result'])
+        self.assertEqual(read_event['action']['max_chars'], 50000)
+
+        # Research profile allows session read max_chars up to 2,000,000
+        fake_1m = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 1_000_000},
+                {'action': 'stop', 'reason': '1m read completed'},
+            ]),
+        ])
+        state_1m = self.run_e2(fake_1m, name='e2_1m_read', budget=E2ResearchBudget())
+        self.assertEqual(state_1m['status'], 'stopped')
+
+        fake_2m = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 2_000_000},
+                {'action': 'stop', 'reason': '2m read completed'},
+            ]),
+        ])
+        state_2m = self.run_e2(fake_2m, name='e2_2m_read', budget=E2ResearchBudget())
+        self.assertEqual(state_2m['status'], 'stopped')
+
+        # Over-ceiling (2,000,001) fails closed with read limit
+        fake_2m1 = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 2_000_001},
+                {'action': 'stop', 'reason': 'over limit'},
+            ]),
+        ])
+        state_2m1 = self.run_e2(fake_2m1, name='e2_2m1_read', budget=E2ResearchBudget())
+        self.assertEqual(state_2m1['status'], 'partial')
+        self.assertEqual(state_2m1['error']['message'], 'read limit')
+
+        # Tool boundary checks: research profile allows read max_chars up to 2,000,000
+        res_2m = self.tools.read(self.uid, max_chars=2_000_000)
+        self.assertEqual(res_2m['unit_id'], self.uid)
+        with self.assertRaises(ExplorationError):
+            self.tools.read(self.uid, max_chars=2_000_001)
+
+    def test_local_tools_read_fail_on_metadata_budget_option(self):
+        result = self.tools.read(self.uid, max_chars=10, fail_on_metadata_budget=False)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("error"), "read_budget_too_small")
+        self.assertEqual(result.get("requested_max_chars"), 10)
+        self.assertGreater(result.get("min_required_max_chars"), 10)
+        self.assertEqual(result.get("unit_id"), self.uid)
+        self.assertIn("source", result)
+
+        with self.assertRaises(ExplorationBudgetExceeded) as ctx:
+            self.tools.read(self.uid, max_chars=10, fail_on_metadata_budget=True)
+        self.assertEqual(str(ctx.exception), "read metadata cannot fit context budget")
+        self.assertGreater(ctx.exception.min_required_chars, 10)
+        self.assertIsNotNone(ctx.exception.result)
+        self.assertEqual(ctx.exception.result["unit_id"], self.uid)
+
+    def test_consecutive_multi_read_sequence_with_small_budget_and_recovery(self):
+        fake = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 10},
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 15},
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 20000},
+                {'action': 'stop', 'reason': 'completed sequence with recovery'},
+            ]),
+        ])
+        state = self.run_e2(fake, name='e2_consecutive_reads')
+        self.assertEqual(state['status'], 'stopped')
+        read_events = [e for e in state['events'] if e['action']['action'] == 'read']
+        self.assertEqual(len(read_events), 4)  # seed + 2 small errors + 1 success
+        self.assertEqual(read_events[1]['result'].get('error'), 'read_budget_too_small')
+        self.assertEqual(read_events[2]['result'].get('error'), 'read_budget_too_small')
+        self.assertNotIn('error', read_events[3]['result'])
+        self.assertEqual(state['used']['reads'], 4)
+        seed_chars = body_chars(read_events[0]['result'])
+        success_chars = body_chars(read_events[3]['result'])
+        self.assertEqual(state['used']['canonical_chars'], seed_chars + success_chars)
+        self.assertEqual(self.run_e2(fake, name='e2_consecutive_reads')['checkpoint_identity'], state['checkpoint_identity'])
+
+    def test_read_budget_too_small_approaching_read_budget_ceiling(self):
+        # Budget allows exactly 2 reads: seed read uses 1, leaving exactly 1 read.
+        budget = E2Budget(reads=2)
+        fake = FakeDecisions([
+            decision([
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 10},
+                {'action': 'read', 'unit_id': self.uid, 'max_chars': 20000},
+            ]),
+        ])
+        state = self.run_e2(fake, name='e2_read_ceiling', budget=budget)
+        self.assertEqual(state['status'], 'budget_exhausted')
+        self.assertEqual(state['termination'], 'read limit')
+        self.assertEqual(state['used']['reads'], 2)
+        read_events = [e for e in state['events'] if e['action']['action'] == 'read']
+        self.assertEqual(len(read_events), 2)  # seed + 1 small error read that reached limit
+        self.assertEqual(read_events[1]['result'].get('error'), 'read_budget_too_small')
+
+    def test_e2_sdk_with_research_budget_output_tokens(self):
+        import tempfile
+        env = {'TOKENMETRO_API_KEY': 'dummy', 'TOKENMETRO_BASE_URL': 'https://tokenmetro.com/v1'}
+        sdk = E2SDK('tokenmetro', model='gpt-6-luna', environment=env, transport='mock')
+        sdk._attempt = lambda *args, **kwargs: {
+            'calls': 1, 'retry_eligible': False, 'terminal_identity': 'mock_term_id',
+            'run_identity': 'run_1', 'finish_reason': 'stop', 'complete': True,
+            'decision_complete': True, 'content': json.dumps(decision([{'action': 'stop', 'reason': 'mock done'}])),
+            'usage': {'input_tokens': 10, 'output_tokens': 10, 'total_tokens': 20},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            b_res = E2ResearchBudget()
+            stem1 = Path(td) / 'stem1'
+            term1 = sdk(stem1, {'model': 'gpt-6-luna', 'instructions': '', 'input': '', 'stream': True, 'max_output_tokens': b_res.output_tokens}, 'run_1')
+            self.assertEqual(term1['attempt_identities'], ['mock_term_id'])
+            self.assertTrue(term1['complete'])
+
+            with self.assertRaises(ExplorationError):
+                stem2 = Path(td) / 'stem2'
+                sdk(stem2, {'model': 'gpt-6-luna', 'instructions': '', 'input': '', 'stream': True, 'max_output_tokens': 8193}, 'run_2')
+
+    def test_batch_multiple_small_reads_and_short_payload_compression(self):
+        self.partial_parent()
+        state = json.loads((self.root / 'e2/session.json').read_text())
+        state['delivered_until'] = 0
+        err_res = self.tools.read(self.uid, max_chars=10, fail_on_metadata_budget=False)
+        # Simulate 5 actions failing with read_budget_too_small in events
+        for i in range(5):
+            state['events'].append({
+                'round': len(state['events']),
+                'action': {'action': 'read', 'unit_id': self.uid, 'max_chars': 10},
+                'result': err_res,
+                'delivered_chars': 2000,
+            })
+            state['used']['reads'] += 1
+            state['used']['tool_response_chars'] += 2000
+        sp = short_payload(state, self.question, E2Budget())
+        new_results = sp['new_tool_results']
+        err_results = [r for r in new_results if r['result'].get('error') == 'read_budget_too_small']
+        self.assertEqual(len(err_results), 5)
+        for er in err_results:
+            self.assertEqual(er['result']['unit_id'], self.uid)
+            self.assertEqual(er['result']['requested_max_chars'], 10)
+            self.assertGreater(er['result']['min_required_max_chars'], 10)
+            self.assertIn('locator', er['result'])
+            self.assertEqual(er['result']['context_scope'], err_res['context_scope'])
+            self.assertEqual(er['result']['omitted_component_unit_count'], err_res['omitted_component_unit_count'])
+            self.assertEqual(er['result']['source_binding_status'], err_res['source_binding_status'])
+            self.assertEqual(er['result']['source_role'], err_res['source']['content_role'])
+            self.assertEqual(er['result']['source_provenance'], err_res['source']['provenance'])
+            self.assertEqual(er['result']['context_unit_ordinals'], err_res['context_unit_ordinals'])
+
+    def test_read_budget_too_small_approaching_tool_response_ceiling(self):
+        fake = FakeDecisions([decision([{'action': 'read', 'unit_id': self.uid, 'max_chars': 10}])])
+        state = self.run_e2(fake, name='e2_resp_ceiling', budget=E2Budget(tool_response_chars=3000))
+        self.assertEqual(state['status'], 'budget_exhausted')
+        self.assertEqual(state['termination'], 'tool response limit')
+
+    def test_large_metadata_and_provenance_envelope_recovery(self):
+        import tempfile
+        from copy import deepcopy
+        from genshin_corpus.retrieval import retrieval_units as ru, candidate_retrieval as lexical
+        from tests.retrieval.test_navi_exploration import FIXTURE
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            record = json.loads(FIXTURE.read_text(encoding='utf-8'))
+            record['record_id'] = 'rec-large-env'
+            record['source_identity']['components']['content_id'] = 'fixture-large'
+            record['source_identity']['key'] = 'mihoyo_obc:zh-cn:fixture-large'
+            record['record_metadata']['name'] = 'Large Envelope Library'
+            for s in record['sections']:
+                for u in s['units']:
+                    u['provenance'] = {'provenance_description': 'p' * 800, 'source_trace': 's' * 800}
+            can_path = root / 'canonical/metadata/manifest.json'
+            can_path.parent.mkdir(parents=True)
+            rec_path = root / 'canonical/rec.json'
+            body = canonical_json_bytes(record)
+            rec_path.write_bytes(body)
+            manifest = {'status': 'complete', 'canonical_run_id': 'c1', 'source': 'mihoyo_obc', 'locale': 'zh-cn',
+                        'input_record_count': 1, 'accounted_record_count': 1, 'input_integrity_failure_count': 0,
+                        'dependencies': {'canonical_versions': record['versions']},
+                        'records': [{'record_id': record['record_id'], 'canonical_record_path': str(rec_path),
+                                    'canonical_record_sha256': sha256(body).hexdigest(), 'canonical_status': 'canonical'}]}
+            can_path.write_bytes(canonical_json_bytes(manifest))
+            ru.build_retrieval_units(can_path, root / 'ru', config=ru.RetrievalUnitBuildConfig(text_fragment_chars=1200, structured_fragment_chars=1200))
+            _, rows = ru.load_retrieval_units(root / 'ru/metadata/manifest.json')
+            target_uid = rows[0]['unit_id']
+            lexical.build_lexical_index(root / 'ru/metadata/manifest.json', root / 'lexical')
+            tools = LocalExplorationTools(can_path, root / 'ru/metadata/manifest.json', root / 'lexical/metadata/manifest.json')
+
+            # Verify tools.read directly: envelope > 2000 chars, fail_on_metadata_budget=False returns structured error
+            err_read = tools.read(target_uid, max_chars=2000, fail_on_metadata_budget=False)
+            self.assertEqual(err_read['error'], 'read_budget_too_small')
+            self.assertEqual(err_read['requested_max_chars'], 2000)
+            self.assertGreater(err_read['min_required_max_chars'], 2000)
+            self.assertIn('provenance', err_read['source'])
+            self.assertIn('canonical_address', err_read['source'])
+
+            # Multi-action recovery session:
+            # Round 1: action with max_chars=2000 yields recoverable error
+            # Round 2: model uses min_required_max_chars to read successfully, adds clue, stops
+            fake = FakeDecisions([
+                decision([{'action': 'read', 'unit_id': target_uid, 'max_chars': 2000}]),
+                decision([{'action': 'read', 'unit_id': target_uid, 'max_chars': err_read['min_required_max_chars'] + 500},
+                          {'action': 'clue', 'text': 'verified clue from large envelope source', 'source_unit_ids': [target_uid]},
+                          {'action': 'stop', 'reason': 'recovered from large envelope'}]),
+            ])
+            state = run_exploration(tools, start_ru=target_uid, output_root=root / 'exp', provider=fake, question='Large envelope test?', budget=E2Budget())
+            self.assertEqual(state['status'], 'stopped')
+            self.assertEqual(state['model_rounds'], 2)
+            self.assertEqual(len(state['events']), 5)  # seed + error read + success read + clue + stop
+            self.assertEqual(state['events'][1]['result']['error'], 'read_budget_too_small')
+            self.assertNotIn('error', state['events'][2]['result'])
+            self.assertEqual(len(state['pending_clues']), 1)
+            self.assertEqual(state['checkpoint_identity'], sha256_json({k: v for k, v in state.items() if k != 'checkpoint_identity'}))
+
+    def test_main_cli_budget_profiles(self):
+        import io
+        from unittest.mock import MagicMock
+        with patch('sys.argv', ['prog', '--canonical-manifest', 'c', '--ru-manifest', 'r',
+                                '--lexical-manifest', 'l', '--start-ru', 's', '--output-root', 'o',
+                                '--route', 'tokenmetro', '--model', 'gpt-6-luna', '--budget-profile', 'research']), \
+             patch('sys.stdout', new_callable=io.StringIO) as mock_out_res, \
+             patch('genshin_corpus.rag.navi_e2_experiment.E2SDK'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.LocalExplorationTools'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.run_exploration', return_value={'run_identity': 'r', 'status': 'stopped', 'model_rounds': 1, 'provider_calls': 1, 'used': {}, 'pages': []}) as mock_run:
+            ret = main()
+            self.assertEqual(ret, 0)
+            b = mock_run.call_args.kwargs['budget']
+            self.assertIsInstance(b, E2ResearchBudget)
+            self.assertEqual(b.profile, 'research')
+            self.assertIn('"status": "stopped"', mock_out_res.getvalue())
+
+        with patch('sys.argv', ['prog', '--canonical-manifest', 'c', '--ru-manifest', 'r',
+                                '--lexical-manifest', 'l', '--start-ru', 's', '--output-root', 'o',
+                                '--route', 'tokenmetro', '--model', 'gpt-6-luna', '--budget-profile', 'standard']), \
+             patch('sys.stdout', new_callable=io.StringIO) as mock_out_std, \
+             patch('genshin_corpus.rag.navi_e2_experiment.E2SDK'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.LocalExplorationTools'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.run_exploration', return_value={'run_identity': 'r', 'status': 'stopped', 'model_rounds': 1, 'provider_calls': 1, 'used': {}, 'pages': []}) as mock_run:
+            ret = main()
+            self.assertEqual(ret, 0)
+            self.assertIsNone(mock_run.call_args.kwargs['budget'])
+            self.assertIn('"status": "stopped"', mock_out_std.getvalue())
+
+        with patch('sys.argv', ['prog', '--canonical-manifest', 'c', '--ru-manifest', 'r',
+                                '--lexical-manifest', 'l', '--start-ru', 's', '--output-root', 'o',
+                                '--route', 'tokenmetro', '--model', 'gpt-6-luna', '--budget-profile', 'research',
+                                '--single-action-continuation', '--parent-root', 'p']), \
+             patch('sys.stdout', new_callable=io.StringIO), \
+             patch('genshin_corpus.rag.navi_e2_experiment.E2SDK'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.LocalExplorationTools'), \
+             patch('genshin_corpus.rag.navi_e2_experiment.run_exploration', return_value={'run_identity': 'r', 'status': 'stopped', 'model_rounds': 1, 'provider_calls': 1, 'used': {}, 'pages': []}) as mock_run:
+            ret = main()
+            self.assertEqual(ret, 0)
+            b = mock_run.call_args.kwargs['budget']
+            self.assertIsInstance(b, E2ResearchBudget)
+            self.assertEqual(b.output_tokens, 4096)
+            self.assertEqual(b.profile, 'research')
 
 # Do not rerun inherited E1 cases as if they were new E2 tests.
 for name in dir(NaviExplorationTests):

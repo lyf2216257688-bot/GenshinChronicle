@@ -20,6 +20,7 @@ from .navi_e2_routes import e2_route, E2_ROUTES
 from genshin_corpus.retrieval.semantic_sdk_runner import (
     _DoneTrackingStream, _JsonlArtifactWriter, _chunk_mapping, _stream_delta, _normalize_usage,
     _responses_event_parts, _ResponsesDecisionText, safe_rate_limit_retry, _retry_after,
+    research_retry_classifier,
 )
 from .navi_experiment import _validate_action, _resolve_read, _save as _e1_save
 
@@ -45,6 +46,43 @@ SINGLE_ACTION_PROMPT = {
     "output": "直接输出search/read/clue/stop动作对象，不包actions/memory/rationale。read.unit_id原样复制候选或seed提供的正式RU ID。clue.text或stop.reason最多500字。无需凑齐动作，材料不足可注明并停止。",
     "tools": PROMPT['tools'],
     "limits": "一次只能一个动作。read后请在clue中注明材料属性、作者/说话者、推测与史料限制；不把候选片段当作完整已读来源。clue始终是unverified_hypothesis_not_fact。剩余轮数或材料足够时自主stop。",
+}
+
+
+RESEARCH_PROMPT = {
+    "task": PROMPT["task"],
+    "authority": PROMPT["authority"],
+    "output": PROMPT["output"],
+    "tools": {
+        "search": PROMPT["tools"]["search"],
+        "read": (
+            "{action:'read',unit_id:原样复制候选或seed提供的正式RU ID,max_chars:1..2000000,neighbors:0或1}。"
+            "两种上下文均使用unit_id引用来源；model_round是模型请求轮次，action_index是全局动作编号，均不是RU ID。只回读真实Canonical，截断可见。"
+            "研究模式单次读取上限为2,000,000字符，推荐单次容量为4,000~8,000+字符；"
+            "因读取结果包含完整出处(provenance)、定位与审计哈希等元数据包底（固定占用约2,000+字符），单次max_chars过小会导致元数据无法容纳；"
+            "若工具返回错误read_budget_too_small及min_required_max_chars，须在后续动作中以max_chars >= min_required_max_chars自适应调整并重试读取。"
+        ),
+        "clue": PROMPT["tools"]["clue"],
+        "stop": PROMPT["tools"]["stop"],
+    },
+    "context": (
+        "seed自动提供；之后每轮只收到上一轮工具返回、已读来源定位、动作索引、上一轮工作记忆和剩余预算，需在memory保留必要线索。"
+        "研究模式预算宽裕，若收到read_budget_too_small错误，应根据min_required_max_chars在后续动作调整容量重试。"
+        "不能把局部读取当作整页已读。最后一轮应主动stop。"
+    ),
+}
+
+
+RESEARCH_SINGLE_ACTION_PROMPT = {
+    "task": SINGLE_ACTION_PROMPT["task"],
+    "authority": PROMPT["authority"],
+    "output": SINGLE_ACTION_PROMPT["output"],
+    "tools": RESEARCH_PROMPT["tools"],
+    "limits": (
+        "一次只能一个动作。研究模式推荐单次read容量为4,000~8,000+字符（上限2,000,000字符），因出处与元数据包底固定占用约2,000+字符；"
+        "若工具返回错误read_budget_too_small及min_required_max_chars，下一步应以max_chars >= min_required_max_chars自适应调整并重试读取。"
+        "read后请在clue中注明材料属性、作者/说话者、推测与史料限制；不把候选片段当作完整已读来源。clue始终是unverified_hypothesis_not_fact。剩余轮数或材料足够时自主stop。",
+    ),
 }
 
 
@@ -99,14 +137,37 @@ def short_payload(state, question, budget):
                 'snippet_omitted_chars':h['snippet_omitted_chars']+max(0,len(h['snippet'])-60),
             } for h in result['hits']]}
         elif 'canonical_payload' in result:
-            result={k:result[k] for k in ('unit_id','ru_text','partial','omitted_chars','context_scope','omitted_component_unit_count','source_binding_status')}
-            original=event['result']
-            result['locator']=original['source']['canonical_address']
-            result['title']=original['source']['record_context']['record_title']
-            result['projection']='RU text from verified Canonical; duplicate Canonical payload withheld; full partial receipt preserved'
-            result['withheld_canonical_payload_chars']=len(original['canonical_payload'])
-            result['source_role']=original['source']['content_role']
-            result['source_provenance']=original['source']['provenance']
+            if result.get('error'):
+                original = event['result']
+                result = {
+                    'unit_id': result['unit_id'],
+                    'error': result['error'],
+                    'message': result.get('message', ''),
+                    'requested_max_chars': result.get('requested_max_chars'),
+                    'min_required_max_chars': result.get('min_required_max_chars'),
+                    'locator': original['source']['canonical_address'],
+                    'title': original['source']['record_context']['record_title'],
+                    'ru_text': '',
+                    'partial': True,
+                    'omitted_chars': result.get('omitted_chars', 0),
+                }
+                for k in ('context_scope', 'omitted_component_unit_count', 'source_binding_status', 'context_unit_ordinals'):
+                    if k in original:
+                        result[k] = original[k]
+                if 'source' in original:
+                    if 'content_role' in original['source']:
+                        result['source_role'] = original['source']['content_role']
+                    if 'provenance' in original['source']:
+                        result['source_provenance'] = original['source']['provenance']
+            else:
+                result={k:result[k] for k in ('unit_id','ru_text','partial','omitted_chars','context_scope','omitted_component_unit_count','source_binding_status')}
+                original=event['result']
+                result['locator']=original['source']['canonical_address']
+                result['title']=original['source']['record_context']['record_title']
+                result['projection']='RU text from verified Canonical; duplicate Canonical payload withheld; full partial receipt preserved'
+                result['withheld_canonical_payload_chars']=len(original['canonical_payload'])
+                result['source_role']=original['source']['content_role']
+                result['source_provenance']=original['source']['provenance']
         else: result=model_result(result)
         new.append({'action_index':event['round'],'result':result})
     return {'question':question,'remaining_calls':budget.rounds-state['provider_calls'],
@@ -132,15 +193,64 @@ class E2Budget:
     total_tokens: int = 100000
     output_tokens: int = 8192
     tool_response_chars: int = 100000
+    profile: str = "standard"
 
     def __post_init__(self):
-        for v in asdict(self).values():
+        for k, v in asdict(self).items():
+            if k == "profile":
+                continue
             if isinstance(v, bool) or not isinstance(v, int) or v <= 0:
                 raise ExplorationError("budget must be positive integers")
-        if (self.rounds > 6 or self.searches > 8 or self.reads > 12 or self.pages > 8
-                or self.canonical_chars > 20000 or self.total_tokens > 100000
-                or self.output_tokens > 8192):
-            raise ExplorationError("E2 single-case hard ceiling exceeded")
+        if self.profile in ("standard", "default"):
+            if (self.rounds > 6 or self.searches > 8 or self.reads > 12 or self.pages > 8
+                    or self.canonical_chars > 20000 or self.total_tokens > 100000
+                    or self.output_tokens > 8192 or self.tool_response_chars > 100000):
+                raise ExplorationError("E2 single-case hard ceiling exceeded")
+        elif self.profile == "research":
+            if (self.rounds > 50 or self.searches > 100 or self.reads > 200 or self.pages > 100
+                    or self.canonical_chars > 500000 or self.total_tokens > 2000000
+                    or self.output_tokens > 8192 or self.tool_response_chars > 2000000):
+                raise ExplorationError("E2 research budget hard ceiling exceeded")
+        else:
+            raise ExplorationError(f"unknown budget profile: {self.profile}")
+
+    @classmethod
+    def research(
+        cls,
+        *,
+        rounds: int = 20,
+        searches: int = 30,
+        reads: int = 50,
+        pages: int = 30,
+        canonical_chars: int = 100000,
+        total_tokens: int = 250000,
+        output_tokens: int = 8192,
+        tool_response_chars: int = 500000,
+    ) -> E2Budget:
+        return cls(
+            rounds=rounds,
+            searches=searches,
+            reads=reads,
+            pages=pages,
+            canonical_chars=canonical_chars,
+            total_tokens=total_tokens,
+            output_tokens=output_tokens,
+            tool_response_chars=tool_response_chars,
+            profile="research",
+        )
+
+
+@dataclass(frozen=True)
+class E2ResearchBudget(E2Budget):
+    rounds: int = 20
+    searches: int = 30
+    reads: int = 50
+    pages: int = 30
+    canonical_chars: int = 100000
+    total_tokens: int = 250000
+    output_tokens: int = 8192
+    tool_response_chars: int = 500000
+    profile: str = "research"
 
 
 def once(path: Path, value: Any):
@@ -162,7 +272,8 @@ def verify_response_attempts(stem):
     if not paths: return
     aggregate = json.loads((stem/'terminal.json').read_text('utf-8'))
     identities = []
-    for path in paths:
+    retry_identities = []
+    for idx, path in enumerate(paths, 1):
         issued = json.loads(path.read_text('utf-8'))
         request = json.loads(path.with_name('request.json').read_text('utf-8'))
         wire = json.loads(path.with_name('wire-request.json').read_text('utf-8'))
@@ -179,9 +290,41 @@ def verify_response_attempts(stem):
         raw_descriptor = terminal.get('raw_error')
         if raw_descriptor and sha256(path.with_name('raw-error.bin').read_bytes()).hexdigest() != raw_descriptor['sha256']:
             raise ExplorationError('Responses raw error integrity mismatch')
+        retry_path = path.with_name('retry.json')
+        if idx < len(paths):
+            if not retry_path.exists():
+                raise ExplorationError('Responses attempt missing retry evidence')
+            retry = json.loads(retry_path.read_text('utf-8'))
+            expected_reason = terminal.get('retry_reason', 'rate_limit_or_network')
+            if (retry.get('same_model') != aggregate['wire_model']
+                    or retry.get('same_route') != aggregate['route']
+                    or retry.get('next_attempt') != idx + 1
+                    or not isinstance(retry.get('delay_seconds'), (int, float))
+                    or retry.get('duplicate_billing_risk', False) != (terminal.get('execution_state') == 'EXECUTION UNKNOWN')
+                    or retry.get('retry_reason', 'rate_limit_or_network') != expected_reason):
+                raise ExplorationError('Responses retry evidence integrity mismatch')
+            if expected_reason == 'format_error' and retry.get('format_error') != terminal.get('format_error'):
+                raise ExplorationError('Responses retry format error mismatch')
+            if 'retry_identity' in retry:
+                if retry['retry_identity'] != sha256_json({k: v for k, v in retry.items() if k != 'retry_identity'}):
+                    raise ExplorationError('Responses retry identity mismatch')
+                retry_identities.append(retry['retry_identity'])
+        else:
+            if retry_path.exists():
+                raise ExplorationError('Responses unexpected retry evidence on final attempt')
         identities.append(terminal['terminal_identity'])
     if aggregate.get('attempt_identities') != identities or aggregate['calls'] != len(paths):
         raise ExplorationError('Responses aggregate attempt mismatch')
+    if 'retry_identities' in aggregate:
+        if aggregate['retry_identities'] != retry_identities:
+            raise ExplorationError('Responses aggregate retry identity mismatch')
+    expected_risk = any(
+        json.loads(p.with_name('terminal.json').read_text('utf-8')).get('duplicate_billing_risk', False)
+        or (p.with_name('retry.json').exists() and json.loads(p.with_name('retry.json').read_text('utf-8')).get('duplicate_billing_risk', False))
+        for p in paths
+    )
+    if aggregate.get('duplicate_billing_risk', False) != expected_risk:
+        raise ExplorationError('Responses aggregate duplicate billing risk mismatch')
 
 
 def reconcile_provider_accounting(root, state):
@@ -199,16 +342,28 @@ def reconcile_provider_accounting(root, state):
     if inherited_account:
         state['model_rounds']=state['provider_calls']
         state['used']['token_reservations']=inherited_account['reservations']+sum(json.loads(p.read_text('utf-8'))['reserved_tokens'] for p in root.glob('rounds/*/input-accounting.json'))
+
+    round_terminals = [json.loads(p.read_text('utf-8')) for p in root.glob('rounds/*/terminal.json')]
+    parent_risk = parent.get('duplicate_billing_risk', False) if parent else False
+    parent_risk_calls = parent.get('provider_audit', {}).get('duplicate_billing_risk_calls', 0) if parent else 0
+    has_billing_risk = parent_risk or any(t.get('duplicate_billing_risk', False) for t in terminals + round_terminals)
+    billing_risk_calls = parent_risk_calls + sum(bool(t.get('duplicate_billing_risk')) for t in terminals)
+    state['duplicate_billing_risk'] = has_billing_risk
+
     state['provider_audit'] = {'issued_calls':len(issued)+inherited_calls, 'child_issued_calls':len(issued),
         'terminal_count':len(terminals)+(inherited_account['calls'] if inherited_account else parent['provider_audit']['terminal_count'] if parent else 0),
         'known_total_tokens':known,
         'usage_unknown_calls':sum(not isinstance(v,int) for v in totals) + max(0,len(issued)-len(terminals))+(0 if inherited_account else parent['provider_audit']['usage_unknown_calls'] if parent else 0),
         'actual_cost':'UNKNOWN', 'currency':'UNKNOWN',
         'retry_calls':sum(max(0, len(list(p.glob('attempts/*/issued.json')))-1) for p in (root/'rounds').glob('*')),
-        'fallback_calls':0}
+        'fallback_calls':0,
+        'duplicate_billing_risk': has_billing_risk,
+        'duplicate_billing_risk_calls': billing_risk_calls}
 
 
 def body_chars(receipt):
+    if not receipt.get('canonical_payload'):
+        return 0
     # Count all string leaves of delivered Canonical unit values; metadata is separate.
     def count(v):
         if isinstance(v, str): return len(v)
@@ -237,6 +392,39 @@ def model_result(result):
                 'omitted_hit_count':result.get('omitted_hit_count',0)}
     if 'canonical_payload' not in result:
         return result
+    if result.get('error'):
+        res = {
+            'unit_id': result['unit_id'],
+            'error': result['error'],
+            'message': result.get('message', ''),
+            'requested_max_chars': result.get('requested_max_chars'),
+            'min_required_max_chars': result.get('min_required_max_chars'),
+            'ru_text': '',
+            'partial': True,
+            'omitted_chars': result.get('omitted_chars', 0),
+        }
+        if 'source' in result:
+            res['canonical_address'] = result['source']['canonical_address']
+            res['record_context'] = result['source']['record_context']
+            if 'content_role' in result['source']:
+                res['source_role'] = result['source']['content_role']
+            if 'provenance' in result['source']:
+                res['source_provenance'] = result['source']['provenance']
+        if 'ru_text_sha256' in result:
+            res['ru_text_sha256'] = result['ru_text_sha256']
+        if 'canonical_record_sha256' in result:
+            res['canonical_record_sha256'] = result['canonical_record_sha256']
+        if 'canonical_payload_sha256' in result:
+            res['canonical_payload_sha256'] = result['canonical_payload_sha256']
+        if 'context_scope' in result:
+            res['context_scope'] = result['context_scope']
+        if 'omitted_component_unit_count' in result:
+            res['omitted_component_unit_count'] = result['omitted_component_unit_count']
+        if 'source_binding_status' in result:
+            res['source_binding_status'] = result['source_binding_status']
+        if 'context_unit_ordinals' in result:
+            res['context_unit_ordinals'] = result['context_unit_ordinals']
+        return res
     try:
         payload = json.loads(result['canonical_payload'])
         values = [{k: u[k] for k in ('ordinal', 'kind', 'value', 'content_role', 'provenance')} for u in payload['units']]
@@ -246,46 +434,6 @@ def model_result(result):
         'canonical_address': result['source']['canonical_address'],
         'record_context': result['source']['record_context'], 'canonical_units': values,
     }
-
-
-def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
-    try:
-        dec = json.loads(visible_text)
-        if not isinstance(dec, dict):
-            return False
-        if mode == "single_action":
-            if dec.get("action") not in {"search", "read", "clue", "stop"}:
-                return False
-            _validate_e2_action(dec)
-            if dec.get("action") in {"clue", "stop"}:
-                text_or_reason = dec.get("text") if dec.get("action") == "clue" else dec.get("reason")
-                if not isinstance(text_or_reason, str) or len(text_or_reason) > 500:
-                    return False
-            return True
-        elif mode == "batch":
-            if set(dec) != {"actions", "memory", "rationale"}:
-                return False
-            acts = dec.get("actions")
-            if not isinstance(acts, list) or not (1 <= len(acts) <= 6):
-                return False
-            for a in acts:
-                if not isinstance(a, dict):
-                    return False
-                _validate_e2_action(a)
-            mem = dec.get("memory")
-            if (not isinstance(mem, dict)
-                    or set(mem) != {"status", "text"}
-                    or mem.get("status") != HYPOTHESIS
-                    or not isinstance(mem.get("text"), str)
-                    or len(mem["text"]) > 1600):
-                return False
-            rat = dec.get("rationale")
-            if not isinstance(rat, str) or len(rat) > 1500:
-                return False
-            return True
-        return False
-    except Exception:
-        return False
 
 
 def _validate_e2_action(action):
@@ -303,7 +451,7 @@ def _validate_e2_action(action):
         valid = ((isinstance(reference, str) and bool(reference)) if 'unit_id' in action else
             isinstance(hit, dict) and set(hit) == {'round', 'index'}
             and all(integer(v, 0, 100000) for v in hit.values()))
-        valid = valid and integer(action.get('max_chars', 20000), 1, 20000) and integer(action.get('neighbors', 0), 0, 1)
+        valid = valid and integer(action.get('max_chars', 20000), 1, 2_000_000) and integer(action.get('neighbors', 0), 0, 1)
     elif kind == 'clue':
         valid = (isinstance(action.get('text'), str) and 1 <= len(action['text']) <= 1000
             and isinstance(action.get('source_unit_ids'), list) and bool(action['source_unit_ids'])
@@ -312,6 +460,170 @@ def _validate_e2_action(action):
         valid = isinstance(action.get('reason'), str) and 1 <= len(action['reason']) <= 1000
     if not valid:
         raise ExplorationError('invalid bounded E2 action arguments')
+
+
+def _diagnose_decision_format(visible_text: str, mode: str = "batch") -> dict[str, Any]:
+    """Diagnose why visible_text is not a valid decision, returning detailed error diagnostics."""
+    if not isinstance(visible_text, str) or not visible_text.strip():
+        return {
+            "valid": False,
+            "error_type": "EmptyContentError",
+            "message": "Model returned empty visible text.",
+        }
+    try:
+        dec = json.loads(visible_text)
+    except Exception as exc:
+        return {
+            "valid": False,
+            "error_type": "JSONDecodeError",
+            "message": f"Output is not valid JSON: {str(exc)[:200]}",
+            "raw_prefix": visible_text[:300],
+        }
+    if not isinstance(dec, dict):
+        return {
+            "valid": False,
+            "error_type": "InvalidJSONStructure",
+            "message": f"Expected JSON object (dict), but received {type(dec).__name__}.",
+        }
+    if mode == "single_action":
+        if "action" not in dec:
+            return {
+                "valid": False,
+                "error_type": "MissingActionField",
+                "message": "Decision object missing required 'action' field.",
+            }
+        act_kind = dec.get("action")
+        if act_kind not in {"search", "read", "clue", "stop"}:
+            return {
+                "valid": False,
+                "error_type": "InvalidActionType",
+                "message": f"Action '{act_kind}' is not one of ('search', 'read', 'clue', 'stop').",
+            }
+        try:
+            _validate_e2_action(dec)
+        except Exception as exc:
+            return {
+                "valid": False,
+                "error_type": "InvalidActionArguments",
+                "message": str(exc),
+            }
+        if act_kind in {"clue", "stop"}:
+            text_or_reason = dec.get("text") if act_kind == "clue" else dec.get("reason")
+            if not isinstance(text_or_reason, str) or len(text_or_reason) > 500:
+                return {
+                    "valid": False,
+                    "error_type": "TextBoundExceeded",
+                    "message": "Text or reason exceeds 500 characters or is not a string.",
+                }
+        return {"valid": True, "error_type": None, "message": None}
+    elif mode == "batch":
+        expected_keys = {"actions", "memory", "rationale"}
+        if set(dec) != expected_keys:
+            missing = expected_keys - set(dec)
+            extra = set(dec) - expected_keys
+            return {
+                "valid": False,
+                "error_type": "SchemaFieldMismatch",
+                "message": f"Expected top-level keys {sorted(expected_keys)}. Missing: {sorted(missing)}. Extra: {sorted(extra)}.",
+            }
+        acts = dec.get("actions")
+        if not isinstance(acts, list) or not (1 <= len(acts) <= 6):
+            return {
+                "valid": False,
+                "error_type": "ActionBatchLimitError",
+                "message": f"'actions' must be a list of 1 to 6 actions, but got {type(acts).__name__} with length {len(acts) if isinstance(acts, list) else 0}.",
+            }
+        for idx, a in enumerate(acts):
+            if not isinstance(a, dict):
+                return {
+                    "valid": False,
+                    "error_type": "InvalidActionStructure",
+                    "message": f"Action at index {idx} must be a dict, got {type(a).__name__}.",
+                }
+            try:
+                _validate_e2_action(a)
+            except Exception as exc:
+                return {
+                    "valid": False,
+                    "error_type": "InvalidActionArguments",
+                    "message": f"Action at index {idx} ('{a.get('action')}') invalid: {str(exc)}",
+                }
+        mem = dec.get("memory")
+        if not isinstance(mem, dict) or set(mem) != {"status", "text"}:
+            return {
+                "valid": False,
+                "error_type": "InvalidMemoryStructure",
+                "message": "Field 'memory' must be a dict with exactly keys {'status', 'text'}.",
+            }
+        if mem.get("status") != HYPOTHESIS:
+            return {
+                "valid": False,
+                "error_type": "InvalidMemoryStatus",
+                "message": f"Memory status must be '{HYPOTHESIS}', got '{mem.get('status')}'.",
+            }
+        if not isinstance(mem.get("text"), str) or len(mem["text"]) > 1600:
+            return {
+                "valid": False,
+                "error_type": "MemoryTextBoundError",
+                "message": f"Memory text must be a string <= 1600 characters, got {type(mem.get('text')).__name__}.",
+            }
+        rat = dec.get("rationale")
+        if not isinstance(rat, str) or len(rat) > 1500:
+            return {
+                "valid": False,
+                "error_type": "RationaleBoundError",
+                "message": f"Rationale must be a string <= 1500 characters, got {type(rat).__name__}.",
+            }
+        return {"valid": True, "error_type": None, "message": None}
+    return {
+        "valid": False,
+        "error_type": "UnknownDecisionMode",
+        "message": f"Unknown decision mode '{mode}'.",
+    }
+
+
+def _is_valid_decision_content(visible_text: str, mode: str = "batch") -> bool:
+    return _diagnose_decision_format(visible_text, mode=mode)["valid"]
+
+
+def _build_format_correction_feedback(diagnosis: Mapping[str, Any], mode: str = "batch") -> dict[str, Any]:
+    """Construct a structured feedback payload instructing the model to correct its output format."""
+    required_schema = (
+        "Top-level JSON object with exactly: "
+        "'actions' (array of 1..6 action objects), "
+        "'memory' ({'status': 'unverified_hypothesis_not_fact', 'text': string <= 1600 chars}), "
+        "'rationale' (string <= 1500 chars)."
+    ) if mode == "batch" else (
+        "Top-level JSON object with: "
+        "'action' ('search'|'read'|'clue'|'stop') and required arguments."
+    )
+    return {
+        "error": "model_output_format_error",
+        "error_type": diagnosis.get("error_type", "SchemaValidationError"),
+        "message": diagnosis.get("message", "Model output failed schema validation"),
+        "mode": mode,
+        "required_schema": required_schema,
+        "instruction": (
+            "Your previous response failed schema validation. Re-emit a valid decision adhering "
+            "strictly to the schema above. Output raw JSON ONLY. Do NOT wrap in markdown code blocks."
+        ),
+    }
+
+
+def _inject_format_feedback(body: Mapping[str, Any], feedback: Mapping[str, Any]) -> dict[str, Any]:
+    """Inject format correction feedback into the request body's input parameter."""
+    new_body = dict(body)
+    raw_input = body.get("input", "")
+    try:
+        payload = json.loads(raw_input)
+        if isinstance(payload, dict):
+            payload["format_correction"] = feedback
+            new_body["input"] = canonical_json_bytes(payload).decode("utf-8")
+            return new_body
+    except Exception:
+        pass
+    new_body["input"] = raw_input + "\n\n[FORMAT_CORRECTION_FEEDBACK]: " + canonical_json_bytes(feedback).decode("utf-8")
+    return new_body
 
 
 def _exception_diagnostics(exc, observation, *, stream_events, response_terminal):
@@ -375,26 +687,49 @@ def _exception_diagnostics(exc, observation, *, stream_events, response_terminal
 
 class E2SDK:
     """Existing SDK route/helpers, with an E2 decision protocol instead of atomic extraction."""
-    def __init__(self, route=None, *, model=None, transport=None, environment=None, max_attempts=3, before_dispatch=None):
+    def __init__(self, route=None, *, model=None, transport=None, environment=None,
+                 max_attempts=None, before_dispatch=None, mode=None, budget_profile=None,
+                 format_retry_enabled=None):
         import openai
         env = dict(os.environ if environment is None else environment)
         self.profile = e2_route(model, route, env, offline=transport is not None)
-        if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 3:
-            raise ExplorationError('attempt ceiling must be 1..3')
-        self.max_attempts = max_attempts
+
+        if mode is None:
+            mode = 'research' if budget_profile == 'research' else 'standard'
+        if mode not in ('standard', 'research'):
+            raise ExplorationError("mode must be 'standard' or 'research'")
+        self.mode = mode
+        if format_retry_enabled is None:
+            format_retry_enabled = (mode == 'research')
+        self.format_retry_enabled = format_retry_enabled
+
+        if mode == 'research':
+            effective_attempts = 5 if max_attempts is None else max_attempts
+            if isinstance(effective_attempts, bool) or not isinstance(effective_attempts, int) or not 1 <= effective_attempts <= 5:
+                raise ExplorationError('attempt ceiling must be 1..5')
+            retry_policy = 'research_broadened_network_provider_retry'
+        else:
+            effective_attempts = 3 if max_attempts is None else max_attempts
+            if isinstance(effective_attempts, bool) or not isinstance(effective_attempts, int) or not 1 <= effective_attempts <= 3:
+                raise ExplorationError('attempt ceiling must be 1..3')
+            retry_policy = 'exact_tokenmetro_pre_generation_tpm_429_only'
+
+        self.max_attempts = effective_attempts
         self.env = env
         self.transport = transport
         self.before_dispatch = before_dispatch
         self.config = {'adapter': 'p05-navi-e2-sdk-responses-0.2', 'route': self.profile.safe_dict(),
                        'sdk_version': openai.__version__, 'max_retries': 0, 'fallback': False,
                        'stream': True, 'include_usage': False, 'timeout_seconds': 180,
-                       'max_attempts': max_attempts, 'retry_policy': 'exact_tokenmetro_pre_generation_tpm_429_only'}
+                       'max_attempts': effective_attempts, 'retry_policy': retry_policy,
+                       'mode': mode, 'format_retry_enabled': format_retry_enabled}
         self._config_identity = sha256_json(self.config)
 
     def __call__(self, stem, body, run_identity, *, decision_mode=None, attempt_limit=None):
         """Persist every attempt. An interrupted wrapper is never automatically resumed."""
         if (sha256_json(self.config) != self._config_identity
-                or self.config['route'] != self.profile.safe_dict() or self.max_attempts != self.config['max_attempts']):
+                or self.config['route'] != self.profile.safe_dict() or self.max_attempts != self.config['max_attempts']
+                or self.mode != self.config.get('mode') or self.format_retry_enabled != self.config.get('format_retry_enabled')):
             raise ExplorationError('immutable provider configuration changed')
         stem = Path(stem)
         limit = self.max_attempts if attempt_limit is None else min(self.max_attempts, attempt_limit)
@@ -417,27 +752,67 @@ class E2SDK:
             if set(p.name for p in stem.iterdir()) != {'input-accounting.json'}:
                 raise ExplorationError('existing attempt evidence; no automatic reissue')
         once(stem / 'request.json', body)
+        current_body = dict(body)
         attempts = []
+        prior_execution_unknown = False
         for number in range(1, limit + 1):
-            attempt = self._attempt(stem / 'attempts' / f'{number:02d}', body, run_identity,
-                                    decision_mode=decision_mode)
+            attempt = self._attempt(stem / 'attempts' / f'{number:02d}', current_body, run_identity,
+                                    decision_mode=decision_mode,
+                                    duplicate_billing_risk=prior_execution_unknown)
             attempts.append(attempt)
             if not attempt['retry_eligible'] or number == limit:
                 break
-            delay = _retry_after(attempt['headers'], 30) or min(2 ** (number - 1), 30)
-            once(stem / 'attempts' / f'{number:02d}' / 'retry.json', {
-                'same_model': self.profile.model_id, 'same_route': self.profile.route,
-                'delay_seconds': delay, 'next_attempt': number + 1})
-            time.sleep(delay)
+
+            is_uncertain = (attempt.get('execution_state') == 'EXECUTION UNKNOWN')
+            prior_execution_unknown = prior_execution_unknown or is_uncertain
+
+            retry_reason = attempt.get('retry_reason', 'rate_limit_or_network')
+            retry_data = {
+                'same_model': self.profile.model_id,
+                'same_route': self.profile.route,
+                'next_attempt': number + 1,
+                'duplicate_billing_risk': is_uncertain,
+            }
+            if retry_reason == 'format_error':
+                feedback = _build_format_correction_feedback(attempt.get('format_error', {}), mode=decision_mode)
+                current_body = _inject_format_feedback(body, feedback)
+                delay = 0
+                retry_data.update(
+                    delay_seconds=delay,
+                    retry_reason='format_error',
+                    format_error=attempt.get('format_error'),
+                )
+            else:
+                delay = _retry_after(attempt['headers'], 30) or min(2 ** (number - 1), 30)
+                retry_data.update(
+                    delay_seconds=delay,
+                    retry_reason=retry_reason,
+                )
+            retry_data['retry_identity'] = sha256_json(retry_data)
+            once(stem / 'attempts' / f'{number:02d}' / 'retry.json', retry_data)
+            if delay:
+                time.sleep(delay)
+
         terminal = dict(attempts[-1])
         terminal.pop('terminal_identity', None)
-        terminal.update(calls=sum(t['calls'] for t in attempts), retry_calls=len(attempts)-1,
-                        attempt_identities=[t['terminal_identity'] for t in attempts])
+        has_risk = any(t.get('duplicate_billing_risk', False) for t in attempts) or prior_execution_unknown
+        update_fields = dict(
+            calls=sum(t['calls'] for t in attempts),
+            retry_calls=len(attempts)-1,
+            attempt_identities=[t['terminal_identity'] for t in attempts],
+            duplicate_billing_risk=has_risk,
+        )
+        if len(attempts) > 1:
+            update_fields['retry_identities'] = [
+                json.loads((stem / 'attempts' / f'{n:02d}' / 'retry.json').read_text('utf-8'))['retry_identity']
+                for n in range(1, len(attempts))
+            ]
+        terminal.update(update_fields)
         terminal['terminal_identity'] = sha256_json(terminal)
         once(stem / 'terminal.json', terminal)
         return terminal
 
-    def _attempt(self, stem, body, run_identity, *, decision_mode=None):
+    def _attempt(self, stem, body, run_identity, *, decision_mode=None, duplicate_billing_risk=False):
         import httpx
         import openai
         key = self.env[self.profile.api_key_env]
@@ -573,11 +948,15 @@ class E2SDK:
         if decision_mode is None:
             instructions = body.get("instructions", "")
             single_action_prompt = canonical_json_bytes(SINGLE_ACTION_PROMPT).decode("utf-8")
-            if instructions == single_action_prompt:
+            research_single_action_prompt = canonical_json_bytes(RESEARCH_SINGLE_ACTION_PROMPT).decode("utf-8")
+            if instructions in (single_action_prompt, research_single_action_prompt):
                 decision_mode = "single_action"
             else:
                 decision_mode = "batch"
-        decision_valid = _is_valid_decision_content(visible_text, mode=decision_mode) if complete else False
+        decision_diagnosis = _diagnose_decision_format(visible_text, mode=decision_mode) if complete else {
+            "valid": False, "error_type": "IncompleteGeneration", "message": "Stream incomplete or errored."
+        }
+        decision_valid = decision_diagnosis["valid"]
         decision_complete = bool(complete and decision_valid)
         terminal = observation | {'run_identity': run_identity, 'finish_reason': finish, 'complete': complete,
             'stream_complete': stream_complete, 'decision_complete': decision_complete,
@@ -599,12 +978,28 @@ class E2SDK:
             stream_chunk_count=writer.chunk_count, stream_complete=stream_complete,
             visible_chars=len(visible_text), reasoning_chars=len(terminal['reasoning']), usage=usage,
             finish_reason=finish)
-        terminal['retry_eligible'] = safe_rate_limit_retry(retry_probe, raw)
+
+        if self.config.get('retry_policy') == 'research_broadened_network_provider_retry':
+            eligible, state_override = research_retry_classifier(retry_probe, raw, error=error)
+            terminal['retry_eligible'] = eligible
+            terminal['execution_state'] = state_override
+        else:
+            terminal['retry_eligible'] = safe_rate_limit_retry(retry_probe, raw)
+            if terminal['retry_eligible']:
+                terminal['execution_state'] = 'NOT_STARTED'
+            elif observation['http_status'] in {400, 401, 403, 404, 422} and not writer.chunk_count:
+                terminal['execution_state'] = 'REJECTED'
+            else:
+                terminal['execution_state'] = terminal['execution_state']
+
+        if not terminal['retry_eligible'] and complete and not decision_valid and self.format_retry_enabled and self.max_attempts > 1:
+            terminal['retry_eligible'] = True
+            terminal['retry_reason'] = 'format_error'
+            terminal['format_error'] = decision_diagnosis
+            terminal['execution_state'] = 'RESOLVED'
+
+        terminal['duplicate_billing_risk'] = bool(duplicate_billing_risk)
         terminal['raw_error'] = {'sha256': sha256(raw).hexdigest(), 'byte_count': len(raw)} if raw is not None else None
-        if terminal['retry_eligible']:
-            terminal['execution_state'] = 'NOT_STARTED'
-        elif observation['http_status'] in {400, 401, 403, 404, 422} and not writer.chunk_count:
-            terminal['execution_state'] = 'REJECTED'
         terminal['terminal_identity'] = sha256_json(terminal)
         once(stem / 'terminal.json', terminal)
         return terminal
@@ -622,24 +1017,110 @@ def execute_action(tools, state, action, budget):
         used['searches'] += 1
         state['available_ids'] = sorted(set(state['available_ids']) | {h['unit_id'] for h in result['hits']})
     elif kind == 'read':
-        uid = _resolve_read(action, state['events'])
-        if uid not in state['available_ids']: raise ExplorationError('read identity was not provided by seed/search')
         if used['reads'] >= budget.reads: raise ExplorationBudgetExceeded('read limit')
-        requested = action.get('max_chars', 20000)
-        neighbors = action.get('neighbors', 0)
-        if isinstance(neighbors, bool) or neighbors not in (0, 1): raise ExplorationError('neighbor limit')
-        if isinstance(requested, bool) or not isinstance(requested, int) or not 1 <= requested <= 20000: raise ExplorationError('read limit')
-        if used['canonical_chars'] >= budget.canonical_chars: raise ExplorationBudgetExceeded('Canonical body limit')
-        address = tools._load_selected_ru([uid])[uid]['source']['canonical_address']
-        if address['record_id'] not in state['pages'] and len(state['pages']) >= budget.pages: raise ExplorationBudgetExceeded('page limit')
-        result = tools.read(uid, max_chars=requested, neighbors=neighbors)
-        page = result['source']['canonical_address']['record_id']
-        if page not in state['pages'] and len(state['pages']) >= budget.pages: raise ExplorationBudgetExceeded('page limit')
-        chars = body_chars(result)
-        if used['canonical_chars'] + chars > budget.canonical_chars: raise ExplorationBudgetExceeded('Canonical body limit')
-        used['reads'] += 1; used['canonical_chars'] += chars
-        state['pages'] = sorted(set(state['pages']) | {page})
-        state['read_sources'].append(result)
+        result = None
+        try:
+            uid = _resolve_read(action, state['events'])
+        except ExplorationError as exc:
+            if budget.profile == 'research':
+                result = {
+                    'error': 'unauthorized_or_invalid_unit_id',
+                    'message': str(exc),
+                    'requested_action': dict(action),
+                }
+            else:
+                raise
+
+        if result is None:
+            if uid not in state['available_ids']:
+                if budget.profile == 'research':
+                    result = {
+                        'error': 'unauthorized_or_invalid_unit_id',
+                        'message': 'read identity was not provided by seed/search',
+                        'requested_unit_id': uid,
+                    }
+                else:
+                    raise ExplorationError('read identity was not provided by seed/search')
+
+        if result is None:
+            requested = action.get('max_chars', 20000)
+            neighbors = action.get('neighbors', 0)
+            if isinstance(neighbors, bool) or neighbors not in (0, 1): raise ExplorationError('neighbor limit')
+            max_read_ceiling = 2_000_000 if budget.profile == 'research' else 20000
+            if isinstance(requested, bool) or not isinstance(requested, int) or not 1 <= requested <= max_read_ceiling: raise ExplorationError('read limit')
+            if used['canonical_chars'] >= budget.canonical_chars: raise ExplorationBudgetExceeded('Canonical body limit')
+            try:
+                loaded = tools._load_selected_ru([uid])
+            except ExplorationError as exc:
+                if str(exc) == "scoped RU identities absent from verified snapshot":
+                    loaded = {}
+                else:
+                    raise
+            if uid not in loaded:
+                if budget.profile == 'research':
+                    result = {
+                        'error': 'unauthorized_or_invalid_unit_id',
+                        'message': 'unknown Retrieval Unit in corpus',
+                        'requested_unit_id': uid,
+                    }
+                else:
+                    raise ExplorationError('unknown Retrieval Unit')
+            else:
+                address = loaded[uid]['source']['canonical_address']
+
+        if result is None:
+            if address['record_id'] not in state['pages'] and len(state['pages']) >= budget.pages: raise ExplorationBudgetExceeded('page limit')
+            import inspect
+            read_params = inspect.signature(tools.read).parameters
+            read_kwargs = {
+                'max_chars': requested,
+                'neighbors': neighbors,
+                'fail_on_metadata_budget': False,
+            }
+            if 'fail_on_unknown_ru' in read_params:
+                read_kwargs['fail_on_unknown_ru'] = (budget.profile != 'research')
+            try:
+                result = tools.read(uid, **read_kwargs)
+            except ExplorationBudgetExceeded as exc:
+                if str(exc) == "read metadata cannot fit context budget":
+                    min_chars = getattr(exc, "min_required_chars", None)
+                    base = getattr(exc, "result", None)
+                    if base is None:
+                        raw_ru = tools._load_selected_ru([uid])[uid]
+                        base = {
+                            "unit_id": uid, "source": raw_ru["source"],
+                            "nested_selector": raw_ru["nested_selector"],
+                            "fragment_selector": raw_ru["fragment_selector"],
+                            "ru_text": "", "canonical_payload": "",
+                            "partial": True,
+                        }
+                    result = dict(base)
+                    result["error"] = "read_budget_too_small"
+                    result["message"] = "read metadata cannot fit context budget"
+                    result["requested_max_chars"] = requested
+                    result["min_required_max_chars"] = min_chars or response_chars(result)
+                else:
+                    raise
+            except ExplorationError as exc:
+                if budget.profile == 'research' and str(exc) in ("unknown Retrieval Unit", "scoped RU identities absent from verified snapshot"):
+                    result = {
+                        'error': 'unauthorized_or_invalid_unit_id',
+                        'message': 'unknown Retrieval Unit',
+                        'requested_unit_id': uid,
+                    }
+                else:
+                    raise
+
+        if not result.get('error'):
+            page = result['source']['canonical_address']['record_id']
+            if page not in state['pages'] and len(state['pages']) >= budget.pages: raise ExplorationBudgetExceeded('page limit')
+            chars = body_chars(result)
+            if used['canonical_chars'] + chars > budget.canonical_chars: raise ExplorationBudgetExceeded('Canonical body limit')
+            used['reads'] += 1; used['canonical_chars'] += chars
+            state['pages'] = sorted(set(state['pages']) | {page})
+            state['read_sources'].append(result)
+        else:
+            used['reads'] += 1
     elif kind == 'clue':
         text, refs = action.get('text'), action.get('source_unit_ids', [])
         if not isinstance(text, str) or not 1 <= len(text) <= 1000 or not isinstance(refs, list) or not set(refs) <= {r['unit_id'] for r in state['read_sources']}:
@@ -659,15 +1140,24 @@ def execute_action(tools, state, action, budget):
 
 def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION, budget=None, parent_root=None, single_action_continuation=False):
     budget = budget or E2Budget()
+    provider_mode = getattr(provider, 'mode', None)
+    if provider_mode is not None:
+        expected_mode = 'research' if budget.profile == 'research' else 'standard'
+        if provider_mode != expected_mode:
+            raise ExplorationError(f"provider mode '{provider_mode}' does not match budget profile '{budget.profile}'")
     if single_action_continuation and parent_root is None: raise ExplorationError('single-action continuation requires frozen parent')
     root = Path(output_root).resolve()
     if any(root.is_relative_to(p.parent.parent) for p in (tools.canonical_path, tools.ru_path, tools.lexical_path)):
         raise ExplorationError('output within immutable input')
     tools.verify_snapshot()
+    if budget.profile == "research":
+        selected_prompt = RESEARCH_SINGLE_ACTION_PROMPT if single_action_continuation else RESEARCH_PROMPT
+    else:
+        selected_prompt = SINGLE_ACTION_PROMPT if single_action_continuation else PROMPT
     config = {'runner': 'p05-navi-e2-0.1', 'question': question, 'start_ru': start_ru,
               'tools_identity': tools.identity, 'ru_build_identity': tools.ru_identity,
               'inputs': {k: str(getattr(tools, k)) for k in ('canonical_path', 'ru_path', 'lexical_path')},
-              'prompt': SINGLE_ACTION_PROMPT if single_action_continuation else PROMPT, 'single_action_continuation':single_action_continuation, 'budget': asdict(budget), 'provider': provider.config}
+              'prompt': selected_prompt, 'single_action_continuation':single_action_continuation, 'budget': asdict(budget), 'provider': provider.config}
     if not single_action_continuation: config.pop('single_action_continuation')
     parent = None
     inherited=None
@@ -684,11 +1174,18 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
             elif parent['status']=='budget_exhausted' and parent.get('termination')=='token dispatch reservation ceiling' and parent.get('pending_round') is None:
                 pass  # no new request was issued; compact input only, never reset budgets
             else: raise ExplorationError('continuation parent terminal is ineligible')
-            expected=asdict(budget);old_budget=dict(parent['budget']);expected.pop('output_tokens');old_budget.pop('output_tokens')
+            expected=asdict(budget);old_budget=dict(parent['budget'])
+            if 'profile' not in old_budget and expected.get('profile') in ('standard', 'default'):
+                old_budget['profile'] = expected.get('profile', 'standard')
+            expected.pop('output_tokens', None);old_budget.pop('output_tokens', None)
             if old_budget!=expected: raise ExplorationError('parent hard budgets cannot reset/change')
         else:
             if parent['status']!='budget_exhausted' or parent.get('termination')!='token dispatch reservation ceiling': raise ExplorationError('continuation only for pre-dispatch token projection stop')
-            if parent['budget']!=asdict(budget): raise ExplorationError('parent budget mismatch')
+            parent_budget=dict(parent['budget'])
+            expected_budget=asdict(budget)
+            if 'profile' not in parent_budget and expected_budget.get('profile') in ('standard', 'default'):
+                parent_budget['profile'] = expected_budget.get('profile', 'standard')
+            if parent_budget!=expected_budget: raise ExplorationError('parent budget mismatch')
             if parent.get('pending_round') is not None: raise ExplorationError('unresolved parent dispatch')
         if parent['binding'] != {'question':question,'ru_build_identity':tools.ru_identity,'tools_identity':tools.identity}: raise ExplorationError('parent scope mismatch')
         parent_config=json.loads((parent_root/'config.json').read_text('utf-8'))
@@ -785,8 +1282,9 @@ def run_exploration(tools, *, start_ru, output_root, provider, question=QUESTION
                     parameters = inspect.signature(provider).parameters
                     if 'decision_mode' in parameters: kwargs['decision_mode'] = exp_mode
                     if 'attempt_limit' in parameters:
-                        kwargs['attempt_limit'] = min(budget.rounds-state['provider_calls'],
-                            (budget.total_tokens-state['used']['tokens']) // reserve)
+                        remaining_rounds = max(1, budget.rounds - state['provider_calls'])
+                        remaining_budget_attempts = max(1, (budget.total_tokens - state['used']['tokens']) // reserve)
+                        kwargs['attempt_limit'] = min(remaining_rounds, remaining_budget_attempts)
                     terminal = provider(stem, body, identity, **kwargs)
                 verify_response_attempts(stem)
                 if 'terminal_identity' in terminal and terminal['terminal_identity'] != sha256_json({k:v for k,v in terminal.items() if k != 'terminal_identity'}): raise ExplorationError('terminal integrity mismatch')
@@ -859,12 +1357,18 @@ def main():
     p.add_argument('--single-action-continuation',action='store_true')
     p.add_argument('--route',choices=sorted({r for m,r in E2_ROUTES}), required=True)
     p.add_argument('--model',choices=sorted({m for m,r in E2_ROUTES}), required=True)
+    p.add_argument('--budget-profile', choices=['standard', 'research'], default='standard')
     a=p.parse_args()
-    provider=E2SDK(a.route, model=a.model)
+    mode = 'research' if a.budget_profile == 'research' else 'standard'
+    provider = E2SDK(a.route, model=a.model, mode=mode)
     tools=LocalExplorationTools(Path(a.canonical_manifest),Path(a.ru_manifest),Path(a.lexical_manifest))
+    if a.budget_profile == 'research':
+        budget = E2ResearchBudget(output_tokens=4096) if a.single_action_continuation else E2ResearchBudget()
+    else:
+        budget = E2Budget(output_tokens=4096) if a.single_action_continuation else None
     state=run_exploration(tools,start_ru=a.start_ru,output_root=Path(a.output_root),provider=provider,parent_root=a.parent_root,
                           single_action_continuation=a.single_action_continuation,
-                          budget=E2Budget(output_tokens=4096) if a.single_action_continuation else None)
+                          budget=budget)
     print(json.dumps({k:state[k] for k in ('run_identity','status','model_rounds','provider_calls','used','pages')},ensure_ascii=False))
     return 0 if state['status']=='stopped' else 2
 

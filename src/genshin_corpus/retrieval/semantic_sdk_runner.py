@@ -597,6 +597,75 @@ def safe_rate_limit_retry(terminal: Mapping[str, Any], raw: bytes | None) -> boo
                for field in ("code", "type"))
 
 
+def research_retry_classifier(
+    probe: Mapping[str, Any],
+    raw: bytes | None,
+    *,
+    error: Mapping[str, Any] | None = None,
+) -> tuple[bool, str]:
+    """Broadened retry eligibility classifier for Phase 05 E2 research mode.
+
+    Evaluates whether an attempt failure is retry-eligible and determines its
+    execution state ('NOT_STARTED' vs 'EXECUTION UNKNOWN' vs 'REJECTED' vs 'RESOLVED').
+
+    Returns:
+        (retry_eligible: bool, execution_state: str)
+    """
+    if error is None and isinstance(probe.get("error"), Mapping):
+        error = probe["error"]
+
+    # 1. Successful stream completion needs no retry
+    if probe.get("stream_complete") is True:
+        return False, "RESOLVED"
+
+    http_status = probe.get("http_status")
+    chunk_count = probe.get("stream_chunk_count", 0)
+    visible_chars = probe.get("visible_chars", 0)
+    sdk_err = str(probe.get("sdk_error_type") or (error.get("type") if error else "") or "")
+
+    # 2. Non-retryable client rejections (HTTP 400, 401, 403, 404, 422 or auth/permission errors)
+    # Evaluated before network diagnostics to ensure authentication/permission errors are never misclassified as retryable
+    is_client_reject = (
+        http_status in {400, 401, 403, 404, 422}
+        or sdk_err in {
+            "AuthenticationError", "PermissionDeniedError", "BadRequestError",
+            "NotFoundError", "UnprocessableEntityError",
+        }
+    )
+    if is_client_reject and chunk_count == 0:
+        return False, "REJECTED"
+
+    # 3. Proven TokenMetro 429 TPM pre-generation reject (empirically verified NOT_STARTED)
+    if safe_rate_limit_retry(probe, raw):
+        return True, "NOT_STARTED"
+
+    # 4. Generic HTTP 429 Rate Limit across other routes/errors
+    # Unverified 429 cannot be assumed NOT_STARTED; must record EXECUTION UNKNOWN
+    # to account for potential backend dispatch and duplicate billing risk.
+    if http_status == 429:
+        return True, "EXECUTION UNKNOWN"
+
+    # 5. HTTP 500, 502, 503, 504, 524 server/gateway errors across ALL routes
+    if http_status in {500, 502, 503, 504, 524}:
+        return True, "EXECUTION UNKNOWN"
+
+    # 6. Network transport errors (SSL disconnects, timeouts, connection resets, ConnectError)
+    # Identified by exception diagnostics or recognized transport error types
+    has_diagnostics = error is not None and error.get("diagnostics") is not None
+    is_transport_type = sdk_err in {
+        "APIConnectionError", "APITimeoutError", "ConnectError", "ReadTimeout",
+        "WriteTimeout", "PoolTimeout", "ConnectTimeout", "RemoteProtocolError",
+        "ConnectionResetError", "TimeoutError", "SSLError", "BrokenStream",
+        "TransportError", "NetworkError",
+    } or any(k in sdk_err for k in ("Connection", "Timeout", "Connect", "Reset", "SSLError"))
+
+    if has_diagnostics or is_transport_type:
+        return True, "EXECUTION UNKNOWN"
+
+    # 7. Other errors (protocol format violations, deadline aborts, schema errors)
+    return False, "EXECUTION UNKNOWN"
+
+
 def _attempts(root: Path, unit_key: str, request_identity: str, run_identity: str, unit_id: str) -> list[dict[str, Any]]:
     directory = root / "units" / unit_key
     if not directory.exists():
