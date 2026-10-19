@@ -6,16 +6,21 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: `main@8caa489` (2026-10-19), unified E2 research budget across models and hardened error recovery.
-- **Working Tree Baseline**: Verified clean at `main@8caa489` before Phase 05 Byakuyakoku local Navi & KG candidate compilation and semantic tightening; operator authorized local commit; no push authorized.
+- **Current Checkpoint**: `main@aecf2fc` (2026-10-19), Byakuyakoku local deterministic candidates and continuity state machine baseline.
+- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Byakuyakoku 7-step model continuous understanding experiment and offline source remediation; no push authorized.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Byakuyakoku local Navi & KG candidate compilation and semantic tightening — COMPLETE (offline only)** (2026-10-19, based on `8caa489`): implemented lightweight context continuity state machine (`clue_state.py`) tracking durable summaries, source ledger, and append-only clue stream with non-destructive multi-perspective contrast; established 3-tier sample dataset (E2 read slices, full RUs, full Canonical sections) across 7 core Byakuyakoku documents (`byakuyakoku_samples.py`); compiled local deterministic Byakuyakoku KG items (8 entities, 6 events, 4 relations) via `SemanticBuild` and verified correct participant roles (Ema as reporter/commissioner, not thief; Vishap suppressed, not island creator); generated strict slice-bounded and full-section Navi states preventing material overstepping; established clear provenance disclaimers marking samples as local curated baselines rather than model extractions; packaged compact evidence ZIP (`p05_byakuyakoku_phase1_evidence.zip`, ~56.5 KB). All 16 focused tests PASS offline (`Ran 16 tests in 26.715s, OK`). No network, no paid API calls, no push authorized.
-- **Immediate Next Action**: Await operator review of Phase 05 local Navi/KG candidates, continuity state design, and method comparison framework before authorizing any future model-assisted extraction runs. No push authorized. No live exploration requests, retries, or protocol probes are authorized. Prior GLM/DeepSeek UNKNOWN attempts and historical UNKNOWN attempts remain unresolved and must never be resumed/reissued.
+- **Active Work Unit**: **Phase 05 Byakuyakoku 7-Step Model Continuous Understanding & Deterministic Source Mapping Remediation — COMPLETE** (2026-10-19, operator-authorized live run + offline remediation):
+  - Executed 7-step sequential continuous lore understanding run using `deepseek-v4.1-flash` @ `jizhi` via Responses SSE streaming (`run_identity`: `44d3e4fa51f95333780c77c718fdf42fae6377c934585ebf24e5c5f4e38a0c13`); 7/7 steps completed, 85,389 cumulative known tokens, 0 errors, 0 retries, generating 41 authentic clues and complete evolution trajectory. Packaged review evidence ZIP (`p05_byakuyakoku_continuity_evidence.zip`, ~353.6 KB).
+  - Remediated offline source mapping in [`byakuyakoku_continuity_experiment.py`](../src/genshin_corpus/retrieval/byakuyakoku_continuity_experiment.py): eliminated coarse `section_unit_ids[:3]` binding; implemented deterministic `resolve_clue_sources` using the model's actual `source_reference` and input sections.
+  - Formally differentiated 3 identifier tiers: Canonical Section ID (`cid:sX`), local component key (`cid:sX:uY`), and production retrieval RU ID (SHA-256 hash). Enforced fail-closed degradation (`section_only` for unindexed components like `508883:s4:u2` and `3429:s7:u2`).
+  - Generated non-destructive derived artifacts in run root: `derived_source_index.json` (41 clues: 37 resolved, 4 section-only) and `derived_continuity_state.json`, preserving original outputs and historical states intact.
+  - Added focused unit tests in [`test_byakuyakoku_continuity_experiment.py`](../tests/retrieval/test_byakuyakoku_continuity_experiment.py) (6/6 PASS, covering `clue_2_05`, `clue_3_03`, `clue_6_05`, compound references, and fallback handling). All 22 repository regression tests PASS.
+- **Immediate Next Action**: Operator review of the 7-step continuous understanding trajectory, derived source index, and post-hoc comparison with deterministic candidates; no live exploration requests or paid API calls are authorized without explicit operator approval. No push authorized.
 
 ### Autonomous Story Exploration Checkpoint (Run 3: `gpt-6-luna` 2026-10-16)
 
