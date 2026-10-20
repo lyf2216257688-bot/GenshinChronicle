@@ -44,6 +44,13 @@ Evidence Packet resolved to official Retrieval Units and Canonical lineage.
 The root can hold the local production materialization baseline, but is not a
 serving-system, vector-database, or permanent source-of-truth contract.
 
+Candidate V offline research roots contain a release catalog and metadata-join
+audit, input/implementation fingerprints, immutable session manifests and chained
+reading/understanding checkpoints, and bounded replay results. Coverage receipts
+record delivery separately from interpretation; they are not formal citations
+or accepted semantic views. New runs use new directories, leaving historical
+A/B roots immutable.
+
 The E2 four-model Responses protocol evidence uses a separate immutable campaign
 root, `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`. Its
 authorization, per-model probe configs, issued attempts, raw error/SSE evidence,

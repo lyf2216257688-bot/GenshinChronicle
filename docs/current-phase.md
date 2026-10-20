@@ -6,21 +6,19 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: main@f685a1c (2026-10-19), Byakuyakoku continuous understanding source mapping remediation and live run.
-- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Byakuyakoku interactive navigation sample, Method A/B experience comparison, and architectural synthesis; no push authorized.
+- **Current Checkpoint**: main@8681e21 plus candidate V commit (2026-10-20).
+- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Navi V prototype, tests, and documentation; no push authorized. Production enablement remains frozen.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Byakuyakoku Interactive Navigation Prototype & Architectural Synthesis — COMPLETE** (2026-10-20, operator-authorized offline work unit):
-  - Reconciled 16 hardcoded component-to-RU mappings in [`byakuyakoku_continuity_experiment.py`](../src/genshin_corpus/retrieval/byakuyakoku_continuity_experiment.py): corrected 12 historical conflict hashes to authoritative production RU IDs matching `byakuyakoku_samples.py` and the 535,802-unit production manifest; updated unit test assertions in [`test_byakuyakoku_continuity_experiment.py`](../tests/retrieval/test_byakuyakoku_continuity_experiment.py) (all 22 repository unit tests PASS offline).
-  - Built a standalone, self-contained interactive navigation prototype ([`byakuyakoku_navi_interactive.html`](research/phase-05/byakuyakoku_navi_interactive.html)) verifying 5-theme switching, cross-document evidence linking, Method A/B stance contrast, and fail-closed `section_only` source degradation.
-  - Documented authentic sample sheets for Method A ([p05-byakuyakoku-navi-sample-method-a.md](research/phase-05/p05-byakuyakoku-navi-sample-method-a.md)) and Method B ([p05-byakuyakoku-navi-sample-method-b.md](research/phase-05/p05-byakuyakoku-navi-sample-method-b.md)), accompanied by a structured evaluation report ([p05-byakuyakoku-navi-comparison-report-20261019.md](research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md)).
-  - Produced in-depth architectural synthesis ([p05-byakuyakoku-navi-architectural-synthesis-20261019.md](research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md)) analyzing OBC data characteristics, Autonomous Exploration A vs Continuous Understanding B mechanisms, scalability limits, and proposed a two-tier (macro-backbone + micro-probe) complementary navigation architecture.
-  - Consumed zero paid API calls; preserved all historical run records intact.
-- **Immediate Next Action**: Operator review of the interactive prototype and architectural synthesis, deciding on Phase 05 design adoption or next navigation milestone; no live exploration requests or paid API calls are authorized without explicit operator approval. No push authorized.
+- **Active Work Unit**: **Phase 05 Navi Candidate V — offline mechanism verification COMPLETE; semantic acceptance OPEN** (2026-10-20):
+  - Implemented the source-version reading queue, Canonical layout body boundaries, full encountered-page unread inventory, separate delivery receipts, three-lane scheduling, and shared strict continuous-understanding history.
+  - Verified bounded Byakuyakoku recorded A/B replay and Caribert batching/recovery with E1 local BM25 and dynamic official RU mapping. Primary evidence: `data/retrieval/p05-navi-v-offline-20261020-r3/`. Targeted tests PASS; historical hashes unchanged; zero provider/network calls. First-hit material selection still exposes a documented gap; no new model autonomy or semantic acceptance is claimed.
+  - Architecture, operating points, evidence and remaining questions are owned by [candidate V research](research/phase-05/p05-navi-v-release-continuity-20261020.md). The prior two-tier/two-round/15,000-token recommendations are historical proposals, not adopted contracts.
+- **Immediate Next Action**: Review candidate V mechanism evidence and the remaining material-selection, question-management, and real revision-quality gaps in its research report. No paid test is requested by this completed work unit. Any later paid semantic test requires a concrete model/route/call/cost/stop plan and explicit fee approval. Production/default behavior below remains frozen; no push is authorized.
 
 ### Autonomous Story Exploration Checkpoint (Run 3: `gpt-6-luna` 2026-10-16)
 
@@ -32,7 +30,7 @@ this document maintains the concise present state, operational baselines, and bo
 - Round 01 planned reading: 4 target RUs (`ffdaf...` 水文考卷三, `b87a...` 常世国龙蛇传小说, `54d64...` 珊瑚宫重要事件, `bff4...` 白夜国重要事件).
 - Historical termination: Round 01 returned completed commentary and final_answer messages; local cross-message concatenation polluted the decision input, and strict JSON validation rejected it (`decision_complete=false`). The system stopped fail-closed with `ExplorationError` (`status=partial`), without retry/fallback. Later read-only checks confirmed each message matches its terminal text and final_answer is valid JSON; historical artifacts/status remain frozen.
 - Cumulative resource usage: 2 issued calls (both RESOLVED, 0 UNKNOWN), 0 retries, 0 fallbacks; **9,692 known total tokens** (8,503 input, 1,189 output, 56 reasoning); 3,089 Canonical body characters; 29,313 tool response characters; actual cost/currency UNKNOWN.
-- Historical run audit checkpoint: **70/70 checks PASS** (`offline-audit-summary.json`), **920/920 repository unit tests PASS**, zero credential leaks. Repair validation is recorded in the active work unit above. E2 remains **PARTIAL**, E3 **NOT READY / NOT AUTHORIZED**.
+- Historical run audit checkpoint: **70/70 checks PASS** (`offline-audit-summary.json`), **920/920 repository unit tests PASS**, zero credential leaks. Subsequent offline repair validation is recorded in the linked Run 3 report. E2 remains **PARTIAL**, E3 **NOT READY / NOT AUTHORIZED**.
 
 ### Autonomous Story Exploration Checkpoint (Run 2: `gpt-6-luna` 2026-10-15)
 
@@ -132,5 +130,6 @@ One fact has one primary documentation owner. Consult the primary owners below r
 | **Phase 05 Navi Sample A** | [`docs/research/phase-05/p05-byakuyakoku-navi-sample-method-a.md`](research/phase-05/p05-byakuyakoku-navi-sample-method-a.md) | Method A (E2 autonomous search) authentic Byakuyakoku narrative sample sheet |
 | **Phase 05 Navi Sample B** | [`docs/research/phase-05/p05-byakuyakoku-navi-sample-method-b.md`](research/phase-05/p05-byakuyakoku-navi-sample-method-b.md) | Method B (7-step continuous lore understanding) authentic Byakuyakoku sample sheet |
 | **Phase 05 Navi Comparison** | [`docs/research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md`](research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md) | Structured evaluation report comparing Method A and Method B on narrative, evidence, and reader experience |
-| **Phase 05 Navi Architecture** | [`docs/research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md`](research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md) | Synthesis analyzing OBC data structure, exploration vs continuity, scalability limits, and two-tier architecture |
+| **Phase 05 Navi Historical Architecture** | [`docs/research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md`](research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md) | Synthesis analyzing OBC data structure, exploration vs continuity, scalability limits, and two-tier architecture |
 | **Phase 05 Navi Prototype** | [`docs/research/phase-05/byakuyakoku_navi_interactive.html`](research/phase-05/byakuyakoku_navi_interactive.html) | Standalone interactive prototype HTML widget for Byakuyakoku navigation exploration |
+| **Phase 05 Navi Candidate V** | [`docs/research/phase-05/p05-navi-v-release-continuity-20261020.md`](research/phase-05/p05-navi-v-release-continuity-20261020.md) | Release queue, shared understanding, offline replay evidence and remaining semantic questions |

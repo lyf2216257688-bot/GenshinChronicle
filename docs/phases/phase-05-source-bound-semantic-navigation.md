@@ -82,6 +82,46 @@ or sole production rules:
    lore without prematurely freezing a single narrative unit standard or fixed
    seed schema.
 
+### Candidate V release queue and continuous-understanding research boundary
+
+Candidate V is an opt-in local research path, not an adopted production
+architecture. Its base queue uses the archived official quest-channel version
+filter order and frozen Listing position within each version. These labels
+describe source release-version metadata, not in-world chronology, verified
+release dates, or prerequisites. Missing, conflicting, and unknown labels stay
+in an explicit metadata backlog; no quest DAG is inferred.
+
+Canonical layout observations must agree with the retained template before
+forming source presentation groups. Such groups are not game-quest counts.
+Complete rich-text occurrences resolve dynamically to official RU fragments;
+dialogue roots, options, branches, edges, and diagnostics remain visible without
+asserting one story path. Structural carriers and graph copies do not multiply
+body coverage. Excluded, oversized, unresolved, and incomplete material remains
+audited.
+
+Version progress, discovered related reading, and independent non-quest topics
+share one continuous-understanding history. Reading coverage is keyed by the
+bound snapshot and Canonical occurrence, independently of topics and research
+status. Search/snippets/summaries never constitute body delivery. Topic reuse
+does not redeliver body; deliberate rereading requires a reason. A reading
+checkpoint precedes interpretation, so failed updates retain delivered material
+as pending understanding. Resume binds the same inputs and checkpoint chain.
+
+The strict V adapter reuses `ClueEvent` and `ContextContinuityState`, rejects
+invalid operations, missing targets, and citations to undelivered official RU,
+and never coerces a failed transition into `add`. Explicit `unclassified`
+research source/epistemic values are allowed alongside historical values.
+Working understanding remains `unverified_hypothesis_not_fact`; mechanical
+source binding is not semantic acceptance. Final citation authority continues
+through the existing Evidence Packet boundary.
+
+This work unit implements injected recorded decisions and deterministic offline
+tests only. Per-case action/search/page/body limits and three-lane batch rotation
+are configurable research operating points, not production contracts. Historical
+two-tier recommendations, fixed two-round probes, and 15,000-token limits are not
+adopted requirements. No new paid transport, serving selector, full-corpus
+semantic build, or KG is authorized by this implementation.
+
 ## Source binding and semantic acceptance
 
 `source_binding_status` and `semantic_acceptance_status` are separate. A

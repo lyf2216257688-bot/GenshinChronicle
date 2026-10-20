@@ -30,7 +30,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   and rank fusion; Formal Deferred Evidence Assembly; and rebuildable local
   materialization, comparison, parity, and bounded research tooling.
   `navi_exploration.py` owns the local E1 search/source-read tools and explicit
-  review-to-topic projection. The
+  review-to-topic projection. `navi_reading.py` owns the opt-in candidate V
+  release catalog and source-layout body partitioning over verified artifacts. The
   existence of an experiment runner does not authorize its execution, and an
   adapter's existence does not establish the current default. It owns no UI
   lifecycle or Generation provider contract, is not a serving system, and does
@@ -52,6 +53,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   smoke also live here; E1 contains no model transport or production Agent.
   `navi_e2_experiment.py` is the opt-in single-case model exploration runner;
   it reuses E1 tools and SDK evidence helpers without creating active views.
+  `navi_v_experiment.py` owns provider-free candidate V scheduling, delivery
+  checkpoints, coverage and strict continuous-understanding updates;
+  `navi_v_research.py` is its bounded real-source recorded-decision replay entry.
   `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
   `model_interfaces_catalog.py` owns the programmatic catalog and consistency
   checks for active and historical AI model interfaces;

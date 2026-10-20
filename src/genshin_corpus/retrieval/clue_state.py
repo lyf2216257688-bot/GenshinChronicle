@@ -22,6 +22,7 @@ VALID_CLUE_STATUSES = frozenset({"active", "supplemented", "revised", "contraste
 INACTIVE_CLUE_STATUSES = frozenset({"superseded", "invalidated", "revised"})
 
 VALID_GENRES = frozenset({
+    "unclassified",                # Explicitly unclassified research input; no inferred genre
     "official_duty_dialogue",       # NPC实务工作对话 (如绘真馆藏管理)
     "ancient_chronicle_forbidden",  # 馆藏禁书编年史 (如《日月前事》)
     "folklore_adapted_fiction",     # 民间故事改编小说 (如《常世国龙蛇传》)
@@ -32,6 +33,7 @@ VALID_GENRES = frozenset({
 })
 
 VALID_EPISTEMIC = frozenset({
+    "unclassified",                # No inferred narrative authority
     "duty_testimony",               # 职务证言
     "ancient_official_record",      # 古代官方实录
     "folklore_oral_tradition",      # 口头传说母题
