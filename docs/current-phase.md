@@ -6,21 +6,21 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: `main@aecf2fc` (2026-10-19), Byakuyakoku local deterministic candidates and continuity state machine baseline.
-- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Byakuyakoku 7-step model continuous understanding experiment and offline source remediation; no push authorized.
+- **Current Checkpoint**: main@f685a1c (2026-10-19), Byakuyakoku continuous understanding source mapping remediation and live run.
+- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Byakuyakoku interactive navigation sample, Method A/B experience comparison, and architectural synthesis; no push authorized.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Byakuyakoku 7-Step Model Continuous Understanding & Deterministic Source Mapping Remediation — COMPLETE** (2026-10-19, operator-authorized live run + offline remediation):
-  - Executed 7-step sequential continuous lore understanding run using `deepseek-v4.1-flash` @ `jizhi` via Responses SSE streaming (`run_identity`: `44d3e4fa51f95333780c77c718fdf42fae6377c934585ebf24e5c5f4e38a0c13`); 7/7 steps completed, 85,389 cumulative known tokens, 0 errors, 0 retries, generating 41 authentic clues and complete evolution trajectory. Packaged review evidence ZIP (`p05_byakuyakoku_continuity_evidence.zip`, ~353.6 KB).
-  - Remediated offline source mapping in [`byakuyakoku_continuity_experiment.py`](../src/genshin_corpus/retrieval/byakuyakoku_continuity_experiment.py): eliminated coarse `section_unit_ids[:3]` binding; implemented deterministic `resolve_clue_sources` using the model's actual `source_reference` and input sections.
-  - Formally differentiated 3 identifier tiers: Canonical Section ID (`cid:sX`), local component key (`cid:sX:uY`), and production retrieval RU ID (SHA-256 hash). Enforced fail-closed degradation (`section_only` for unindexed components like `508883:s4:u2` and `3429:s7:u2`).
-  - Generated non-destructive derived artifacts in run root: `derived_source_index.json` (41 clues: 37 resolved, 4 section-only) and `derived_continuity_state.json`, preserving original outputs and historical states intact.
-  - Added focused unit tests in [`test_byakuyakoku_continuity_experiment.py`](../tests/retrieval/test_byakuyakoku_continuity_experiment.py) (6/6 PASS, covering `clue_2_05`, `clue_3_03`, `clue_6_05`, compound references, and fallback handling). All 22 repository regression tests PASS.
-- **Immediate Next Action**: Operator review of the 7-step continuous understanding trajectory, derived source index, and post-hoc comparison with deterministic candidates; no live exploration requests or paid API calls are authorized without explicit operator approval. No push authorized.
+- **Active Work Unit**: **Phase 05 Byakuyakoku Interactive Navigation Prototype & Architectural Synthesis — COMPLETE** (2026-10-20, operator-authorized offline work unit):
+  - Reconciled 16 hardcoded component-to-RU mappings in [`byakuyakoku_continuity_experiment.py`](../src/genshin_corpus/retrieval/byakuyakoku_continuity_experiment.py): corrected 12 historical conflict hashes to authoritative production RU IDs matching `byakuyakoku_samples.py` and the 535,802-unit production manifest; updated unit test assertions in [`test_byakuyakoku_continuity_experiment.py`](../tests/retrieval/test_byakuyakoku_continuity_experiment.py) (all 22 repository unit tests PASS offline).
+  - Built a standalone, self-contained interactive navigation prototype ([`byakuyakoku_navi_interactive.html`](research/phase-05/byakuyakoku_navi_interactive.html)) verifying 5-theme switching, cross-document evidence linking, Method A/B stance contrast, and fail-closed `section_only` source degradation.
+  - Documented authentic sample sheets for Method A ([p05-byakuyakoku-navi-sample-method-a.md](research/phase-05/p05-byakuyakoku-navi-sample-method-a.md)) and Method B ([p05-byakuyakoku-navi-sample-method-b.md](research/phase-05/p05-byakuyakoku-navi-sample-method-b.md)), accompanied by a structured evaluation report ([p05-byakuyakoku-navi-comparison-report-20261019.md](research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md)).
+  - Produced in-depth architectural synthesis ([p05-byakuyakoku-navi-architectural-synthesis-20261019.md](research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md)) analyzing OBC data characteristics, Autonomous Exploration A vs Continuous Understanding B mechanisms, scalability limits, and proposed a two-tier (macro-backbone + micro-probe) complementary navigation architecture.
+  - Consumed zero paid API calls; preserved all historical run records intact.
+- **Immediate Next Action**: Operator review of the interactive prototype and architectural synthesis, deciding on Phase 05 design adoption or next navigation milestone; no live exploration requests or paid API calls are authorized without explicit operator approval. No push authorized.
 
 ### Autonomous Story Exploration Checkpoint (Run 3: `gpt-6-luna` 2026-10-16)
 
@@ -129,3 +129,8 @@ One fact has one primary documentation owner. Consult the primary owners below r
 | **Phase 05 Quality Review (6+6)** | [`docs/research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md`](research/phase-05/p05-w2-semantic-quality-review-v01-20261008.md) | 12-sample atomic quality review evidence packet and index |
 | **Phase 05 Unique Archive** | [`docs/research/phase-05/p05-unique-historical-archive-20261012.md`](research/phase-05/p05-unique-historical-archive-20261012.md) | 200-unit Responses live/continuation run and cheap canary archive |
 | **AI Model Interfaces** | [`docs/model-interfaces.md`](model-interfaces.md) | Central AI provider catalog, request protocols, credential discovery, and maintenance checks |
+| **Phase 05 Navi Sample A** | [`docs/research/phase-05/p05-byakuyakoku-navi-sample-method-a.md`](research/phase-05/p05-byakuyakoku-navi-sample-method-a.md) | Method A (E2 autonomous search) authentic Byakuyakoku narrative sample sheet |
+| **Phase 05 Navi Sample B** | [`docs/research/phase-05/p05-byakuyakoku-navi-sample-method-b.md`](research/phase-05/p05-byakuyakoku-navi-sample-method-b.md) | Method B (7-step continuous lore understanding) authentic Byakuyakoku sample sheet |
+| **Phase 05 Navi Comparison** | [`docs/research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md`](research/phase-05/p05-byakuyakoku-navi-comparison-report-20261019.md) | Structured evaluation report comparing Method A and Method B on narrative, evidence, and reader experience |
+| **Phase 05 Navi Architecture** | [`docs/research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md`](research/phase-05/p05-byakuyakoku-navi-architectural-synthesis-20261019.md) | Synthesis analyzing OBC data structure, exploration vs continuity, scalability limits, and two-tier architecture |
+| **Phase 05 Navi Prototype** | [`docs/research/phase-05/byakuyakoku_navi_interactive.html`](research/phase-05/byakuyakoku_navi_interactive.html) | Standalone interactive prototype HTML widget for Byakuyakoku navigation exploration |

@@ -242,8 +242,8 @@ class ByakuyakokuContinuityExperimentTests(unittest.TestCase):
         self.assertEqual(
             res_2_01["production_ru_ids"],
             [
-                "bb1b9f9614c33ba846b438ea242df3ba928a3f81ebc6ae78a5840fc72d0382ce",
-                "6961332b1b0fbb412aa0d99fa8fa538e14603348c485295c52c615ca9441113b",
+                "bb1b9f9614c358ec0e0650e1ca12afa90fc92efa61c75a98d3b7b39dc7b79707",
+                "6961332b1b0f292b1896fb9f72a8ffb844ddbf144bee2e1fc8b841f30d6f138b",
             ],
         )
         self.assertEqual(res_2_01["overall_status"], "resolved")
@@ -264,8 +264,8 @@ class ByakuyakokuContinuityExperimentTests(unittest.TestCase):
         self.assertEqual(
             res_3_06_text["production_ru_ids"],
             [
-                "6fb5641569df9190db9b2d861d87e0743b749673966953ca096cff8e1a134a66",
-                "d9fed6511005a303649581f1eeb4df2d601b3334237129528d2d63428f5c90b6",
+                "6fb5641569df1013c0bda1ded11d69ba82e2506b9493d12ee09255c3220b77ed",
+                "d9fed6511005d773cdb702580731656454c0f6d40685451dfe11ddbb1b45cfb8",
             ],
         )
         self.assertEqual(res_3_06_text["overall_status"], "resolved")

@@ -1,0 +1,754 @@
+<!-- Standalone copy of byakuyakoku_navi_interactive.html in repository -->
+<!-- See C:/Users/Lyf22/.gemini/antigravity/brain/ab8a0c09-49f4-48aa-a82f-e126e120e324/byakuyakoku_navi_interactive.html for canonical artifact -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 05 白夜国轻量交互导航样张</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(120,120,120,0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(120,120,120,0.5); }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 antialiased p-3 sm:p-5 text-sm selection:bg-amber-500/20">
+
+  <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-5 mb-4 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 font-bold text-base">渊</span>
+        <div>
+          <h1 class="font-bold text-base sm:text-lg tracking-tight">白夜国剧情交互导航样张 (Phase 05 Navi Prototype)</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">验证剧情主题跳转 · 跨文档关联 · 连续理解状态 · 官方来源可信回查</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">零付费调用</span>
+        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/20">真实历史 Run 数据</span>
+      </div>
+    </div>
+
+    <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+      <span class="font-bold shrink-0">⚠️ 验证原则声明：</span>
+      <div>
+        <span>本样张仅用于验证交互与机制能否自然工作，<b>不通过单一样本评判 A/B 优劣</b>。所有剧情文本 100% 采自模型真实输出；展示组织为人工交互设计；来源无法核验处已严格降级为 <code>section_only</code>。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    
+    <div class="lg:col-span-7 flex flex-col gap-4">
+      
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 shadow-sm">
+        <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between">
+          <span>选择白夜国剧情主题（点击切换主线）</span>
+          <span id="theme-counter" class="text-amber-600 font-mono">1 / 5</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-1.5" id="theme-tabs"></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button id="btn-mode-b" onclick="switchMode('B')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-amber-500 text-white shadow-sm">
+              Method B: 七步连续理解 (85k tokens)
+            </button>
+            <button id="btn-mode-a" onclick="switchMode('A')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100">
+              Method A: E2 自主搜索 (193k tokens)
+            </button>
+          </div>
+          <span id="mode-meta" class="text-xs font-mono text-slate-500">Step: 7/7 | Clues: 41</span>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 mb-3">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+              <span>📖</span>
+              <span id="narrative-title">当前主题叙事理解</span>
+            </span>
+            <span id="stance-badge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-blue-500/10 text-blue-600">
+              认知姿态: 多视角互见
+            </span>
+          </div>
+          <p id="narrative-body" class="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+            加载中...
+          </p>
+        </div>
+
+        <div class="mb-3">
+          <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">本主题涉及官方文献跨文档关联：</div>
+          <div class="flex flex-wrap gap-1.5" id="doc-pills"></div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">模型真实提炼线索（点击右侧即时查看官方原文证据）：</span>
+            <span id="clue-count-badge" class="text-[11px] text-slate-400 font-mono">3 条线索</span>
+          </div>
+          <div class="flex flex-col gap-2 max-h-[380px] overflow-y-auto pr-1" id="clue-list"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="lg:col-span-5 flex flex-col gap-4">
+      
+      <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-5 shadow-sm sticky top-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-600 text-xs font-bold">源</span>
+            <h2 class="font-bold text-sm tracking-tight">官方来源核验抽屉 (Source Inspector)</h2>
+          </div>
+          <span id="inspect-status-badge" class="px-2 py-0.5 rounded text-xs font-mono bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">
+            Resolved
+          </span>
+        </div>
+
+        <div class="mb-3 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div class="text-[11px] text-slate-500 dark:text-slate-400 mb-1 flex items-center justify-between">
+            <span>当前审查线索：</span>
+            <span id="inspect-clue-id" class="font-mono text-amber-600 font-bold">clue_2_01</span>
+          </div>
+          <div id="inspect-clue-text" class="text-xs line-clamp-2 text-slate-700 dark:text-slate-300 italic">
+            请点击左侧线索进行来源审计...
+          </div>
+        </div>
+
+        <div class="space-y-2 mb-3">
+          <div class="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">1. 权威章节标号 (Canonical Section ID)</div>
+            <div id="inspect-section-id" class="font-mono font-medium text-slate-800 dark:text-slate-200">3470:s2</div>
+            <div id="inspect-record-title" class="text-[11px] text-slate-500 dark:text-slate-400">《白夜国馆藏》日月前事</div>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">2. 局部组件键 (Local Component Key)</div>
+            <div id="inspect-component-key" class="font-mono font-medium text-slate-800 dark:text-slate-200">3470:s2:u1</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">对应官方原始数据切片单元</div>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5 flex items-center justify-between">
+              <span>3. 生产检索 RU ID (SHA-256)</span>
+              <span id="inspect-ru-state" class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600">已核准</span>
+            </div>
+            <div id="inspect-ru-hash" class="font-mono text-[11px] break-all text-slate-700 dark:text-slate-300 bg-black/5 dark:bg-white/5 p-1.5 rounded mt-1">
+              6961332b1b0f292b1896fb9f72a8ffb844ddbf144bee2e1fc8b841f30d6f138b
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
+            <span>官方原文精确引用 (Corpus Verbatim Excerpt)</span>
+            <span class="text-[11px] text-amber-600 font-mono">100% 真实切片</span>
+          </div>
+          <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-xs leading-relaxed max-h-[180px] overflow-y-auto text-slate-700 dark:text-slate-300" id="inspect-verbatim">
+            原文加载中...
+          </div>
+        </div>
+
+        <div id="inspect-uncertainty-box" class="mt-3 bg-blue-500/5 border border-blue-500/20 rounded-xl p-2.5 text-xs text-slate-600 dark:text-slate-400">
+          <div class="font-semibold text-blue-600 dark:text-blue-400 text-[11px] mb-0.5">🔍 叙事限制与审慎说明 (Epistemic Note)：</div>
+          <div id="inspect-uncertainty-text">无叙事限制说明。</div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Exact same verified data as canonical artifact
+    const THEMES = [
+      {
+        id: "theme_1",
+        title: "起源与深渊之变",
+        subtitle: "大日御舆与阿倍良久",
+        docs: [
+          { name: "《日月前事》", genre: "编年史原典", cid: "3470:s2" },
+          { name: "《常世国龙蛇传》", genre: "民间演义", cid: "3226:s1" },
+          { name: "《白夜国》重要事件", genre: "百科整理", cid: "508883:s4" }
+        ],
+        dataB: {
+          stance: "原初创世与傀儡政权多重视角对勘",
+          summary: "白夜国起源于原初创世与第二王座战争后坠入地下的海渊之民，与深海龙嗣争战，直至时间之执政卡伊洛斯（常世大神）启智贤人阿倍良久造出大日御舆，白夜降临，龙嗣溃败。安定后贵族推行大日御舆崇拜，立幼童为傀儡「太阳之子」；第一任太阳之子离可琉虽崇拜阿倍良久，仍因权贵构陷而判其谋逆罪、终生监禁于大日御舆之顶。",
+          clues: [
+            {
+              id: "clue_2_03",
+              op: "add",
+              genre: "ancient_chronicle_forbidden",
+              epistemic: "ancient_official_record",
+              text: "《日月前事》编年史记载：原初法涅斯创世，葬火之年天上的第二个王座到来导致大君战争蔓延，海渊先祖与栖居之地落入深渊之海；深海龙嗣横行，先祖与之征战，用千灯逐入影子。",
+              significance: "提供白夜国起源最宏大的神话与历史框架",
+              uncertainty: "编年史对原初名讳存不确定语气；寓言体段落需谨慎解读",
+              source: {
+                sec: "3470:s2",
+                key: "3470:s2:u1",
+                ru: "6961332b1b0f292b1896fb9f72a8ffb844ddbf144bee2e1fc8b841f30d6f138b",
+                status: "resolved",
+                title: "《白夜国馆藏》日月前事",
+                quote: "原初的那一位，或许是法涅斯……造了四个发光的影子……葬火之年。天上的第二个王座到来，大君的战争蔓延……我们的先祖和栖居之地就此落入了深渊之海。"
+              }
+            },
+            {
+              id: "clue_2_01",
+              op: "add",
+              genre: "ancient_chronicle_forbidden",
+              epistemic: "ancient_official_record",
+              text: "贤人阿倍良久（又名阿布拉克）被常世大神启智，从不见太阳的渊下宫造出太阳神车赫利俄斯（大日御舆）。太阳之子因嫉妒其才华将其囚禁至寿终，正是其造出之日催生了太阳之子王权。",
+              significance: "确立从黑暗时代到白夜时代的核心技术创造与政治悲剧",
+              uncertainty: "小说演义称常世大神启智，编年史称开启神智，细节来源有别",
+              source: {
+                sec: "3470:s2",
+                key: "3470:s2:u1",
+                ru: "6961332b1b0f292b1896fb9f72a8ffb844ddbf144bee2e1fc8b841f30d6f138b",
+                status: "resolved",
+                title: "《白夜国馆藏》日月前事",
+                quote: "贤人阿布拉克，命众人造出光之造物，常世国因此得见光明……"
+              }
+            },
+            {
+              id: "clue_6_01",
+              op: "supplement",
+              genre: "community_chronology",
+              epistemic: "community_synthesis",
+              text: "第一任太阳之子为离可琉，擅长建筑技艺且十分崇拜阿倍良久；但阿倍良久反对太阳之子制度，大日御舆建成后第二年，权贵营造其谋逆假象，离可琉亲自判处恩师终生监禁于大日御舆之顶。",
+              significance: "补充执行者离可琉视角的崇拜与背叛心理冲突，明确谋逆罪名与囚禁地点",
+              uncertainty: "社区条目未标原始出处，综合多份文本；降级为章节保护",
+              source: {
+                sec: "508883:s4",
+                key: "508883:s4:u2",
+                ru: null,
+                status: "section_only",
+                title: "《白夜国》重要事件·离可琉",
+                quote: "第一任太阳之子为离可琉，他擅长建筑技艺，十分崇拜阿倍良久。然而，由于阿倍良久十分反对太阳之子的制度，在大日御舆建成后的第二年，权贵们营造了阿倍良久想要图谋王位的假象，离可琉为阿倍良久判下谋逆大罪，终生监禁于大日御舆之顶。"
+              }
+            }
+          ]
+        },
+        dataA: {
+          stance: "防御性怀疑 (unverified_hypothesis_not_fact)",
+          summary: "E2 自主搜索命中百科时间线与小说正文：贤人阿倍良久被常世大神启智造日遭囚禁，离可琉首任太阳之子判谋逆；龙嗣亲近黑暗忌惮光明。模型极度防守，将小说与时间线均标为未证实推测，因检索过早转向蛇神话题，未在 pending clues 中梳理法涅斯创世体系。",
+          clues: [
+            {
+              id: "clue_A_01_part",
+              op: "search_read",
+              genre: "folklore_adapted_fiction",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "已核实原文：RU 0e59547（《常世国龙蛇传》小说正文）贤人阿倍良久被常世大神启智、从无日渊下掘光，遭太阳之子囚禁至死；龙嗣亲近黑暗忌惮光明；小说态叙事需与史料区分。",
+              significance: "自主发现小说正文保存的造日母题",
+              uncertainty: "模型标注：小说而非馆藏史书，需待核日月前事正文史料",
+              source: {
+                sec: "3226:s1",
+                key: "3226:s1:u1",
+                ru: "0e59547688f1e8f64e695165d6b0f70a0965914de8b12f6de45cb6647694c5b6",
+                status: "resolved",
+                title: "《常世国龙蛇传》常世国龙蛇传",
+                quote: "相传，阿倍良久被常世大神启开了智慧，因此才从不见太阳的渊下宫里掘出来了光。但是太阳之子嫉妒他的才华，把他囚禁直至他寿终。"
+              }
+            },
+            {
+              id: "mem_A_abaraku",
+              op: "memory_checkpoint",
+              genre: "community_chronology",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "工作记忆沉淀：大日御舆建成方有白夜国名；离可琉首任太阳之子、阿倍良久被判谋逆；权贵营造阿倍良久图谋王位假象终生监禁。",
+              significance: "捕捉到造日与谋逆罪名细节，但受限于截断未固化为独立线索",
+              uncertainty: "模型防守性归档于工作记忆草稿",
+              source: {
+                sec: "508883:s4",
+                key: "508883:s4:u0",
+                ru: "fbd839c6d20c6935cef11aa901504367d6db90e6674012af8a04bede8995f15b",
+                status: "resolved",
+                title: "《白夜国》重要事件·黑暗与造日",
+                quote: "第一任太阳之子为离可琉……离可琉为阿倍良久判下谋逆大罪，终生监禁于大日御舆之顶。"
+              }
+            }
+          ]
+        }
+      },
+      {
+        id: "theme_2",
+        title: "失窃案与《日月前事》",
+        subtitle: "图书辨伪与书记绝笔",
+        docs: [
+          { name: "《龙蛇藏归辑录》", genre: "职务对话", cid: "3429:s7" },
+          { name: "《白夜国馆藏》", genre: "禁书编年史", cid: "3470:s2" },
+          { name: "《常世国龙蛇传》资料页", genre: "再版描述", cid: "3226:s0" }
+        ],
+        dataB: {
+          stance: "实务焦虑 -> 原典绝笔 -> 版本分叉",
+          summary: "末代图书管理员绘真因《日月前事》等五本馆藏失窃而极度焦虑，安贞等嫌疑人关押于悬空牢；读入《日月前事》原本后印证书记官因如实按事实记录原初创世与王座战争，在门外盔甲声中绝笔被捕，该书遂成最高政治禁书；同时八重堂再版本与馆藏原版存在文本分叉，解释了绘真对封面异样的困惑。",
+          clues: [
+            {
+              id: "clue_1_02",
+              op: "add",
+              genre: "official_duty_dialogue",
+              epistemic: "duty_testimony",
+              text: "白夜国搬迁海面前夕有五本馆藏未追回：《常世国龙蛇传》《白夜国水文考》《光昼影底集》、宫地那波人实验记录，以及被盗的《日月前事》。",
+              significance: "确立失窃文献清单与调查起点",
+              uncertainty: "绘真对重要性的判断受职务焦虑影响",
+              source: {
+                sec: "3429:s7",
+                key: "3429:s7:u3",
+                ru: "d9fed6511005d773cdb702580731656454c0f6d40685451dfe11ddbb1b45cfb8",
+                status: "resolved",
+                title: "《龙蛇藏归辑录》剧情对话",
+                quote: "目前没有追回的书分别是《常世国龙蛇传》、《白夜国水文考》、《光昼影底集》、宫地那波人的实验记录……啊，第五本丢失的书我们还是有点头绪的。《日月前事》这本书被盗，几个嫌疑人被关押起来了。"
+              }
+            },
+            {
+              id: "clue_2_09",
+              op: "supplement",
+              genre: "ancient_chronicle_forbidden",
+              epistemic: "ancient_official_record",
+              text: "《日月前事》编年史末段记载书记官因“若无把一切按事实记写的胆量，哪里能成为常世大神的书记”而绝笔，听到门外盔甲声被捕；该书因记录王座更替真相而成为绝对禁书。",
+              significance: "解释《日月前事》失窃案与悬空牢审讯的政治敏感性根源",
+              uncertainty: "下达逮捕命令的具体权贵未明，日月十年后编年史中断",
+              source: {
+                sec: "3470:s2",
+                key: "3470:s2:u1",
+                ru: "6961332b1b0f292b1896fb9f72a8ffb844ddbf144bee2e1fc8b841f30d6f138b",
+                status: "resolved",
+                title: "《白夜国馆藏》日月前事",
+                quote: "若无把一切按事实记写的胆量，哪里能成为常世大神的书记呢？我听到了门外盔甲的声音，我于此绝笔。"
+              }
+            },
+            {
+              id: "clue_3_06",
+              op: "supplement",
+              genre: "folklore_adapted_fiction",
+              epistemic: "folklore_oral_tradition",
+              text: "《常世国龙蛇传》八重堂再版资料页与绘真对话对照：渊下宫馆藏原版与海祇岛—鸣神岛流传异本之间存在文本传承分叉，解释了绘真看不懂归还书封与文字的困惑。",
+              significance: "以跨地域文献流传实证解开第一步绘真书籍真伪之疑",
+              uncertainty: "商人誊抄时间点与最后迁徙日的先后关系需综合判断",
+              source: {
+                sec: "3226:s0",
+                key: "3226:s0:u0",
+                ru: "6fb5641569df1013c0bda1ded11d69ba82e2506b9493d12ee09255c3220b77ed",
+                status: "resolved",
+                title: "《常世国龙蛇传》资料描述",
+                quote: "取材自海祇岛民间故事的小说。最早的版本乃是蛇神尚在人世之时，有鸣神岛商人前往海祇岛，将当地民间故事誊抄转写带回……如今由八重堂再版。"
+              }
+            }
+          ]
+        },
+        dataA: {
+          stance: "敏锐探案发现 (unverified_hypothesis_not_fact)",
+          summary: "E2 自主搜索展示了极高的侦探嗅觉：不仅梳理了绘真的五本失窃名单与安贞案，更自主对勘八重堂资料页（3226:s0:u0），敏锐发现旅行者归还的书“封面非渊下宫统一封面、字看不懂”，实为鸣神岛商业再版小说，证实版本来源存疑而非馆藏原书。",
+          clues: [
+            {
+              id: "clue_A_02",
+              op: "autonomous_cross_check",
+              genre: "official_duty_dialogue",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "RU d9fed651（绘真证言）：绘真列失踪馆藏五本；《日月前事》被盗安贞被关。绘真验书：四本确为馆藏，但《常世国龙蛇传》封面非统一封面、字看不懂怀疑凑数。说明旅行者所持版本非馆藏原书。",
+              significance: "自主识别出游戏内旅行者归还书目的版本真实性缺陷",
+              uncertainty: "模型保持严格角色证言审慎定性",
+              source: {
+                sec: "3429:s7",
+                key: "3429:s7:u3",
+                ru: "d9fed6511005d773cdb702580731656454c0f6d40685451dfe11ddbb1b45cfb8",
+                status: "resolved",
+                title: "《龙蛇藏归辑录》剧情对话",
+                quote: "这一本不是原本。这根本不是馆藏图书的统一封面，而且上面的文字我完全看不懂。"
+              }
+            }
+          ]
+        }
+      },
+      {
+        id: "theme_3",
+        title: "蛇神降临与神民立誓",
+        subtitle: "暗海败逃与小童契约",
+        docs: [
+          { name: "《证誓之明瞳》", genre: "神明自述", cid: "3611:s3" },
+          { name: "《白夜国》重要事件", genre: "百科时间线", cid: "508883:s4" },
+          { name: "《白夜国地理水文考》", genre: "地理文献", cid: "3470:s4" }
+        ],
+        dataB: {
+          stance: "神明第一人称自述与三方契约构建",
+          summary: "奥罗巴斯在魔神战争失去所有败逃暗之外海，得珊瑚礼赠身负力量；在海渊三隅洞中见寻龙骨花小童，受邀为神；奥罗巴斯以证誓明瞳立誓，直陈不胜贵金鸣神、受够偷生渎名之耻，尊重斯巴达克反神传统，设立三方共治与大日御舆崩毁熔断机制，折断珊瑚枝照亮深渊架梯造岛，履行天上之都誓言。",
+          clues: [
+            {
+              id: "clue_4_01",
+              op: "add",
+              genre: "weapon_lore_divine_oath",
+              epistemic: "primary_divine_statement",
+              text: "奥罗巴斯自述因无法胜过贵金之神与鸣神才逃往未知之海，坦言“偷生之辱、渎名之耻——我已经受够”，表明介入渊下事务带有洗刷败逃耻辱、自我救赎的强烈动机。",
+              significance: "以第一人称神明自述确立蛇神入渊的深层心理与动机",
+              uncertainty: "贵金与鸣神战争年代未详，渎名之耻暗示真名存在禁忌",
+              source: {
+                sec: "3611:s3",
+                key: "3611:s3:u1",
+                ru: "05e788aceff16128d03709e10a04807e103771d6f9a013da4eec8112e82aa4d6",
+                status: "resolved",
+                title: "《证誓之明瞳》相关故事",
+                quote: "我本就因无法胜过贵金之神与鸣神，才选择逃往未知之海……偷生之辱、渎名之耻——我已经受够。"
+              }
+            },
+            {
+              id: "clue_4_03",
+              op: "add",
+              genre: "weapon_lore_divine_oath",
+              epistemic: "primary_divine_statement",
+              text: "奥罗巴斯以证誓明瞳立誓击退龙蜥、治理圣土，约定珊瑚宫家、地走官众、御使三方中任意两方不满，大日之塔将听闻决议自行崩毁湮灭一切；蛇神随后带民前去海面履行天上誓言。",
+              significance: "确立白夜国末期三方政治共治与毁塔熔断机制",
+              uncertainty: "天上之都誓言具体内容未明，关联天空岛神契",
+              source: {
+                sec: "3611:s3",
+                key: "3611:s3:u1",
+                ru: "05e788aceff16128d03709e10a04807e103771d6f9a013da4eec8112e82aa4d6",
+                status: "resolved",
+                title: "《证誓之明瞳》相关故事",
+                quote: "倘若你们、海民中不从神治的遗民、我之御使三方中，若有两方以上不满……此塔亦将听闻此决意，自行崩毁，湮灭往昔之一切……带剩余之民前去海面，履行与天上之都的誓言。"
+              }
+            },
+            {
+              id: "clue_6_03",
+              op: "supplement",
+              genre: "community_chronology",
+              epistemic: "community_synthesis",
+              text: "传说奥罗巴斯初现身覆四色珊瑚枝，战胜深海龙蜥、折断珊瑚枝照亮海渊、架梯让子民回地面见阳光，涡流塑珊瑚成海祇岛，留珊瑚玉枝镇压龙蜥。",
+              significance: "以时间线序列完整串联战胜龙蜥到折枝造岛的具象神话动作",
+              uncertainty: "自称传说，非编年史，属于民间神话综合",
+              source: {
+                sec: "508883:s4",
+                key: "508883:s4:u4",
+                ru: "7ceb1023dcbed8fdc8c355d53eb7e1275ba456d3a6ee73da83ed2f856c7215f4",
+                status: "resolved",
+                title: "《白夜国》重要事件·折珊瑚枝",
+                quote: "传说大蛇在常夜的渊下国土中初次现身时，身上覆满了四色的珊瑚枝……它战胜了深海龙蜥、将身上的珊瑚枝折断，照亮海渊，并用珊瑚枝架起登高的阶梯，让它的子民们再次回到地面上。"
+              }
+            }
+          ]
+        },
+        dataA: {
+          stance: "对勘神明死誓与民间传说 (unverified_hypothesis_not_fact)",
+          summary: "E2 自主搜索敏锐发现了神明第一人称自述与民间传说之间的张力：奥罗巴斯直陈败于贵金之神与鸣神、怀偷生渎名之耻前去海面履行天上誓言；而百科民间传说则强调仁爱拯救折枝造岛，模型强调动因与细节不一致，需区分整理叙述与一手自述。",
+          clues: [
+            {
+              id: "clue_A_04_part",
+              op: "autonomous_cross_check",
+              genre: "weapon_lore_divine_oath",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "RU 05e788ac《证誓之明瞳》：纯白巨蛇对小童自述因败于贵金之神与鸣神逃未知之海，提‘偷生之辱、渎名之耻’，率民赴海面‘履行与天上之都的誓言’。神明死誓与民间救赎传说存在显著动因反差。",
+              significance: "揭示奥罗巴斯入渊与赴死的双重动因张力",
+              uncertainty: "模型提示：未证奥罗巴洛斯=奥罗巴斯，保持防守定性",
+              source: {
+                sec: "3611:s3",
+                key: "3611:s3:u1",
+                ru: "05e788aceff16128d03709e10a04807e103771d6f9a013da4eec8112e82aa4d6",
+                status: "resolved",
+                title: "《证誓之明瞳》相关故事",
+                quote: "我本就因无法胜过贵金之神与鸣神，才选择逃往未知之海……前去海面，履行与天上之都的誓言。"
+              }
+            }
+          ]
+        }
+      },
+      {
+        id: "theme_4",
+        title: "两重叙事与编年史封存",
+        subtitle: "牺牲说推测 vs 封存野史",
+        docs: [
+          { name: "《珊瑚宫民间信仰初勘》", genre: "考据专著", cid: "3227:s1" },
+          { name: "《白夜国》重要事件", genre: "文化改造", cid: "508883:s4" }
+        ],
+        dataB: {
+          stance: "意识之史与事实之史对勘 -> 文化同化政策",
+          summary: "学者初勘指明广为接受的大蛇牺牲说纯属后人推测，缺乏成文史料；而野史称海渊之民原本拥有可靠编年史，被大蛇下令封存渊下宫不得带出，海祇民改学鸣神姓氏，且传大蛇得天京传谕引颈就戮；百科时间线正式确证海祇决心抹除民众过去封存史书，揭示绘真图书馆被封存乃大蛇推行鸣神同化之主动政策。",
+          clues: [
+            {
+              id: "clue_5_01",
+              op: "contrast",
+              genre: "scholarly_conjecture",
+              epistemic: "scholarly_conjecture",
+              text: "海祇岛广泛流传的‘意识之史’：大蛇折珊瑚枝救民，因饥馑东侵，巫女隐瞒必败卜辞，大蛇坦然牺牲以败亡铸就永恒信仰。学者指出动机并无确实可靠史料，牺牲说系后人推测。",
+              significance: "指出海祇官方记忆的建构性本质",
+              uncertainty: "学者明确指出缺乏史料支撑，牺牲说为后世推断",
+              source: {
+                sec: "3227:s1",
+                key: "3227:s1:u1",
+                ru: "e9f3aa8de26fb76700477f818275f093b544c8cf28e9a60d1dcd6db7d8caea13",
+                status: "resolved",
+                title: "《珊瑚宫民间信仰初勘》考据正文",
+                quote: "远吕羽氏之动机并无确实可靠之史料记载……所谓的牺牲，大概也是在发现了巫女的卜辞之后，后人的推测。"
+              }
+            },
+            {
+              id: "clue_5_02",
+              op: "contrast",
+              genre: "scholarly_conjecture",
+              epistemic: "scholarly_conjecture",
+              text: "斩海祇传说的‘另一个版本’：海渊先民原在渊下拥有可靠编年史，被大蛇下令封存于渊下宫不得带出；海祇民今姓系学习鸣神传统后出现；大蛇离开水下时曾得天京传谕，暗示可能奉命引颈就戮。",
+              significance: "解释渊下宫编年史失落与大蛇赴死的天命审判背景",
+              uncertainty: "学者自评为稗官野史，但承认隐喻事实",
+              source: {
+                sec: "3227:s1",
+                key: "3227:s1:u1",
+                ru: "e9f3aa8de26fb76700477f818275f093b544c8cf28e9a60d1dcd6db7d8caea13",
+                status: "resolved",
+                title: "《珊瑚宫民间信仰初勘》考据正文",
+                quote: "曾经的海渊之民在渊下之时，拥有极为可靠的编年史……但是这些都被大蛇下令封存于渊下宫之中，不得带出。曾经的海渊之民的名字甚至也不是如今的稻妻样式——如今的海祇民诸姓也是大蛇下令学习鸣神传统之后才出现的。"
+              }
+            },
+            {
+              id: "clue_6_04",
+              op: "supplement",
+              genre: "community_chronology",
+              epistemic: "community_synthesis",
+              text: "白夜国时间线确认：海祇决心抹除海祇岛民众的过去，下令将编年史封存在渊下宫不得带出，又下令学习鸣神传统改造海祇民众姓氏；将野史正式提升为官方文化同化政策。",
+              significance: "为绘真图书馆被封存及渊下宫历史湮灭提供直接政策依据",
+              uncertainty: "抹除过去带有目的论修辞，具体范围由后人综合",
+              source: {
+                sec: "508883:s4",
+                key: "508883:s4:u5",
+                ru: "6be0d75b766fc5a89849736012bfb9a23700f29e744f782669d1b661c0ca255d",
+                status: "resolved",
+                title: "《白夜国》重要事件·文化改造",
+                quote: "海祇决心抹除海祇岛民众的过去。他下令将编年史封存在渊下宫之中，不得带出；又下令学习鸣神传统，改造海祇民众的姓氏。"
+              }
+            }
+          ]
+        },
+        dataA: {
+          stance: "批判性史料解构 (unverified_hypothesis_not_fact)",
+          summary: "E2 自主搜索深刻拆解了学者专著：(1)指出广受接受的牺牲说缺乏史料系后人推测，批评海祇史学为蓄积意识而非记录事实；(2)摘录了封存编年史与天京传谕的野史版本。但模型由于过度防守，以红字警告野史不可证实，未敢将其纳入历史政策主线。",
+          clues: [
+            {
+              id: "clue_A_04_treatise",
+              op: "autonomous_critique",
+              genre: "scholarly_conjecture",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "RU e9f3aa8d《初勘》学者笔调对勘二说：广泛传说版折珊瑚枝牺牲东征属推测；另一版本大蛇封存可靠编年史、改鸣神姓氏、得天京传谕引颈就戮作者自评稗官野史。重要：封存编年史之说在此为另一版本传说的作者转述，非可证史料。",
+              significance: "对海祇岛两种相互矛盾的民间历史记忆进行了严密质证",
+              uncertainty: "模型将其全面降级为待证实假说",
+              source: {
+                sec: "3227:s1",
+                key: "3227:s1:u1",
+                ru: "e9f3aa8de26fb76700477f818275f093b544c8cf28e9a60d1dcd6db7d8caea13",
+                status: "resolved",
+                title: "《珊瑚宫民间信仰初勘》考据正文",
+                quote: "但是，这个斩海祇的传说故事还有另一个版本：曾经的海渊之民在渊下之时，拥有极为可靠的编年史……但是这些都被大蛇下令封存于渊下宫之中，不得带出。"
+              }
+            }
+          ]
+        }
+      },
+      {
+        id: "theme_5",
+        title: "历史终局与后世海祇岛",
+        subtitle: "魔神战死与现人神巫女",
+        docs: [
+          { name: "《珊瑚宫心海》角色详细", genre: "官方设定", cid: "2403:s13" }
+        ],
+        dataB: {
+          stance: "官方角色设定终局锚定与血脉神意统一",
+          summary: "心海角色设定定性白夜国历史终局：奥罗巴斯将海底渊下宫住民带到地面开创海祇文明，后被雷神斩杀，身体化作枯骨、怨念凝成祟神；定义「现人神巫女」为继承珊瑚宫家血脉、以凡人之躯承载蛇神守护意志之人；将珊瑚宫家从政治契约方提升为神契血脉载体，统一了血脉古老传承与鸣神改姓晚出的关系。",
+          clues: [
+            {
+              id: "clue_7_01",
+              op: "add",
+              genre: "character_lore",
+              epistemic: "official_character_definition",
+              text: "官方角色设定确认：魔神奥罗巴斯将生活在海底渊下宫的海祇住民带到地面开创文明；后被雷神斩杀，身体化为累累枯骨，怨念凝成祟神气息，确立后世定局与灾难遗留。",
+              significance: "以官方最高设定权威完成奥罗巴斯功绩与死局的叙事收束",
+              uncertainty: "概括性设定语言，斩杀经过与时间点未详述",
+              source: {
+                sec: "2403:s13",
+                key: "2403:s13:u1",
+                ru: "c89d23c79d89c7d2a1dfe03abdaa7adc8b340404d48e2bc31bd6eeeb8428b3f5",
+                status: "resolved",
+                title: "《珊瑚宫心海》角色详细",
+                quote: "海祇岛的住民，曾生活在海底的渊下宫。魔神奥罗巴斯将他们带到地面，才有了海祇岛如今的文明。奥罗巴斯被雷神斩杀后，身体化作累累枯骨，怨念凝成崇神气息。"
+              }
+            },
+            {
+              id: "clue_7_02",
+              op: "supplement",
+              genre: "character_lore",
+              epistemic: "official_character_definition",
+              text: "官方设定定义「现人神巫女」：继承珊瑚宫家血脉、以凡人之躯承载神的意志、代替神明守护海祇土地；蛇神守护意志融入珊瑚宫家血脉代代相传，赋予珊瑚宫家神学正当性。",
+              significance: "为第四步契约中的珊瑚宫家提供了血脉与神学层面的终极解释",
+              uncertainty: "未说明现人神巫女制度是生前亲设还是后世追认",
+              source: {
+                sec: "2403:s13",
+                key: "2403:s13:u1",
+                ru: "c89d23c79d89c7d2a1dfe03abdaa7adc8b340404d48e2bc31bd6eeeb8428b3f5",
+                status: "resolved",
+                title: "《珊瑚宫心海》角色详细",
+                quote: "继承了珊瑚宫家血脉的『现人神巫女』，亦即『以凡人之躯承载神的意志，代替神明守护这片土地之人』。奥罗巴斯守护海祇岛的意志，融入了珊瑚宫家的血脉中，代代相传。"
+              }
+            }
+          ]
+        },
+        dataA: {
+          stance: "截断于工作记忆 (unverified_hypothesis_not_fact)",
+          summary: "E2 自主搜索在末轮阅读了心海角色详细与珊瑚宫词条，工作记忆准确记录了奥罗巴斯被雷神斩杀、枯骨化为祟神、八酝岛五处镇物；但由于 17 轮算力/轮次预算耗尽，未能在 pending clues 中将后世终局整理成独立线索，状态停留在草稿草案中。",
+          clues: [
+            {
+              id: "mem_A_kokomi",
+              op: "memory_checkpoint",
+              genre: "character_lore",
+              epistemic: "unverified_hypothesis_not_fact",
+              text: "工作记忆终态草稿：RU c89d23c 心海角色：渊下宫→奥罗巴斯带出→被雷神斩杀化枯骨怨念成祟神。RU 507928 珊瑚宫条目含斩杀、祟神、八酝岛五处镇物。待核东征考据。",
+              significance: "成功触达后世终局材料，但受探索截断影响未能产出终局导览",
+              uncertainty: "未形成正式 pending clue，截断于 memory",
+              source: {
+                sec: "2403:s13",
+                key: "2403:s13:u1",
+                ru: "c89d23c79d89c7d2a1dfe03abdaa7adc8b340404d48e2bc31bd6eeeb8428b3f5",
+                status: "resolved",
+                title: "《珊瑚宫心海》角色详细",
+                quote: "海祇岛的住民，曾生活在海底的渊下宫。魔神奥罗巴斯将他们带到地面……奥罗巴斯被雷神斩杀后，身体化作累累枯骨，怨念凝成崇神气息。"
+              }
+            }
+          ]
+        }
+      }
+    ];
+
+    let currentThemeIdx = 0;
+    let currentMode = 'B';
+    let currentClue = null;
+
+    function init() {
+      renderThemeTabs();
+      loadTheme(0);
+    }
+
+    function renderThemeTabs() {
+      const container = document.getElementById("theme-tabs");
+      container.innerHTML = "";
+      THEMES.forEach((t, idx) => {
+        const btn = document.createElement("button");
+        btn.className = `p-2 rounded-xl text-left transition-all border ${
+          idx === currentThemeIdx 
+            ? "bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400 font-semibold"
+            : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-100"
+        }`;
+        btn.onclick = () => loadTheme(idx);
+        btn.innerHTML = `
+          <div class="text-[10px] font-mono text-amber-600">0${idx+1}</div>
+          <div class="font-medium text-xs truncate">${t.title}</div>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    function switchMode(mode) {
+      currentMode = mode;
+      const btnA = document.getElementById("btn-mode-a");
+      const btnB = document.getElementById("btn-mode-b");
+      const meta = document.getElementById("mode-meta");
+
+      if (mode === 'B') {
+        btnB.className = "px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-amber-500 text-white shadow-sm";
+        btnA.className = "px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100";
+        meta.textContent = "Step: 7/7 | 41 Clues | 85k Tokens";
+      } else {
+        btnA.className = "px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-amber-500 text-white shadow-sm";
+        btnB.className = "px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100";
+        meta.textContent = "Calls: 17/17 | 4 Clues + Mem | 193k Tokens (Partial)";
+      }
+
+      loadTheme(currentThemeIdx);
+    }
+
+    function loadTheme(idx) {
+      currentThemeIdx = idx;
+      renderThemeTabs();
+      const theme = THEMES[idx];
+      const data = currentMode === 'B' ? theme.dataB : theme.dataA;
+
+      document.getElementById("theme-counter").textContent = `${idx + 1} / ${THEMES.length}`;
+      document.getElementById("narrative-title").textContent = `【${theme.title}】模型真实叙事理解`;
+      document.getElementById("stance-badge").textContent = `认知姿态: ${data.stance}`;
+      document.getElementById("narrative-body").textContent = data.summary;
+
+      const docPills = document.getElementById("doc-pills");
+      docPills.innerHTML = "";
+      theme.docs.forEach(d => {
+        const span = document.createElement("span");
+        span.className = "px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300";
+        span.textContent = `${d.name} (${d.genre})`;
+        docPills.appendChild(span);
+      });
+
+      const clueList = document.getElementById("clue-list");
+      clueList.innerHTML = "";
+      document.getElementById("clue-count-badge").textContent = `${data.clues.length} 条模型线索`;
+
+      data.clues.forEach((c) => {
+        const item = document.createElement("div");
+        item.className = "p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition-all flex flex-col gap-1.5";
+        item.onclick = () => inspectClue(c);
+
+        const opBadgeClass = c.op === 'add' ? 'bg-emerald-500/10 text-emerald-600' :
+                             c.op === 'supplement' ? 'bg-blue-500/10 text-blue-600' :
+                             c.op === 'contrast' ? 'bg-purple-500/10 text-purple-600' : 'bg-gray-500/10 text-gray-600';
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between text-[11px]">
+            <div class="flex items-center gap-1.5 font-mono">
+              <span class="font-bold text-amber-600">${c.id}</span>
+              <span class="px-1.5 py-0.2 rounded uppercase ${opBadgeClass}">${c.op}</span>
+            </div>
+            <span class="text-slate-400 text-[10px] truncate max-w-[140px]">${c.source.title}</span>
+          </div>
+          <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">${c.text}</p>
+          <div class="text-[11px] text-slate-400 italic flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+            <span class="truncate">意义: ${c.significance}</span>
+            <span class="shrink-0 text-amber-600 hover:underline">查证来源 ↗</span>
+          </div>
+        `;
+        clueList.appendChild(item);
+      });
+
+      if (data.clues.length > 0) {
+        inspectClue(data.clues[0]);
+      }
+    }
+
+    function inspectClue(clue) {
+      currentClue = clue;
+      const s = clue.source;
+
+      document.getElementById("inspect-clue-id").textContent = clue.id;
+      document.getElementById("inspect-clue-text").textContent = `"${clue.text}"`;
+
+      const statusBadge = document.getElementById("inspect-status-badge");
+      if (s.status === 'resolved') {
+        statusBadge.textContent = "Verified RU (权威切片)";
+        statusBadge.className = "px-2 py-0.5 rounded text-xs font-mono bg-emerald-500/15 text-emerald-600 border border-emerald-500/20";
+        document.getElementById("inspect-ru-state").textContent = "已核准 (535k Manifest)";
+        document.getElementById("inspect-ru-state").className = "text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600";
+        document.getElementById("inspect-ru-hash").textContent = s.ru;
+      } else {
+        statusBadge.textContent = "Section Only (降级保护)";
+        statusBadge.className = "px-2 py-0.5 rounded text-xs font-mono bg-amber-500/15 text-amber-600 border border-amber-500/20";
+        document.getElementById("inspect-ru-state").textContent = "未切片单元·绝不伪造";
+        document.getElementById("inspect-ru-state").className = "text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600";
+        document.getElementById("inspect-ru-hash").textContent = "NULL (Fail-closed degraded to section " + s.sec + ")";
+      }
+
+      document.getElementById("inspect-section-id").textContent = s.sec;
+      document.getElementById("inspect-record-title").textContent = s.title;
+      document.getElementById("inspect-component-key").textContent = s.key;
+      document.getElementById("inspect-verbatim").textContent = s.quote;
+      document.getElementById("inspect-uncertainty-text").textContent = clue.uncertainty || "该记录为官方原始文献，无额外怀疑项。";
+    }
+
+    window.onload = init;
+  </script>
+
+</body>
+</html>
