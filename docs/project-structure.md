@@ -55,7 +55,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   it reuses E1 tools and SDK evidence helpers without creating active views.
   `navi_v_experiment.py` owns provider-free candidate V scheduling, delivery
   checkpoints, coverage and strict continuous-understanding updates;
-  `navi_v_research.py` is its bounded real-source recorded-decision replay entry.
+  `navi_v_research.py` is its bounded real-source recorded-decision replay entry;
+  `navi_v_live_research.py` owns opt-in live research loop execution;
+  `navi_v_expanded_research.py` owns multi-task progression and cross-task understanding runner.
   `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
   `model_interfaces_catalog.py` owns the programmatic catalog and consistency
   checks for active and historical AI model interfaces;

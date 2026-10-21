@@ -16,6 +16,7 @@ from genshin_corpus.retrieval.navi_reading import (
 from genshin_corpus.rag.navi_v_experiment import ReadingBudget, ReadingSession
 from genshin_corpus.rag.navi_v_research import HistoricalReplay
 from genshin_corpus.rag import navi_v_live_research as live_research
+from genshin_corpus.rag import navi_v_expanded_research as expanded_research
 
 FIXTURE = Path(__file__).parents[1] / "fixtures/retrieval/canonical-rag-w1-record.json"
 
@@ -1331,6 +1332,148 @@ class LiveResearchRepairTests(unittest.TestCase):
         self.assertIn("neither chosen_candidate_index nor chosen_unit_id was provided", rejection)
         self.assertIsNone(report["reading_and_understanding"]["chosen_hit"])
 
+
+class TestNaviVExpandedResearch(unittest.TestCase):
+    """Targeted tests for ExpandedResearchRunner and multi-task progression in navi_v_expanded_research."""
+
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.sources, self.records = make_sources(self.root)
+        self.catalog = build_release_catalog(listing(), source=self.sources.tools.canonical["source"],
+                                             locale=self.sources.tools.canonical["locale"])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_mock_client_cannot_be_marked_as_live_model_decisions(self):
+        client = MockClient({})
+        out = self.root / "run_expanded_mock_live_rejected"
+        with self.assertRaisesRegex(ExplorationError, "mock_client run must not be marked as live_model_decisions"):
+            expanded_research.run_expanded_experiment(
+                out, mock_client=client, sources=self.sources, catalog=self.catalog,
+                baseline_content_ids=("0", "2"), decision_mode="live_model_decisions"
+            )
+
+    def test_expanded_research_four_stage_closure_and_lane_return(self):
+        plan0 = self.sources.plan("mihoyo_obc:zh-cn:0")
+        uid0 = plan0["batches"][0]["units"][0]["unit_ids"][0]
+
+        hits = self.sources.search("next")["hits"]
+        hit = hits[0]
+        hit_uid = hit["unit_id"]
+
+        plan2 = self.sources.plan("mihoyo_obc:zh-cn:2")
+        uid2 = plan2["batches"][0]["units"][0]["unit_ids"][0]
+
+        client = MockClient({
+            "round_01": json.dumps({
+                "research_purpose": "任务0初读",
+                "clues": [{
+                    "clue_id": "clue_01",
+                    "text": "任务0初始事实",
+                    "source_unit_ids": [uid0],
+                    "source_genre": "official_duty_dialogue",
+                    "epistemic_status": "duty_testimony"
+                }],
+                "summary": "任务0总结",
+                "next_search": {"query": "next", "reason": "查找下一篇"}
+            }),
+            "round_02": json.dumps({
+                "research_purpose": "候选判定",
+                "evaluations": [],
+                "decision": {
+                    "action": "read",
+                    "chosen_candidate_index": 1,
+                    "chosen_unit_id": hit_uid,
+                    "selection_rationale": "选择候选1"
+                }
+            }),
+            "round_03": json.dumps({
+                "research_purpose": "旁支研读",
+                "clue_updates": [{
+                    "operation": "supplement",
+                    "target_clue_id": "clue_01",
+                    "reason": "补充信息",
+                    "clue": {
+                        "clue_id": "clue_02",
+                        "text": "旁支补充事实",
+                        "source_unit_ids": [hit_uid],
+                        "source_genre": "official_duty_dialogue",
+                        "epistemic_status": "duty_testimony"
+                    }
+                }],
+                "updated_summary": "旁支研读总结",
+                "unresolved_questions": []
+            }),
+            "round_04": json.dumps({
+                "research_purpose": "任务2跨任务研读",
+                "clue_updates": [{
+                    "operation": "contrast",
+                    "target_clue_id": "clue_01",
+                    "reason": "对比信息",
+                    "clue": {
+                        "clue_id": "clue_03",
+                        "text": "任务2对比事实",
+                        "source_unit_ids": [uid2],
+                        "source_genre": "official_duty_dialogue",
+                        "epistemic_status": "duty_testimony"
+                    }
+                }],
+                "updated_summary": "全景研究总结",
+                "unresolved_questions": []
+            }),
+        })
+
+        out = self.root / "run_expanded_success"
+        report = expanded_research.run_expanded_experiment(
+            out, mock_client=client, sources=self.sources, catalog=self.catalog, baseline_content_ids=("0", "2")
+        )
+
+        self.assertTrue(report["baseline_progression"]["version_progression_verified"])
+        self.assertEqual(report["baseline_progression"]["tasks_delivered_count"], 2)
+        self.assertTrue(report["lane_return"]["lane_return_verified"])
+        self.assertEqual(report["lane_return"]["related_delivered_count"], 1)
+        self.assertTrue(report["reading_and_understanding"]["closed_loop_verified"])
+        self.assertEqual(report["decision_mode"], "mock_model_decisions")
+        self.assertEqual(report["reading_and_understanding"]["cross_task_operations_count"], 2)
+        self.assertEqual(len(report["reading_and_understanding"]["active_clues"]), 3)
+        self.assertTrue(report["resume_verified"])
+
+    def test_expanded_candidate_selection_conflict_fails_closed(self):
+        plan0 = self.sources.plan("mihoyo_obc:zh-cn:0")
+        uid0 = plan0["batches"][0]["units"][0]["unit_ids"][0]
+        hits = self.sources.search("next")["hits"]
+        self.assertGreaterEqual(len(hits), 2)
+        hit1 = hits[0]
+        hit2 = hits[1]
+
+        client = MockClient({
+            "round_01": json.dumps({
+                "research_purpose": "任务0初读",
+                "clues": [{"clue_id": "clue_01", "text": "线索", "source_unit_ids": [uid0],
+                           "source_genre": "official_duty_dialogue", "epistemic_status": "duty_testimony"}],
+                "summary": "初读总结",
+                "next_search": {"query": "next", "reason": "测试"}
+            }),
+            "round_02": json.dumps({
+                "research_purpose": "候选判定",
+                "evaluations": [],
+                "decision": {
+                    "action": "read",
+                    "chosen_candidate_index": 1,
+                    "chosen_unit_id": hit2["unit_id"],  # Conflicting with index 1
+                    "selection_rationale": "冲突判定"
+                }
+            }),
+        })
+
+        out = self.root / "run_expanded_conflict"
+        report = expanded_research.run_expanded_experiment(
+            out, mock_client=client, sources=self.sources, catalog=self.catalog, baseline_content_ids=("0", "2")
+        )
+        self.assertFalse(report["reading_and_understanding"]["closed_loop_verified"])
+        self.assertIn("Candidate selection conflict", report["reading_and_understanding"]["rejection_reason"])
 
 
 if __name__ == "__main__":

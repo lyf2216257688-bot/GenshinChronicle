@@ -6,19 +6,21 @@ action. Detailed historical narratives and experiment checkpoints are owned by t
 respective research notes or historical registers (see [Documentation Router](#4-documentation-router));
 this document maintains the concise present state, operational baselines, and boundaries only.
 
-- **Current Checkpoint**: main@8681e21 plus candidate V commit (2026-10-20).
-- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Navi V prototype, tests, and documentation; no push authorized. Production enablement remains frozen.
+- **Current Checkpoint**: main@0f7323d plus candidate V expanded live research runner and tests (2026-10-21).
+- **Working Tree Baseline**: Operator authorized local commit for Phase 05 Navi V expanded live research prototype, tests, and documentation; no push authorized. Production enablement remains frozen.
 
 ---
 
 ## 1. Active Phase & Work Unit
 
 - **Active Phase**: **Phase 05 — Source-Bound Semantic Navigation** (Specification: [`docs/phases/phase-05-source-bound-semantic-navigation.md`](phases/phase-05-source-bound-semantic-navigation.md)).
-- **Active Work Unit**: **Phase 05 Navi Candidate V — offline mechanism verification COMPLETE; semantic acceptance OPEN** (2026-10-20):
+- **Active Work Unit**: **Phase 05 Navi Candidate V — Expanded live semantic research COMPLETE; review bundle PREPARED** (2026-10-21):
   - Implemented the source-version reading queue, Canonical layout body boundaries, full encountered-page unread inventory, separate delivery receipts, three-lane scheduling, and shared strict continuous-understanding history.
-  - Verified bounded Byakuyakoku recorded A/B replay and Caribert batching/recovery with E1 local BM25 and dynamic official RU mapping. Primary evidence: `data/retrieval/p05-navi-v-offline-20261020-r3/`. Targeted tests PASS; historical hashes unchanged; zero provider/network calls. First-hit material selection still exposes a documented gap; no new model autonomy or semantic acceptance is claimed.
-  - Architecture, operating points, evidence and remaining questions are owned by [candidate V research](research/phase-05/p05-navi-v-release-continuity-20261020.md). The prior two-tier/two-round/15,000-token recommendations are historical proposals, not adopted contracts.
-- **Immediate Next Action**: Review candidate V mechanism evidence and the remaining material-selection, question-management, and real revision-quality gaps in its research report. No paid test is requested by this completed work unit. Any later paid semantic test requires a concrete model/route/call/cost/stop plan and explicit fee approval. Production/default behavior below remains frozen; no push is authorized.
+  - Executed expanded live experiment `data/retrieval/p05-navi-v-live-deepseek-20261020-r5-expanded/` (4 calls, 36,602 tokens, 0.008663 RMB) across baseline tasks 3429 and 3428 and related branch 3508.
+  - Verified in live closed loop: (1) multi-task version queue automatic progression (`version_progression_verified: true`); (2) related lane exploration and return to baseline queue (`lane_return_verified: true`); (3) cross-task understanding and clue evolution (12 active clues, 8 operations: 6 supplement, 2 contrast, 0 rejections); (4) strict source qualification (`duty_testimony` / `official_duty_dialogue`) and 1:1 RU grounding; (5) soft budget accounting (< 0.01 RMB) and 10 sequential checkpoints with 100% resume equivalence.
+  - Packaged desktop evidence zip `p05-navi-v-live-expanded-evidence-20261020.zip` for independent ChatGPT audit. Fixed proxy streaming reasoning item ID check in `semantic_sdk_runner.py`.
+  - Architecture, operating points, evidence and remaining questions are owned by [candidate V research](research/phase-05/p05-navi-v-release-continuity-20261020.md).
+- **Immediate Next Action**: Review candidate V expanded live evidence bundle. Production/default behavior below remains frozen; no push is authorized.
 
 ### Autonomous Story Exploration Checkpoint (Run 3: `gpt-6-luna` 2026-10-16)
 

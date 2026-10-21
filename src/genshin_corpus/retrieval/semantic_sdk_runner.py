@@ -275,7 +275,8 @@ class _ResponsesDecisionText:
             if kind in {"response.output_item.added", "response.output_item.done"}:
                 snapshot = event.get("item")
                 require(isinstance(snapshot, Mapping), "missing item snapshot")
-                require(all(snapshot.get(k) == item.get(k) for k in ("id", "type", "role", "phase")),
+                fields = ("id", "type", "role", "phase") if item.get("type") == "message" else ("type", "role", "phase")
+                require(all(snapshot.get(k) == item.get(k) for k in fields),
                         "item identity/type/role/phase disagrees with terminal")
                 require(oi not in closed_items, "event after item done")
                 if kind == "response.output_item.added":
