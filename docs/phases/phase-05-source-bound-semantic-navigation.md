@@ -35,6 +35,20 @@ Semantic interpretation is not evidence authority. Raw, Parsed, Canonical,
 Retrieval Unit lineage, and the final Evidence Packet retain their existing
 authority boundaries.
 
+### Standalone offline Card/Link research
+
+Separately authorized bounded G1 research can use independent, versioned
+Canonical-managed reading Cards, cached source-only queries and dual-source
+Navi Links without implementing or adopting the shared hierarchy/KG build.
+True section/unit structure, explicit reading/omission accounting and exact
+program-extracted RU/Canonical quotations remain binding. A/B/C/D/U are
+navigation recommendations; model self-checks and separate targeted model
+reviews do not constitute curated/human acceptance or active-view eligibility.
+Secondary interpretation can guide reading but is not an independent history
+witness. Experimental fields/operating points belong to the scoped research
+note, not a mandatory global extraction schema. Current authorization and
+production status remain owned by `docs/current-phase.md`.
+
 ### Navi and KG semantic responsibility separation
 
 Rather than forcing both views to consume a monolithic, unverified model

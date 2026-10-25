@@ -64,6 +64,10 @@ the immediate next action are owned by `docs/current-phase.md`.
   `navi_r1_qa.py` owns the isolated follow-up candidate ledger, Canonical/RU
   snippet verification, method-blind source-ID review and offline quote/semantic
   review projections. It preserves R1 artifacts and creates no production view.
+  `navi_g1_experiment.py` owns the opt-in G1 offline Card/query/Hybrid/Link
+  loop, legacy reuse adapters, source-disjoint bounded validation, conservative
+  grade recommendations and targeted model checks. It writes inactive research
+  artifacts only; it is not an online RAG selector or full-corpus scheduler.
   `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
   `model_interfaces_catalog.py` owns the programmatic catalog and consistency
   checks for active and historical AI model interfaces;

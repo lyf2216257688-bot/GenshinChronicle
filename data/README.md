@@ -68,6 +68,15 @@ review owns the new candidate comparison. Exact quote binding, model semantics
 and human acceptance are separately recorded. No QA artifact changes R1 inputs,
 Canonical evidence, production retrieval or active semantic views.
 
+G1 offline navigation roots (`p05-navi-g1-*`) keep standalone versioned Cards
+and Links, real-section/unit inventories, batch reading receipts, cached
+source-only semantic queries, original-text Hybrid candidates, extracted exact
+Canonical/RU evidence, A/B/C/D/U recommendations, model/self/targeted reviews,
+and request/failure/hash ledgers. Reused legacy versions and new generations
+are counted separately. Earlier ten-case QA packets are calibration only.
+All G1 results remain inactive and human acceptance remains explicit; no
+artifact is a Canonical fact or independently accepted history witness.
+
 The E2 four-model Responses protocol evidence uses a separate immutable campaign
 root, `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`. Its
 authorization, per-model probe configs, issued attempts, raw error/SSE evidence,

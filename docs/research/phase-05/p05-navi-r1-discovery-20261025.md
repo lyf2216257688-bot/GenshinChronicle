@@ -5,6 +5,11 @@ Status: **COMPLETE as an experiment; semantic acceptance OPEN, production inacti
 when available, measured results. No production adoption or human semantic
 acceptance is implied.
 
+Historical checkpoint before G1. The lightweight offline Card/query/Hybrid/Link
+loop was subsequently implemented and boundedly validated in
+[G1](p05-navi-g1-offline-20261025.md); the measured R1 results below retain their
+original scope and do not establish current production authorization.
+
 ## Question and frozen design
 
 Test discovery of a hidden other source, separately from explaining a given

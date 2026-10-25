@@ -70,6 +70,14 @@ or experimental configurations as current production defaults.
 All E2 routes are defined in [`src/genshin_corpus/rag/navi_e2_routes.py`](file:///d:/GenshinChronicle/src/genshin_corpus/rag/navi_e2_routes.py) under `E2_ROUTES`.
 E2 requires the **OpenAI Responses API** streaming SSE surface (`api_surface='responses'`, endpoint path `/responses`).
 
+The separately authorized G1 offline research runner reuses the existing
+`deepseek-v4.1-flash` / `jizhi` Responses transport for source Cards, B dual-source
+propositions/self-checks and bounded targeted checks. It reuses the configured
+Qwen query embedding seam for new cached queries. G1 creates no new provider,
+credential slot, endpoint, production default or automatic fallback. Its
+authorization and bounded request/token safeguards are owned by current-phase
+and the G1 research note; R1/R1-QA historical cohorts remain immutable.
+
 | Logical Model (`model`) | Route Key (`route`) | Provider | Protocol Surface | Confirmed Base URL | API Key Env | Base URL Env | Surface Env | Current Lifecycle Status |
 |---|---|---|---|---|---|---|---|---|
 | `gpt-6-luna` | `tokenmetro` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` | `TOKENMETRO_BASE_URL` | `TOKENMETRO_API_SURFACE` | **e2_active_exploration** (Primary story exploration route; Run 1–3) |
