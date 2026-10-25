@@ -86,6 +86,26 @@ E2 requires the **OpenAI Responses API** streaming SSE surface (`api_surface='re
 
 ---
 
+### R1 isolated discovery comparison (2026-10-25)
+
+The separately authorized 2026-10-25 R1 discovery comparison is an isolated
+research consumer of the existing Bailian workspace Chat Completion transport
+and Qwen embedding seam. Its uniform generation model is `qwen3.8-max` and
+its separate reference/quality reviewer is `qwen3.7-plus-2026-05-26`, with
+research-specific output limits and traced persistent connections. It does
+not enable the retired shared semantic SDK or alter E2 Responses-only rules
+or production Generation settings. Protocols, partial model cohorts and
+uncertain-call quarantine are owned by the R1 research note and run artifacts.
+
+R1-QA is a separately authorized candidate-review consumer. After the operator
+reported Aliyun quota exhaustion, its partial Qwen cohort stopped. Subsequent
+review uses the existing `jizhi` / `deepseek-v4.1-flash` native Responses route
+and `JIZHI_API_KEY` / `JIZHI_BASE_URL` credential slots. The opt-in QA runner
+reuses SDK stream evidence with retries disabled, verifies exact streamed and
+terminal text, and keeps its narrow empty-metadata/JSON-envelope reconciliation
+as separate artifacts. It does not relax production/E2 parser policies or
+alter Phase04 Generation. UNKNOWN requests remain quarantined across QA cohorts.
+
 ### 2.3 Tier 3: Phase 05 Shared Semantic SDK Routes (Retired from Live Dispatch)
 
 Defined in [`src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py`](file:///d:/GenshinChronicle/src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py) and consumed by [`semantic_sdk_runner.py`](file:///d:/GenshinChronicle/src/genshin_corpus/retrieval/semantic_sdk_runner.py).

@@ -51,6 +51,23 @@ record delivery separately from interpretation; they are not formal citations
 or accepted semantic views. New runs use new directories, leaving historical
 A/B roots immutable.
 
+R1 Navi discovery comparison roots preserve frozen 128-document research
+scopes, evaluator-only reference proposals, independent source profiles,
+provider attempts/raw responses, derived experimental vectors and rankings,
+dual-source judgments, stability checks and cost accounting. Partial model
+cohorts remain separate from the complete-model cohort; execution-unknown paid
+requests are quarantined. Model review is not human semantic acceptance, and
+full raw-corpus retrieval does not imply full-corpus semantic production.
+
+The separate `p05-navi-r1-qa-20261025-r*` roots preserve source-pair discovery
+ledgers, legacy dispositions, hash-verified Canonical/RU snippets, blind review
+deliveries, raw model/stream outcomes, independent reconciliation projections,
+method comparisons and pending human review materials. Partial Qwen and later
+operator-requested jizhi DeepSeek cohorts remain distinct; the uniform DeepSeek
+review owns the new candidate comparison. Exact quote binding, model semantics
+and human acceptance are separately recorded. No QA artifact changes R1 inputs,
+Canonical evidence, production retrieval or active semantic views.
+
 The E2 four-model Responses protocol evidence uses a separate immutable campaign
 root, `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`. Its
 authorization, per-model probe configs, issued attempts, raw error/SSE evidence,

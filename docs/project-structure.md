@@ -58,6 +58,12 @@ the immediate next action are owned by `docs/current-phase.md`.
   `navi_v_research.py` is its bounded real-source recorded-decision replay entry;
   `navi_v_live_research.py` owns opt-in live research loop execution;
   `navi_v_expanded_research.py` owns multi-task progression and cross-task understanding runner.
+  `navi_r1_experiment.py` owns the isolated, opt-in R1 profile/discovery comparison,
+  immutable paid-attempt accounting and research-only analysis; it creates no
+  active semantic view and does not change production retrieval or generation.
+  `navi_r1_qa.py` owns the isolated follow-up candidate ledger, Canonical/RU
+  snippet verification, method-blind source-ID review and offline quote/semantic
+  review projections. It preserves R1 artifacts and creates no production view.
   `navi_e2_routes.py` owns explicit E2 model/route/credential-slot mappings;
   `model_interfaces_catalog.py` owns the programmatic catalog and consistency
   checks for active and historical AI model interfaces;
