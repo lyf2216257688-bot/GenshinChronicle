@@ -31,7 +31,34 @@ the immediate next action are owned by `docs/current-phase.md`.
   materialization, comparison, parity, and bounded research tooling.
   `navi_exploration.py` owns the local E1 search/source-read tools and explicit
   review-to-topic projection. `navi_reading.py` owns the opt-in candidate V
-  release catalog and source-layout body partitioning over verified artifacts. The
+  release catalog and source-layout body partitioning over verified artifacts.
+  `navi_f1_prepare.py` owns provider-free fresh-sample deterministic selection,
+  exact Canonical/RU packet binding, arm-input integrity and frozen-evidence replay;
+  it separates mechanical PASS from sample-independence dispositions and has no
+  model/embedding/publication seam.
+  `navi_f1_freshness.py` owns bounded full-rich-text exact/near-duplicate screening
+  with source locators; it does not classify semantic truth or certify story-family
+  independence. F1 source roles and family dispositions remain explicit agent review.
+  `navi_f2_preflight.py` owns isolated provider-free request construction, frozen
+  native/rc1 response validation, non-streaming wire/envelope replay, raw-first
+  create-only archival and parameterized budget arithmetic. It has no credential,
+  network client, sending loop or production adoption seam.
+  `navi_f2_c1.py` adds an isolated offline historical Responses stream projection,
+  unchanged-input streaming draft renderer, empirical usage proxies and budget
+  gate. It does not certify current provider capabilities or authorize dispatch.
+  `navi_f2_live_probe.py` is a retired/no-send entrypoint; its two prior attempts
+  remain historical evidence. `navi_f2_sdk_transport.py` owns the isolated F2
+  SDK/httpx single-case stream adapter, raw-body/event separation, explicit proxy
+  and fingerprint/resume checks. It does not start a campaign or authorize probes.
+  `navi_f2_execute.py` executes the 48 frozen base slots in order under explicit F2
+  authority and stops on transport/stream failures; original outputs remain inactive.
+  `navi_f2_instruction_diagnostic.py` isolates two user-authorized Responses input/
+  output-cap diagnostics and audits raw/SDK events and item identities separately.
+  `navi_g1_s1_audit.py` owns provider-free G1 evidence-packet preparation,
+  validation/freezing of separately agent-authored judgments, historical
+  comparison and input integrity. `navi_v02_contract.py` checks rc1 offline
+  proposition provenance, reading receipts and original-text retention after
+  schema validation. Both have no semantic classifier, provider or release seam. The
   existence of an experiment runner does not authorize its execution, and an
   adapter's existence does not establish the current default. It owns no UI
   lifecycle or Generation provider contract, is not a serving system, and does
