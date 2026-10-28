@@ -125,7 +125,8 @@ differences, full-source freshness evidence, 24-pair/48-source exact inputs,
 `navi-v02-fresh-1`. No historical-calibration block is known under bounded agent
 review; same-character references and within-F1 content dependence are disclosed.
 `retrieval/p05-navi-f1-replay-20261026-r2/` owns the separate 24-packet replay
-and post-seal checks. R1 and its PARTIAL findings are preserved. F2 is not authorized.
+and post-seal checks. R1 and its PARTIAL findings are preserved. At this historical
+checkpoint F2 was not authorized; current authority belongs to `docs/current-phase.md`.
 See [R2 report](../docs/research/phase-05/p05-navi-f1-r2-freeze-20261026.md).
 
 ### F2 offline preflight (2026-10-26)
@@ -186,3 +187,21 @@ instruction checks. These calls do not consume formal F2 slots. See the
 `retrieval/p05-navi-f2-metro-diagnostic-20261028-r1/` holds the separately
 authorized one-call TokenMetro comparison, HTTP 401 response and isolated audit;
 see the [TokenMetro report](../docs/research/phase-05/p05-navi-f2-tokenmetro-diagnostic-20261028.md).
+
+### F2 JSON-object recovery and 30k preparation (2026-10-28)
+
+The independent `p05-navi-f2-legacy-json-mode-20261028-r1/`,
+`p05-navi-f2-rc1-json-mode-20261028-r1/` and
+`p05-navi-f2-rc1-json-mode-30k-20261028-r1/` roots preserve the matched-pair
+diagnostic requests, raw responses, SDK events and observations. The separate
+`p05-navi-f2-json-mode-prepared-20261028-r1/` and
+`p05-navi-f2-json-mode-prepared-30k-20261028-r1/` roots contain unsent plans;
+they do not authorize dispatch. The original F2 failure and remaining slots
+stay separate. See the [recovery](../docs/research/phase-05/p05-navi-f2-json-mode-recovery-20261028.md)
+and [30k runner](../docs/research/phase-05/p05-navi-f2-json-mode-30k-and-runner-20261028.md) reports.
+
+These generated files remain Git-ignored. A per-file SHA-256
+[inventory](../docs/research/phase-05/p05-navi-f2-evidence-inventory-20261028.json)
+records the F1/F2/v0.2 local evidence copied from worktree `5d8c` to this main
+checkout; it is not a backup of file contents. Both copies are local to the same
+machine, so retain an independent backup before removing either checkout or data root.

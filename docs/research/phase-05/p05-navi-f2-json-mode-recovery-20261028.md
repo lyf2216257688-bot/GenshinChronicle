@@ -63,4 +63,4 @@
 
 不发布 Navi，不更改 Phase04/Embedding/KG，不自动重试 UNKNOWN，不提交或推送 Git。实际账单费用 UNKNOWN。
 
-**实务结论：** F2 旧/新版 Prompt 已找到共同可用的 Responses 输入包装；下一阶段重点是输出额度余量与正式执行器接入，而非继续大量重复短格式测试。
+**当时的实务结论：** F2 旧/新版 Prompt 已找到共同可用的 Responses 输入包装；后续 30k 单次验证和独立执行器准备见[后续报告](p05-navi-f2-json-mode-30k-and-runner-20261028.md)。
