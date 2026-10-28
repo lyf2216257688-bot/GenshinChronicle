@@ -58,6 +58,9 @@ the immediate next action are owned by `docs/current-phase.md`.
   separate unsent JSON-object plans. `navi_f2_json_mode_execute_v2.py` owns the
   isolated 30k plan's guarded executor and archived-content replay; its existence
   does not authorize dispatch or establish a completed batch.
+  `navi_f2_continue_46.py` is the separately authorized continuation for frozen
+  slots 3–48; it verifies earlier runs, permits bounded proven pre-header retries
+  within one run, and never auto-resumes an existing root.
   `navi_g1_s1_audit.py` owns provider-free G1 evidence-packet preparation,
   validation/freezing of separately agent-authored judgments, historical
   comparison and input integrity. `navi_v02_contract.py` checks rc1 offline

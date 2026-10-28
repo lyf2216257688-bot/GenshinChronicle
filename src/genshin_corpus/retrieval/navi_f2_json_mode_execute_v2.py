@@ -103,6 +103,8 @@ def execute_one(row, cap, key, evidence, legacy_validator, schema):
                 "mechanical_status": checked["mechanical_status"],
                 "full_stream_status": checked["full_stream_status"],
                 "protocol_warning": checked["protocol_warning"],
+                "reasoning_id_conflicts": checked["reasoning_id_conflicts"],
+                "validation": checked["validation"],
                 "output_token_headroom": checked["output_token_headroom"],
                 "near_output_limit": checked["near_output_limit"],
                 "message_sha256": checked["message_sha256"],
@@ -163,7 +165,7 @@ def main():
         print(json.dumps({"slot": index, "state": result["state"],
                           "mechanical": result.get("mechanical_status"),
                           "usage": result["usage"]}, ensure_ascii=False), flush=True)
-        if result["state"] not in ("CONTENT_VERIFIED", "CONTENT_VERIFIED_PROTOCOL_WARNING"):
+        if result["state"] != "CONTENT_VERIFIED" or result.get("full_stream_status") != "PASS":
             put(OUT / "STOP.json", {"slot": index, "state": result["state"],
                                    "remaining_not_sent": 48 - index,
                                    "no_retry": True, "fee": "UNKNOWN"})

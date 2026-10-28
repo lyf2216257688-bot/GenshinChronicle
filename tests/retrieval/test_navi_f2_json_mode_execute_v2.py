@@ -27,7 +27,6 @@ class JSONModeF2ExecuteTests(unittest.TestCase):
         self.assertEqual(self.manifest["state"], "PREPARED_NOT_AUTHORIZED")
         self.assertEqual(self.manifest["formal_model_requests_sent"], 0)
         self.assertEqual(self.manifest["max_output_tokens"], 30000)
-        self.assertFalse(run.OUT.exists())
         self.assertTrue(read(run.PLAN / "STOP.json")["no_auto_resume"])
         for r in rows:
             case = read(run.PRE / "requests" / (r["request_id"] + ".json"))
@@ -56,23 +55,54 @@ class JSONModeF2ExecuteTests(unittest.TestCase):
                 self.assertFalse(actual["reasoning_id_conflicts"])
 
     def test_guard_requires_explicit_batch_approval(self):
-        with patch("sys.argv", ["runner", "--execute-authorized"]):
+        with patch("sys.argv", ["runner", "--execute-authorized"]), \
+             patch.object(run, "execute_one") as execute:
             with self.assertRaisesRegex(ValueError, "approval"):
                 run.main()
-        self.assertFalse(run.OUT.exists())
+        execute.assert_not_called()
 
     def test_guard_rejects_partial_official_cohort(self):
         with patch("sys.argv", ["runner", "--execute-authorized",
-                                "--ack-new-f2-48-request-batch", "--max-requests", "1"]):
+                                "--ack-new-f2-48-request-batch", "--max-requests", "1"]), \
+             patch.object(run, "execute_one") as execute:
             with self.assertRaisesRegex(ValueError, "partial"):
                 run.main()
-        self.assertFalse(run.OUT.exists())
+        execute.assert_not_called()
+
+    def test_existing_output_root_blocks_resume(self):
+        with patch("sys.argv", ["runner", "--execute-authorized", "--ack-new-f2-48-request-batch"]), \
+             patch.object(run.Path, "exists", return_value=True), \
+             patch.object(run, "verify_plan", return_value={"records": [], "max_output_tokens": 30000, "provider": "fixture"}), \
+             patch.object(run, "execute_one") as execute:
+            with self.assertRaisesRegex(ValueError, "no replay or automatic resume"):
+                run.main()
+        execute.assert_not_called()
 
     def test_original_F2_failure_still_untouched(self):
         old = read(BASE / "p05-navi-f2-experiment-20261027-r1/STOP.json")
         self.assertEqual(old["slot"], 1)
         self.assertEqual(old["remaining_not_sent"], 47)
         self.assertFalse(old["automatic_retry"])
+
+    def test_protocol_warning_stops_before_next_slot(self):
+        manifest = {"records": [{"request_id": f"slot-{i}"} for i in range(48)],
+                    "max_output_tokens": 30000, "provider": "jizhi", "version": "test"}
+        written = []
+        with patch("sys.argv", ["runner", "--execute-authorized", "--ack-new-f2-48-request-batch"]), \
+             patch.object(run, "verify_plan", return_value=manifest), \
+             patch.object(run, "environment", return_value={"JIZHI_API_KEY": "fixture", "JIZHI_BASE_URL": run.c1.BASE_URL}), \
+             patch.object(run.Path, "exists", return_value=False), \
+             patch.object(run.Path, "mkdir"), \
+             patch.object(run, "sha", return_value="fixture"), \
+             patch.object(run, "read", return_value={}), \
+             patch.object(run.pre, "native_legacy_validator", return_value=None), \
+             patch.object(run, "put", side_effect=lambda path, obj: written.append((path, obj))), \
+             patch.object(run, "execute_one", return_value={"state": "CONTENT_VERIFIED_PROTOCOL_WARNING", "full_stream_status": "FAIL", "usage": {}}) as execute:
+            run.main()
+        self.assertEqual(execute.call_count, 1)
+        stop = next(obj for path, obj in written if path.name == "STOP.json")
+        self.assertEqual(stop["remaining_not_sent"], 47)
+        self.assertTrue(stop["no_retry"])
 
 
 if __name__ == "__main__":

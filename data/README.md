@@ -205,3 +205,24 @@ These generated files remain Git-ignored. A per-file SHA-256
 records the F1/F2/v0.2 local evidence copied from worktree `5d8c` to this main
 checkout; it is not a backup of file contents. Both copies are local to the same
 machine, so retain an independent backup before removing either checkout or data root.
+
+### F2 30k partial execution (2026-10-28)
+
+`retrieval/p05-navi-f2-json-mode-execution-20261028-r1/` contains the new
+48-slot run configuration, two attempted slots and stop record. The separate
+`retrieval/p05-navi-f2-json-mode-execution-audit-20261028-r1/` inventories the
+run files and all 48 dispositions after offline replay. It does not replace raw
+evidence. The run stopped at the rc1 Schema failure with 46 slots unsent; see
+the [execution report](../docs/research/phase-05/p05-navi-f2-formal-30k-partial-20261028.md).
+
+The independent `retrieval/p05-navi-f2-json-mode-continuation-46-20261028-r1/`
+records the separately authorized slot 3–48 continuation and its slot 3 pre-send
+TLS stop. `retrieval/p05-navi-f2-json-mode-continuation-audit-20261028-r1/`
+combines dispositions read-only over the unchanged 48-slot plan; it does not
+replace either raw run. See the [continuation report](../docs/research/phase-05/p05-navi-f2-continuation-46-20261028.md).
+
+`retrieval/p05-navi-f2-json-mode-continuation-retry-20261028-r1/` holds the
+subsequently authorized slots 3–48, each in an independent attempt directory.
+`retrieval/p05-navi-f2-48-final-audit-20261028-r1/` and corrected r2 hold the
+read-only 48-slot replay and accounting; r2 corrects the slot 2 attempt number.
+See the [execution report](../docs/research/phase-05/p05-navi-f2-48-execution-20261028.md).
