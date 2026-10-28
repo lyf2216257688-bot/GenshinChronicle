@@ -77,6 +77,18 @@ are counted separately. Earlier ten-case QA packets are calibration only.
 All G1 results remain inactive and human acceptance remains explicit; no
 artifact is a Canonical fact or independently accepted history witness.
 
+The separate G1-S1 roots (`p05-navi-g1-s1-*`) retain score-withheld evidence
+packets, exact snippet/RU checks, agent-authored and frozen proposition reviews,
+complete 48-pair historical comparisons, separate supplemental cases, reverse
+self-audits and static prompt/schema checks. They bind the unchanged G1 input
+inventory and do not regenerate Cards/Links or alter human/release states.
+Agent review is explicitly not human gold; rubric migration is not model accuracy.
+
+The independent `p05-navi-v02-finalization-*` roots preserve pre-edit document
+snapshots, unchanged G1/S1 inventories, conservative fresh-source exclusions,
+synthetic static-contract probes and verification records. They are preparation
+evidence, not a newly selected validation cohort or new model-generated Links.
+
 The E2 four-model Responses protocol evidence uses a separate immutable campaign
 root, `data/retrieval/p05-navi-e2-responses-four-model-20261015-r1/`. Its
 authorization, per-model probe configs, issued attempts, raw error/SSE evidence,
@@ -91,3 +103,86 @@ requests. Historical E2 r1-r4 and original protocol roots stay immutable.
 Experiment-specific, review-only, provider, or challenger evidence that is
 kept under `.local/` remains outside this data-root contract and must not be
 promoted to tracked data merely because it informs a later decision.
+
+### Navi F1 candidate evidence freeze (2026-10-26)
+
+`retrieval/p05-navi-f1-20261026-r1/` owns the independent candidate pool, exclusions,
+24-pair/48-source selection, exact Canonical/RU snapshots, shared source inputs,
+reviewer-only original candidates/probes and file-hash seal. Final independence
+status is PARTIAL (19 provisional, four blocked, one family review); this is not
+a complete 24-pair F2 input or a model experiment. Earlier checkpoints are retained;
+`independence-dispositions-final.json` and `f2-readiness.json` own final dispositions.
+`retrieval/p05-navi-f1-replay-20261026-r1/` owns the separate offline reconstruction
+comparison and post-seal verification, without writing back to the sealed r1 root.
+See [F1 report](../docs/research/phase-05/p05-navi-f1-freeze-20261026.md). No project
+model/Embedding inference, human acceptance or production release is authorized.
+
+### Navi F1-R2 repaired sample freeze (2026-10-26)
+
+`retrieval/p05-navi-f1-20261026-r2/` owns the expanded finite pool, R1-to-R2
+differences, full-source freshness evidence, 24-pair/48-source exact inputs,
+4+4 reviewer candidate registry and file-hash seal. User-confirmed seed is
+`navi-v02-fresh-1`. No historical-calibration block is known under bounded agent
+review; same-character references and within-F1 content dependence are disclosed.
+`retrieval/p05-navi-f1-replay-20261026-r2/` owns the separate 24-packet replay
+and post-seal checks. R1 and its PARTIAL findings are preserved. F2 is not authorized.
+See [R2 report](../docs/research/phase-05/p05-navi-f1-r2-freeze-20261026.md).
+
+### F2 offline preflight (2026-10-26)
+
+`retrieval/p05-navi-f2-preflight-20261026-r1/` owns 48 static base requests from
+sealed F1-R2, prompt/native validator/Schema snapshots, byte/token-proxy and
+price templates, optional-review slots, evaluation/failed-attempt protocols,
+synthetic-only replay evidence and the preflight seal. At that historical checkpoint
+readiness was BLOCKED on runtime/token/context/budget/review settings and authorization;
+current execution authority is owned by `docs/current-phase.md`.
+Synthetic examples and statuses are not actual F2 outputs or performance. No model
+or Embedding calls are authorized by this artifact. See [Preflight report](../docs/research/phase-05/p05-navi-f2-preflight-20261026.md).
+
+### F2-C1 runtime and budget preparation (2026-10-27)
+
+`retrieval/p05-navi-f2-c1-20261027-r1/` owns 48 unchanged-input streaming drafts,
+119 historical G1 stream replays, empirical token proxies, replaceable budget
+scenarios, the runtime draft, tests and a separate seal. Model/route selection is
+user-confirmed as jizhi / deepseek-v4.1-flash; at that historical checkpoint provider
+capabilities and F2 dispatch were unverified and unauthorized. No historical inputs
+are replaced. See [C1 report](../docs/research/phase-05/p05-navi-f2-c1-20261027.md).
+
+### F2 live probe (2026-10-27)
+
+`retrieval/p05-navi-f2-live-20261027-r1/` preserves the authorized neutral probe,
+its HTTP 403 access-denied response, the 48 base slots unsent at that checkpoint and
+integrity records.
+See the [blocked F2 report](../docs/research/phase-05/p05-navi-f2-live-20261027.md).
+`retrieval/p05-navi-f2-live-20261027-r2/` preserves the subsequent user-requested
+probe with an unresolved URLError and UNKNOWN execution state; see the
+[retry record](../docs/research/phase-05/p05-navi-f2-retry-20261027.md).
+`retrieval/p05-navi-f2-transport-audit-20261027-r1/` contains the subsequent
+provider-free client and proxy comparison; see the
+[transport audit](../docs/research/phase-05/p05-navi-f2-transport-audit-20261027.md).
+
+### F2 SDK communication repair (2026-10-27)
+
+`retrieval/p05-navi-f2-sdk-repair-20261027-r1/` owns the original urllib-code snapshot,
+48 full-adapter synthetic replays, relevant fixture logs, historical protection checks
+and one unauthenticated homepage GET response. Synthetic usage is not model usage;
+homepage200 does not establish authenticated Responses/30K capability. See the
+[SDK repair report](../docs/research/phase-05/p05-navi-f2-sdk-repair-20261027.md).
+
+### F2 first formal request (2026-10-28)
+
+`retrieval/p05-navi-f2-experiment-20261027-r1/` owns the authorized first
+frozen base request, raw stream, SDK events, stop record, 48-slot ledger and
+offline observation. One request was attempted; 47 remain unsent, and strict
+stream validation failed. See the [first-request report](../docs/research/phase-05/p05-navi-f2-first-request-20261028.md).
+
+### F2 instructions and output-cap diagnostic (2026-10-28)
+
+`retrieval/p05-navi-f2-instructions-diagnostic-20261028-r1/` owns two separately
+authorized neutral diagnostic requests, raw responses, SDK events and identity/
+instruction checks. These calls do not consume formal F2 slots. See the
+[diagnostic report](../docs/research/phase-05/p05-navi-f2-instructions-diagnostic-20261028.md).
+
+`retrieval/p05-navi-f2-metro-diagnostic-20261028-r1/` holds the separately
+authorized one-call TokenMetro comparison, HTTP 401 response and isolated audit;
+see the [TokenMetro report](../docs/research/phase-05/p05-navi-f2-tokenmetro-diagnostic-20261028.md).

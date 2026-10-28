@@ -1,0 +1,897 @@
+{
+  "$id": "urn:genshinchronicle:research:navi-b-v02-rc1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": [
+        "CANDIDATES",
+        "NO_FORMAL_NAVI",
+        "UNRESOLVED"
+      ]
+    },
+    "no_link_reason": {
+      "type": "string"
+    },
+    "propositions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "a_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "b_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "boundary": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "critical_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grade": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "U"
+            ]
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "increment_a_from_b": {
+            "type": "string"
+          },
+          "increment_b_from_a": {
+            "type": "string"
+          },
+          "navigation_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "relation": {
+            "enum": [
+              "direct_reference",
+              "background",
+              "contrast",
+              "literary_parallel",
+              "shared_mechanism",
+              "duplicate",
+              "gameplay_only",
+              "none"
+            ]
+          },
+          "release": {
+            "enum": [
+              "CATALOG_ONLY",
+              "ELIGIBLE_PENDING_RELEASE",
+              "EXCLUDED",
+              "REVIEW_REQUIRED",
+              "UNRESOLVED"
+            ]
+          },
+          "review_action": {
+            "enum": [
+              "PROPOSE",
+              "KEEP",
+              "REWRITE",
+              "REJECT",
+              "UNRESOLVED"
+            ]
+          },
+          "support": {
+            "enum": [
+              "EXPLICIT",
+              "GROUNDED_INTERPRETATION",
+              "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+              "UNDETERMINED",
+              "WEAK"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "role": {
+            "enum": [
+              "ORIGINAL_CORE",
+              "ORIGINAL_COMPONENT",
+              "SAFE_REPHRASING",
+              "NEW_DISCOVERY",
+              "COUNTERFACTUAL_GUARD"
+            ]
+          },
+          "evidence_gap": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "candidate_id",
+          "review_action",
+          "text",
+          "relation",
+          "a_ids",
+          "b_ids",
+          "support",
+          "increment_a_from_b",
+          "increment_b_from_a",
+          "boundary",
+          "grade",
+          "release",
+          "navigation_label",
+          "critical_error",
+          "reason",
+          "role",
+          "evidence_gap"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "B"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "navigation_label": {
+                  "const": "解释性联读 / 非确定史实"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "D"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "critical_error": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "enum": [
+                    "A",
+                    "B"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "a_ids": {
+                  "minItems": 1
+                },
+                "b_ids": {
+                  "minItems": 1
+                }
+              },
+              "anyOf": [
+                {
+                  "properties": {
+                    "increment_a_from_b": {
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "increment_b_from_a": {
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "A"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "support": {
+                  "const": "EXPLICIT"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "release": {
+                  "const": "ELIGIBLE_PENDING_RELEASE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "grade": {
+                  "enum": [
+                    "A",
+                    "B"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "D"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "support": {
+                  "const": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION"
+                },
+                "critical_error": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "release": {
+                  "enum": [
+                    "EXCLUDED",
+                    "REVIEW_REQUIRED"
+                  ]
+                }
+              },
+              "anyOf": [
+                {
+                  "properties": {
+                    "a_ids": {
+                      "minItems": 1
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "b_ids": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "U"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "support": {
+                  "const": "UNDETERMINED"
+                },
+                "evidence_gap": {
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "release": {
+                  "const": "UNRESOLVED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "support": {
+                  "const": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "grade": {
+                  "const": "D"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "support": {
+                  "const": "UNDETERMINED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "grade": {
+                  "const": "U"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "B"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "support": {
+                  "enum": [
+                    "EXPLICIT",
+                    "GROUNDED_INTERPRETATION"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "grade": {
+                  "const": "C"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "support": {
+                  "enum": [
+                    "EXPLICIT",
+                    "GROUNDED_INTERPRETATION",
+                    "WEAK"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "SAFE_REPHRASING"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "review_action": {
+                  "const": "REWRITE"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "NEW_DISCOVERY"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "candidate_id": {
+                  "type": "null"
+                },
+                "review_action": {
+                  "const": "PROPOSE"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "COUNTERFACTUAL_GUARD"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "review_action": {
+                  "const": "PROPOSE"
+                },
+                "release": {
+                  "enum": [
+                    "EXCLUDED",
+                    "UNRESOLVED"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "ORIGINAL_CORE",
+                    "ORIGINAL_COMPONENT"
+                  ]
+                },
+                "candidate_id": {
+                  "type": "string"
+                },
+                "grade": {
+                  "const": "D"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "review_action": {
+                  "const": "REJECT"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "ORIGINAL_CORE",
+                    "ORIGINAL_COMPONENT"
+                  ]
+                },
+                "candidate_id": {
+                  "type": "string"
+                },
+                "grade": {
+                  "const": "U"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "review_action": {
+                  "const": "UNRESOLVED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "ORIGINAL_CORE",
+                    "ORIGINAL_COMPONENT"
+                  ]
+                },
+                "candidate_id": {
+                  "type": "string"
+                },
+                "grade": {
+                  "enum": [
+                    "A",
+                    "B",
+                    "C"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "review_action": {
+                  "const": "KEEP"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "reading": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "additionalProperties": false,
+          "properties": {
+            "limitations": {
+              "type": "string"
+            },
+            "read_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "unread_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "read_ids",
+            "unread_ids",
+            "limitations"
+          ],
+          "type": "object"
+        },
+        "B": {
+          "additionalProperties": false,
+          "properties": {
+            "limitations": {
+              "type": "string"
+            },
+            "read_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "unread_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "read_ids",
+            "unread_ids",
+            "limitations"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "A",
+        "B"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "p05-navi-b-v0.2-rc1"
+    },
+    "source_roles": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attribution": {
+                "type": "string"
+              },
+              "basis": {
+                "type": "string"
+              },
+              "evidence_ids": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "role": {
+                "enum": [
+                  "game_text",
+                  "in_world_literature",
+                  "legend",
+                  "attributed_testimony",
+                  "editorial_compilation",
+                  "secondary_analysis",
+                  "gameplay_catalog",
+                  "mixed",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "role",
+              "basis",
+              "evidence_ids",
+              "attribution"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "B": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attribution": {
+                "type": "string"
+              },
+              "basis": {
+                "type": "string"
+              },
+              "evidence_ids": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "role": {
+                "enum": [
+                  "game_text",
+                  "in_world_literature",
+                  "legend",
+                  "attributed_testimony",
+                  "editorial_compilation",
+                  "secondary_analysis",
+                  "gameplay_catalog",
+                  "mixed",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "role",
+              "basis",
+              "evidence_ids",
+              "attribution"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "A",
+        "B"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "decision",
+    "reading",
+    "source_roles",
+    "propositions",
+    "no_link_reason"
+  ],
+  "title": "User-confirmed semantic principles; candidate model interface; static validation only",
+  "type": "object",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "propositions": {
+            "contains": {
+              "properties": {
+                "role": {
+                  "not": {
+                    "const": "COUNTERFACTUAL_GUARD"
+                  }
+                },
+                "release": {
+                  "const": "ELIGIBLE_PENDING_RELEASE"
+                }
+              },
+              "required": [
+                "role",
+                "release"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "CANDIDATES"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "propositions": {
+            "not": {
+              "contains": {
+                "properties": {
+                  "role": {
+                    "not": {
+                      "const": "COUNTERFACTUAL_GUARD"
+                    }
+                  },
+                  "release": {
+                    "const": "ELIGIBLE_PENDING_RELEASE"
+                  }
+                },
+                "required": [
+                  "role",
+                  "release"
+                ]
+              }
+            },
+            "contains": {
+              "properties": {
+                "role": {
+                  "not": {
+                    "const": "COUNTERFACTUAL_GUARD"
+                  }
+                },
+                "release": {
+                  "enum": [
+                    "REVIEW_REQUIRED",
+                    "UNRESOLVED"
+                  ]
+                }
+              },
+              "required": [
+                "role",
+                "release"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "UNRESOLVED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "propositions": {
+            "not": {
+              "anyOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "role": {
+                        "not": {
+                          "const": "COUNTERFACTUAL_GUARD"
+                        }
+                      },
+                      "release": {
+                        "const": "ELIGIBLE_PENDING_RELEASE"
+                      }
+                    },
+                    "required": [
+                      "role",
+                      "release"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "role": {
+                        "not": {
+                          "const": "COUNTERFACTUAL_GUARD"
+                        }
+                      },
+                      "release": {
+                        "enum": [
+                          "REVIEW_REQUIRED",
+                          "UNRESOLVED"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "role",
+                      "release"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "NO_FORMAL_NAVI"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "propositions": {
+            "maxItems": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "no_link_reason": {
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  ]
+}
