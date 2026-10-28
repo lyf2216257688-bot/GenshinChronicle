@@ -101,6 +101,16 @@ the immediate next action are owned by `docs/current-phase.md`.
 
 ## Data directories
 
+The opt-in local Qwen3 deployment uses persistent ignored resources in the
+primary checkout: `.local/models/qwen3-embedding-0.6b/<revision>/`,
+`.local/embedding-runtime/`, `.local/embedding-dependency-cache/` and
+`.local/embedding-tests/`. The last directory owns this separately authorized
+small verification index, measurements and installation evidence; it does not
+replace the production `data/retrieval/` ownership or any historical index.
+`retrieval/local_qwen3_embedding.py` owns the explicit offline encoder/index
+binding; `local_qwen3_validation.py` owns the bounded deployment CLI. The
+environment lock is `requirements-local-qwen3-embedding.txt`.
+
 - `data/raw/`: immutable local Raw evidence, including responses and auditable
   run metadata.
 - `data/parsed/`: generated Parsed run records and manifests derived from Raw;

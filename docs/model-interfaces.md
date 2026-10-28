@@ -48,6 +48,20 @@ or experimental configurations as current production defaults.
 
 ## 2. Canonical Model Interface Directory
 
+### Opt-in local embedding deployment (outside production serving)
+
+`genshin_corpus.retrieval.local_qwen3_embedding` loads official
+`Qwen/Qwen3-Embedding-0.6B`, revision
+`97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, entirely from local files.
+It has no provider endpoint, credential slot, remote fallback or production
+selector. The first contract fixes 1024 dimensions, FP32/L2 output, 2048-token
+right truncation, left padding and last-token pooling. Query text uses the
+official `Instruct: ...\nQuery:...` template; documents use exact RU text.
+CUDA FP16 and CPU FP32 have different identities and require distinct indexes.
+The pinned file manifest, repeatability tolerance and measured validation are
+owned by [the deployment report](research/phase-05/p05-local-qwen3-embedding-20261025.md).
+All production tiers below retain their existing defaults.
+
 ### 2.1 Tier 1: Phase 04 Production QA Serving Chain
 
 | Route Name | Logical Model | Model ID / Snapshot | Provider | Protocol Surface | Endpoint / Base URL | API Key Env | Status | Applicable Modules |
