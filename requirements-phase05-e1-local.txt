@@ -1,0 +1,9 @@
+# Opt-in Phase05 E1 only. Production has no dependency on this environment.
+# Install torch from https://download.pytorch.org/whl/cu118 separately.
+torch==2.7.1+cu118
+transformers==4.51.3
+numpy==2.2.6
+psutil==7.0.0
+huggingface-hub==0.30.2
+safetensors==0.5.3
+tokenizers==0.21.1
