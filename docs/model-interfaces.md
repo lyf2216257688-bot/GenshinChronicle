@@ -92,6 +92,32 @@ credential slot, endpoint, production default or automatic fallback. Its
 authorization and bounded request/token safeguards are owned by current-phase
 and the G1 research note; R1/R1-QA historical cohorts remain immutable.
 
+**Scoped Navi v0.3-rc1 capability audit (2026-10-28, offline):** the installed
+OpenAI SDK 3.19.2 forwards Responses `text.format` for both `json_object` and
+`json_schema/strict=true` through offline MockTransport. Official
+[Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs)
+distinguishes JSON syntax mode from Schema adherence; it does not certify a
+third-party proxy/model. The [historical Jizhi dual-route probe](research/phase-05/p05-navi-f2-dual-route-20261028.md)
+accepted strict Schema parameters, but does not prove enforcement. Final F2
+used JSON-object mode and retained JSON/Schema failures. Strict enforcement for
+`jizhi/deepseek-v4.1-flash` remains **UNKNOWN**. The frozen candidate construction module prepares unsent
+drafts only; both explicit formats require the same full local Schema/context
+validation, with no automatic fallback, retry or live capability probe. See the
+[candidate contract](research/phase-05/p05-navi-b-prompts-v03.md).
+
+The separately prepared `retrieval/navi_v03_runner.py` now provides opt-in
+single-request execution for that unchanged candidate, using explicit frozen
+plan acknowledgment, the existing jizhi Responses route, SDK/transport retries
+disabled and at most three independently proven pre-send attempts. Default
+operation remains offline. A separately authorized three-case `json_object`
+trial completed with HTTP 200, completed terminal events and full local content
+replay for all three requests; this confirms only those bounded requests, not
+general route reliability or semantic quality. Third-party enforcement of
+`json_schema/strict=true` remains UNKNOWN, and no standing future-call
+authorization follows from that trial. See the
+[execution-readiness audit](research/phase-05/p05-navi-v03-run-readiness-20261028.md)
+and [limited live acceptance report](research/phase-05/p05-navi-v03-limited-live-20261028.md).
+
 | Logical Model (`model`) | Route Key (`route`) | Provider | Protocol Surface | Confirmed Base URL | API Key Env | Base URL Env | Surface Env | Current Lifecycle Status |
 |---|---|---|---|---|---|---|---|---|
 | `gpt-6-luna` | `tokenmetro` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` | `TOKENMETRO_BASE_URL` | `TOKENMETRO_API_SURFACE` | **e2_active_exploration** (Primary story exploration route; Run 1–3) |
@@ -104,7 +130,7 @@ and the G1 research note; R1/R1-QA historical cohorts remain immutable.
 - **Base URL Verification**: `e2_route()` strictly validates the configured Base URL against the confirmed URL. Mismatched or non-HTTPS URLs refuse credential dispatch.
 - **Decision Text Parsing**: Uses `_ResponsesDecisionText` to check line/item/content identities, select the unique `item.phase=final_answer` message, isolate `commentary` messages, and fail closed on corrupt, ambiguous, or multi-answer payloads.
 - **Fail-Closed Policy**: Any stream error, identity conflict, or schema rejection sets `decision_complete=false` and stops execution immediately. Automatic retry, model switching, or fallback is strictly prohibited.
-- **Retry Rule**: Bounded application retry (at most 3 attempts on the exact same route and model) is permitted only for proven pre-generation TokenMetro TPM 429 errors. Uncertain execution is never retried.
+- **E2 Retry Rule**: Bounded E2 application retry (at most 3 attempts on the exact same route and model) is permitted only for proven pre-generation TokenMetro TPM 429 errors. Uncertain execution is never retried. The separate v0.3 recorder uses only the scoped, archived pre-send non-transmission policy described above; it does not change E2 policy.
 
 ---
 

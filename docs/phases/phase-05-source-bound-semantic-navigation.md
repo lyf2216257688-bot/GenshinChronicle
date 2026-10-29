@@ -49,6 +49,16 @@ witness. Experimental fields/operating points belong to the scoped research
 note, not a mandatory global extraction schema. Current authorization and
 production status remain owned by `docs/current-phase.md`.
 
+The prospective v0.3 Navi candidate targets concrete story connections across
+dispersed texts: locatable and mutually supporting evidence about characters,
+events or world settings. Shared imagery, metaphor or broad theme alone does
+not establish formal story navigation; neither shared names nor explicit
+cross-reference is mandatory. Relation discovery, semantic judgment and formal
+admission remain separate. Hidden-connection interpretations cannot certify
+authorial intent or historical fact. This scope does not retroactively regrade
+v0.2/F2 research. The bounded candidate contract is owned by
+[`p05-navi-b-prompts-v03.md`](../research/phase-05/p05-navi-b-prompts-v03.md).
+
 ### Navi and KG semantic responsibility separation
 
 Rather than forcing both views to consume a monolithic, unverified model

@@ -65,8 +65,19 @@ the immediate next action are owned by `docs/current-phase.md`.
   validation/freezing of separately agent-authored judgments, historical
   comparison and input integrity. `navi_v02_contract.py` checks rc1 offline
   proposition provenance, reading receipts and original-text retention after
-  schema validation. Both have no semantic classifier, provider or release seam. The
-  existence of an experiment runner does not authorize its execution, and an
+  schema validation. Both have no semantic classifier, provider or release seam.
+  `navi_prompt_candidate.py` owns the separate v0.3-rc1 offline candidate:
+  mode-specific model schemas, unsent Responses drafts, deterministic disposition/
+  Pair summaries and the prospective story-admission policy. It reuses complete
+  rc1 local invariants internally and has no dispatch, repair, publication or
+  default-runner adoption seam. Its small checked-in F2 regression fixture records
+  agent-authored judgments, not new model output or human semantic gold.
+  separate `navi_v03_runner.py` owns opt-in single-request execution preparation,
+  Canonical/RU-bound source snapshots, a persistent fingerprint reservation,
+  raw-first SDK archival, strict full-stream/content replay and at most three
+  independently proven pre-send attempts. Default CLI operation is offline;
+  it never sends via an old F2 Prompt renderer or automatically resumes a run.
+  The existence of an experiment runner does not authorize its execution, and an
   adapter's existence does not establish the current default. It owns no UI
   lifecycle or Generation provider contract, is not a serving system, and does
   not establish a permanent technology winner.

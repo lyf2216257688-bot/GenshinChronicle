@@ -1,5 +1,9 @@
 # B生成与定向审核Prompt v0.2草案
 
+历史范围说明（2026-10-28）：本页保留v0.2-rc1准备时的Prompt/Schema，不修改F2已执行
+合同或结果。下文“仅静态验证/未调用模型”描述当时检查点；后来的实测由F2报告拥有。
+新的前瞻性候选见[v0.3-rc1](p05-navi-b-prompts-v03.md)。
+
 状态：**语义原则已由用户确认；模型接口为rc1候选草案，仅静态验证，未接入runner或调用模型**。语义规则见
 [v0.2标准](p05-navi-semantic-standard-v02.md)，完整字段结构见
 [JSON Schema草案](p05-navi-b-v02.schema.json)。不改变G1 v0.1历史协议。

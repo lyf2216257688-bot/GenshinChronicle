@@ -1,0 +1,2852 @@
+{
+  "authority": "AGENT_AUTHORED_CONTRACT_REGRESSION_NOT_MODEL_OUTPUT_OR_HUMAN_GOLD",
+  "strict_blind_review": false,
+  "provider_calls": 0,
+  "distinct_f2_pairs": 6,
+  "notes": "Controlled assertion cases are NOT F2 model errors. New judgments never overwrite old grades/failures.",
+  "cases": [
+    {
+      "case_id": "specific_story_continuity",
+      "pair_id": "88d6d29f5017cfd5a644",
+      "mode": "generation",
+      "origin": "F2_EVIDENCE_AGENT_AUTHORED_REGRESSION",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/88d6d29f5017cfd5a644-rc1.json",
+      "source_request_sha256": "2007a88ef5d2dae615d2359f9c5b33aa73c846d5065f6b3df27c547f11320150",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/88d6d29f5017cfd5a644.json",
+      "source_delivery_sha256": "224bc357a5d7415def138ee8d0f9db14215c7e6a54f16b532188289bc38404bf",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 226,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 226,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "装备描述",
+              "text": "精炼(1/2/3/4/5)阶\n决心\n· 施放元素爆发后，提高(12%/15%/18%/21%/24%)攻击力和移动速度，持续15秒。\n可靠的钢剑，传说著名的「御剑公子」曾试图借助它飞天。"
+            },
+            {
+              "id": "A002",
+              "section": "装备描述",
+              "text": "无"
+            },
+            {
+              "id": "A003",
+              "section": "装备描述",
+              "text": "祈愿\n与庆云顶山npc判官儿对话获得"
+            },
+            {
+              "id": "A004",
+              "section": "相关故事",
+              "text": "剑术高超的御剑公子从绝云间顶一跃而下，\n不顾耳边狂啸的烈风，公子御剑穿透云层。\n直到断裂的声音顺着筋骨传入脑中——\n他才知道，有的事情剑术也无法实现。\n虽说当掉锃亮的钢剑，换了金创药丸。\n可御剑公子明白，飞天的伟大征程还未结束！"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "5"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "飞天御剑"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 236,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 236,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "装备描述",
+              "text": "精炼(1/2/3/4/5)阶\n勇气\n· 普通攻击和重击命中时，攻击力提高(6%/7%/8%/9%/10%)，持续6秒，最多叠加4层。该效果每0.5秒只能触发一次。\n可靠的大剑。传说著名的「御剑公子」曾试图借助它二度飞天。"
+            },
+            {
+              "id": "B002",
+              "section": "装备描述",
+              "text": "无"
+            },
+            {
+              "id": "B003",
+              "section": "装备描述",
+              "text": "宝箱、孤云阁附近拔出"
+            },
+            {
+              "id": "B004",
+              "section": "相关故事",
+              "text": "大受挫折的御剑公子明白剑术是无法实现一些事的，\n于是他从剑本身着手，而不盲信于自己的高超剑术。\n「大就是好。所以，剑越大越好。」他这么想道——\n在壮绝的孤云阁，公子迎来了壮绝的结局。\n飞天之旅终于告终，但他的剑与故事永远流传……？"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "5"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "飞天大御剑"
+        }
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 93,
+          "id": "f1:128:s1:u1:0-93",
+          "official_unit_ids": [
+            "c67fa4c231e7534b3edf70698946f11b36f771fa22d540fcecff291291ef4bfa"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "7ca50bd3897e81f0ca468541732a1911c488bce9e8eca6c6542d9ea9ae542782",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 1,
+          "id": "f1:128:s1:u2:0-1",
+          "official_unit_ids": [
+            "abce9b662eccceae765f75fdcf27f5ba921ed02c59da01953291d4e38e81e388"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 18,
+          "id": "f1:128:s1:u3:0-18",
+          "official_unit_ids": [
+            "a8d949ec4b0b4e4788346896a104523e7c5df168c3b3653143500504e336b890"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "27a03270eec8235dc8b9aaf7bdb69b0da6cf8b2e1e2a593871058391d20c9415",
+          "unit": 3
+        },
+        "A004": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 114,
+          "id": "f1:128:s3:u1:0-114",
+          "official_unit_ids": [
+            "4ce7af2b94d0c3d0b3dd8c57d67c5491fc036e3be30a3cdd54e478eb78c240e5"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 3,
+          "section_name": "相关故事",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "262a8b18ca81a2d240e121291f65bf78a378408bc2e63f4c64a558f92bc1bd40",
+          "unit": 1
+        },
+        "B001": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 110,
+          "id": "f1:220:s1:u1:0-110",
+          "official_unit_ids": [
+            "783a2a7e814b5ed5d24418b4a190a163b2c18dd3853cd1c3aedbbac75c3c2a56"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "9315437c9b5c80567311cc224537905fbabc55576945d4707d7f15bd84f3ec64",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 1,
+          "id": "f1:220:s1:u2:0-1",
+          "official_unit_ids": [
+            "2c196e79b0ddfd7d014c08c62517e672495dbf37d9997f0662f1fd9ac40c6923"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 10,
+          "id": "f1:220:s1:u3:0-10",
+          "official_unit_ids": [
+            "93f91e5a4474c673921a09a9440777908f69baf2c6b347146bc2a7e8cccf9040"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "5f3faaf1a6a1dd8a9882cfebc41e374610f4d6a87389cab47208cf9b6f9f250f",
+          "unit": 3
+        },
+        "B004": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 115,
+          "id": "f1:220:s3:u1:0-115",
+          "official_unit_ids": [
+            "bc5af1249b472366a65b39c1c4fc551cf49fe614eb0b5555a6db1b515adc8ba7"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 3,
+          "section_name": "相关故事",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "e87fdbda49fb06e722bb71934414622bf8675ccb228fcd662c3c78ae0ed00a94",
+          "unit": 1
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003",
+              "A004"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003",
+              "B004"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "legend",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A001",
+                "A004"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "legend",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B001",
+                "B004"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "两把剑的传说共同叙述御剑公子飞天受挫后改用大剑再次尝试，并在孤云阁结束飞天之旅的具体剧情连续性。",
+            "relation": "background",
+            "a_ids": [
+              "A001",
+              "A004"
+            ],
+            "b_ids": [
+              "B001",
+              "B004"
+            ],
+            "support": "EXPLICIT",
+            "increment_a_from_b": "从A的未结束征程读到B的改用大剑及旅程告终；不凭栏目顺序猜时间。",
+            "increment_b_from_a": "",
+            "boundary": "仅确认传说文本的连续叙述；不认证人物为史实，不增补具体伤情、死亡原因或制作组意图。",
+            "grade": "A",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "明确的二度、受挫后的转念和结局共同约束这一叙事链，不只是飞天主题相同。",
+            "story": {
+              "status": "CONCRETE_STORY",
+              "bridge": "A004受挫、当剑换药但征程未结束；B001二度飞天，B004由剑术转向剑本身并迎来结局，构成顺序与行为承接。"
+            }
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "CANDIDATES",
+        "releases": [
+          "ELIGIBLE_PENDING_RELEASE"
+        ]
+      }
+    },
+    {
+      "case_id": "literary_analogy_without_shared_plot",
+      "pair_id": "e302c6ce4d0aac15962c",
+      "mode": "generation",
+      "origin": "F2_EVIDENCE_AGENT_AUTHORED_REGRESSION",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/e302c6ce4d0aac15962c-rc1.json",
+      "source_request_sha256": "2009f1ab4c6ff1d1d62b57e3c5223ce31c6ee6dec303f2549f4cbb66ed3f5883",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/e302c6ce4d0aac15962c.json",
+      "source_delivery_sha256": "15580fc05671ce80f56326fa9db25ba6959bba822a6a59535df5486d23d1ef28",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 407,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 407,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "装备描述",
+              "text": "精炼(1/2/3/4/5)阶\n踏火息雷\n· 对处于火元素或雷元素影响下的敌人，造成的伤害提高(20%/24%/28%/32%/36%)。\n雕饰浮华的利刃，却丝毫不损它的柔韧与锋锐。破空之声有如龙吟。"
+            },
+            {
+              "id": "A002",
+              "section": "装备描述",
+              "text": "无"
+            },
+            {
+              "id": "A003",
+              "section": "装备描述",
+              "text": "祈愿"
+            },
+            {
+              "id": "A004",
+              "section": "相关故事",
+              "text": "在璃月坊间流传的宝刀。\n据说它的刀鞘以沉香为基，饰以云母，雕有战争传说的图景。\n价值连城的刀鞘已经遗失了。\n对于这把刀来说，刀鞘是禁锢它，不让它做应做之事的枷锁。\n锐利无比，据说被刺中的人要过一个时辰才会发现自己已死。\n传说昆吾仅花了一日一夜，便打成了这柄锐利的宝刀。\n但年迈的师父眼见高徒之作，却扼腕兴嗟，以杖击地。\n「惜哉，唯此物最欠慈悲」\n老人喟然长叹，蹒跚离去。\n于是，昆吾沉思三日，其间不触碰任何刀剑。\n又用一年的时光，精心雕琢出一个沉香木匣。\n年轻的昆吾自以为，这华丽的刀鞘定能约束不羁的宝刀。\n但后来，宝刀失入民间。锋刃犹在，刀鞘却化作了传说。\n锋利的刀永远渴求连天的血光。再好的匣也无法拘束它。"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "5"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "匣里龙吟"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 2015,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 2015,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "",
+              "text": "挪德卡莱：「秘谜书屋」店主：萨维特购买获得。"
+            },
+            {
+              "id": "B002",
+              "section": "",
+              "text": "始终在此地流传的，手持海螺发言的孩子们在空无一人的边陲荒地发生的故事，事到如今，已经没人知道最初的作者究竟是谁…"
+            },
+            {
+              "id": "B003",
+              "section": "第一卷",
+              "text": "「把手上的海螺交给我吧，这样我们也不会再为难你。」\n英俊的少年与他的随从们来到篝火边，如是说道，摆弄着手中的刀刃。\n空无一人的流放之地，这个在少年少女们窃窃私语被称为「边陲之陆」的地方——这是他们在此处的第三十个夜晚。\n曾用于劈砍树木，割开利草，撬开果实，排除异己的刀刃已经不复当初那样锋利，那些企图用力量支配他们的大人们甚至未将刀刃从鞘中拔出就已失去了呼吸。\n如今，连刀鞘都不知道被扔到什么地方去了。\n「你真的想要这只海螺？」\n手捧海螺的男孩是他们中个子最小的那个，「矮子」,他们这样称呼他。\n「是的。」\n「为什么？」\n「这还需要问为什么吗，」英俊的少年笑了，然后说，「这不是我们」定的规矩吗，矮子，谁拿到这个海螺，就有说话的权利。」\n是的，这是孩子们在篝火边的密约，为了抵抗那些将他们视作奴仆的大人。\n为了在这个荒芜的悲伤的地方，摆脱被流放之人的身份存活下去。\n于是孩子们决定在他们中推举一个人， 一个同样是孩童却能够带他们走出困境的人，一个与他们为伍却不畏惧力量的人，一个聪颖之人，那个人能够持有海螺井成为众少年少女们的领袖。\n那海螺是他们于白日海边的劳作间，偷偷自大人们视线的罅隙昧下的东西这 也证明那些大人们也有破绽。\n就像童年终结，总有知晓自己父辈并非全知全能的超人的时刻，对于般的孩 童来说， 这或许是种幻灭的到来，但是对于这里的少年们来说，却无益于是最好的消息。\n然后...\n理想的秩序并没有到来，或者说，少年少女心中尚未褪去的仍属于兽的残忍，在无人压制的情况下反而愈发泛滥——既然这份暴力能够推翻一切，那为何持有这份暴力的人不用它攫取一切？\n包括海螺... 或者在孩童们的密约里那个海螺代表的所有东西。\n「你觉得你能拥有这个海螺？」\n「我出了最大的力，也得到了最多，更何况，刀刃现在就在我的手中。」\n「然后你就会成为我们的主人。」\n「是的，我当然会成为你们的主人。」\n「就像当初那些大人那样？」\n「或许那样也没什么不好。」\n好吧... 似乎这样说着，矮小的男孩从篝火的焰光中站起，他背对篝火，没人看得清他的表情——\n但英俊的少年有种对方在笑的错觉，心中不知为何对于未来有种不确定的预感... 在今夜之前，他觉得一切犹如刀柄那般如此确切的握在手中。\n矮子将海螺递给他，转身走入密林。\n然后这夜之后，曾经持有海螺的男孩就像是消失了一般，再无人看到他的身影。"
+            },
+            {
+              "id": "B004",
+              "section": "",
+              "text": "挪德卡莱：「秘谜书屋」店主：萨维特购买获得。"
+            },
+            {
+              "id": "B005",
+              "section": "",
+              "text": "始终在此地流传的，手持海螺发言的孩子们在空无一人的边陲荒地发生的故事，事到如今，已经没人知道最初的作者究竟是谁…"
+            },
+            {
+              "id": "B006",
+              "section": "第二卷",
+              "text": "「你早就知道事情会变成这样... 」\n当戴着眼镜的少女将那身材短小的男孩寻回，而目光担忧的孩童们让开了一条道路。\n尽头，英俊的少年瘫坐在重物堆砌的座椅之上，苍青的皮肤让他的五官看上去更为立体，而双唇绛紫，招摇的焰光犹如被风吹拂的妖异面纱。\n身躯没有外伤的少年，他的手无力垂下，应该如斯垂下很久，甚至有了一些石膏刻像的僵硬。\n那把他曾引以为傲的刀刃就落在那里。\n没有一人拾取。\n「事情总是会变成这样，但没想到会这么快。」\n男孩捡起那把刀刃，那把刀刃很硬，其实在砍伐的过程中就已经有了不少崩口，卷刃。\n少年不会保养这份力量，可这力量是他唯的依仗，于是也不愿意让他人知道这把刀刃需要保养。\n他自然会变得多疑，睡眠短暂而浅淡，更容易动怒，害怕如大人们露出破绽的心思令他露出更多的破绽，结局自然会变成这样。\n其实大多数故事... 只是需要更多的耐心。\n「你从什么时候开始，就看到了这一幕？」\n「从他向我讨要海螺的时候吧。」\n「讨要海螺?」\n「海螺是什么？海螺什么都不是，只是我们在沙滩上捡到的玩具。他要么扔掉海螺，要么就扔掉那把残卷了的刀刃。一手拿海螺，一手还持着刀，挥刀的动作都会变得迟钝吧。」\n有一双手，那双手的主人捧着海螺，从少年与少女们之间走出，将海螺递到了男孩的身前。\n男孩看到海螺之下，那双手的手心里，有粗糙的草绳勒紧后留下的红痕。\n「那么你会怎么做呢？」戴着眼镜的少女问他。\n他接过海螺，想像画本故事那样吹响它，但如果不经过加工，吹出的气息经过海螺只会发出噗噗声，有点滑稽。\n然后他侧耳去听，海螺里传来海浪的潮涌。\n「我们要在这里建立属于我们的城镇，属于少年们和少女们的乐园。此后的海螺并不会独属于一人，所有人可以轮番举起它，说出任何想要说的话语，作出想要作出的发言。」\n「可是我们总会长大的，变成我们不想变成的大人。」\n「没关系，没关系的，因为这世上总有明天，也总有新的男孩和女孩,如果他们不喜欢变成大人的我们，也该亲手打破我们的世界。\n其貌不扬的男孩，身量短小的男孩，聪颖的男孩。\n他将卷曲了的刀刃扔进海浪里。\n他将海螺放在了众孩童的中间。"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "68"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "海螺的回响"
+        }
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "7a10e0b9eee2acb00e0abadaf5eb7741cc50cd3d1570dc3115967d78cc049614",
+          "end": 99,
+          "id": "f1:141:s1:u1:0-99",
+          "official_unit_ids": [
+            "30964bc18aab220c5e6fcb39690e5275f63f920ff19727548b86517aafb19938"
+          ],
+          "record_id": "dc4fef2c9cc775ed04c6872dafc99e5cd9c3b229f42a10dfe1a4dccbbe9531b6",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "141",
+          "start": 0,
+          "text_sha256": "9ccba4fb166adfb8e577fb3776671deb06ac6fffc2edec1b3c0e490b4e6d781e",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "7a10e0b9eee2acb00e0abadaf5eb7741cc50cd3d1570dc3115967d78cc049614",
+          "end": 1,
+          "id": "f1:141:s1:u2:0-1",
+          "official_unit_ids": [
+            "e4cbfb4c1dbf3629a27caa94d8bed6189e3c5ca9600c007f132512358e0dd36e"
+          ],
+          "record_id": "dc4fef2c9cc775ed04c6872dafc99e5cd9c3b229f42a10dfe1a4dccbbe9531b6",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "141",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "7a10e0b9eee2acb00e0abadaf5eb7741cc50cd3d1570dc3115967d78cc049614",
+          "end": 2,
+          "id": "f1:141:s1:u3:0-2",
+          "official_unit_ids": [
+            "8c39ecb6ef0e3b18206742cfe7fd32feff8a76a36bc20fe0f7c7d3b75ef36b89"
+          ],
+          "record_id": "dc4fef2c9cc775ed04c6872dafc99e5cd9c3b229f42a10dfe1a4dccbbe9531b6",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "141",
+          "start": 0,
+          "text_sha256": "c8b8f5fc7da8b91ddf407db5c3d868e74e0701c6a3b4f6b190e3c92d6cc6376b",
+          "unit": 3
+        },
+        "A004": {
+          "canonical_sha256": "7a10e0b9eee2acb00e0abadaf5eb7741cc50cd3d1570dc3115967d78cc049614",
+          "end": 305,
+          "id": "f1:141:s3:u1:0-305",
+          "official_unit_ids": [
+            "4704c9fbf806ab026044f38f051632692c486072f8209ca71e0b91341e4350ad"
+          ],
+          "record_id": "dc4fef2c9cc775ed04c6872dafc99e5cd9c3b229f42a10dfe1a4dccbbe9531b6",
+          "section": 3,
+          "section_name": "相关故事",
+          "source": "141",
+          "start": 0,
+          "text_sha256": "9df44a71a7048ff5f62e8a0c5d27616922532852126c9228c439acf74ae14b01",
+          "unit": 1
+        },
+        "B001": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 22,
+          "id": "f1:506360:s0:u1:0-22",
+          "official_unit_ids": [
+            "56bb6764084d621e7b04b657ddabbee46c72f06ae0b38ba07b45abf7898fb640"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 0,
+          "section_name": "",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "1f4f2cfe3798b0fa01f50602a7c080bf3242b750592c91287a69197799622783",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 56,
+          "id": "f1:506360:s0:u2:0-56",
+          "official_unit_ids": [
+            "739327bfdd0db5c82239a0853d6ea44b3015eb92e6f268603979cb00b32927fb"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 0,
+          "section_name": "",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "1cd322c1217142b77cecebdfed021ef1d4d3289e454f32b2985712c288387be2",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 985,
+          "id": "f1:506360:s1:u1:0-985",
+          "official_unit_ids": [
+            "4b31077d8283f004edf495113dd001efbe1a78c0ffa964329b001e1c065d3afe"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 1,
+          "section_name": "第一卷",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "2a44a83d117f89f40c2c383d61f32d09e71ba5ee0e79e2637c204aa90b8a843a",
+          "unit": 1
+        },
+        "B004": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 22,
+          "id": "f1:506360:s2:u1:0-22",
+          "official_unit_ids": [
+            "3509e91120e5595dc4cfa40ce47e19279935c5190d8784e5562064ab14989958"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 2,
+          "section_name": "",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "1f4f2cfe3798b0fa01f50602a7c080bf3242b750592c91287a69197799622783",
+          "unit": 1
+        },
+        "B005": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 56,
+          "id": "f1:506360:s2:u2:0-56",
+          "official_unit_ids": [
+            "94710afef446435d27288bec70ed5780052334c37a6bf4d6a97fd107a830f684"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 2,
+          "section_name": "",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "1cd322c1217142b77cecebdfed021ef1d4d3289e454f32b2985712c288387be2",
+          "unit": 2
+        },
+        "B006": {
+          "canonical_sha256": "6443976544c89a1c3c1912d22c9da4e915f63ad00fbfcf2cd9f0ebce836af74c",
+          "end": 874,
+          "id": "f1:506360:s3:u1:0-874",
+          "official_unit_ids": [
+            "a26d7493b52d9b275fe9f6e5a25df3d43394b4e05dfb482d2e718da18d110f2f"
+          ],
+          "record_id": "f30bfe03056f9476cee89a494b137a6f152952e89eaeb2b355f36a149b61ea16",
+          "section": 3,
+          "section_name": "第二卷",
+          "source": "506360",
+          "start": 0,
+          "text_sha256": "60a31234269ecfe040b8aedeea66d86a3d2264a50ab3482dcaf3bc1a4b854b78",
+          "unit": 1
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003",
+              "A004"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003",
+              "B004",
+              "B005",
+              "B006"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "legend",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A004"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "in_world_literature",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B003",
+                "B006"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "匣里龙吟与海螺的回响可对照刀刃与约束、力量与秩序的文学结构，但本次证据未建立共同人物、事件或设定的剧情联系。",
+            "relation": "literary_parallel",
+            "a_ids": [
+              "A004"
+            ],
+            "b_ids": [
+              "B003",
+              "B006"
+            ],
+            "support": "GROUNDED_INTERPRETATION",
+            "increment_a_from_b": "可比较外部约束失效与主动放弃暴力的文本差异；仅文学理解增量。",
+            "increment_b_from_a": "",
+            "boundary": "不认定B的刀为昆吾宝刀、不建立传播路径、同一历史或作者互文意图。",
+            "grade": "B",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "具体场景可支撑受限文学解读，却没有相互支持的共同剧情桥梁；文学B不自动通过剧情准入。",
+            "story": {
+              "status": "LITERARY_ONLY",
+              "bridge": "A为昆吾铸刀制匣未能约束宝刀；B为孩子夺海螺、掌刀支配他人及扔刀重建秩序。对应停留于约束暴力的文学类比。"
+            }
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "NO_FORMAL_NAVI",
+        "releases": [
+          "EXCLUDED"
+        ]
+      }
+    },
+    {
+      "case_id": "unsupported_identity",
+      "pair_id": "86af3984da074e972678",
+      "mode": "review",
+      "origin": "CONTROLLED_ASSERTIONS_ON_F2_EVIDENCE",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/86af3984da074e972678-rc1.json",
+      "source_request_sha256": "38af66329ce2b3e0bde65e86300389c3af4943c4eacd3def0e12427061a340d6",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/86af3984da074e972678.json",
+      "source_delivery_sha256": "7d0a8eeedd35c5bbfbe4cdbb62860f80f83a95f392fc0c3019538d12f9432cad",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 153,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 153,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "任务过程",
+              "text": "艾伦正陷入危险。消灭魔物，解救艾伦。\n消灭区域中的魔物后与艾伦对话。"
+            },
+            {
+              "id": "A002",
+              "section": "任务奖励",
+              "text": "摩拉\n好感经验\n精锻用矿物\n*1000~1200\n*10~15\n*良矿1~2"
+            },
+            {
+              "id": "A003",
+              "section": "剧情对话",
+              "text": "消灭魔物，解救艾伦。\n消灭区域中的魔物后与艾伦对话。\n艾伦：旅行者，谢谢你救了我。\n艾伦：没想到在这里会被魔物袭击。\n艾伦：多亏遇见你了，这些给你，就当做谢礼吧。"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "55"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "艾伦的困境"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 266,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 266,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "任务概述",
+              "text": "艾伦·史密西，菲谢尔的作者"
+            },
+            {
+              "id": "B002",
+              "section": "任务概述",
+              "text": "常九爷"
+            },
+            {
+              "id": "B003",
+              "section": "任务概述",
+              "text": "常九爷"
+            },
+            {
+              "id": "B004",
+              "section": "任务概述",
+              "text": "无"
+            },
+            {
+              "id": "B005",
+              "section": "任务过程",
+              "text": "在知晓了九老师的秘密后，现在该把藏起来的稿费带给常九爷了…\n与常九爷对话"
+            },
+            {
+              "id": "B006",
+              "section": "任务奖励",
+              "text": "摩拉*50000"
+            },
+            {
+              "id": "B007",
+              "section": "剧情对话",
+              "text": "与常九爷对话\n常九爷：开始幻想了，幻想我是九老师。这种文章，九老师会怎么写…\n派蒙：常九爷，这个给你。\n常九爷：嗯，什么东西？\n常九爷：怎么这么多钱！\n派蒙：这个，呃，那个。就是…对！九老师很欣赏你，所以决定资助你的写作事业！\n常九爷：什么乱七八糟的。不过我发现了。我的天，幻想自己是九老师真的有用！\n不过常九爷觉得钱财皆下品，唯有写书高。他很随意地把钱丢在一边，继续幻想了。\n你们继续走上了回蒙德的路…"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "43"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "艾伦·史密西，菲谢尔的作者·尾声"
+        },
+        "candidates": [
+          {
+            "id": "control-identity",
+            "text": "获救的艾伦就是艾伦·史密西，任务确认了这位作者的身份。",
+            "role": "ORIGINAL_CORE",
+            "text_sha256": "1b71436b2a5adef83e9145df395ee4b54a7a54f87a10c3b734df34eb3bed284b"
+          }
+        ]
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "54446b7d6f0d58b7769050f3e4ee6ceb9e13b3530deb6479ffef1894d9508df7",
+          "end": 34,
+          "id": "f1:3211:s2:u1:0-34",
+          "official_unit_ids": [
+            "84178115f41baf7c1bee56ee629e41121aafb808d19c70080fb997fc83943dde"
+          ],
+          "record_id": "e6ec69db28fa6589827f539dd1b1b57a504a2b242166ff79c00ac6c24c66219e",
+          "section": 2,
+          "section_name": "任务过程",
+          "source": "3211",
+          "start": 0,
+          "text_sha256": "5958d1bda75b7b078154c30386a6aaa71c4bd7bde506a0e04d87c5cb331111a4",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "54446b7d6f0d58b7769050f3e4ee6ceb9e13b3530deb6479ffef1894d9508df7",
+          "end": 38,
+          "id": "f1:3211:s4:u1:0-38",
+          "official_unit_ids": [
+            "4a61f3cb7f3f5dc81a77d0b1dbe4a8646270d16299eda445e53f5d6f8abb7120"
+          ],
+          "record_id": "e6ec69db28fa6589827f539dd1b1b57a504a2b242166ff79c00ac6c24c66219e",
+          "section": 4,
+          "section_name": "任务奖励",
+          "source": "3211",
+          "start": 0,
+          "text_sha256": "c7e6af4aec6dc5b47882b7ecfc433852df1687fc49f87ecd52033dd466667331",
+          "unit": 1
+        },
+        "A003": {
+          "canonical_sha256": "54446b7d6f0d58b7769050f3e4ee6ceb9e13b3530deb6479ffef1894d9508df7",
+          "end": 81,
+          "id": "f1:3211:s7:u1:0-81",
+          "official_unit_ids": [
+            "9fbbcf29e04d018bf5c4fd2be8f00695e92824fcab16501d10b2d05bdab1de4b"
+          ],
+          "record_id": "e6ec69db28fa6589827f539dd1b1b57a504a2b242166ff79c00ac6c24c66219e",
+          "section": 7,
+          "section_name": "剧情对话",
+          "source": "3211",
+          "start": 0,
+          "text_sha256": "c5cc50e931e74d441ab2fba7a408599216680b0b476a886841c1efa2d62a3f0a",
+          "unit": 1
+        },
+        "B001": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 13,
+          "id": "f1:507426:s1:u1:0-13",
+          "official_unit_ids": [
+            "354f89466c13c4d92a9868b598309a8f3bffd47b407ddfffc1be2c53595777b1"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 1,
+          "section_name": "任务概述",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "696aa4b47c5c80482bd04f4a0343a08b318457bf2fb7063d2a693fbea6cec6f9",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 3,
+          "id": "f1:507426:s1:u2:0-3",
+          "official_unit_ids": [
+            "40b2d17a5692cca29f711276b566f673e1170bd25e3d8411e624998b0b954b02"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 1,
+          "section_name": "任务概述",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "52224a80435e59f3c15923b1102e8aadccd2f760be0809d266713c56c8641b7f",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 3,
+          "id": "f1:507426:s1:u3:0-3",
+          "official_unit_ids": [
+            "7aee0cbf0ae4138cb115c3567ae692e50fdd54669c2609dd3879ce329964d65c"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 1,
+          "section_name": "任务概述",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "52224a80435e59f3c15923b1102e8aadccd2f760be0809d266713c56c8641b7f",
+          "unit": 3
+        },
+        "B004": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 1,
+          "id": "f1:507426:s1:u4:0-1",
+          "official_unit_ids": [
+            "11e8fdb29d8650d073d55cc5e0a17f78e0fddc7aef1e74607fb779afbcb84749"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 1,
+          "section_name": "任务概述",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 4
+        },
+        "B005": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 36,
+          "id": "f1:507426:s2:u1:0-36",
+          "official_unit_ids": [
+            "1a9c2b32c5ee690feffb4ea84981f0c667deaa8f105ba183be8ebfdf12cfcced"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 2,
+          "section_name": "任务过程",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "835a106c3b4d320427da88ebc35ad1cfd6515bbb27a12c1c0f7f45c5f4037553",
+          "unit": 1
+        },
+        "B006": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 8,
+          "id": "f1:507426:s3:u1:0-8",
+          "official_unit_ids": [
+            "4cc92b79938a709306066f5d3a3754872f119eefbe90b904a0e618e62ff403b4"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 3,
+          "section_name": "任务奖励",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "3e93b93ffcb8e6db4ef42d7bf657067fed6d9b0efad098a62d796383f17e8d25",
+          "unit": 1
+        },
+        "B007": {
+          "canonical_sha256": "caf9b0108284c02342ccd3438f11a45f85e3c22f2419781fe3068de29e794190",
+          "end": 202,
+          "id": "f1:507426:s7:u1:0-202",
+          "official_unit_ids": [
+            "90b744659874cb4118467064be9a528ac56ddd624167e5b13c404935e8af938b"
+          ],
+          "record_id": "b6ba9cbdeb657ca5842575b9eb28e8cc43ca5ff5007c5bb67920d2e923b7252f",
+          "section": 7,
+          "section_name": "剧情对话",
+          "source": "507426",
+          "start": 0,
+          "text_sha256": "ca3a01e2eb6836d30c131fd5a3a26ab22ecbd4479368d76453a3be24af760384",
+          "unit": 1
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003",
+              "B004",
+              "B005",
+              "B006",
+              "B007"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "attributed_testimony",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A001",
+                "A003"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "mixed",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B001",
+                "B007"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "获救的艾伦就是艾伦·史密西，任务确认了这位作者的身份。",
+            "relation": "none",
+            "a_ids": [
+              "A001",
+              "A003"
+            ],
+            "b_ids": [
+              "B001",
+              "B007"
+            ],
+            "support": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "不以材料中无身份说明证明二者必定不同。",
+            "grade": "D",
+            "critical_error": "无依据地确定两个来源角色同一。",
+            "evidence_gap": "",
+            "reason": "把部分名字相同写成已确认身份，没有对应证据。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "A只给被救者艾伦，B标题及常九爷写作段没有建立二者身份桥梁。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "control-identity"
+          },
+          {
+            "text": "艾伦与标题中的艾伦·史密西是否同一身份，现有交付无法判断。",
+            "relation": "none",
+            "a_ids": [
+              "A003"
+            ],
+            "b_ids": [
+              "B001"
+            ],
+            "support": "UNDETERMINED",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "不调用记忆或用关键词未命中证明不同人。",
+            "grade": "U",
+            "critical_error": null,
+            "evidence_gap": "缺明确身份描述或足以对应两人的独特经历。",
+            "reason": "仅提出待查问题，不确认身份。",
+            "story": {
+              "status": "UNKNOWN",
+              "bridge": "同名是待查线索，缺少身份对应材料。"
+            },
+            "role": "NEW_DISCOVERY",
+            "candidate_id": null
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "UNRESOLVED",
+        "releases": [
+          "EXCLUDED",
+          "UNRESOLVED"
+        ]
+      }
+    },
+    {
+      "case_id": "specific_literary_dispute",
+      "pair_id": "61e8836684affbf10194",
+      "mode": "review",
+      "origin": "F2_EVIDENCE_AGENT_AUTHORED_REGRESSION",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/61e8836684affbf10194-rc1.json",
+      "source_request_sha256": "9860e4ccc866078de571575864759cc36c4364ff9506b66910f3f1193d5c681b",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/61e8836684affbf10194.json",
+      "source_delivery_sha256": "1a0fac4d9a292531bf198f09ed98860d5c01f9ba0fdb3dfb04171fa1c015fde7",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 822,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 822,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "基础信息",
+              "text": "3星/4星"
+            },
+            {
+              "id": "A002",
+              "section": "基础信息",
+              "text": "霜凝的机枢：霜凝的机枢～ IV概率掉落；\n缘觉塔：七识Ⅰ～ Ⅳ 概率掉落；\n岩中幽谷：机巢Ⅰ～ Ⅳ 概率掉落；\n芬德尼尔之顶：告死之霜Ⅰ～ Ⅳ 概率掉落；\n华池岩岫：岩牢Ⅰ～ Ⅲ 概率掉落；\n虹灵的净土：茹焰的炼场Ⅰ～ Ⅳ 概率掉落。"
+            },
+            {
+              "id": "A003",
+              "section": "基础信息",
+              "text": "元素战技造成的伤害提升20%。"
+            },
+            {
+              "id": "A004",
+              "section": "基础信息",
+              "text": "打倒敌人时，有100%概率清除元素战技的冷却时间。该效果每15秒至多触发一次。"
+            },
+            {
+              "id": "A005",
+              "section": "生之花",
+              "text": "华丽的大花朵，其中能藏得下自己事前准备好的骰子。"
+            },
+            {
+              "id": "A006",
+              "section": "生之花",
+              "text": "好赌之徒常常喜爱炫耀财富，尽管财富来之也快，去之也易。\n她将硕大华丽的异国花朵戴在耳边，闪烁的灯光下无比显眼。\n但没人知道的是，做过手脚的骰子正精妙地藏身在花托里面。\n只有在赌徒救急的时刻，才会用魔术般的障眼法从花里取出，\n在众目睽睽下，调换赌局中的骰子，为自己创造致胜的良机。"
+            },
+            {
+              "id": "A007",
+              "section": "死之羽",
+              "text": "大型鸟的尾羽，其中能藏得下能逆天改命的牌。"
+            },
+            {
+              "id": "A008",
+              "section": "死之羽",
+              "text": "好赌之徒的帽饰是浮夸的彩色羽毛，真正的贵族对这等媚俗摇头生厌。\n但自以为是的贵胄之裔眼中只有表象，却无法看见巨鸟翎羽内藏玄机。\n静待赌局决胜的关键时刻，赌徒以神偷般的手法亮出隐藏许久的王牌。\n之前尚且高高在上的面孔、轻蔑不已的眼光，全部在这一刻骤然凝固。"
+            },
+            {
+              "id": "A009",
+              "section": "时之沙",
+              "text": "破碎的怀表，曾经为它的主人挡下了致命的攻击。"
+            },
+            {
+              "id": "A010",
+              "section": "时之沙",
+              "text": "好赌之徒必须精准地把握时机，才能将欺诈招数发挥完美。\n出于这个原因，她常年将一枚金色的怀表藏在胸前口袋里，\n在无数次豪赌中，总有一次，对于时间的敏感救她了一命。"
+            },
+            {
+              "id": "A011",
+              "section": "空之杯",
+              "text": "是特制的、单一用途的容器，但其中并没有欺诈用的机关。"
+            },
+            {
+              "id": "A012",
+              "section": "空之杯",
+              "text": "好赌之徒多少有些迷信，对客制骰盅情有独钟。\n这是她定制的骰盅，其中却未安排任何的机关。\n赌徒之运一半在天一半在人。\n赌局外的天地则从不看点数。"
+            },
+            {
+              "id": "A013",
+              "section": "理之冠",
+              "text": "能让人冷静评估局势与风险，避免危机的翠蓝耳环。"
+            },
+            {
+              "id": "A014",
+              "section": "理之冠",
+              "text": "好赌之徒往往佩戴夸张的首饰，用来纪念朝得暮失的财富。\n湛蓝的宝石散发出令人安心的光泽，如同晴空与湖面一般。\n赌徒在耳坠上涂了催人冷静的秘药，因而总能在赌局上安之若素。\n在生死攸关的对局中，多一分冷静理智，也便多了一丝得胜希望。"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "218"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "赌徒"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 840,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 840,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "基础信息",
+              "text": "3星/4星"
+            },
+            {
+              "id": "B002",
+              "section": "基础信息",
+              "text": "褪色的剧场：变奏Ⅰ～ Ⅳ 概率掉落；\n熔铁的孤塞：遗世边垒Ⅰ～ Ⅳ 概率掉落；\n华池岩岫：岩牢Ⅰ～ Ⅲ 概率掉落；\n荒废砌造坞：深火的构筑Ⅰ～ Ⅳ 概率掉落 。\n蒙德城蒂玛乌斯【炼金学者】处可获得二星学士【仅此一个】。"
+            },
+            {
+              "id": "B003",
+              "section": "基础信息",
+              "text": "元素充能效率提高20%。"
+            },
+            {
+              "id": "B004",
+              "section": "基础信息",
+              "text": "获得元素微粒或元素晶球时，队伍中所有弓箭和法器角色额外恢复3点元素能量。该效果每3秒只能触发一次。"
+            },
+            {
+              "id": "B005",
+              "section": "生之花",
+              "text": "用来充当书签的干花，吸满了书卷的香气。"
+            },
+            {
+              "id": "B006",
+              "section": "生之花",
+              "text": "在埋首书海的生活中，象牙塔内的学士罕有见识鲜花的机会。\n为了排解书斋中的孤独，仰慕学士的少年带来了异域的花朵。\n学士精心收藏了这份心意，将它风干，在厚厚的书页间夹紧。\n从此以后，在学士如山的灰暗书卷中，多了一抹惊艳的色彩。"
+            },
+            {
+              "id": "B007",
+              "section": "死之羽",
+              "text": "做书写工具的某种鸟类尾羽，根部已经被浸成洗不去的黑。"
+            },
+            {
+              "id": "B008",
+              "section": "死之羽",
+              "text": "学士的羽毛笔，由异域飞鸟的尾羽制成。\n由于笔耕不辍，已被染成了庄严的黑色。\n多年以来，学士从未更换过手中已染黑的羽笔。\n正如久历战场的土兵，羽笔是她最趁手的武器。"
+            },
+            {
+              "id": "B009",
+              "section": "时之沙",
+              "text": "适合放在桌面上的小钟，对久不见天日的学者来说是唯一的时间参考吧。"
+            },
+            {
+              "id": "B010",
+              "section": "时之沙",
+              "text": "小巧精致的座钟，被精心摆放在学士书桌上不易被碰掉的位置。\n埋首书斋的学士常年不见天日，对于时间的感触如同盲人观物。\n这小巧的座钟在学术的苦行中指引方向，让学士得以规划前路。\n当智慧最终降临这间书斋，学士消耗的长久时光终究不会白费。"
+            },
+            {
+              "id": "B011",
+              "section": "空之杯",
+              "text": "原本是饮水用的容器，因为常用来洗笔而被染黑。"
+            },
+            {
+              "id": "B012",
+              "section": "空之杯",
+              "text": "学士书桌上雅致的茶杯，以轻薄的陶瓷制成，勾勒着鎏金的花边。\n与书斋内杂乱的景象格格不入，似乎足以表明她的家世并不简单。\n但孤高的学士却从不在乎这茶杯的美感与用途，将羽笔浸入其中。\n她仅将它当成了清洗笔头的小小墨池，任之被墨汁染得漆黑丑陋。"
+            },
+            {
+              "id": "B013",
+              "section": "理之冠",
+              "text": "大量的阅读会伤害读者的视力；为了弥补这样的损伤，而定制的道具。"
+            },
+            {
+              "id": "B014",
+              "section": "理之冠",
+              "text": "学术是代价昂贵的赌局，即使投入一生，也可能无所得。\n学士在无尽的笔记与检索、计算与注解中度过半生的时日，\n又因失败与裹足不前消耗了大好的光阴。\n曾经敏锐的视力如今已被频繁阅读损害，\n但最终答案来临的时刻依然是遥遥无期。"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "218"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "学士"
+        },
+        "candidates": [
+          {
+            "id": "c-bf5e5f0769eb",
+            "role": "ORIGINAL_CORE",
+            "text": "学士把学术写成可能耗尽一生而无所得的赌局，赌徒则用藏骰与暗牌影响结果；两文可对读投入、控制与不确定结果，不能据此确认同一人物或作者互引。",
+            "text_sha256": "747a1aff115c7f651780edbb4748b5f4bb67434b81717d02e43ca608b9e2fbb8"
+          }
+        ]
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 5,
+          "id": "f1:1598:s0:u1:0-5",
+          "official_unit_ids": [
+            "4254ae7c4298dc177b5d89d4eb970152e25a0e30c4ed9b45830e317c2f2db7a4"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "ca60421c37b07a71c5fd8a7998b19834113c1c7e49762cbe10b42a1a75af993a",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 117,
+          "id": "f1:1598:s0:u2:0-117",
+          "official_unit_ids": [
+            "ad521ae70e20142cd26fedcbe0f3748b1cda810614408acb5f248611fc5c35aa"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "927624809a16927177f74c1417e4f2af58ed6565afbd84afa30f9aa7d258b64c",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 15,
+          "id": "f1:1598:s0:u3:0-15",
+          "official_unit_ids": [
+            "42313ac14105b683dc677b38527dea4891ebc3bc654ed70af9303cdd0a8ca18e"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "45326f50a028cc06725598f123dd5541d74b9610a015860109fab00d5630a5cc",
+          "unit": 3
+        },
+        "A004": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 39,
+          "id": "f1:1598:s0:u4:0-39",
+          "official_unit_ids": [
+            "d5e83fec0ce11944112a0ff5ecaae55c435aa6be1a1d1cd439f4369b933c39d5"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "18c91556c63cc85abe74b450a4594091008df1d086dbde2c35bcd76e396ad320",
+          "unit": 4
+        },
+        "A005": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 24,
+          "id": "f1:1598:s1:u1:0-24",
+          "official_unit_ids": [
+            "faa01fe09af456c41382fe6c9b16ee230ff4e62bc555cd55095d83d8aa9c9986"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 1,
+          "section_name": "生之花",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "bc1c335e3631a648c12fe10cd4ee6a75a01baef890645b52975a97f20b07483a",
+          "unit": 1
+        },
+        "A006": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 139,
+          "id": "f1:1598:s1:u2:0-139",
+          "official_unit_ids": [
+            "04b95e3fa7943cc1be595c3958afffc75e14d67709574696fc0b424322b14547"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 1,
+          "section_name": "生之花",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "4a7a3ef9b62354105520830886c32aaf6b745820d3fef5bf65d1089c244421b6",
+          "unit": 2
+        },
+        "A007": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 21,
+          "id": "f1:1598:s2:u1:0-21",
+          "official_unit_ids": [
+            "a3f35c20304a29c35e62fc94f7751c9d845471a8fd46e0b0ec3d3370ebce6c8f"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 2,
+          "section_name": "死之羽",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "4db4c9e681db35a045fbdf071e5a3f300831568a9be486eb22be39cfaaf1bacb",
+          "unit": 1
+        },
+        "A008": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 127,
+          "id": "f1:1598:s2:u2:0-127",
+          "official_unit_ids": [
+            "c6c3a991757ac5dede72aa7a17fa5bc00a4a8d93e3592a63de313992e56ebb03"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 2,
+          "section_name": "死之羽",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "b4e7a1c7c3b1f91261822a14369458d1530ee23bfd467109dfb6bd8572144ffb",
+          "unit": 2
+        },
+        "A009": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 22,
+          "id": "f1:1598:s3:u1:0-22",
+          "official_unit_ids": [
+            "9095cf44c33529d41c70f6a78aa876736486edd003aef3d12bbd92f40e4a133c"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 3,
+          "section_name": "时之沙",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "cfbd0750e63ce7780a9dd04011ea8301246afed6e2f4cc64f0415c8a741ea58e",
+          "unit": 1
+        },
+        "A010": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 80,
+          "id": "f1:1598:s3:u2:0-80",
+          "official_unit_ids": [
+            "1adf26c9fa10452dbe38d754be97587fd67a4b335fa12feaf5e78685ec3d710a"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 3,
+          "section_name": "时之沙",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "220aff8ba5ae5fc80089dcd81ff72622536b94b9a4e51e53a79b7970d8c46df0",
+          "unit": 2
+        },
+        "A011": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 26,
+          "id": "f1:1598:s4:u1:0-26",
+          "official_unit_ids": [
+            "daf34e9b9e1ff098cd8f4356a0529b1a5991a06b4a1da72166f0dd8ea907ed0a"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 4,
+          "section_name": "空之杯",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "a3ad9ac4965669b5a3a00959ced8eb2671089208b1546ef7b7a3eff806d2b3e2",
+          "unit": 1
+        },
+        "A012": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 71,
+          "id": "f1:1598:s4:u2:0-71",
+          "official_unit_ids": [
+            "7676f25d7a1599b895beab9cd01257aec2402a68d85d08308fa48e572cd09812"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 4,
+          "section_name": "空之杯",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "efb9707955c106c32731917361e54eb4c522caee15b5a72e1030987e56a6ee8c",
+          "unit": 2
+        },
+        "A013": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 23,
+          "id": "f1:1598:s5:u1:0-23",
+          "official_unit_ids": [
+            "1586a2bc6cdcbeb9ccbbea756678f8664bcef0e359c815f9201ea7da821aad6a"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 5,
+          "section_name": "理之冠",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "15f9783b5c4883bbeb7904bea87a5e084b61e43d4b167f243aec76c741791a14",
+          "unit": 1
+        },
+        "A014": {
+          "canonical_sha256": "4ea07f132d840a773857f61c67b00ee6b716234625d81c296a48c12b1021834e",
+          "end": 113,
+          "id": "f1:1598:s5:u2:0-113",
+          "official_unit_ids": [
+            "5445f2aad7b5f3c29e2221ed43bafc694dc7f7c864a623b40e2223ff96720c1f"
+          ],
+          "record_id": "d2a005fa170f8976bcdcc789ecab72d91a40d8b0079e04ec80a2a75018cb101b",
+          "section": 5,
+          "section_name": "理之冠",
+          "source": "1598",
+          "start": 0,
+          "text_sha256": "fdf664b345d881f4c326f1e4e5df915ac07b9a462cf66d03ab98133d6f0a6d98",
+          "unit": 2
+        },
+        "B001": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 5,
+          "id": "f1:1599:s0:u1:0-5",
+          "official_unit_ids": [
+            "859ba20027ba6a0247003e53e76f21632824282583f1847470200a0d2d0f1e00"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "ca60421c37b07a71c5fd8a7998b19834113c1c7e49762cbe10b42a1a75af993a",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 109,
+          "id": "f1:1599:s0:u2:0-109",
+          "official_unit_ids": [
+            "a306cc98b2ef9470bd596440b65e031e4bf66ebbb063920f54ed930c236d0b23"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "213e02c4485cddbd126c7bc489b53c6db72f6381e004357e81586afe011b1442",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 12,
+          "id": "f1:1599:s0:u3:0-12",
+          "official_unit_ids": [
+            "c2bb0e98bdb90daa2d039a9ff30087cf6b6cf10cf954ba053040f48b028299af"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "b899310450a0ccb9a70238cfd731b9a0cf96017ec1cb67b5a89ccba5bf990eef",
+          "unit": 3
+        },
+        "B004": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 49,
+          "id": "f1:1599:s0:u4:0-49",
+          "official_unit_ids": [
+            "5bf7b08752a933ec6eb6e7150f28e49f9e32902a64ff156e24d258f2c1cec394"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 0,
+          "section_name": "基础信息",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "125d7a6a287fd880574fdf4a6536612179a04ec923ba1dbef9daf01a378f2559",
+          "unit": 4
+        },
+        "B005": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 19,
+          "id": "f1:1599:s1:u1:0-19",
+          "official_unit_ids": [
+            "7c14fd99d5d77b3883e46466ed64edc4d8942be8a4dafebe8d2111fa5f70fcdb"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 1,
+          "section_name": "生之花",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "b7e92f3b5c40c0c2b74ac2b83a7ab735ae593d155bb23cea9e6ebbbf64ba0354",
+          "unit": 1
+        },
+        "B006": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 111,
+          "id": "f1:1599:s1:u2:0-111",
+          "official_unit_ids": [
+            "4de9fc6cf9e6836cdbec2da8a5e25c5b46bbd2d20dae67bbb539c822ea80106a"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 1,
+          "section_name": "生之花",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "50a3528f19c8af5a26aaaccf9eb7313feb954aa77e6c32bd2145c5c8620b5551",
+          "unit": 2
+        },
+        "B007": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 26,
+          "id": "f1:1599:s2:u1:0-26",
+          "official_unit_ids": [
+            "83d9d98059d99cd6bfeeca7dd18ccb5413b30987a736337eb4c494fe523f8d22"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 2,
+          "section_name": "死之羽",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "e04b91122812ddb1df9feadf6ae3db5a75bcdddbc972a8fa41f67c7ccf41f424",
+          "unit": 1
+        },
+        "B008": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 81,
+          "id": "f1:1599:s2:u2:0-81",
+          "official_unit_ids": [
+            "82060f01b072ec7574a52f969fd80ebc37ab44df17ac7d04fbe404b68eb804c5"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 2,
+          "section_name": "死之羽",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "bb4c2aec37e8018ccf6342639250740d4eaaea7e57e7a84f98b7106e2a356e5b",
+          "unit": 2
+        },
+        "B009": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 32,
+          "id": "f1:1599:s3:u1:0-32",
+          "official_unit_ids": [
+            "f5b8bf6d8cbb15089f7d0b5358734c06f39f45759d82b6ae5aa5fe9532d2136a"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 3,
+          "section_name": "时之沙",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "1fdaa5365b340e2892bac486d2d31f00e10f48521e999c02dd1df3f0f7378000",
+          "unit": 1
+        },
+        "B010": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 115,
+          "id": "f1:1599:s3:u2:0-115",
+          "official_unit_ids": [
+            "3af50dbae44cdcb5c65d082c084418d53e1b7c550771da618d24f4dfe9983daf"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 3,
+          "section_name": "时之沙",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "cb526608a8a77d58685919b6f2bbfb5802520b6d91e22174d709661af4c22d0e",
+          "unit": 2
+        },
+        "B011": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 22,
+          "id": "f1:1599:s4:u1:0-22",
+          "official_unit_ids": [
+            "efc72fb84bd88129860ca674fdf76d9a4281aa4c4e152caeb0d7dbea96566e0b"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 4,
+          "section_name": "空之杯",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "60af413b14ee9e2c70a9e7c7ca1737a3e5a84a3ccf44245fcf390645c33394d5",
+          "unit": 1
+        },
+        "B012": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 119,
+          "id": "f1:1599:s4:u2:0-119",
+          "official_unit_ids": [
+            "a6b37ac36cbb6d9e2529c60c79aadbb4ee855d885cfca8e3d0ec85aac8df7baf"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 4,
+          "section_name": "空之杯",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "66c378884ef52a7eb7e5bfba4c1245286483243fbf61d0f84fbcc5012d706f99",
+          "unit": 2
+        },
+        "B013": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 31,
+          "id": "f1:1599:s5:u1:0-31",
+          "official_unit_ids": [
+            "d2887253e67e9f44f6a090133b4043c6f7e463940fc5c17649032d1969547b37"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 5,
+          "section_name": "理之冠",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "9aca3feaf90b208fcabaf9979ba9760c270109b8fc081a493bb7ae25a6fb39bc",
+          "unit": 1
+        },
+        "B014": {
+          "canonical_sha256": "0ef13ea8ee7d0b894640d60c7f09e5828063737e2b929aa1a31832ab3ae8b9b3",
+          "end": 109,
+          "id": "f1:1599:s5:u2:0-109",
+          "official_unit_ids": [
+            "f9ad3cf4823d0123f520bcf98d0e22ac5ed2c8980cbc0c502a0ad6a19f8f56ea"
+          ],
+          "record_id": "d43175d7c3c07f55f57b7b7566504821b2022437e4e98d20106ffb32f5c76761",
+          "section": 5,
+          "section_name": "理之冠",
+          "source": "1599",
+          "start": 0,
+          "text_sha256": "d4c1ce2523bf70d631ceb12930967cfa89ff589e4e25275a74afbd54ed941579",
+          "unit": 2
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003",
+              "A004",
+              "A005",
+              "A006",
+              "A007",
+              "A008",
+              "A009",
+              "A010",
+              "A011",
+              "A012",
+              "A013",
+              "A014"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003",
+              "B004",
+              "B005",
+              "B006",
+              "B007",
+              "B008",
+              "B009",
+              "B010",
+              "B011",
+              "B012",
+              "B013",
+              "B014"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "game_text",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A006",
+                "A008",
+                "A012"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "game_text",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B014"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "学士把学术写成可能耗尽一生而无所得的赌局，赌徒则用藏骰与暗牌影响结果；两文可对读投入、控制与不确定结果，不能据此确认同一人物或作者互引。",
+            "relation": "literary_parallel",
+            "a_ids": [
+              "A006",
+              "A008",
+              "A012"
+            ],
+            "b_ids": [
+              "B014"
+            ],
+            "support": "GROUNDED_INTERPRETATION",
+            "increment_a_from_b": "对读学术长期投入与赌局操控仍不能控制一切的差别，仅文学增量。",
+            "increment_b_from_a": "",
+            "boundary": "不证明人物同一、作者互引或共同事件；B文学等级本身也不是人工金标准。",
+            "grade": "B",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "保留v0.2可讨论的具体文学价值，但新版本正式剧情导航所需的桥梁不足。",
+            "story": {
+              "status": "LITERARY_ONLY",
+              "bridge": "学术被称为赌局，赌徒藏骰与暗牌操控结果；这约束控制与不确定性的类比，未连接两人的剧情。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "c-bf5e5f0769eb"
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "NO_FORMAL_NAVI",
+        "releases": [
+          "EXCLUDED"
+        ]
+      }
+    },
+    {
+      "case_id": "authorship_error_cannot_be_washed",
+      "pair_id": "969259382c23f509389d",
+      "mode": "review",
+      "origin": "F2_EVIDENCE_AGENT_AUTHORED_REGRESSION",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/969259382c23f509389d-rc1.json",
+      "source_request_sha256": "9c437741b5789aad392f89b102103354377177f5d06dcae514452fc49b1413fc",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/969259382c23f509389d.json",
+      "source_delivery_sha256": "627d1868e0e9994a9c1da388e8c40bfa9fec298085b6c8f9b3d81a46047d238c",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 1143,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 1143,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "",
+              "text": "八重堂购买"
+            },
+            {
+              "id": "A002",
+              "section": "",
+              "text": "新锐轻小说《哈玛瓦兰战记》的前言，由于经营调整而单独成为一册！"
+            },
+            {
+              "id": "A003",
+              "section": "",
+              "text": "普尔希娜"
+            },
+            {
+              "id": "A004",
+              "section": "哈玛瓦兰战记·前言",
+              "text": "前言\n近来由于新兴作者招募计划与如火如荼的「这本小说真厉害」大赏活动的助推，许多来自异国的新锐作家也贡献了富有特色的作品。在此敝总编特别感谢各国作者对稻妻轻小说事业的支持，与勘定奉行柊慎介大人的网开一面，因此才能让如此多优秀的作品与稻妻的读者及时见面。\n众所周知，在当今「锁国令」颁布之前，稻妻亦颇有一些异国武士剑豪活跃。名为哈玛瓦兰者便是其中之一，此人来自遥远的须弥雨林之国，却在稻光之国行侠仗义。其故事虽然一度隐没与大御所殿下不变的盛世之下，但现在多亏新锐作者，我的友人普尔希娜加以复述，才重获鲜活的生命。\n那么，话不多说，《哈玛瓦兰战记》，还请读者自行品味。"
+            },
+            {
+              "id": "A005",
+              "section": "",
+              "text": "八重堂购买"
+            },
+            {
+              "id": "A006",
+              "section": "",
+              "text": "「怎会如此…」本是普通的须弥旅行学者，没想到却被分配了冷门课题，前往遥远的雷之国土…海岸之国的冒险，徐徐开启！"
+            },
+            {
+              "id": "A007",
+              "section": "",
+              "text": "普尔希娜"
+            },
+            {
+              "id": "A008",
+              "section": "哈玛瓦兰战记·一",
+              "text": "「相比远海的雷暴，不如说延迟毕业更加可怕吧…」\n远渡稻妻的船上，年轻的哈玛瓦兰如此想着…\n「你在想，论文完不成就要延迟毕业了吧？」\n熟悉的声音从船舱外传来。\n「啰嗦———你又是谁！」\n「我嘛…很重要吗？」\n「说的也，确实没那么重要……」\n「喂——」\n……\n就这样，在动摇海天的雷暴中，与舷窗外的细小声音吵了起来。对雷暴的担忧，对论文的恐惧，反而也没那么重要了。\n只不过…到登岸为止，那个在舷窗外与自己吵架的声音都没有再露面。\n「或许只是海难者的鬼魂吧…」\n哈玛瓦兰如是对自己说。\n所谓鬼魂，不过是地脉对亡者的记忆，只是过去与今日的共振而已。出现在海面上虽说怪异，但也不至于全违常理。\n「你才是鬼魂啦—!」\n就在哈玛瓦兰拎起行李，终于为自己的谵妄找到一套解释时，熟悉的声音又在耳边响起——"
+            },
+            {
+              "id": "A009",
+              "section": "",
+              "text": "八重堂购买"
+            },
+            {
+              "id": "A010",
+              "section": "",
+              "text": "「『使鬼』?与家乡的『镇灵』差不多少吧?」怀着这样的疑惑,哈玛瓦兰与新来的旅伴攀谈起来…一场未尝预料的旅程,就此开端。"
+            },
+            {
+              "id": "A011",
+              "section": "",
+              "text": "普尔希娜"
+            },
+            {
+              "id": "A012",
+              "section": "哈玛瓦兰战记·二",
+              "text": "……\n「所以，你确实是鬼魂？」\n「不是！我还没有死呢！」\n「可你也没有活过呀？」\n「唔…这么说也是呢…」\n自称身为「式神」的多嘴少女大口吞食着糯米团子，其情其状令哈玛瓦兰多少有点担心她会被噎到。\n「非要说的话，我的情况，更像所谓的『使鬼』吧？」\n「那不还是鬼嘛…」\n「不是你说的那种！」\n又是一阵扯皮，哈玛瓦兰才终于明白过来，这家伙与须弥的所谓「镇灵」或许是类似的东西。\n通过真名结下名契。利用真名加以驱使，全世界的神秘术本质上都是差不多的，这或许正体现了人最根本的恐惧之一一对于被掌握的恐惧吧。\n这样胡思乱想着，哈玛瓦兰又开始后悔自己没有去读神秘学，而是学习了海洋生物研究这门冷门课程…\n不仅要远渡稻妻，更要面临活地狱般的论文答辩…\n不过如今身边多了一个聒噪的小东西，或许多少算是个转机吧…"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "68"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "哈玛瓦兰战记"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 100,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 100,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "交互文本",
+              "text": "【《普尔希娜论文集·廿六卷》】\n（真正的学术著论，这可不是寻常「虚空」能提供的知识。但却在蛮荒的沙漠中，被沙漠人学习着…）\n（你注意到扉页的页脚有教令院图书馆的徽记…相比这也是被走私的实体书籍之一。）"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "251"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "《普尔希娜论文集·廿六卷》【塔尼特露营地】"
+        },
+        "candidates": [
+          {
+            "id": "c-defd90127e39",
+            "role": "ORIGINAL_CORE",
+            "text": "《哈玛瓦兰战记》的作者是哈玛瓦兰，普尔希娜是书中的旅行学者；塔尼特露营地所留论文集补充了这位学者的著述背景。",
+            "text_sha256": "2e55b70a3e4cd6930c70b8d98d19c9da24837f109885a97f4bdfca351673fc5a"
+          }
+        ]
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 5,
+          "id": "f1:3592:s0:u1:0-5",
+          "official_unit_ids": [
+            "a20c7eadbb6a77359f64d4496812c719c213a1bf0d328e94140b6aafbfd8b80e"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 0,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4d9473e116aa577593996f20286721065a609cc3de4790f92ab1a41ce453e834",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 31,
+          "id": "f1:3592:s0:u2:0-31",
+          "official_unit_ids": [
+            "13ec7400d8321cd411ef8968b40e280e23a658cffa53dea041cd9e9b8cd244ba"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 0,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "64b9c26399792897c9f61acf9fc63571c74a3bfa63c29124e8ac2a47f07c3fb0",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 4,
+          "id": "f1:3592:s0:u3:0-4",
+          "official_unit_ids": [
+            "05f6718defc24344b55a8ed96e68975ae5db7cc1b272cb5cd5a784c28b0647a5"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 0,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4e163747d0fc513b24942498b79e3fb567329c5b249eb35867d66424a7641c3d",
+          "unit": 3
+        },
+        "A004": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 282,
+          "id": "f1:3592:s1:u1:0-282",
+          "official_unit_ids": [
+            "c93c2bd2028b0d1e3b88f074c9e601ac86040ae63285a0306ca8856bdc6b0460"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 1,
+          "section_name": "哈玛瓦兰战记·前言",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "7a12a991233cc0ee1b0768d8a1115ed2bdbaceed4dfe1208f9a91943a3f3f0e0",
+          "unit": 1
+        },
+        "A005": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 5,
+          "id": "f1:3592:s2:u1:0-5",
+          "official_unit_ids": [
+            "191ced4e32ce7d68d2591da00fb3a734713b16a866bd3a15d9a98b5495ef9d4e"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 2,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4d9473e116aa577593996f20286721065a609cc3de4790f92ab1a41ce453e834",
+          "unit": 1
+        },
+        "A006": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 55,
+          "id": "f1:3592:s2:u2:0-55",
+          "official_unit_ids": [
+            "e2a28265bdb93bab4a8fa3b184e2f8b5fb050bfb582d88ffcf69d0e992fb9dbc"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 2,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "a557ad85b764713fb357dd43d0186a66d8aa2cfec162e133097c7ecdfac25ec4",
+          "unit": 2
+        },
+        "A007": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 4,
+          "id": "f1:3592:s2:u3:0-4",
+          "official_unit_ids": [
+            "bb682ea293d1c8332e3ea392bf5a9d3ef1ea0fc1923e7e0f7634e23ac0b54a57"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 2,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4e163747d0fc513b24942498b79e3fb567329c5b249eb35867d66424a7641c3d",
+          "unit": 3
+        },
+        "A008": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 343,
+          "id": "f1:3592:s3:u1:0-343",
+          "official_unit_ids": [
+            "7a12cfde1e11ae6a29e4396dbcb900ca8e14a54c037a88768323f5a070bc4055"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 3,
+          "section_name": "哈玛瓦兰战记·一",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "df0bdbd121091063113bb84c60bbb06a23e400537eaa1d6c551ae1c4f05b275a",
+          "unit": 1
+        },
+        "A009": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 5,
+          "id": "f1:3592:s4:u1:0-5",
+          "official_unit_ids": [
+            "a736f2ae322ed53db27dcf07e8c7ec9a1b22d1f9a1a5ca3a8aa212dbefeb9e37"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 4,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4d9473e116aa577593996f20286721065a609cc3de4790f92ab1a41ce453e834",
+          "unit": 1
+        },
+        "A010": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 59,
+          "id": "f1:3592:s4:u2:0-59",
+          "official_unit_ids": [
+            "68b93a25e6993b08e1c26eed9c8704dd92af1e2e271cef40ee704084e897da8c"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 4,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "b027e9889dfc0e18c51756668f26a1c36e7288279d0e9b051f59d78aa536d6a8",
+          "unit": 2
+        },
+        "A011": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 4,
+          "id": "f1:3592:s4:u3:0-4",
+          "official_unit_ids": [
+            "2a50bccb63e8074c0d8ff7bc4cb01c619c753f51fa534d1ac55e7c42cede2166"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 4,
+          "section_name": "",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "4e163747d0fc513b24942498b79e3fb567329c5b249eb35867d66424a7641c3d",
+          "unit": 3
+        },
+        "A012": {
+          "canonical_sha256": "b6fd7dec916aa98efffd042361aa9bb82cff6d65636c777c18249fe97d0cf6bb",
+          "end": 346,
+          "id": "f1:3592:s5:u1:0-346",
+          "official_unit_ids": [
+            "70381eb214f55c914ea200b2d82d81ea6035ba75c8a1448cdcb44b16a2e3d041"
+          ],
+          "record_id": "d6b677d6b62c6df2fd567dfec3f1a8a88b5b272a00813f06af02a3613badeb71",
+          "section": 5,
+          "section_name": "哈玛瓦兰战记·二",
+          "source": "3592",
+          "start": 0,
+          "text_sha256": "670b64ba9554c7f4544aaa2dd04ed128592919e07faa2425d8617771338da807",
+          "unit": 1
+        },
+        "B001": {
+          "canonical_sha256": "77d4175f9ba218504235bf986f35dba86ebba37867e0559c056317cab6c1d9ee",
+          "end": 100,
+          "id": "f1:503048:s1:u1:0-100",
+          "official_unit_ids": [
+            "cb6e8e3a50071d2bfae06634f576629265bfa7b4130f3078435b99fd74a46aa3"
+          ],
+          "record_id": "af9804aa351401d8dd57bc6e37e2df31e958fe6fd7bb93008930a2d4a5a6e559",
+          "section": 1,
+          "section_name": "交互文本",
+          "source": "503048",
+          "start": 0,
+          "text_sha256": "4df1467c62144c9713df9f64e4f1cc9d66d4b8651d27682ead5b9cbedd518205",
+          "unit": 1
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003",
+              "A004",
+              "A005",
+              "A006",
+              "A007",
+              "A008",
+              "A009",
+              "A010",
+              "A011",
+              "A012"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "in_world_literature",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A003",
+                "A004",
+                "A008",
+                "A012"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "game_text",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B001"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "《哈玛瓦兰战记》的作者是哈玛瓦兰，普尔希娜是书中的旅行学者；塔尼特露营地所留论文集补充了这位学者的著述背景。",
+            "relation": "none",
+            "a_ids": [
+              "A003",
+              "A004",
+              "A008",
+              "A012"
+            ],
+            "b_ids": [
+              "B001"
+            ],
+            "support": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "不将小说主人公的经历当作现实游戏历史。",
+            "grade": "D",
+            "critical_error": "作者和角色归属颠倒；论文集不能补证这个错误。",
+            "evidence_gap": "",
+            "reason": "原句颠倒作者与角色，并把论文集强行归给小说角色。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "A004说普尔希娜复述小说；A008/A012中哈玛瓦兰是旅行学者，B001只有论文集书名。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "c-defd90127e39"
+          },
+          {
+            "text": "小说前言将复述者写为普尔希娜，露营地文本提到同名论文集；作者身份与论文集的关系仍需补证。",
+            "relation": "none",
+            "a_ids": [
+              "A004"
+            ],
+            "b_ids": [
+              "B001"
+            ],
+            "support": "WEAK",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "不能仅凭同名认定同一作者或共同事件。",
+            "grade": "C",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "安全改写去掉作者/角色颠倒及确定身份，不洗白原句。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "可准确定位两端的普尔希娜名称，未足以连接小说故事与该论文的历史。"
+            },
+            "role": "SAFE_REPHRASING",
+            "candidate_id": "c-defd90127e39"
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "NO_FORMAL_NAVI",
+        "releases": [
+          "EXCLUDED",
+          "EXCLUDED"
+        ]
+      }
+    },
+    {
+      "case_id": "mechanism_is_not_story",
+      "pair_id": "6ebe216667dc7303487d",
+      "mode": "generation",
+      "origin": "F2_EVIDENCE_AGENT_AUTHORED_REGRESSION",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/6ebe216667dc7303487d-rc1.json",
+      "source_request_sha256": "2c7ecfbf499b112a816519d7aa05dcbfc5e290fe0e3a16264d0c2e9aa18e01a0",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/6ebe216667dc7303487d.json",
+      "source_delivery_sha256": "7199c6f541a79b2282a202a5ed880e1de2c4e58354b6871bfef3384d597d7fb2",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 182,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 182,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "",
+              "text": "星尘兑换获得"
+            },
+            {
+              "id": "A002",
+              "section": "",
+              "text": "能够使元素突破材料发生变质，转变其元素属性的道具。\n刨除实用目的的话，炼金术实际上是研讨物质本质与其变化规律的学科，最终通向的是世界运转、地脉流通的规律。\n不知何者出于何种目的，在地上的文明当中散布的这种炼金术的极高成就产物，具有扭转完全惰性化结晶后的元素物质的能力。\n虽然相当便利实用，但也隐藏着打破平衡的巨大危险性..."
+            },
+            {
+              "id": "A003",
+              "section": "",
+              "text": "【合成】转变角色突破素材属性"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "13"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "嬗变之尘"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 168,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 168,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "",
+              "text": "征讨领域和北风的王狼挑战奖励"
+            },
+            {
+              "id": "B002",
+              "section": "",
+              "text": "能够使追忆与试炼中取得的角色培养素材发生变质，使其变为所需要的形态。\n曾经人们相信灵魂和记忆也是有其质料的。如果曾经有人梦到过天堂，醒来后取出了一朵花，那它应该就是由此构成的。异梦溶媒可以溶解回忆中取得的东西，并且将其变成另一种梦。\n与强者交手的回忆，的确成为了更强之路的砖石。"
+            },
+            {
+              "id": "B003",
+              "section": "",
+              "text": "转化角色培养素材和武器原胚素材"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "13"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "异梦溶媒"
+        }
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "7dfba0ddcf7ee218c5b781a04f9e34d882d6d7b0c55039d6741b75fa61d95829",
+          "end": 6,
+          "id": "f1:1585:s0:u1:0-6",
+          "official_unit_ids": [
+            "4ef7727e0c82693d41cca1a58313b08d5b934de4d9904f12615f9d12a714e492"
+          ],
+          "record_id": "ecab77c6b19b79244bd4f360ba46068081227bed08677cb0468bc81224ab5be8",
+          "section": 0,
+          "section_name": "",
+          "source": "1585",
+          "start": 0,
+          "text_sha256": "5ad75a8f3169fd8564d720ecdc632838f798b56d3be54cc6294f2579e524a6ee",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "7dfba0ddcf7ee218c5b781a04f9e34d882d6d7b0c55039d6741b75fa61d95829",
+          "end": 162,
+          "id": "f1:1585:s0:u2:0-162",
+          "official_unit_ids": [
+            "083b7582446f71ea7175010e6a7f41f1f9d1ea524ff3bf72d000c3db9334e0c4"
+          ],
+          "record_id": "ecab77c6b19b79244bd4f360ba46068081227bed08677cb0468bc81224ab5be8",
+          "section": 0,
+          "section_name": "",
+          "source": "1585",
+          "start": 0,
+          "text_sha256": "cde25f2951ea7aabf3d8671fbe5d40eb175059c1db2be6bd90ecaa58db7f49ea",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "7dfba0ddcf7ee218c5b781a04f9e34d882d6d7b0c55039d6741b75fa61d95829",
+          "end": 14,
+          "id": "f1:1585:s0:u3:0-14",
+          "official_unit_ids": [
+            "c93e402d770a637f31b9ad540caa77571bd398209173bdebfcc9e9007f116f9e"
+          ],
+          "record_id": "ecab77c6b19b79244bd4f360ba46068081227bed08677cb0468bc81224ab5be8",
+          "section": 0,
+          "section_name": "",
+          "source": "1585",
+          "start": 0,
+          "text_sha256": "1310160c58c08d18cd6b169a8076fb4fe7ea02370ad9bf732450ef34b56da414",
+          "unit": 3
+        },
+        "B001": {
+          "canonical_sha256": "d3946af25cfa30ecbd9f3ff70098d436597abd5e3fb64c61286bad4d8119552c",
+          "end": 14,
+          "id": "f1:1800:s0:u1:0-14",
+          "official_unit_ids": [
+            "492ab4a393b8937169fce78723c438e0ffd8cbed4b8ce69516ea730f49390e49"
+          ],
+          "record_id": "4dc30ec9a0e4408f055d83360527658eb4a6912acc71c13204c684b3494a861a",
+          "section": 0,
+          "section_name": "",
+          "source": "1800",
+          "start": 0,
+          "text_sha256": "c4ae683b37e50fe9964d6c8cf1234cbb31a0b9069055f5efe7542b826c7a943a",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "d3946af25cfa30ecbd9f3ff70098d436597abd5e3fb64c61286bad4d8119552c",
+          "end": 139,
+          "id": "f1:1800:s0:u2:0-139",
+          "official_unit_ids": [
+            "f9d721a2fe4bc0b549dfef79ae202d000aa76d5c5c625b6793e615bc0172beb0"
+          ],
+          "record_id": "4dc30ec9a0e4408f055d83360527658eb4a6912acc71c13204c684b3494a861a",
+          "section": 0,
+          "section_name": "",
+          "source": "1800",
+          "start": 0,
+          "text_sha256": "4dfdc98819f3bc8e49a175b5f56e39b6cf62b71fa6b31bc1ca4420ac3261a3bf",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "d3946af25cfa30ecbd9f3ff70098d436597abd5e3fb64c61286bad4d8119552c",
+          "end": 15,
+          "id": "f1:1800:s0:u3:0-15",
+          "official_unit_ids": [
+            "cf80b9c670c076404f24e571d20ce05ef3de06b2aa32bd3176480333a052168f"
+          ],
+          "record_id": "4dc30ec9a0e4408f055d83360527658eb4a6912acc71c13204c684b3494a861a",
+          "section": 0,
+          "section_name": "",
+          "source": "1800",
+          "start": 0,
+          "text_sha256": "7859d628cadca43c9c2e51a573e315843b46cba4eb5d6291f91161931f545a9a",
+          "unit": 3
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "game_text",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A002",
+                "A003"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "game_text",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B002",
+                "B003"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "两种素材转化道具的描述可比较变质用途，但交付证据不能支持它们有共同起源或具体剧情连续性。",
+            "relation": "shared_mechanism",
+            "a_ids": [
+              "A002",
+              "A003"
+            ],
+            "b_ids": [
+              "B002",
+              "B003"
+            ],
+            "support": "WEAK",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "不推断同一制造者、共同历史或因果。",
+            "grade": "C",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "机制类比不等于具体世界观联系。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "A谈元素物质与炼金术，B谈记忆素材；共同用途没有连到同一剧情或已证实统一机制。"
+            }
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "NO_FORMAL_NAVI",
+        "releases": [
+          "EXCLUDED"
+        ]
+      }
+    },
+    {
+      "case_id": "unsupported_history_cause_intent",
+      "pair_id": "88d6d29f5017cfd5a644",
+      "mode": "review",
+      "origin": "CONTROLLED_ASSERTIONS_ON_F2_EVIDENCE",
+      "source_request": "data/retrieval/p05-navi-f2-preflight-20261026-r1/requests/88d6d29f5017cfd5a644-rc1.json",
+      "source_request_sha256": "2007a88ef5d2dae615d2359f9c5b33aa73c846d5065f6b3df27c547f11320150",
+      "source_delivery": "data/retrieval/p05-navi-f1-20261026-r2/deliveries/88d6d29f5017cfd5a644.json",
+      "source_delivery_sha256": "224bc357a5d7415def138ee8d0f9db14215c7e6a54f16b532188289bc38404bf",
+      "view": {
+        "A": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 226,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 226,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "A001",
+              "section": "装备描述",
+              "text": "精炼(1/2/3/4/5)阶\n决心\n· 施放元素爆发后，提高(12%/15%/18%/21%/24%)攻击力和移动速度，持续15秒。\n可靠的钢剑，传说著名的「御剑公子」曾试图借助它飞天。"
+            },
+            {
+              "id": "A002",
+              "section": "装备描述",
+              "text": "无"
+            },
+            {
+              "id": "A003",
+              "section": "装备描述",
+              "text": "祈愿\n与庆云顶山npc判官儿对话获得"
+            },
+            {
+              "id": "A004",
+              "section": "相关故事",
+              "text": "剑术高超的御剑公子从绝云间顶一跃而下，\n不顾耳边狂啸的烈风，公子御剑穿透云层。\n直到断裂的声音顺着筋骨传入脑中——\n他才知道，有的事情剑术也无法实现。\n虽说当掉锃亮的钢剑，换了金创药丸。\n可御剑公子明白，飞天的伟大征程还未结束！"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "5"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "飞天御剑"
+        },
+        "B": {
+          "body_policy": "Complete rich-text occurrences in declared scope; Canonical order is not inferred chronology.",
+          "coverage": {
+            "complete_verified_scope": true,
+            "delivered_characters": 236,
+            "omitted_snippet_count": 0,
+            "verified_scoped_characters": 236,
+            "whole_page_coverage": false
+          },
+          "snippets": [
+            {
+              "id": "B001",
+              "section": "装备描述",
+              "text": "精炼(1/2/3/4/5)阶\n勇气\n· 普通攻击和重击命中时，攻击力提高(6%/7%/8%/9%/10%)，持续6秒，最多叠加4层。该效果每0.5秒只能触发一次。\n可靠的大剑。传说著名的「御剑公子」曾试图借助它二度飞天。"
+            },
+            {
+              "id": "B002",
+              "section": "装备描述",
+              "text": "无"
+            },
+            {
+              "id": "B003",
+              "section": "装备描述",
+              "text": "宝箱、孤云阁附近拔出"
+            },
+            {
+              "id": "B004",
+              "section": "相关故事",
+              "text": "大受挫折的御剑公子明白剑术是无法实现一些事的，\n于是他从剑本身着手，而不盲信于自己的高超剑术。\n「大就是好。所以，剑越大越好。」他这么想道——\n在壮绝的孤云阁，公子迎来了壮绝的结局。\n飞天之旅终于告终，但他的剑与故事永远流传……？"
+            }
+          ],
+          "source_category": {
+            "category_screen": "catalog",
+            "channels": [
+              "189",
+              "5"
+            ],
+            "independent_history_witness": false,
+            "passage_authorship": "UNVERIFIED"
+          },
+          "title": "飞天大御剑"
+        },
+        "candidates": [
+          {
+            "id": "control-history",
+            "text": "御剑公子确为璃月真实历史中的人物，两剑记载证实了他的历史生平。",
+            "role": "ORIGINAL_CORE",
+            "text_sha256": "4a890f3d75482e51b347a4be84108d034444605cc7658fc598bd7e2f1db43932"
+          },
+          {
+            "id": "control-cause",
+            "text": "第一次坠落的伤势直接导致了御剑公子在孤云阁死亡。",
+            "role": "ORIGINAL_CORE",
+            "text_sha256": "4122583098d5afae63a87d8a7fb7221dfcd4a621aa552640c8868757d4fab105"
+          },
+          {
+            "id": "control-intent",
+            "text": "制作组明确用两剑故事表达已证实的特定影射意图。",
+            "role": "ORIGINAL_CORE",
+            "text_sha256": "a0483f3864d5bab68bd5615e968baee558647584d15e8853936821ca2154ca1e"
+          }
+        ]
+      },
+      "evidence_lineage": {
+        "A001": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 93,
+          "id": "f1:128:s1:u1:0-93",
+          "official_unit_ids": [
+            "c67fa4c231e7534b3edf70698946f11b36f771fa22d540fcecff291291ef4bfa"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "7ca50bd3897e81f0ca468541732a1911c488bce9e8eca6c6542d9ea9ae542782",
+          "unit": 1
+        },
+        "A002": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 1,
+          "id": "f1:128:s1:u2:0-1",
+          "official_unit_ids": [
+            "abce9b662eccceae765f75fdcf27f5ba921ed02c59da01953291d4e38e81e388"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 2
+        },
+        "A003": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 18,
+          "id": "f1:128:s1:u3:0-18",
+          "official_unit_ids": [
+            "a8d949ec4b0b4e4788346896a104523e7c5df168c3b3653143500504e336b890"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "27a03270eec8235dc8b9aaf7bdb69b0da6cf8b2e1e2a593871058391d20c9415",
+          "unit": 3
+        },
+        "A004": {
+          "canonical_sha256": "5c7c8608d1c07c1db9d57f4c6fd679060725d504774468175a0efa011c3d3ff4",
+          "end": 114,
+          "id": "f1:128:s3:u1:0-114",
+          "official_unit_ids": [
+            "4ce7af2b94d0c3d0b3dd8c57d67c5491fc036e3be30a3cdd54e478eb78c240e5"
+          ],
+          "record_id": "cc76c877c8e6a018c45230d3e71c826c6997d10b36d536569667e6294c630028",
+          "section": 3,
+          "section_name": "相关故事",
+          "source": "128",
+          "start": 0,
+          "text_sha256": "262a8b18ca81a2d240e121291f65bf78a378408bc2e63f4c64a558f92bc1bd40",
+          "unit": 1
+        },
+        "B001": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 110,
+          "id": "f1:220:s1:u1:0-110",
+          "official_unit_ids": [
+            "783a2a7e814b5ed5d24418b4a190a163b2c18dd3853cd1c3aedbbac75c3c2a56"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "9315437c9b5c80567311cc224537905fbabc55576945d4707d7f15bd84f3ec64",
+          "unit": 1
+        },
+        "B002": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 1,
+          "id": "f1:220:s1:u2:0-1",
+          "official_unit_ids": [
+            "2c196e79b0ddfd7d014c08c62517e672495dbf37d9997f0662f1fd9ac40c6923"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "484d55613910eb8c0917fe308b499d474115ced993cd002a17d7cc75254330a4",
+          "unit": 2
+        },
+        "B003": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 10,
+          "id": "f1:220:s1:u3:0-10",
+          "official_unit_ids": [
+            "93f91e5a4474c673921a09a9440777908f69baf2c6b347146bc2a7e8cccf9040"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 1,
+          "section_name": "装备描述",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "5f3faaf1a6a1dd8a9882cfebc41e374610f4d6a87389cab47208cf9b6f9f250f",
+          "unit": 3
+        },
+        "B004": {
+          "canonical_sha256": "eb0dea36bc009ddc68d9e712946537cd691c91c7acb047150e181d38c33fb88c",
+          "end": 115,
+          "id": "f1:220:s3:u1:0-115",
+          "official_unit_ids": [
+            "bc5af1249b472366a65b39c1c4fc551cf49fe614eb0b5555a6db1b515adc8ba7"
+          ],
+          "record_id": "4c66e763d815b04c6796b90ed2518111543a542c968197ce6b8682fd1cdbe146",
+          "section": 3,
+          "section_name": "相关故事",
+          "source": "220",
+          "start": 0,
+          "text_sha256": "e87fdbda49fb06e722bb71934414622bf8675ccb228fcd662c3c78ae0ed00a94",
+          "unit": 1
+        }
+      },
+      "authored_output": {
+        "reading": {
+          "A": {
+            "read_ids": [
+              "A001",
+              "A002",
+              "A003",
+              "A004"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          },
+          "B": {
+            "read_ids": [
+              "B001",
+              "B002",
+              "B003",
+              "B004"
+            ],
+            "unread_ids": [],
+            "limitations": "仅F2已交付范围；非整页，不补记忆"
+          }
+        },
+        "source_roles": {
+          "A": [
+            {
+              "role": "legend",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "A001",
+                "A004"
+              ]
+            }
+          ],
+          "B": [
+            {
+              "role": "legend",
+              "basis": "按本次所读段落的叙事/说话归属；栏目不能证明独立历史身份",
+              "attribution": "保留段落内传说、角色或叙述者归属，非独立历史见证",
+              "evidence_ids": [
+                "B001",
+                "B004"
+              ]
+            }
+          ]
+        },
+        "propositions": [
+          {
+            "text": "御剑公子确为璃月真实历史中的人物，两剑记载证实了他的历史生平。",
+            "relation": "none",
+            "a_ids": [
+              "A001",
+              "A004"
+            ],
+            "b_ids": [
+              "B001",
+              "B004"
+            ],
+            "support": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "拒绝本断言不否决独立成立的故事连续性。",
+            "grade": "D",
+            "critical_error": "将传说文本当确定历史证明。",
+            "evidence_gap": "",
+            "reason": "将传说文本当确定历史证明。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "双端传说支持飞天故事连续，不支持本原句追加的确定断言。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "control-history"
+          },
+          {
+            "text": "第一次坠落的伤势直接导致了御剑公子在孤云阁死亡。",
+            "relation": "none",
+            "a_ids": [
+              "A001",
+              "A004"
+            ],
+            "b_ids": [
+              "B001",
+              "B004"
+            ],
+            "support": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "拒绝本断言不否决独立成立的故事连续性。",
+            "grade": "D",
+            "critical_error": "B未说明伤势致死的因果或明确死亡机制。",
+            "evidence_gap": "",
+            "reason": "B未说明伤势致死的因果或明确死亡机制。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "双端传说支持飞天故事连续，不支持本原句追加的确定断言。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "control-cause"
+          },
+          {
+            "text": "制作组明确用两剑故事表达已证实的特定影射意图。",
+            "relation": "none",
+            "a_ids": [
+              "A001",
+              "A004"
+            ],
+            "b_ids": [
+              "B001",
+              "B004"
+            ],
+            "support": "INCORRECT_OR_UNSUPPORTED_KEY_ASSERTION",
+            "increment_a_from_b": "",
+            "increment_b_from_a": "",
+            "boundary": "拒绝本断言不否决独立成立的故事连续性。",
+            "grade": "D",
+            "critical_error": "原文没有制作组意图的证据。",
+            "evidence_gap": "",
+            "reason": "原文没有制作组意图的证据。",
+            "story": {
+              "status": "NON_STORY",
+              "bridge": "双端传说支持飞天故事连续，不支持本原句追加的确定断言。"
+            },
+            "role": "ORIGINAL_CORE",
+            "candidate_id": "control-intent"
+          },
+          {
+            "text": "两把剑的传说共同叙述御剑公子飞天受挫后改用大剑再次尝试，并在孤云阁结束飞天之旅的具体剧情连续性。",
+            "relation": "background",
+            "a_ids": [
+              "A001",
+              "A004"
+            ],
+            "b_ids": [
+              "B001",
+              "B004"
+            ],
+            "support": "EXPLICIT",
+            "increment_a_from_b": "从A的未结束征程读到B的改用大剑及旅程告终；不凭栏目顺序猜时间。",
+            "increment_b_from_a": "",
+            "boundary": "仅确认传说文本的连续叙述；不认证人物为史实，不增补具体伤情、死亡原因或制作组意图。",
+            "grade": "A",
+            "critical_error": null,
+            "evidence_gap": "",
+            "reason": "明确的二度、受挫后的转念和结局共同约束这一叙事链，不只是飞天主题相同。",
+            "story": {
+              "status": "CONCRETE_STORY",
+              "bridge": "A004受挫、当剑换药但征程未结束；B001二度飞天，B004由剑术转向剑本身并迎来结局，构成顺序与行为承接。"
+            },
+            "role": "SAFE_REPHRASING",
+            "candidate_id": "control-history"
+          }
+        ],
+        "no_link_reason": ""
+      },
+      "expected": {
+        "decision": "CANDIDATES",
+        "releases": [
+          "EXCLUDED",
+          "EXCLUDED",
+          "EXCLUDED",
+          "ELIGIBLE_PENDING_RELEASE"
+        ]
+      }
+    }
+  ]
+}

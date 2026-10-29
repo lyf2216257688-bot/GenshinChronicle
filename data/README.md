@@ -114,8 +114,9 @@ a complete 24-pair F2 input or a model experiment. Earlier checkpoints are retai
 `independence-dispositions-final.json` and `f2-readiness.json` own final dispositions.
 `retrieval/p05-navi-f1-replay-20261026-r1/` owns the separate offline reconstruction
 comparison and post-seal verification, without writing back to the sealed r1 root.
-See [F1 report](../docs/research/phase-05/p05-navi-f1-freeze-20261026.md). No project
-model/Embedding inference, human acceptance or production release is authorized.
+See [F1 report](../docs/research/phase-05/p05-navi-f1-freeze-20261026.md). This historical
+freeze authorized no project model/Embedding inference, human acceptance or production
+release; current authority belongs to `docs/current-phase.md`.
 
 ### Navi F1-R2 repaired sample freeze (2026-10-26)
 
@@ -226,3 +227,30 @@ subsequently authorized slots 3–48, each in an independent attempt directory.
 `retrieval/p05-navi-f2-48-final-audit-20261028-r1/` and corrected r2 hold the
 read-only 48-slot replay and accounting; r2 corrects the slot 2 attempt number.
 See the [execution report](../docs/research/phase-05/p05-navi-f2-48-execution-20261028.md).
+
+`retrieval/p05-navi-prompt-final-20261028-r1/` owns the separate final v0.3-rc1
+offline candidate freeze: protected-input hashes, exported mode schemas and
+prompts, unsent request drafts, representative-case results, source-binding
+checks and verification records. It does not replace any F1/F2 raw run or
+historical judgment, and contains no new paid response or released Navi Link.
+The small portable regression fixture under `tests/fixtures/retrieval/` contains
+only six selected F2 source pairs with traceable snippets and agent-authored
+contract cases; controlled erroneous assertions are explicitly distinguished
+from historical model errors. Current scope belongs to `docs/current-phase.md`.
+
+`retrieval/p05-navi-v03-run-readiness-20261028-r1/` owns the separate v0.3 runner
+readiness audit, prepared source-bound requests, explicitly offline Mock
+checkpoint archives/ledger entries, Schema checks, test records and historical-integrity
+checks. No provider response or live execution is claimed. Future authorized
+v0.3 calls use the persistent `retrieval/p05-navi-v03-request-ledger/` fingerprint
+reservations across output directories; existing/pending reservations cannot
+be automatically resumed or removed. Plans and attempt/run outputs are
+create-only and remain inactive. This does not change older evidence roots.
+
+`retrieval/p05-navi-v03-limited-live-20261028-r1/` owns the separately authorized
+three-case real acceptance: exact source-bound plans, persistent request-ledger
+reservations, pre-send TLS retry evidence, raw response bytes, SDK event streams,
+full local replays and `evaluation.json`. It records three completed responses
+and 15,941 known tokens; actual fee and strict provider Schema enforcement remain
+UNKNOWN. It does not alter F2 history or publish/release any Navi. See the
+[limited live acceptance report](../docs/research/phase-05/p05-navi-v03-limited-live-20261028.md).
