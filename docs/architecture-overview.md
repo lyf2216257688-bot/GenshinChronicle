@@ -144,3 +144,11 @@ behavior, Evidence Packet authority, or Generation-visible request contract.
 Its provider-free first work unit proves only semantic-build/view and bounded
 navigation mechanics; it does not prove semantic extraction quality or answer
 improvement.
+
+The standalone offline Navi environment owns adaptive source-bound Card
+hierarchy, separate local RU/Card vector indexes and candidate-to-original-text
+generation/review. These are inactive research derivatives, separate from the
+accepted online paths and from KG. Its pinned embedding worker reuses the
+qualified ML runtime through local process pipes; generation SDK dependencies
+stay in the orchestration runtime. Current authorization and measured readiness
+remain with `docs/current-phase.md`.

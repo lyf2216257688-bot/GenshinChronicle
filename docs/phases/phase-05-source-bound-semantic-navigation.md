@@ -59,6 +59,29 @@ authorial intent or historical fact. This scope does not retroactively regrade
 v0.2/F2 research. The bounded candidate contract is owned by
 [`p05-navi-b-prompts-v03.md`](../research/phase-05/p05-navi-b-prompts-v03.md).
 
+### Standalone offline knowledge environment
+
+The opt-in `p05-navi-offline-1` environment adds source-bound document, optional
+true-section and clue Cards, separate RU/Card local embedding indexes, bounded
+candidate discovery, dual-source v0.3 generation/review, and inactive review
+artifacts. It does not implement KG or online integration. Current authorization
+and measured evidence belong to `docs/current-phase.md` and the
+[offline environment report](../research/phase-05/p05-navi-offline-environment-20261029.md).
+
+Typed source binding reuses the accepted RU reprojection, including structured
+scalar selectors and dialogue nodes/branches. Only rich-text quotations claim
+Canonical character offsets; other quotations use verified RU representation
+ranges and retain original selectors. Direct source delivery, model reading
+declarations and inherited Card evidence are separate. Cards and embedding
+windows never replace upstream citation identity or certify semantic truth.
+
+The frozen v0.3 semantic contract and old runner remain unchanged. Compatible
+rich-text pairs invoke that runner; a separately versioned adapter supplies
+typed-source and Card execution without reclassifying historical runs. Local
+deterministic recovery cannot authorize provider reissue: pending, UNKNOWN and
+sent failures remain isolated. Human reviews append exact artifact/item hashes
+and never automatically publish or activate a view.
+
 ### Navi and KG semantic responsibility separation
 
 Rather than forcing both views to consume a monolithic, unverified model

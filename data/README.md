@@ -1,5 +1,23 @@
 # Data Directory
 
+## Standalone offline Navi environment
+
+`retrieval/p05-navi-offline-20261029-r1/` contains this work unit's protected-input
+inventory, bounded validation runs, test logs and local verification records.
+Each run separates sealed `prepared/` source snapshots and execution code,
+create-only `jobs/` raw archives, isolated Mock ledger, Card checkpoints,
+independent `indexes/ru` and `indexes/card`, completed output and append-only
+human-review records. Unfinished attempts remain forensic data and are never
+overwritten. The full input RU artifact is scanned/verified, but only explicitly
+selected sources are materialized; vector budgets are separate and audited.
+
+Review exports include source snapshots and raw request/response evidence with
+checksums. They are not independent backups merely because they exist on the
+same disk. All these data remain Git-ignored; committing code would not back
+them up. Historical roots, the real v0.3 request ledger and 2048-dimensional
+production indexes retain their existing responsibilities. See the
+[environment report](../docs/research/phase-05/p05-navi-offline-environment-20261029.md).
+
 `data/` contains generated/local datasets, not source code.
 
 ## Raw evidence

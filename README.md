@@ -39,6 +39,7 @@ Start here:
 - `AGENTS.md` — repository-wide working rules for Codex
 - `docs/current-phase.md` — current status and immediate next action
 - `docs/phases/phase-05-source-bound-semantic-navigation.md` — Phase 05 semantic navigation boundary and RU candidate contract
+- [Offline Navi environment and CLI](docs/research/phase-05/p05-navi-offline-environment-20261029.md) — local Card/index/discovery/generation-review workflow, evidence and inactive review exports
 - `docs/phases/phase-04-first-end-to-end-rag-amendment-v1.md` — Phase 04 RAG v1 contract and historical plan
 - `docs/research/phase-04/p04-rag-historical-checkpoint-register.md` — compact Phase 04 checkpoint index and evidence pointers
 - `docs/architecture-overview.md` — long-term architecture, intentionally high-level

@@ -1,5 +1,15 @@
 # Project Structure
 
+The opt-in `src/genshin_corpus/retrieval/navi_offline/` package owns the standalone
+offline Navi source catalog, typed quotations, adaptive Cards, sharded RU/Card
+indexes, raw-first request adapters, pipeline CLI and inactive human-review
+records. It reuses existing projection, local embedding and frozen v0.3 modules;
+it does not replace old experiment runners, production retrieval or `rag/`.
+`embedding_worker.py` runs in the already-qualified local ML environment while
+the CLI and SDK remain in the orchestration environment. `testing.py` provides
+explicitly foreign MOCK vectors only. See the
+[environment report](research/phase-05/p05-navi-offline-environment-20261029.md).
+
 This document describes directory responsibilities. Current project status and
 the immediate next action are owned by `docs/current-phase.md`.
 
