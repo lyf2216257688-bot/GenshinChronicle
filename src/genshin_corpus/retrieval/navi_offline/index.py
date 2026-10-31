@@ -1,6 +1,9 @@
 """Typed, resumable exact local vector indexes; embedding windows are not evidence."""
 import json
 import os
+import sqlite3
+from contextlib import ExitStack
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 import numpy as np
@@ -29,15 +32,31 @@ def windows(text, encoder):
         start = lo
 
 
-def build(root, items, encoder, *, kind, input_identity, shard_size=4096, batch_size=2):
+def build(root, items, encoder, *, kind, input_identity, shard_size=4096, batch_size=2, projection=None, reuse_from=None):
+    with ExitStack() as resources:
+        return _build(root,items,encoder,kind=kind,input_identity=input_identity,shard_size=shard_size,
+                      batch_size=batch_size,projection=projection,reuse_from=reuse_from,resources=resources)
+
+
+def _build(root, items, encoder, *, kind, input_identity, shard_size, batch_size, projection, reuse_from, resources):
     require(kind in {'ru', 'card'} and 1 <= shard_size <= 4096, 'Invalid typed index policy')
+    require(projection is None or (kind=='card' and projection in {
+                'card_story_observation_interpretation_question_v1','card_story_observation_interpretation_question_v2',
+            'card_narrative_attributed_v3','card_narrative_attributed_v4'}),
+            'Unknown/foreign text projection')
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     spec = {'version': VERSION, 'kind': kind, 'input_identity': input_identity,
             'encoder_space': encoder.space_identity, 'encoder_contract': encoder.contract,
-            'projection': 'exact_ru_text' if kind == 'ru' else 'card_semantic_labeled_v1',
+            'projection': projection or ('exact_ru_text' if kind == 'ru' else 'card_semantic_labeled_v1'),
             'window_policy': 'contiguous_character_ranges_tokenizer_le2048_including_eos',
             'shard_size': shard_size, 'batch_size': batch_size, 'dimension': 1024}
+    # A new immutable index may reuse only exact windows in the same vector space.
+    # The disk locator avoids loading all old rows/vectors into Python memory.
+    reusable=None; reuse_temp=None; reuse_db=None
+    if reuse_from is not None:
+        reusable=Index(reuse_from,kind=kind,encoder_space=encoder.space_identity,projection=spec['projection'])
+        spec['reuse_index_identity']=reusable.manifest['identity']
     if (root / 'spec.json').exists():
         require(read(root / 'spec.json') == spec, 'Index resume identity changed')
     else:
@@ -45,6 +64,16 @@ def build(root, items, encoder, *, kind, input_identity, shard_size=4096, batch_
     if (root / 'complete.json').exists():
         verify(root)
         return read(root / 'manifest.json')
+    if reusable is not None:
+        reuse_temp=resources.enter_context(TemporaryDirectory(prefix='navi-vector-reuse-'))
+        reuse_db=sqlite3.connect(str(Path(reuse_temp)/'locator.sqlite'))
+        resources.callback(reuse_db.close)
+        reuse_db.execute('create table locators(id text primary key, shard text, position integer)')
+        for name in reusable.manifest['shards']:
+            verify(reusable.root/name)
+            reuse_db.executemany('insert into locators values(?,?,?)',
+                ((r['window_id'],name,i) for i,r in enumerate(read(reusable.root/name/'rows.json'))))
+        reuse_db.commit()
     existing = []
     for folder in sorted((root / 'shards').glob('*')):
         if (folder / 'complete.json').exists():
@@ -70,16 +99,25 @@ def build(root, items, encoder, *, kind, input_identity, shard_size=4096, batch_
         for start in range(0, len(pending), batch_size):
             batch = pending[start:start+batch_size]
             try:
-                encoded = encoder.encode_documents([r['_text'] for r in batch], batch_size=batch_size)
+                missing=[]
+                for offset,row in enumerate(batch):
+                    prior=None if reuse_db is None else reuse_db.execute('select shard,position from locators where id=?',(row['window_id'],)).fetchone()
+                    if prior is None:missing.append((offset,row))
+                    else:
+                        vectors=np.load(reusable.root/prior[0]/'vectors.npy',mmap_mode='r',allow_pickle=False)
+                        values[start+offset]=vectors[prior[1]];del vectors
+                        audits.append({'reused_window_id':row['window_id'],'index_identity':reusable.manifest['identity']})
+                if not missing:continue
+                encoded = encoder.encode_documents([r['_text'] for _,r in missing], batch_size=batch_size)
             except BaseException:
                 values.flush()
                 values._mmap.close()
                 raise
             require(encoded.space_identity == encoder.space_identity and encoded.role == 'document', 'Encoder identity changed')
-            require(encoded.vectors.shape == (len(batch), 1024), 'Vector shape differs')
+            require(encoded.vectors.shape == (len(missing), 1024), 'Vector shape differs')
             require(all(not a['truncated'] for a in encoded.token_audit), 'Window unexpectedly truncated')
             require(np.isfinite(encoded.vectors).all() and np.allclose(np.linalg.norm(encoded.vectors,axis=1),1,atol=1e-5), 'Invalid normalized vectors')
-            values[start:start+len(batch)] = encoded.vectors
+            for i,(offset,_) in enumerate(missing):values[start+offset] = encoded.vectors[i]
             audits.extend(encoded.token_audit)
         values.flush()
         values._mmap.close()
@@ -120,13 +158,14 @@ def build(root, items, encoder, *, kind, input_identity, shard_size=4096, batch_
 
 
 class Index:
-    def __init__(self, root, *, kind, encoder_space):
+    def __init__(self, root, *, kind, encoder_space, projection=None):
         self.root = Path(root)
         verify(root)
         self.manifest = read(self.root / 'manifest.json')
         spec = self.manifest['spec']
         require(self.manifest['identity']==digest([spec,self.manifest['shard_content']]),'Index content identity differs')
         require(spec['kind'] == kind and spec['encoder_space'] == encoder_space and spec['dimension'] == 1024, 'Foreign index kind/model/device/dimension')
+        require(projection is None or spec['projection']==projection,'Foreign index text projection')
         self.kind, self.space = kind, encoder_space
         self.stamps = {p: (p.stat().st_size, p.stat().st_mtime_ns) for p in self.root.rglob('*') if p.is_file()}
 

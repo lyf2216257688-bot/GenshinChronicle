@@ -90,6 +90,15 @@ RAG answers are query results. They must not automatically become Canonical fact
 
 ## Cross-layer invariants
 
+`genshin_corpus.model_calls` owns shared model-call attempts, request budgets,
+retry decisions, interrupted-call recovery and per-channel cooldown. The small
+`evidence_io` module reuses the existing create-only/hash/seal contract formerly
+owned by the offline package. Adapters retain raw HTTP/CLI evidence and separate
+reasoning, usage, protocol and task-content validation. The caller owns source
+selection, semantic contracts and live authorization. No call output acquires
+Canonical authority. Current migration coverage and legacy exceptions are listed
+in `docs/model-interfaces.md`; adopted Phase04 and frozen runners are unchanged.
+
 - Source/API organization != game-content organization != research interpretation.
 - Raw evidence remains reproducible and auditable.
 - Derived artifacts must be traceable back to Raw.
@@ -152,3 +161,11 @@ accepted online paths and from KG. Its pinned embedding worker reuses the
 qualified ML runtime through local process pipes; generation SDK dependencies
 stay in the orchestration runtime. Current authorization and measured readiness
 remain with `docs/current-phase.md`.
+
+The Card-only build path can prepare a whole-corpus snapshot, process adaptive
+reading and source-aware section/document synthesis in bounded batches, and
+build a new local Card index with exact-window reuse. Card observations,
+interpretations and hypotheses remain distinct derived content. Card-led Link
+research follows Card qualification; Canonical/RU retain original-evidence
+authority. The optional attribution sidecar is a diagnostic, not formal factual
+review or release authority. None of these paths selects a production default.

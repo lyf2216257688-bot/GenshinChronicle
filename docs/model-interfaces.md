@@ -10,6 +10,113 @@ and `src/genshin_corpus/rag/model_interfaces_catalog.py`.
 
 ---
 
+## Shared model-call execution (2026-10-30)
+
+New API work defaults to `genshin_corpus.model_calls`. It schedules retry-free
+SDK attempts, reuses raw-first transport and create-only evidence IO, and does
+not alter prompts or content acceptance. A call root contains `call.json`, the
+unchanged adapter `plan.json`, immutable `attempts/`, `dispatches/`, `decisions/`,
+selected-artifact projections and a sealed result. Route fingerprint ledgers
+are retained. A recovery root references the exact old plan, original bytes and
+original ledger reservation; it never salts a fingerprint or removes a claim.
+
+`Policy` defaults: maximum 3 attempts; only proved TCP/TLS pre-send failures
+retry automatically; uncertain retries 0; JSON-generation retries 0; exponential
+backoff from 1s capped at 30s; channel circuit after 3 consecutive channel
+failures, cooldown 60s. Numeric/date `Retry-After` is honored within the cap.
+These are operating points, not claims of provider capacity.
+
+HTTP429/5xx/524, disconnection and uncertain interrupted calls may retry within
+explicit `unknown_retries`, `cost_risk_authorization`, attempt and batch limits.
+No generic assumption says 429/5xx proves no generation. Metro server-side
+idempotency is **NOT_VERIFIED**; identical bodies/fingerprints do not prove
+server deduplication. The generic seam can carry a stable `Idempotency-Key`
+with a route-bound verified provider contract; neither current Metro adapter
+enables it. Otherwise another attempt may incur another charge and consumes
+risk allowance. Completed non-JSON can retry only with finite authorized
+`format_retries`. Source/Schema failures and truncation are isolated, never
+silently repaired/resampled. Existing deterministic Card conversions remain
+strictly source-bound. Successful retries never erase earlier UNKNOWN.
+
+`Batch` reserves each attempt under an OS process lock. Unknown usage consumes
+its conservative token allowance instead of zero. Independent tasks continue
+while reservations fit. Reported usage and actual/unknown cost are independent
+of protocol/content PASS. Allowances are operating reservations, not tokenizer
+guarantees, provider enforcement or invoices; overruns can defer later sends.
+Sealed attempts are reused on resume; partial attempts remain UNKNOWN. Channel
+and budget deferrals are resumable. Execution stays serial; no database, queue
+service or new dependency. Caller still owns live authorization and task
+validation. SDK/transport retries stay disabled.
+
+| Task | Integration |
+|---|---|
+| Metro Card Chat (`metro_chat.execute`) | Shared by default; same prompt/wire/source validation |
+| Typed Responses Card / Link generation / review / attribution (`requests.execute`) | Shared by default; frozen Link semantics unchanged |
+| New offline Navi, including rich text | Shared typed path by default; native runner explicit compatibility only |
+| Card-only builds / new DeepSeek blind preparations | Shared budgets and independent-task continuation |
+| Antigravity blind CLI | Shared outer budget/recovery/archive/circuit; internal HTTP attempts/retries/dedup/fees UNKNOWN |
+| Completed original blind roots / scoped permits | Historical immutable identities; no implicit migration/additional authorization |
+| Frozen native v0.3 / F2 / older semantic SDK / R1 and related research | Legacy, not migrated |
+| Navi E2 `E2SDK` and historical research retry modes | Legacy, not migrated |
+| Adopted Phase04 Generation / remote embedding / older SDK and urllib consumers | Legacy, production unchanged |
+
+Card and new blind CLIs accept `--call-policy <json>`. It never substitutes for
+`--execute-authorized`, exact preparation acknowledgment or campaign budgets.
+Live Card builds require finite prepared `total_request_limit`. New preparations
+snapshot both shared modules along with task code. Code drift needs a new
+preparation or explicit origin-bound recovery, not hash substitution. Completed
+historical blind campaigns and their exhausted authorization remain closed.
+CLI invocation count is not API request count; unknown internal attempts are
+reported separately from known API request observations. Its input-plus-output
+allowance cannot guarantee the size of native Agent overhead.
+
+Read-only diagnosis (PowerShell 7, no model calls):
+
+```powershell
+$env:PYTHONPATH = 'src'
+python -m genshin_corpus.model_calls inspect --request data/retrieval/p05-card-blind-prep-20261030-r1/runs/deepseek/T01/request
+```
+
+Explicit programmatic recovery uses `metro_chat.execute(new_root, view, evidence,
+strategy=original_strategy, legacy_origin=original_request_root, call_policy=policy,
+call_batch=batch, live_authorized=True, api_key=...)`. Input reconstructs the
+exact original plan; credentials stay in existing environment. Partial originals
+remain partial and hashed, never resealed. Use a new output root and retain
+UNKNOWN. This documentation does not authorize executing that recovery.
+
+[Investigation, T01 offline verification and limits](research/phase-05/p05-model-call-unification-20261030.md).
+
+
+### Card-only Metro Responses consumer (2026-10-29; historical checkpoint)
+
+The subsequent [parameter study](research/phase-05/p05-metro-parameter-study-20261029.md)
+keeps SDK serialization, vendor documentation, Metro public endpoint declarations
+and actual Metro parameter enforcement separate. `metro_parameter_drafts.py`
+exports offline-only DeepSeek none/low/nonstream/schema and Qwen Chat controls;
+it has no dispatch entrypoint and changes no default model or production wire.
+Neither native API documentation nor successful Mock serialization authorizes
+an unsupported/untested Metro live operating point.
+The subsequently authorized [D1 trial](research/phase-05/p05-metro-none-live-20261029.md)
+did send reasoning.effort=none, but still returned visible reasoning and failed
+ID/output-cap checks; it did not qualify this parameter as a reliable thinking
+disable switch on the current route. Conditional non-stream D2 was not sent.
+
+At the initial Metro checkpoint, `retrieval/navi_offline/card_build.py` live Card preparations defaulted to
+`tokenmetro / deepseek-v4.1-flash`, configured `TOKENMETRO_API_KEY` and
+`TOKENMETRO_BASE_URL`, `https://tokenmetro.com/v1/responses`, JSON-object mode,
+8192 output cap. The authenticated model catalog lists the exact model ID and
+Responses support. Route/surface/URL/wire identities and the dedicated
+`data/retrieval/p05-card-metro-request-ledger/` preserve cross-run duplicate
+protection separately from historical jizhi requests. No route fallback or retry.
+This is a new explicit Card consumer, not reactivation of retired shared SDK or
+a change to E2/v0.3/Phase04 policies. The first Metro response passed local Card
+content checks but failed protocol ID/output-cap checks; further sends stopped.
+Independent provider counters, stream and content outcomes are retained. Scope
+and actual evidence: [Metro report](research/phase-05/p05-card-metro-switch-20261029.md).
+
+Current Card CLI behavior is the structured-generation strategy documented below;
+this historical Responses checkpoint does not override it.
+
 ## 1. Interface Lifecycle Tiers
 
 Interfaces are strictly partitioned into four operational tiers. Never treat historical
@@ -232,3 +339,47 @@ python -m genshin_corpus.rag.model_interfaces_catalog --markdown
 # 3. Run consistency unit test
 python -m unittest tests.retrieval.test_model_interfaces_consistency
 ```
+
+### Metro Card opt-in Chat check (2026-10-29; historical checkpoint)
+
+An isolated `navi_offline/metro_chat.py` adapter archives raw nonstream Chat before SDK parsing,
+uses the existing Metro persistent ledger with endpoint-bound identity. Its raw transport never retries; shared scheduling now owns bounded attempts. At this historical checkpoint it never retried.
+It does not change Card defaults. One authorized DeepSeek/Chat/disabled-thinking request
+showed no visible reasoning but failed token arithmetic and Card Schema; batch continuation
+was blocked at that checkpoint. Superseded by the bounded Card strategy below. See [actual evidence](research/phase-05/p05-metro-chat-disabled-live-20261029.md).
+
+### Card structured-generation strategy (2026-10-29)
+
+Current Card CLI preparation defaults to `deepseek-card-structured-1`: Metro
+`https://tokenmetro.com/v1/chat/completions`, `deepseek-v4.1-flash`, stream=false,
+max_tokens=12288, json_object, thinking.type=disabled via top-level extra-body forwarding.
+System Prompt carries the complete Card Schema and typed examples; deterministic aliases
+reduce wire IDs without changing provenance. The existing TOKENMETRO credential slot is reused.
+`qwen-card-structured-1` remains an explicit experimental candidate (Qwen3.8 Flash,
+json_schema/enable_thinking=false); its live probe HTTP524 is not a success or free-call proof.
+Card internal Python prepare defaults retain legacy compatibility; explicit legacy-responses
+selects the old Card execution path. E2 and frozen Link protocol rules are unaffected.
+
+Only this new Card adapter permits recorded token arithmetic warnings and the observed
+DeepSeek v4.1/v4-1 returned spelling alias; it still rejects foreign models, truncation,
+missing counters, over-cap output and source/content violations. Native upstream identity
+and actual fees remain UNKNOWN. See [real batch, recovery and semantic limitations](research/phase-05/p05-card-reliable-generation-20261029.md).
+
+### 2026-10-31 Phase05 Card A/C qualification
+
+**Decision locked; runtime integration pending.** Machine-readable profile: `config/phase05-card-api-profile-20261031.json`. Original sealed A/C outputs: `data/retrieval/p05-card-api-ac-20261031-r1/`.
+
+- Selected NEW Card profile: TokenMetro `deepseek-v4.1-flash`, Chat Completions, nonstream, `response_format={"type":"json_object"}`, `thinking.type=disabled`, 32,000 output cap, full local Schema and source/quotation checks. Native upstream identity unverified.
+- A: Responses `text.format=json_schema`, T01, 32k, thinking none: HTTP 400, `This response_format type is unavailable now`; provider usage UNKNOWN. Do not select Responses JSON Schema at current route.
+- C: Chat Low requested, T05, 32k: HTTP 200; mechanical/source PASS; 7,279 input + 16,008 output = 23,287 tokens, versus disabled 19,831. Response had neither reasoning_content nor reasoning-token breakdown, so effective Low is unverified. No clear semantic gain; remain disabled by default.
+- Shared model_calls remains required for retry, recovery, budgets, persistent raw records, channel fault control, UNKNOWN accounting. Unsupported HTTP 400 is not retried. Sent/unknown requests require bounded cost-risk authorization for resends.
+- Long-document B/truncation strategy deferred. Cards remain INACTIVE/NOT_REVIEWED.
+- **Migration note:** current production source still has 12,288 in legacy `deepseek-card-structured-1`. Do not overwrite sealed historical executable identity. Integrate a NEW versioned 32k Card strategy and make it the default for NEW campaigns only, with regression tests and unchanged historical resume behavior. The JSON decision file alone is not yet an active code switch.
+
+Official references: https://api-docs.deepseek.com/api/create-chat-completion/ , https://api-docs.deepseek.com/api/create-response/ , https://api-docs.deepseek.com/guides/thinking_mode/ .
+
+### 2026-10-31 final Chat strict Function Calling A/C extension
+
+Isolated paid T01 probe: Chat Completions + forced `submit_navi_card` function (`strict:true`), thinking disabled, nonstream, 32k. On the **TokenMetro `/v1/chat/completions` route**, HTTP 200 with exactly one function call, `finish_reason=tool_calls`, and **full local source/Schema/quote PASS**. Tokens: input 2,956, output 13,839, total 16,795, fee UNKNOWN. Disabled-thinking JSON Object T01 reference total: 11,291; both passed. Note DeepSeek official strict tool calling requires a Beta endpoint, while this was through Metro; this successful output does not independently prove provider-side strict-enforcement guarantees.
+
+**No change to chosen default:** Chat Completions, JSON Object, thinking disabled, new-run 32k profile. Strict Function Calling is a *compatible alternate* only: around 49% higher observed total tokens on T01, no clear semantic gain, and a tool-call adapter would be required. Keep independent local Schema and exact-source checks. See `docs/research/phase-05/p05-chat-strict-function-20261031.md` and original raw artifacts at `data/retrieval/p05-card-strict-tools-20261031-r1/`. Legacy runtime still requires a versioned 32k integration; no silent update to old strategies.

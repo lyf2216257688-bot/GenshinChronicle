@@ -1,5 +1,43 @@
 # Data Directory
 
+Shared model calls retain route fingerprint ledgers and immutable original
+reservations. New call roots contain `attempts/`, dispatch/retry records and a
+sealed aggregate result; explicit recoveries reference original artifact hashes
+and append ledger `recoveries/` records without changing old entries. Shared
+batch directories reserve each attempt before dispatch and keep UNKNOWN token
+allowances separate from observed usage. Ledger `.channel/` records provide
+per-channel cooldown; `.locks/` files use OS process locks, not deletion for
+recovery. Offline verification evidence:
+`retrieval/p05-model-call-unification-20261030-r1/`; no paid rerun or new Card
+production. These ignored archives still need an independent backup.
+
+## Independent Card comparison preparation
+
+`retrieval/p05-card-blind-prep-20261030-r1/` owns the five-source selection metadata,
+sealed Canonical/RU snapshot, shared model-visible materials, execution code,
+offline checks and separately sealed accidental diagnostic evidence. Authorized
+`runs/gemini/` and `runs/deepseek/` retain raw invocation/response/usage and
+source-bound document Cards. Generation results stay separate from preparation.
+`runtime-revision/` appends explicit code migrations without resealing original
+preparations; `recoveries/<provider>/<case>/` binds independently validated offline
+results to original completed requests. Neither replaces raw failures or ledgers.
+`isolated/<provider>/<case>/` accounts for proved completed, known-usage content
+failures without accepting their Cards or permitting reissue; uncertain sends
+remain blocking. Multiple code revisions preserve their predecessor seals.
+`review-key.json` is private
+control data, excluded from anonymous review exports and the model workspace.
+`anonymous-review/` includes every selected document with paired, single-sided or
+no-valid-Card dispositions. Only accepted Cards receive semantic/projection files;
+failed and missing results receive no automatic semantic score. Provider names,
+usage, timing, raw errors and the private assignment stay outside that package.
+`deepseek-independent-dispatch.json` records a separately user-authorized,
+five-case exception to UNKNOWN accounting; it never changes original usage or
+permits reissue and is not a general production authorization.
+The external Antigravity workspace receives only the sealed materials subtree;
+the main corpus, historical model answers and review findings are not workspace roots.
+Configured CLI access controls are not a claim of complete OS containment. Current
+authorization and incident accounting are owned by `docs/current-phase.md`.
+
 ## Standalone offline Navi environment
 
 `retrieval/p05-navi-offline-20261029-r1/` contains this work unit's protected-input
@@ -18,7 +56,26 @@ them up. Historical roots, the real v0.3 request ledger and 2048-dimensional
 production indexes retain their existing responsibilities. See the
 [environment report](../docs/research/phase-05/p05-navi-offline-environment-20261029.md).
 
+`retrieval/p05-card-production-readiness-20261029-r1/` owns the separate
+Card-only engineering checkpoint: initial/final Canonical census, historical
+Card input comparison, append-only range/usage replay, bounded real-source
+Mock builds, resource/cost scenarios and protected-input verification. It
+contains no new paid response or full-corpus embedding. New Card builds keep
+sealed `prepared/`, create-only raw `jobs/`, immutable per-source attempts under
+`documents/`, completion pointers and batch summaries. A completed build means
+mechanical completion, never human acceptance. New Card indexes are explicit
+separate artifacts; historical RU/Card and production indexes stay intact.
+See the [Card readiness report](../docs/research/phase-05/p05-card-production-readiness-20261029.md).
+
 `data/` contains generated/local datasets, not source code.
+
+`retrieval/p05-card-metro-discovery-20261029-r1/` retains secret-free model-catalog
+discovery. `retrieval/p05-card-metro-live-20261029-r1/` owns the one authorized
+Metro Card verification, strict protocol failure, independently known counters,
+content-only unaccepted JSON and five-source stop records. Its separate persistent
+ledger is `retrieval/p05-card-metro-request-ledger/`; the old jizhi ledger/results
+remain unchanged. Valid JSON alone is not an ingested Card or human acceptance.
+See the [Metro report](../docs/research/phase-05/p05-card-metro-switch-20261029.md).
 
 ## Raw evidence
 

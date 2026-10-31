@@ -125,6 +125,12 @@ only when its scope is clear enough that it cannot override current authority.
 - When a task requires commands for the user to run manually on Windows, provide PowerShell 7 (`pwsh`)-compatible commands by default. Use Windows PowerShell 5.1 only for an explicit legacy-compatibility requirement. This applies only to commands given to the user; Codex must use the shell available in its actual runtime and must not assume PowerShell 7 is installed there. Do not include usernames, absolute PowerShell installation paths, or other machine-specific paths in repository content.
 
 ## Engineering behavior
+- New or materially changed model API tasks must use `genshin_corpus.model_calls`
+  for attempts, retry decisions, budgets and recovery, with raw-first adapters
+  and task-specific validators. Do not add experiment-local retry/UNKNOWN
+  bypasses. Frozen historical runners and adopted Phase04 paths retain their
+  documented legacy policies until explicitly migrated. Configuring a retry
+  policy never grants permission for a paid call or duplicate billing risk.
 - Prefer small, reviewable changes with clear acceptance criteria.
 - Separate observed facts from assumptions and historical leads.
 - Fail loudly on unknown critical structures; do not silently discard data.

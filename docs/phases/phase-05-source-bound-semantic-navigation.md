@@ -82,6 +82,48 @@ deterministic recovery cannot authorize provider reissue: pending, UNKNOWN and
 sent failures remain isolated. Human reviews append exact artifact/item hashes
 and never automatically publish or activate a view.
 
+The offline environment also supports explicit research options for an
+attribution crosscheck sidecar and an evidence-filtered narrative Card index.
+The sidecar preserves original v0.3 judgments and records optional diagnostic
+warnings only; it is not a formal fact-review, admission or release gate.
+Retrieval views may exclude inherited
+copies, mechanics and hypotheses with audited dispositions and independent
+projection identities; legacy Card and exact RU paths remain available.
+These options do not alter the frozen semantic contract or authorize calls.
+Scoped policy and local-only evidence belong to the
+[quality report](../research/phase-05/p05-navi-semantic-quality-20261029.md).
+
+The subsequent opt-in `p05-card-build-1` Card-only path owns `p05-navi-card-2`:
+atomic source-observation subjects/actions/objects/modalities, program-located
+verbatim anchors, separate interpretations/hypotheses, adaptive source reading,
+and real model synthesis for multi-batch sections/documents. Synthesis receives
+children and inherited source quotations; it never counts inherited evidence as
+direct full-document reading. Batch/reduction nodes are not narrative chapters.
+All selected, unread, unsupported and failed scopes remain explicit. A typed
+quote/receipt PASS establishes delivery/identity, not semantic truth.
+
+`card_narrative_attributed_v3` embeds narrative document/section content and
+explicitly labeled uncertainty; machine reading receipts and release/review
+states do not enter vectors. Exact-window vector reuse requires the same model,
+device and projection contract. Completed jobs and immutable per-source versions
+support bounded batches, exact replay reuse and explicit targeted regeneration;
+pending/UNKNOWN/sent failures never authorize automatic reissue. Provider-reported
+terminal usage observations are retained independently of stream/content/cap acceptance;
+raw report and arithmetic validity are distinct from billing certainty. A cap
+violation still rejects content and blocks new paid dispatch. Historical contracts
+and outcomes are preserved. Full-corpus scale/paid execution and new-Prompt
+semantic qualification require separate authorization; measured scope/budgets
+belong to the [Card readiness report](../research/phase-05/p05-card-production-readiness-20261029.md).
+
+New Card-only live preparations explicitly select Metro, preserving the same
+logical DeepSeek model and Card semantic contract. Route/API/URL participate in
+request identity and a dedicated persistent ledger; this does not rewrite old
+provider outcomes or re-enable historical shared SDK/E2 routes. Reasoning and
+final text are archived separately; protocol and content outcomes are separate,
+and only both PASS allow a Card value. A failed paid Card stops the Metro batch
+without retry, fallback or parameter resampling. Operational evidence belongs
+to the [Metro Card report](../research/phase-05/p05-card-metro-switch-20261029.md).
+
 ### Navi and KG semantic responsibility separation
 
 Rather than forcing both views to consume a monolithic, unverified model
@@ -848,6 +890,16 @@ source/build/stage dependencies against these persisted identities.
 
 ## UNKNOWN classification
 
+For newly integrated offline API tasks, shared-call execution in
+`docs/model-interfaces.md` supersedes historical experiment-wide stop policies.
+A single failure/UNKNOWN isolates that task; independent tasks may consume their
+own finite reservations. UNKNOWN is neither zero usage nor a permanent ban:
+uncertain retries require explicit duplicate-cost risk authorization or verified
+provider deduplication. Current Metro deduplication is NOT_VERIFIED. Old results,
+reservations, validators and frozen v0.3 runners are unchanged. Infrastructure
+does not authorize paid requests. Historical retry predicates elsewhere in this
+spec continue to describe the original runners only.
+
 Non-blocking UNKNOWNs and first-version operating points are the later
 provider/model choice, one-request versus staged extraction, initial hierarchy
 expansion policy, traversal algorithm, hop/node/edge/candidate limits,
@@ -861,3 +913,26 @@ different durable architecture and require approval before dependent work.
 Blocking UNKNOWNs are limited to missing identity, provenance, correctness
 authority, safety, or other formal-contract facts that make continuing W1
 require guessing. No such UNKNOWN is open for the approved W1 slice.
+
+## Card-only structured generation and evidence-preserving recovery
+
+The versioned Card Chat strategy may use explicit model/interface/Prompt/Schema variants
+under a finite operator-authorized campaign budget. Old raw responses, result states and
+request reservations remain immutable. A completed raw response may be re-evaluated into a
+separately sealed recovery artifact with original hash, versioned conversion log and strict
+local Schema/source validation; it is never silently retroactively graded. Source aliases
+are reversible. Program-owned exact quote ranges remain authoritative. No conversion may
+write missing facts, guess source references or cross source documents. Same-document exact
+unique quote rebinding must record both the original and verified fragment identity.
+
+This Card-only boundary can classify noncritical provider metadata as warnings independently
+of content acceptance. Provider counts remain raw and fees UNKNOWN without billing evidence;
+missing counters/unknown transmission, truncation and source/Schema failures remain explicit
+blocks, without automatic resending. No such policy change applies to the frozen v0.3 Link
+Prompt, Schema, protocol runner or story admission standard.
+
+Card build COMPLETE means the declared structural/source work completed, not semantic or
+human acceptance. Coverage is computed from selected/delivered ranges and representations;
+a chapter with any omitted range is not necessarily an unread chapter. Inherited synthesis
+never claims direct source reading. Quality reviews bind exact Card/file hashes and remain
+separate from originals. New retrieval projections need separate version/index identities.

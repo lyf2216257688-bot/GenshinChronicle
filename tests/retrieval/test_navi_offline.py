@@ -62,6 +62,45 @@ class OfflineTests(unittest.TestCase):
         pipeline.prepare(root,self.cp,self.rp,['0','1'],body_limit=kwargs.pop('body_limit',8000),**kwargs)
         return root
 
+    def test_story_policy_and_auxiliary_check_complete_mock_chain(self):
+        root=self.prepared(retrieval_policy=pipeline.story_retrieval.POLICY,attribution_check=True)
+        result=pipeline.run(root,MockEncoder(),backend='mock')
+        self.assertEqual(result['failures'],0)
+        self.assertEqual(pipeline.audit(root)['archive_integrity'],'PASS')
+        output=pipeline.output_root(root)
+        self.assertTrue((output/'story-retrieval.json').exists())
+        links=read(output/'links.json')
+        self.assertTrue(links)
+        for link in links:
+            self.assertIsNotNone(link['attribution_job'])
+            self.assertEqual(link['attribution_disposition'],'MOCK_NOT_SEMANTIC_VERIFICATION')
+            self.assertEqual(link['human_acceptance'],'NOT_REVIEWED')
+        self.assertEqual(pipeline.run(root,MockEncoder(),backend='mock'),result)
+
+    def test_proven_untransmitted_accounts_zero_without_reissue(self):
+        folder=self.root/'campaign/jobs/failure'
+        view={'title':'fixture','evidence':[]};wire=cards.wire(view)
+        ledger=self.root/'ledger'
+        def fail(req):
+            trace=req.extensions['trace']
+            trace('connection.connect_tcp.started',{})
+            trace('connection.connect_tcp.complete',{})
+            trace('connection.start_tls.started',{})
+            trace('connection.start_tls.failed',{})
+            raise httpx.ConnectError('synthetic presend TLS',request=req)
+        with patch.object(old,'LEDGER',ledger):
+            result=requests.execute(folder,'card',wire,view,[],backend='live',live_authorized=True,api_key='test-private-not-in-source',transport_override=httpx.MockTransport(fail),call_policy=requests.model_calls.Policy(max_attempts=1))
+            before=sha(folder/'complete.json')
+            self.assertEqual(result['state'],'UNKNOWN')
+            self.assertTrue(requests.proven_untransmitted(folder))
+            self.assertEqual(requests.accounted_tokens(folder),0)
+            self.assertEqual(sha(folder/'complete.json'),before)
+            again=requests.execute(folder,'card',wire,view,[],backend='live',live_authorized=True,api_key='test-private-not-in-source',transport_override=httpx.MockTransport(lambda req:self.fail('reissued')),call_policy=requests.model_calls.Policy(max_attempts=1))
+            self.assertEqual(again,result)
+            # Any evidence of sending prevents the zero-token accounting exception.
+            with patch.object(requests.transport,'pre_send_failure',return_value=False):
+                with self.assertRaises(ValueError):requests.accounted_tokens(folder)
+
     def test_complete_mock_chain_review_audit_export_resume(self):
         root=self.prepared()
         result=pipeline.run(root,MockEncoder())
@@ -265,7 +304,7 @@ class OfflineTests(unittest.TestCase):
             quotes.append(sources.quote(row['unit_id']))
         view,binding=pipeline.link_view(sources,list(sources.documents),quotes)
         jid,result,value=pipeline._run_job(root,'generation',view,binding,backend='mock',mock_value=pipeline.mock_link(view),
-                                          replay_root=None,live=False,api_key=None,sources=sources)
+                                          replay_root=None,live=False,api_key=None,sources=sources,shared_calls=False)
         self.assertEqual(result['state'],'CONTENT_VERIFIED')
         self.assertEqual(read(root/'jobs'/jid/'plan.json')['executor'],'UNCHANGED_V03_RUNNER')
         self.assertEqual(old.audit_run(root/'jobs'/jid/'native-run')['archive_integrity'],'PASS')

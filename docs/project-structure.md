@@ -1,5 +1,12 @@
 # Project Structure
 
+Shared execution primitives: `src/genshin_corpus/model_calls.py` owns serial
+model-call attempts, budgets, retry/resume and channel cooldown;
+`src/genshin_corpus/evidence_io.py` owns reused create-only evidence IO.
+`retrieval/navi_offline/common.py` re-exports that IO for compatibility.
+Source/Schema/semantic validation remains in its existing domain modules.
+Integration and legacy exceptions: `docs/model-interfaces.md`.
+
 The opt-in `src/genshin_corpus/retrieval/navi_offline/` package owns the standalone
 offline Navi source catalog, typed quotations, adaptive Cards, sharded RU/Card
 indexes, raw-first request adapters, pipeline CLI and inactive human-review
@@ -9,6 +16,20 @@ it does not replace old experiment runners, production retrieval or `rag/`.
 the CLI and SDK remain in the orchestration environment. `testing.py` provides
 explicitly foreign MOCK vectors only. See the
 [environment report](research/phase-05/p05-navi-offline-environment-20261029.md).
+
+Within the same package, `cards_v2.py` owns attributed narrative reading,
+section/document synthesis and the labeled story projection; `card_build.py`
+owns Card-only batches, immutable source revisions, reuse and targeted updates;
+`card_census.py` estimates whole-corpus work through the approved RU projector.
+`anchors.py` computes unique exact quotation ranges. These are specialized
+offline functions, not a general agent framework or a new authoritative layer.
+`response_records.py` preserves provider counters and independent strict
+stream/content outcomes plus separated reasoning/final text. Card-only Metro
+requests reuse the raw-first adapter with explicit route identity and ledger;
+historical request paths and frozen v0.3 are not rewritten.
+`metro_parameter_drafts.py` is an isolated offline wire/non-stream parsing
+prototype for parameter studies, with no live dispatch or default adoption.
+See the [Card readiness report](research/phase-05/p05-card-production-readiness-20261029.md).
 
 This document describes directory responsibilities. Current project status and
 the immediate next action are owned by `docs/current-phase.md`.
@@ -176,3 +197,17 @@ records and manifests. `data/retrieval/` is the ignored local root for
 authorized rebuildable Retrieval/RAG derivatives, Phase 05 semantic build/view
 artifacts, and materialization outputs; its detailed responsibilities are owned
 by `data/README.md`.
+
+Card generation: `navi_offline/card_generation.py` owns versioned typed Chat prompts,
+wire aliases and logged deterministic conversions; `metro_chat.py` owns raw-first
+nonstream transport and independent protocol/content/accounting records. `card_build.py`
+uses those strategies for bounded Card-only batches and separately sealed raw recovery.
+These modules do not own Link standards or Canonical evidence.
+
+`navi_offline/card_blind.py` owns opt-in source-identical Card comparison preparation,
+fresh Antigravity CLI invocation, reuse of the existing Metro transport/ledger,
+immutable per-source results, append-only code revisions/offline recovery, and
+private anonymous-review assignment with explicit partial-failure cohorts. Named,
+bounded independent dispatch in the historical blind root used a separately recorded authorization. New preparations use shared independent-task budgets; uncertain retries still require explicit cost-risk authorization. UNKNOWN usage and failed requests remain preserved. Its default
+execution path is a provider-free preview. It does not own Card semantic standards,
+provider production defaults, or OS-level isolation guarantees.

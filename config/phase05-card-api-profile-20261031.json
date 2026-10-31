@@ -1,0 +1,89 @@
+{
+  "schema_version": "gc-card-api-profile-decision-20261031-v1",
+  "status": "DECISION_LOCKED_RUNTIME_INTEGRATION_PENDING",
+  "scope": "NEW_PHASE05_CARD_GENERATION_ONLY",
+  "channel": "tokenmetro",
+  "upstream_native_model_identity": "NOT_ATTESTED",
+  "model_requested": "deepseek-v4.1-flash",
+  "api_surface": "chat_completions",
+  "endpoint": "/chat/completions",
+  "stream": false,
+  "response_format": {
+    "type": "json_object"
+  },
+  "extra_body": {
+    "thinking": {
+      "type": "disabled"
+    }
+  },
+  "reasoning_effort": "NOT_SENT",
+  "max_tokens": 32000,
+  "baseline_legacy_strategy": "deepseek-card-structured-1",
+  "new_strategy_id": "deepseek-card-structured-32k-20261031",
+  "validators": [
+    "JSON_STRUCTURE_LOCAL",
+    "SCHEMA_LOCAL",
+    "EXACT_QUOTE",
+    "EVIDENCE_ID",
+    "SOURCE_BOUND",
+    "MODALITY"
+  ],
+  "call_layer": "genshin_corpus.model_calls",
+  "call_policy": {
+    "max_attempts": 3,
+    "unknown_retries": 0,
+    "format_retries": 0,
+    "risk_authorized_unknown_retries": "ONLY_WHEN_EXPLICIT_BOUNDED_COST_AUTHORIZATION"
+  },
+  "eligibility": {
+    "navi_link_review": "UNCHANGED",
+    "long_document_output_policy": "DEFERRED_B",
+    "human_review": "INACTIVE_NOT_REVIEWED"
+  },
+  "qualification": {
+    "A": {
+      "route": "responses",
+      "format": "json_schema",
+      "case": "T01",
+      "http": 400,
+      "error": "This response_format type is unavailable now",
+      "usage": "UNKNOWN",
+      "decision": "NOT_ENABLED"
+    },
+    "C": {
+      "route": "chat_completions",
+      "thinking_requested": "low",
+      "case": "T05",
+      "http": 200,
+      "mechanical": "PASS",
+      "input_tokens": 7279,
+      "output_tokens": 16008,
+      "total_tokens": 23287,
+      "reasoning_content": "ABSENT",
+      "reasoning_usage": "ABSENT",
+      "decision": "NOT_DEFAULT"
+    },
+    "baseline_off": {
+      "case": "T05",
+      "total_tokens": 19831,
+      "mechanical": "PASS"
+    },
+    "tool_strict": {
+      "case": "T01",
+      "route": "chat_completions",
+      "strict_function": true,
+      "tool_choice": "submit_navi_card",
+      "http": 200,
+      "mechanical": "PASS",
+      "one_tool_call": true,
+      "input_tokens": 2956,
+      "output_tokens": 13839,
+      "total_tokens": 16795,
+      "baseline_json_object_tokens": 11291,
+      "fee": "UNKNOWN",
+      "strict_server_enforcement": "NOT_INDEPENDENTLY_PROVEN",
+      "decision": "WORKING_OPTION_NOT_DEFAULT",
+      "report": "docs/research/phase-05/p05-chat-strict-function-20261031.md"
+    }
+  }
+}

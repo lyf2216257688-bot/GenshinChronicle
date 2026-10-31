@@ -59,11 +59,13 @@ def prepare_sources(root, canonical_path, ru_path, source_ids):
             name = entry['record_id'] + '.json'
             copy(original, root / 'canonical' / name)
             units = []
+            by_unit = {}
+            for row in expected:
+                address = row['source']['canonical_address']
+                by_unit.setdefault((address['section_ordinal'],address['canonical_unit_ordinal']),[]).append(row['unit_id'])
             for section in record['sections']:
                 for unit in section['units']:
-                    matched = [r['unit_id'] for r in expected if
-                               r['source']['canonical_address']['section_ordinal'] == section['ordinal'] and
-                               r['source']['canonical_address']['canonical_unit_ordinal'] == unit['ordinal']]
+                    matched = by_unit.get((section['ordinal'],unit['ordinal']),[])
                     units.append({'section': section['ordinal'], 'unit': unit['ordinal'], 'kind': unit['kind'],
                                   'ru_ids': matched, 'disposition': 'AVAILABLE' if matched else 'EMPTY_OR_UPSTREAM_SKIPPED'})
             documents.append({'source_id': record['source_identity']['key'], 'record_id': record['record_id'],
@@ -86,10 +88,19 @@ class Sources:
         self.manifest = read(self.root / 'sources.json')
         self.documents = {d['source_id']: d for d in self.manifest['documents']}
         self._cache=OrderedDict()
+        self._records=OrderedDict()
+        self._offsets=OrderedDict()
         self.db = sqlite3.connect('file:' + (self.root / 'locator.sqlite').resolve().as_posix() + '?mode=ro', uri=True)
 
     def close(self):
         self.db.close()
+
+    def record(self, source):
+        if source not in self._records:
+            self._records[source] = read(self.root/self.documents[source]['canonical_file'])
+        self._records.move_to_end(source)
+        if len(self._records)>2:self._records.popitem(last=False)
+        return self._records[source]
 
     def rows(self, source):
         if source in self._cache:
@@ -113,6 +124,27 @@ class Sources:
         require(value is not None, 'Unknown RU')
         return json.loads(value[0])
 
+    def rich_offsets(self, source):
+        if source not in self._offsets:
+            groups={}
+            for r in self.rows(source):
+                if r['source']['canonical_address']['canonical_unit_kind']=='rich_text':
+                    groups.setdefault(digest(r['source']['canonical_address']),[]).append(r)
+            record=self.record(source);values={}
+            units={(s['ordinal'],u['ordinal']):u for s in record['sections'] for u in s['units']}
+            for siblings in groups.values():
+                siblings.sort(key=lambda r:r['fragment_selector'].get('fragment_index',0))
+                a=siblings[0]['source']['canonical_address']
+                unit=units[(a['section_ordinal'],a['canonical_unit_ordinal'])]
+                require(''.join(r['retrieval_visible_text'] for r in siblings)==unit['value']['normalized_text'], 'Rich occurrence incomplete')
+                offset=0
+                for r in siblings:
+                    values[r['unit_id']]=offset;offset+=len(r['retrieval_visible_text'])
+            self._offsets[source]=values
+        self._offsets.move_to_end(source)
+        if len(self._offsets)>2:self._offsets.popitem(last=False)
+        return self._offsets[source]
+
     def quote(self, uid, start=0, end=None):
         row = self.row(uid)
         text = row['retrieval_visible_text']
@@ -130,13 +162,7 @@ class Sources:
         result['text_sha256'] = sha256(result['text'].encode()).hexdigest()
         # Rich text has an exact Canonical range; other kinds deliberately do not.
         if address['canonical_unit_kind'] == 'rich_text':
-            record = read(self.root / d['canonical_file'])
-            section = next(s for s in record['sections'] if s['ordinal'] == address['section_ordinal'])
-            unit = next(u for u in section['units'] if u['ordinal'] == address['canonical_unit_ordinal'])
-            siblings = [r for r in self.rows(source) if r['source']['canonical_address'] == address]
-            siblings.sort(key=lambda r: r['fragment_selector'].get('fragment_index', 0))
-            require(''.join(r['retrieval_visible_text'] for r in siblings) == unit['value']['normalized_text'], 'Rich occurrence incomplete')
-            offset = sum(len(r['retrieval_visible_text']) for r in siblings[:next(i for i,r in enumerate(siblings) if r['unit_id']==uid)])
+            offset = self.rich_offsets(source)[uid]
             result.update(canonical_start=offset+start, canonical_end=offset+end)
         return result
 

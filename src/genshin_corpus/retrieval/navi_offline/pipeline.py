@@ -3,12 +3,14 @@ from collections import defaultdict
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 import time
 
 from .. import navi_prompt_candidate as candidate
 from .. import navi_v03_runner as old
 from ..local_qwen3_embedding import LocalQwen3Config, LocalQwen3Embedding, REVISION
-from . import VERSION, cards, index, requests
+from . import VERSION, cards, index, requests, attribution, story_retrieval
+from ... import model_calls
 from .common import copy, digest, inventory, read, require, seal, sha, verify, write
 from .sources import Sources, prepare_sources
 
@@ -16,17 +18,21 @@ REPO = Path(__file__).resolve().parents[4]
 CANONICAL = 'data/canonical/mihoyo_obc/zh-cn/phase03-batch5b-p01eb-full-20260824/metadata/manifest.json'
 RU = 'data/retrieval/p04-rag-production/phase03-batch5b-p01eb-full-20260824-pm02/ru/metadata/manifest.json'
 MODEL = '.local/models/qwen3-embedding-0.6b/' + REVISION
+DELIVERY_POLICY = 'narrative-first-exact-ru-v1'
 
 
 def code_identity():
-    return {p.name:sha(p) for p in sorted(Path(__file__).parent.glob('*.py'))}
+    return {p.name:sha(p) for p in sorted(Path(__file__).parent.glob('*.py'))} | model_calls.code_identity()
 
 
 def prepare(root, canonical_path, ru_path, source_ids, *, device='cuda', model_path=MODEL,
-            max_ru=512, max_cards=64, max_pairs=20, max_card_jobs=32, body_limit=8000):
+            max_ru=512, max_cards=64, max_pairs=20, max_card_jobs=32, body_limit=8000,
+            retrieval_policy='legacy', attribution_check=False):
     root=Path(root)
     require(all(type(x) is int and x>0 for x in (max_ru,max_cards,max_pairs,max_card_jobs,body_limit)), 'Positive budgets required')
     require(device in {'cuda','cpu'},'Explicit embedding device required')
+    require(retrieval_policy in {'legacy',story_retrieval.POLICY} and type(attribution_check) is bool,
+            'Unknown retrieval/attribution policy')
     require(max_cards>=len(source_ids),'Card budget must retain every document management node')
     require(not root.exists(),'New run root required')
     root.mkdir(parents=True)
@@ -47,11 +53,13 @@ def prepare(root, canonical_path, ru_path, source_ids, *, device='cuda', model_p
     config={'version':VERSION,'sources':resolved,'device':device,'model_path':str(Path(model_path).resolve()),
             'max_ru':max_ru,'max_cards':max_cards,'max_pairs':max_pairs,'max_card_jobs':max_card_jobs,
             'body_limit':body_limit,'request_limit':24000,'top_k':20,'rrf_denominator':60,
+            'retrieval_policy':retrieval_policy,'attribution_check':attribution_check,
             'code':code_identity(),'semantic_engine':engine,'model_revision':REVISION,
             'send_authorized':False,'navigation_status':'INACTIVE','human_acceptance':'NOT_REVIEWED'}
     write(prepared/'config.json',config)
     for p in Path(__file__).parent.glob('*.py'):
         copy(p,prepared/'execution-code'/p.name)
+    model_calls.snapshot(prepared/'execution-code')
     seal(prepared)
     return {'plan_sha256':sha(prepared/'complete.json'),'config':config}
 
@@ -102,6 +110,109 @@ def link_view(sources, endpoints, quotes, candidates=(), scoped_quotes=None):
     return view,registry
 
 
+def select_link_evidence(sources, endpoints, discovered, *, body_limit=8000, supplement_limit=512):
+    """Prioritize source-labelled narrative; budgets never rewrite upstream text.
+
+    Section labels are reading hints, not semantic roles or fact certification.
+    Complete endpoint RU inventories provide story/context absent from Top-K.
+    Companion structured projections remain separately accounted, never declared
+    equivalent to rich text. Dialogue fragments are admitted whole or omitted.
+    """
+    require(type(body_limit) is int and body_limit>0 and type(supplement_limit) is int and
+            0<=supplement_limit<=body_limit,'Invalid Link reading budgets')
+    discovered=list(discovered)
+    for q in discovered:
+        sources.verify_quote(q)
+        require(q['source_id'] in endpoints,'Discovery quote outside endpoints')
+    selected_units={(q['source_id'],q['canonical_address']['section_ordinal'],
+                     q['canonical_address']['canonical_unit_ordinal']) for q in discovered}
+    selected_ru_ids={q['unit_id'] for q in discovered}
+    admitted=[];scoped=[];audits={}
+    for source in endpoints:
+        d=sources.documents[source]
+        record=read(sources.root/d['canonical_file'])
+        names={s['ordinal']:s['source_metadata'].get('name','') for s in record['sections']}
+        rows=sources.rows(source)
+        rich_sections={r['source']['canonical_address']['section_ordinal'] for r in rows
+                       if r['source']['canonical_address']['canonical_unit_kind']=='rich_text'}
+        ranked=[]
+        for row in rows:
+            q=sources.quote(row['unit_id']);scoped.append(q)
+            a=q['canonical_address'];name=names[a['section_ordinal']];kind=a['canonical_unit_kind']
+            story=bool(re.search(r'故事|剧情|对话|语音|配音|台词|背景',name))
+            mechanics=bool(re.search(r'成长|数值|属性|推荐|配装|搭配|技能|天赋|命之座|掉落|奖励|突破|材料|装备展示|秘境详情',name))
+            if kind=='dialogue_graph':priority,category=0,'dialogue'
+            elif kind=='rich_text' and story:priority,category=0,'labelled_story'
+            elif kind=='structured_observation' and story and a['section_ordinal'] not in rich_sections:
+                priority,category=0,'structured_narrative'
+            elif mechanics:priority,category=5,'mechanics'
+            elif kind=='rich_text' and name!='装备描述':priority,category=1,'unclassified_readable_body'
+            elif kind=='rich_text':priority,category=2,'description_context'
+            elif a['section_ordinal'] in rich_sections:priority,category=4,'structured_companion_context'
+            else:priority,category=3,'unclassified_structured_context'
+            unit=(source,a['section_ordinal'],a['canonical_unit_ordinal'])
+            order=(a['section_ordinal'],a['canonical_unit_ordinal'],q['fragment_selector'].get('fragment_index',0))
+            ranked.append(((priority,unit not in selected_units,q['unit_id'] not in selected_ru_ids,order,q['unit_id']),q,category,name))
+        used=0;supplement=0;records=[]
+        for sort,q,category,name in sorted(ranked,key=lambda x:x[0]):
+            primary=sort[0]<=1
+            remaining=body_limit-used
+            if not primary:remaining=min(remaining,supplement_limit-supplement)
+            length=len(q['text']);take=length if length<=remaining else 0
+            reason='SOURCE_ORDER_WITHIN_READING_PRIORITY'
+            if not take and primary and remaining>0 and q['canonical_address']['canonical_unit_kind']!='dialogue_graph':
+                take=remaining
+                boundary=q['text'].rfind('\n',0,take)
+                if boundary>=take*0.75:take=boundary+1
+                reason='EXACT_PREFIX_BUDGET_PARTIAL'
+            if take:
+                actual=q if take==length else sources.quote(q['unit_id'],0,take)
+                admitted.append(actual);used+=take
+                if not primary:supplement+=take
+            else:
+                reason=('WHOLE_DIALOGUE_FRAGMENT_EXCEEDS_BUDGET' if category=='dialogue' else
+                        'BODY_BUDGET' if primary else 'SUPPLEMENT_BUDGET_OR_OVERSIZE')
+            records.append({'unit_id':q['unit_id'],'section':q['canonical_address']['section_ordinal'],
+                'unit':q['canonical_address']['canonical_unit_ordinal'],'section_name':name,
+                'category':category,'priority':sort[0],'discovery_unit':not sort[1],
+                'available_range':[0,length],'delivered_range':[0,take] if take else None,
+                'undelivered_ranges':[[take,length]] if take<length else [],
+                'disposition':'DELIVERED_FULL' if take==length else 'DELIVERED_PARTIAL' if take else 'OMITTED',
+                'reason':reason})
+        audits[source]={'policy':DELIVERY_POLICY,'body_limit':body_limit,'supplement_limit':supplement_limit,
+                        'delivered_chars':used,'supplement_chars':supplement,'units':records}
+    # Present excerpts in Canonical order, independent of admission priority.
+    admitted.sort(key=lambda q:(endpoints.index(q['source_id']),q['canonical_address']['section_ordinal'],
+                  q['canonical_address']['canonical_unit_ordinal'],q['fragment_selector'].get('fragment_index',0),q['ru_start']))
+    audit={'policy':DELIVERY_POLICY,'sources':audits,'discovery_excerpt_ids':[q['id'] for q in discovered]}
+    if any(not any(q['source_id']==s for q in admitted) for s in endpoints):
+        error=ValueError('No complete readable endpoint excerpt fits; do not dispatch')
+        error.delivery_audit=audit
+        raise error
+    view,binding=link_view(sources,endpoints,admitted,scoped_quotes=scoped)
+    for side,source in zip(('A','B'),endpoints):
+        ledger=audits[source]
+        sections=[]
+        for section in sorted({u['section'] for u in ledger['units']}):
+            units=[u for u in ledger['units'] if u['section']==section]
+            sections.append({'section':section,'name':units[0]['section_name'],
+                'available_chars':sum(u['available_range'][1] for u in units),
+                'delivered_chars':sum(u['delivered_range'][1] if u['delivered_range'] else 0 for u in units)})
+        # Undelivered hashes stay in the audit, never become model reading aliases.
+        omitted_ids=view[side]['coverage'].pop('omitted_excerpt_ids')
+        view[side]['coverage'].update(scope='endpoint RU catalog; narrative-first budgeted excerpts, not whole-page semantic coverage',
+            delivery_policy=DELIVERY_POLICY,supplement_limit=supplement_limit,
+            omitted_excerpt_count=len(omitted_ids),
+            partial_ru_count=sum(u['disposition']=='DELIVERED_PARTIAL' for u in ledger['units']),
+            section_delivery=sections,
+            unread_scope_note='Undelivered ranges are not read; section totals describe delivery, not semantic understanding.')
+        for snippet in view[side]['snippets']:
+            q=binding[snippet['id']]
+            snippet['source_context']['delivered_ru_range']={'start':q['ru_start'],'end':q['ru_end'],
+                 'available_chars':len(sources.row(q['unit_id'])['retrieval_visible_text'])}
+    return view,binding,audit
+
+
 def mock_link(view, *, review=False):
     # Honest zero-discovery mock; synthetic positive claims belong only to contract tests.
     ids={s:[q['id'] for q in view[s]['snippets']] for s in ('A','B')}
@@ -118,19 +229,25 @@ def mock_link(view, *, review=False):
     return value
 
 
-def _run_job(root, stage, view, evidence, *, backend, mock_value, replay_root, live, api_key, sources):
-    wire=cards.wire(view) if stage=='card' else candidate.prepare_request(view,mode=stage,model=old.c1.MODEL,
+def job_wire(stage, view):
+    if stage=='card':return cards.wire(view)
+    if stage=='attribution':return attribution.wire(view)
+    return candidate.prepare_request(view,mode=stage,model=old.c1.MODEL,
                         route='jizhi',max_output_tokens=30000,format_mode='json_object')['wire']
+
+
+def _run_job(root, stage, view, evidence, *, backend, mock_value, replay_root, live, api_key, sources, shared_calls=True, call_batch=None):
+    wire=job_wire(stage,view)
     job_id=digest([stage,wire,evidence])
     folder=Path(root)/'jobs'/job_id
-    if stage!='card' and backend!='replay' and all(q['canonical_address']['canonical_unit_kind']=='rich_text' for q in evidence.values()):
+    if not shared_calls and stage in {'generation','review'} and backend!='replay' and all(q['canonical_address']['canonical_unit_kind']=='rich_text' for q in evidence.values()):
         result=requests.execute_native(folder,stage,wire,view,evidence,sources,backend=backend,mock_value=mock_value,
                             candidate_freeze=Path(root)/'prepared/candidate-freeze.json',live_authorized=live,api_key=api_key,
                             ledger=None if backend=='live' else Path(root)/'mock-ledger')
     else:
         result=requests.execute(folder,stage,wire,view,evidence,backend=backend,mock_value=mock_value,
                                 replay_root=replay_root,live_authorized=live,api_key=api_key,
-                                ledger=None if backend=='live' else Path(root)/'mock-ledger')
+                                ledger=None if backend=='live' else Path(root)/'mock-ledger',call_batch=call_batch)
     return job_id,result,read(folder/'value.json') if result['state']=='CONTENT_VERIFIED' else None
 
 
@@ -202,19 +319,13 @@ def run(root, encoder=None, *, backend='mock', replay_root=None, live_authorized
     failures,deferred=[],[]
     card_list=[]
     jobs_used=0
+    batch=model_calls.Batch(root/'model-call-budget',max_requests=config['max_card_jobs']+3*config['max_pairs'],
+                            max_tokens=max_provider_tokens)
 
     def job(stage, view, evidence, mock_value):
         nonlocal jobs_used
-        if backend=='live':
-            outcomes=[read(p) for p in (root/'jobs').glob('*/result.json')]
-            # Conservative UTF-8-byte input reservation plus output cap; never billing/tokenizer truth.
-            pending=[p for p in (root/'jobs').glob('*/plan.json') if not (p.parent/'complete.json').exists()]
-            require(not pending and all(isinstance(r['usage'],dict) for r in outcomes),'Unresolved provider usage blocks dispatch')
-            wire=cards.wire(view) if stage=='card' else candidate.prepare_request(view,mode=stage,model=old.c1.MODEL,route='jizhi',max_output_tokens=30000)['wire']
-            reservation=len(json.dumps(wire,ensure_ascii=False).encode())+wire['max_output_tokens']
-            require(sum(r['usage']['total_tokens'] for r in outcomes)+reservation<=max_provider_tokens,'Provider token budget exhausted/unknown')
         jobs_used+=1
-        return _run_job(root,stage,view,evidence,backend=backend,mock_value=mock_value,replay_root=replay_root,live=live_authorized,api_key=api_key,sources=sources)
+        return _run_job(root,stage,view,evidence,backend=backend,mock_value=mock_value,replay_root=replay_root,live=live_authorized,api_key=api_key,sources=sources,call_batch=batch)
 
     try:
         for source in config['sources']:
@@ -256,40 +367,50 @@ def run(root, encoder=None, *, backend='mock', replay_root=None, live_authorized
         ru_items=({'id':r['unit_id'],'source_id':r['source']['canonical_address']['source_identity_key'],'text':r['retrieval_visible_text']} for r in _selected_rows(sources,config))
         ru_identity=digest([sha(root/'prepared/complete.json'),config['max_ru'],'round_robin_source_kind_uid_v1'])
         index.build(root/'indexes/ru',ru_items,encoder,kind='ru',input_identity=ru_identity)
-        card_items=({'id':c['card_id'],'source_id':c['source_id'],'text':cards.projection(c)} for c in kept)
-        index.build(root/'indexes/card',card_items,encoder,kind='card',input_identity=sha(stage/'cards.json'))
-        indexes={k:index.Index(root/'indexes'/k,kind=k,encoder_space=encoder.space_identity) for k in ('ru','card')}
+        story_views=None
+        if config.get('retrieval_policy','legacy')==story_retrieval.POLICY:
+            story_views=story_retrieval.prepare_views(kept,sources)
+            card_items=iter(story_views['items'])
+            queries=story_views['queries']
+        else:
+            card_items=({'id':c['card_id'],'source_id':c['source_id'],'text':cards.projection(c)} for c in kept)
+            queries=[]
+            for card in kept:
+                seen=set()
+                for detail in card['queries']:
+                    if detail['text'] in seen:continue
+                    seen.add(detail['text'])
+                    queries.append({'query_id':digest([card['card_id'],detail['text'],detail['evidence_ids']]),
+                                    'card_id':card['card_id'],'source_id':card['source_id'],**detail})
+        index.build(root/'indexes/card',card_items,encoder,kind='card',
+                    input_identity=digest([sha(stage/'cards.json'),story_retrieval.POLICY]) if story_views else sha(stage/'cards.json'),
+                    projection=story_retrieval.PROJECTION if story_views else None)
+        indexes={k:index.Index(root/'indexes'/k,kind=k,encoder_space=encoder.space_identity,
+                              projection=story_retrieval.PROJECTION if k=='card' and story_views else None) for k in ('ru','card')}
         rankings=[]
         pairs={}
-        for card in kept:
-            seen=set()
-            for detail in card['queries']:
-                text=detail['text']
-                if text in seen:
-                    continue
-                seen.add(text)
-                qid=digest([card['card_id'],text,detail['evidence_ids']])
-                try:
-                    vector=index.query(encoder,text)
-                    for kind,reader in indexes.items():
-                        hits=reader.search(vector,kind=kind,top_k=config['top_k'])
-                        rankings.append({'query_id':qid,'query':text,'card_id':card['card_id'],'kind':kind,'hits':hits})
-                        source_ranks={}
-                        for hit in hits:
-                            target=hit['source_id']
-                            if target==card['source_id']:
-                                continue
-                            if target in source_ranks:
-                                continue
-                            source_ranks[target]=hit['rank']
-                            endpoints=tuple(sorted([card['source_id'],target]))
-                            pid=digest(endpoints)
-                            pair=pairs.setdefault(pid,{'pair_id':pid,'endpoints':list(endpoints),'rrf':0.0,'discoveries':[]})
-                            pair['rrf']+=1/(config['rrf_denominator']+hit['rank'])
-                            pair['discoveries'].append({'query_id':qid,'source_id':card['source_id'],'target':target,'hit':hit,
-                                                        'source_evidence_ids':detail['evidence_ids']})
-                except ValueError as exc:
-                    failures.append({'stage':'query','query_id':qid,'diagnostics':requests.transport.diagnostics(exc)})
+        for detail in queries:
+            qid=detail['query_id'];text=detail['text']
+            try:
+                vector=index.query(encoder,text)
+                for kind,reader in indexes.items():
+                    hits=reader.search(vector,kind=kind,top_k=config['top_k'])
+                    weight=detail.get('rrf_weight',1.0)
+                    rankings.append({'query_id':qid,'query':text,'card_id':detail['card_id'],'kind':kind,'hits':hits,
+                                     'rrf_weight':weight})
+                    source_ranks={}
+                    for hit in hits:
+                        target=hit['source_id']
+                        if target==detail['source_id'] or target in source_ranks:continue
+                        source_ranks[target]=hit['rank']
+                        endpoints=tuple(sorted([detail['source_id'],target]))
+                        pid=digest(endpoints)
+                        pair=pairs.setdefault(pid,{'pair_id':pid,'endpoints':list(endpoints),'rrf':0.0,'discoveries':[]})
+                        pair['rrf']+=weight/(config['rrf_denominator']+hit['rank'])
+                        pair['discoveries'].append({'query_id':qid,'source_id':detail['source_id'],'target':target,'hit':hit,
+                                                    'source_evidence_ids':detail['evidence_ids'],'rrf_weight':weight})
+            except ValueError as exc:
+                failures.append({'stage':'query','query_id':qid,'diagnostics':requests.transport.diagnostics(exc)})
         ordered_pairs=sorted(pairs.values(),key=lambda p:(-p['rrf'],p['pair_id']))
         links=[]
         card_map={c['card_id']:c for c in kept}
@@ -307,20 +428,13 @@ def run(root, encoder=None, *, backend='mock', replay_root=None, live_authorized
                     targets=[sources.quote(hit['id'])] if hit['kind']=='ru' else card_map[hit['id']]['evidence']
                     for q in targets:
                         quotes[q['id']]=q
-                # Complete selected RUs when possible; budgeted delivery records every omitted quote.
-                admitted=[];omitted=[]
-                for source in pair['endpoints']:
-                    chars=0
-                    own=[q for q in quotes.values() if q['source_id']==source]
-                    for q in own:
-                        if chars+len(q['text'])<=8000:
-                            admitted.append(q);chars+=len(q['text'])
-                        else:
-                            omitted.append(q['id'])
-                view,binding=link_view(sources,pair['endpoints'],admitted,scoped_quotes=list(quotes.values()))
+                view,binding,delivery_audit=select_link_evidence(sources,pair['endpoints'],list(quotes.values()))
+                omitted=[digest([u['unit_id'],0,u['available_range'][1]]) for a in delivery_audit['sources'].values()
+                         for u in a['units'] if u['disposition']=='OMITTED']
                 jid,result,value=job('generation',view,binding,mock_link(view))
                 link={'link_id':digest([pair['pair_id'],jid]),'pair':pair,'generation_job':jid,'generation':value,
-                      'delivery':binding,'omitted_evidence_ids':omitted,'review_job':None,'review':None,
+                      'delivery':binding,'delivery_audit':delivery_audit,
+                      'omitted_evidence_ids':omitted,'review_job':None,'review':None,
                       'human_acceptance':'NOT_REVIEWED','navigation_status':'INACTIVE'}
                 links.append(link)
                 if value is None:
@@ -339,8 +453,26 @@ def run(root, encoder=None, *, backend='mock', replay_root=None, live_authorized
                         failures.append({'stage':'review','link_id':link['link_id'],'diagnostics':requests.transport.diagnostics(exc)})
                 else:
                     link['review_disposition']='NO_PROPOSITIONS_TO_REVIEW'
+                link['attribution_job']=None
+                link['attribution']=None
+                link['attribution_items']=[]
+                link['attribution_disposition']=attribution.disposition(None,backend=backend)
+                if config.get('attribution_check',False) and value is not None and value['propositions']:
+                    av=attribution.prepare(view,{'generation':value,'review':link['review']})
+                    link['attribution_items']=attribution.proposition_findings(None,av,backend=backend)
+                    try:
+                        aid,ares,avalue=job('attribution',av,binding,attribution.mock(av))
+                        link.update(attribution_job=aid,attribution=avalue,
+                                    attribution_disposition=attribution.disposition(avalue,backend=backend),
+                                    attribution_items=attribution.proposition_findings(avalue,av,backend=backend))
+                        if avalue is None:
+                            failures.append({'stage':'attribution','job_id':aid,'state':ares['state']})
+                    except (ValueError,FileExistsError) as exc:
+                        failures.append({'stage':'attribution','link_id':link['link_id'],'diagnostics':requests.transport.diagnostics(exc)})
             except (ValueError,FileExistsError) as exc:
-                failures.append({'stage':'link','pair_id':pair['pair_id'],'diagnostics':requests.transport.diagnostics(exc)})
+                failure={'stage':'link','pair_id':pair['pair_id'],'diagnostics':requests.transport.diagnostics(exc)}
+                if hasattr(exc,'delivery_audit'):failure['delivery_audit']=exc.delivery_audit
+                failures.append(failure)
         output=root/'output'
         # A crash before the completion seal keeps this attempt; later attempts never overwrite it.
         if output.exists():
@@ -354,6 +486,7 @@ def run(root, encoder=None, *, backend='mock', replay_root=None, live_authorized
                  'elapsed_seconds':round(time.perf_counter()-started,3),'encoder_space':encoder.space_identity,
                  'human_acceptance':'NOT_REVIEWED','navigation_status':'INACTIVE','backup_status':'NOT_CONFIRMED',
                  'output_directory':output.name}
+        if story_views is not None:write(output/'story-retrieval.json',story_views)
         for name,value in [('cards',payload),('rankings',rankings),('candidates',ordered_pairs),('links',links),
                            ('failures',failures),('deferred',deferred),('summary',summary)]:
             write(output/(name+'.json'),value)
