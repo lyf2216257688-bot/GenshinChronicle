@@ -192,6 +192,12 @@ class Batch:
         require(value['attempt_complete_sha256'] == sha(attempt/'complete.json') and
                 value['observed_tokens'] == token_count(read(attempt/'result.json')),
                 'Budget outcome differs from sealed raw-attempt result')
+        # A raw adapter has no provider usage before TLS; the sealed trace can
+        # nevertheless prove zero transmitted work. Keep raw observations intact.
+        raw=read(attempt/'result.json')
+        trace=read(attempt/'trace.json').get('events',[]) if (attempt/'trace.json').exists() else []
+        execution=classify(raw,trace)['execution']
+        value=value|{'execution':execution,'accounted_tokens':0 if execution=='PROVEN_NOT_SENT' else value['observed_tokens']}
         self._outcome_cache[path]=value
         return value
 
@@ -204,7 +210,8 @@ class Batch:
             charged = 0
             for p in slots:
                 reserved = read(p)
-                n = self._outcome(p)['observed_tokens']
+                outcome=self._outcome(p)
+                n = outcome.get('accounted_tokens',outcome['observed_tokens'])
                 charged += reserved['token_allowance'] if n is None else n
             cap = self.config['max_tokens']
             if cap is not None and charged+allowance>cap:raise Deferred('BATCH_TOKEN_BUDGET_DEFERRED')
@@ -224,8 +231,8 @@ class Batch:
         rows = []
         for p in sorted((self.root/'requests').glob('*/reservation.json')):
             rows.append(self._outcome(p))
-        unknown = sum(r['observed_tokens'] is None for r in rows)
-        known = sum(r['observed_tokens'] or 0 for r in rows)
+        unknown = sum(r.get('accounted_tokens',r['observed_tokens']) is None for r in rows)
+        known = sum(r.get('accounted_tokens',r['observed_tokens']) or 0 for r in rows)
         known_requests = sum(r['request_observations'] or 0 for r in rows)
         unknown_requests = sum(r['request_observations'] is None for r in rows)
         return {'request_reservations': len(rows),'new_request_reservations':len(rows)-self.window_start, 'known_tokens': known,
@@ -233,6 +240,7 @@ class Batch:
                 'unknown_request_counts': unknown_requests,
                 'api_requests_total': 'UNKNOWN' if unknown_requests else known_requests,
                 'external_invocations': sum(r['external_invocations'] for r in rows),
+                'proven_not_sent_attempts':sum(r.get('execution')=='PROVEN_NOT_SENT' for r in rows),
                 'unknown_usage_requests': unknown, 'total_tokens': 'UNKNOWN' if unknown else known,
                 'actual_fee': 'UNKNOWN'}
 

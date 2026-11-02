@@ -5,7 +5,7 @@ import json
 import time
 
 from .. import retrieval_units as ru
-from . import cards_v2 as v2
+from . import cards_v2 as v2, card_structure, card_generation
 from .common import read, require, sha, write, seal
 from .sources import Sources
 
@@ -26,7 +26,7 @@ class ProjectedSource(Sources):
     def row(self, uid):return self._by_id[uid]
 
 
-def census(out, canonical, ru_manifest, *, body_limit=8000, request_limit=24000):
+def census(out, canonical, ru_manifest, *, body_limit=8000, request_limit=100000,context_token_limit=None):
     out=Path(out);require(not out.exists(),'New census directory required');out.mkdir(parents=True)
     started=time.perf_counter()
     manifest=read(canonical);entries=ru._validate_manifest(manifest); rm=read(ru_manifest)
@@ -43,8 +43,8 @@ def census(out, canonical, ru_manifest, *, body_limit=8000, request_limit=24000)
                 record=ru._load_record(entry,i)
                 rows,skips=ru._validate_record(record,entry,i,cfg,source=manifest['source'],locale=manifest['locale'])
                 s=ProjectedSource(record,entry,rows,skips);source=entry['parsed_identity_key']
-                plan=v2.reading_plan(s,source)
-                batches=list(v2.read_batches(s,source,plan,body_limit,request_limit))
+                plan=card_structure.plan(s,source)
+                batches=list(card_structure.batches(s,source,plan,body_limit,request_limit,context_token_limit))
                 groups=Counter(section for section,_,_ in batches)
                 # Exact reading calls. Synthesis tree fan-out depends on future model output.
                 minimum_synthesis=(sum(n>1 for section,n in groups.items() if section is not None)+1
@@ -53,8 +53,8 @@ def census(out, canonical, ru_manifest, *, body_limit=8000, request_limit=24000)
                     raw_chars=sum(len(r['retrieval_visible_text']) for r in rows),
                     selected_chars=sum(len(q['text']) for q in plan['selected']),
                     read_calls=len(batches),minimum_synthesis_calls=minimum_synthesis,
-                    exact_read_wire_chars=sum(len(json.dumps(v2.wire(v),ensure_ascii=False)) for _,v,_ in batches),
-                    exact_read_wire_utf8_bytes=sum(len(json.dumps(v2.wire(v),ensure_ascii=False).encode()) for _,v,_ in batches),
+                    exact_read_wire_chars=sum(len(json.dumps(card_generation.wire(v,card_generation.DEFAULT_STRATEGY),ensure_ascii=False)) for _,v,_ in batches),
+                    exact_read_wire_utf8_bytes=sum(len(json.dumps(card_generation.wire(v,card_generation.DEFAULT_STRATEGY),ensure_ascii=False).encode()) for _,v,_ in batches),
                     sections=len(groups),upstream_skips=len(skips),
                     status='ELIGIBLE' if batches else 'NO_ELIGIBLE_TEXT_MANAGEMENT_NODE_ONLY')
                 labels.update(s['source_metadata'].get('name','') for s in record['sections'])
@@ -68,7 +68,8 @@ def census(out, canonical, ru_manifest, *, body_limit=8000, request_limit=24000)
         values=sorted(r[key] for r in records)
         return {'sum':sum(values),'max':max(values,default=0),
                 **{f'p{p}':values[min(len(values)-1,int((len(values)-1)*p/100))] if values else 0 for p in (50,90,95,99)}}
-    summary={'card_version':v2.VERSION,'reading_policy':v2.READING_POLICY,'prompt_sha256':__import__('hashlib').sha256(v2.PROMPT.encode()).hexdigest(),
+    summary={'card_version':v2.VERSION,'reading_policy':card_structure.POLICY,'generation_strategy':card_generation.DEFAULT_STRATEGY,
+        'prompt_sha256':__import__('hashlib').sha256(card_generation.prompt(card_generation.DEFAULT_STRATEGY).encode()).hexdigest(),
         'canonical_manifest_sha256':sha(canonical),'ru_manifest_sha256':sha(ru_manifest),
         'records':len(entries),'eligible_sources':sum(r['status']=='ELIGIBLE' for r in records),
         'management_only_sources':sum(r['status']!='ELIGIBLE' for r in records),'quarantined':len(failures),

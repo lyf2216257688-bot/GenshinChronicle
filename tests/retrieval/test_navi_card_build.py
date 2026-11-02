@@ -159,7 +159,7 @@ class CardBuildTests(unittest.TestCase):
         card_build.prepare(second,cp,rp,['0'],body_limit=8,revision='fix1',reason='test only',regenerate_jobs=[plans[0].parent.name])
         result=card_build.run(second,reuse=[first],max_new_requests=100)
         self.assertTrue(all(s['status']=='COMPLETE' for s in result['sources']))
-        new_read=[p for p in (second/'jobs').glob('*/plan.json') if read(p)['view']['mode']=='read' and read(p)['backend']=='mock']
+        new_read=[p for p in (second/'jobs').glob('*/plan.json') if read(p)['view']['mode']=='read' and read(p)['view']['build_revision']=='fix1']
         self.assertEqual(len(new_read),1)
         self.assertEqual(read(new_read[0])['view']['build_revision'],'fix1')
 

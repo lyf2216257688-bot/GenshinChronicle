@@ -329,3 +329,47 @@ full local replays and `evaluation.json`. It records three completed responses
 and 15,941 known tokens; actual fee and strict provider Schema enforcement remain
 UNKNOWN. It does not alter F2 history or publish/release any Navi. See the
 [limited live acceptance report](../docs/research/phase-05/p05-navi-v03-limited-live-20261028.md).
+
+## Fixed-32k Card integration evidence
+
+`retrieval/p05-card-integration-32k-20261031-r1/` owns offline integration checks,
+source-plan/historical-response replay, final structural census and protected hashes.
+In new builds `reorganizations/` seals one replacement decision per failed task;
+`reorganization-results/` separately seals its successful resolution (never inside
+an already sealed decision). Original failed jobs and successful temporary nodes
+remain traceable. `documents/*/accepted-build.json` exists only after all required
+reading/synthesis succeeds; temporary nodes are not default semantic index owners.
+
+## Card evidence-selection and source export checks
+
+`retrieval/p05-card-evidence-selection-20261031-r1/` owns offline historical replay,
+new-contract preparation, MOCK-only index verification and protected archive hashes.
+It contains no newly generated semantic Cards or real embedding result. Its controlled
+reference selections are test inputs, not model effectiveness or semantic review evidence.
+
+New `deepseek-card-evidence-32k-20261031` preparations seal
+`prepared/quote-locations.json`; raw-first job plans bind their actual delivered/inherited
+position maps, including replacement tasks. This is a locator over existing verified
+RU evidence, not a second evidence authority. New Card index roots seal
+`card-selection.json` with completed-source identities, counts and every skipped source
+and reason. An empty export contains `export-result.json` without vector shards.
+Neither export nor replay edits source Cards, historical failures or request ledgers.
+
+`retrieval/p05-card-live66-1017-repair-v3-20261101-r1/` owns the fixed66 Card repair
+continuation: campaign/prepared binds the unchanged source selection, prior runtime
+and pilot/shard preparation identities; pilot and shard directories own immutable
+raw requests/responses, exact source maps, Cards and shared finite call reservations.
+Reuse-origin records link copied historical successes without recharging them.
+Failed responses and prior run roots are retained. Full66 status counts complete
+source documents separately from requests; it does not grant semantic acceptance.
+No Link/KG/Embedding or new production index is owned by this data root.
+
+Within that repair root, `full66_status.json` preserves the initial four-worker
+checkpoint (51/66); `combined_status.json` records the later drained54/66 state;
+`closure-report/status.json` is the sealed closure census including physical-attempt
+accounting, exact66 statuses, required-read progress, audits and uncertainty.
+`continuation-*-v4/`, canary and `authorized-unknown-once-v4/` preserve later partial
+work and originals. `operator-stop/` and `operator-stop-result/` record closure of new
+dispatches without cancelling sent requests. `final-cards/` holds only54 actually
+complete normalized review sources, not66; it owns no new API reservations. Original
+failed roots and budgets remain unchanged. All outputs are inactive/not reviewed.

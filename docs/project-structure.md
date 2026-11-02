@@ -21,7 +21,9 @@ Within the same package, `cards_v2.py` owns attributed narrative reading,
 section/document synthesis and the labeled story projection; `card_build.py`
 owns Card-only batches, immutable source revisions, reuse and targeted updates;
 `card_census.py` estimates whole-corpus work through the approved RU projector.
-`anchors.py` computes unique exact quotation ranges. These are specialized
+`anchors.py` owns versioned lossless sentence/paragraph position maps, program
+extraction and inherited anchor identities; the legacy exact-quote locator remains.
+These are specialized
 offline functions, not a general agent framework or a new authoritative layer.
 `response_records.py` preserves provider counters and independent strict
 stream/content outcomes plus separated reasoning/final text. Card-only Metro
@@ -202,6 +204,10 @@ Card generation: `navi_offline/card_generation.py` owns versioned typed Chat pro
 wire aliases and logged deterministic conversions; `metro_chat.py` owns raw-first
 nonstream transport and independent protocol/content/accounting records. `card_build.py`
 uses those strategies for bounded Card-only batches and separately sealed raw recovery.
+New evidence-selection wire Schemas materialize into the existing Card v2 fields;
+Card build also owns completed-source index selection and explicit skip reports.
+`card_structure.py` owns versioned structure-aware reading and semantic scope identities;
+`card_runtime.py` isolates hash-verified prepared runtimes for old-task resume.
 These modules do not own Link standards or Canonical evidence.
 
 `navi_offline/card_blind.py` owns opt-in source-identical Card comparison preparation,
@@ -211,3 +217,22 @@ private anonymous-review assignment with explicit partial-failure cohorts. Named
 bounded independent dispatch in the historical blind root used a separately recorded authorization. New preparations use shared independent-task budgets; uncertain retries still require explicit cost-risk authorization. UNKNOWN usage and failed requests remain preserved. Its default
 execution path is a provider-free preview. It does not own Card semantic standards,
 provider production defaults, or OS-level isolation guarantees.
+
+`navi_offline/card_contract.py` owns the explicit bounded exact-anchor Card wire
+Schema and program-derived source bindings. `card_recovery.py` owns hash-bound
+cross-version success imports and reachable-reading completion checks.
+`scripts/retrieval/phase05_card66_repair.py` orchestrates only the fixed66 selection
+with disjoint finite source shards; it uses shared model_calls through card_build
+and introduces no transport or retry bypass.
+
+`navi_offline/card_normalize.py` owns metadata-only review consolidation and actual
+per-job generation contract annotations; source semantics and historical artifacts
+remain unchanged. `scripts/retrieval/phase05_card66_continue.py` is the sealed finite
+contract4 handoff runner; its existing implementation is not permission to restart
+the operator-stopped experiment. Current source counts and the next authorized action
+remain owned by current-phase and the scoped repair report.
+
+`navi_offline/card_semantics.py` owns the opt-in evidence-judgment prompt,
+source-context-first synthesis input, narrow audited narrative admission and
+selected-range delivery summaries. It does not adjudicate semantic truth,
+rewrite historical Cards or assign authoritative source provenance.

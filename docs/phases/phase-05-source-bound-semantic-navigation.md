@@ -120,8 +120,8 @@ logical DeepSeek model and Card semantic contract. Route/API/URL participate in
 request identity and a dedicated persistent ledger; this does not rewrite old
 provider outcomes or re-enable historical shared SDK/E2 routes. Reasoning and
 final text are archived separately; protocol and content outcomes are separate,
-and only both PASS allow a Card value. A failed paid Card stops the Metro batch
-without retry, fallback or parameter resampling. Operational evidence belongs
+and only both PASS allow a Card value. At the initial Metro checkpoint a failed paid Card stopped the batch;
+new Card-only campaigns now use shared independent-task continuation and the bounded structural policy below. Historical operational evidence belongs
 to the [Metro Card report](../research/phase-05/p05-card-metro-switch-20261029.md).
 
 ### Navi and KG semantic responsibility separation
@@ -936,3 +936,133 @@ human acceptance. Coverage is computed from selected/delivered ranges and repres
 a chapter with any omitted range is not necessarily an unread chapter. Inherited synthesis
 never claims direct source reading. Quality reviews bind exact Card/file hashes and remain
 separate from originals. New retrieval projections need separate version/index identities.
+
+### Versioned fixed-32k structural Cards
+
+The initial fixed-32k Card-only default was `deepseek-card-structured-32k-20261031`;
+the citation-selection extension below now owns new preparations' default. Historical
+strategies/archives remain unchanged. All reading and model synthesis requests use
+32,000 output tokens, not a per-document token allowance. Source template placement,
+explicit volumes/chapters, continuous source passages and observed dialogue edges
+control reading order/grouping. Character/context limits are capacity guards;
+missing/ambiguous structure does not authorize invented chronology or source identity.
+
+Formal document/section/story/clue Cards carry source-bound semantic scope identities;
+reading batches and synthesis batches are temporary audit/recovery nodes, excluded
+from the default semantic index. Required selected ranges must all have successful
+reading dependencies before document synthesis or COMPLETE. Failures retain successful
+nodes and explicit missing scopes; inherited synthesis never claims direct reading.
+
+One eligible completed, accounted truncation/planning failure can trigger a recorded
+structural replacement decision. It may create multiple calls within the original
+campaign budget; its replacement subtree cannot reorganize again. Raw failed evidence
+and the decision/result linkage remain immutable. Shared transport retries, UNKNOWN
+risk controls and cooldown remain separate. No paid call, Link, KG, embedding or
+semantic acceptance is granted by this engineering policy. Implementation evidence:
+[32k integration](../research/phase-05/p05-card-integration-32k-20261031.md).
+
+### Program-extracted Card quotations and completed-source export
+
+New Card-only preparations default to `deepseek-card-evidence-32k-20261031` with
+`card-evidence-selection-1`, retaining every fixed-32k transport, budget, structural
+recovery and semantic-boundary rule above. The old model-output Schema, strategies,
+Cards and verified prepared runtimes remain available; no implicit archive migration occurs.
+
+Models select delivered evidence IDs and program-generated sentence/paragraph start/end
+segment IDs. Each choice denotes one continuous occurrence inside one delivered evidence
+fragment; extraction preserves all intervening characters. Noncontiguous passages or
+different RUs require separate anchors. Repeated wording is legal when its exact occurrence
+is identified. Programs materialize the existing Card v2 quote and fragment/RU offsets
+from verified source text, preserving Canonical selectors and lineage. Structured material
+does not acquire invented Canonical text offsets. Parent synthesis may only select stable
+IDs for verified child anchors, without shortening, rewriting or joining quotations.
+
+Preparation binds the location map and both read/synthesis Schema hashes; every new job
+binds its actual delivered or inherited position map. Invalid IDs, ranges, source bindings,
+Schema and unsupported inherited anchors remain isolated. New selection outputs do not
+use legacy quote repair, approximate matching or inferred source rebinding. Accurate
+extraction does not establish attribution, action relations, narrative stance or semantic
+support; identified semantic rejection remains blocking and all unreviewed results retain
+NOT_VALIDATED / INACTIVE / NOT_REVIEWED. No extra model review call is required.
+
+`card-complete-sources-export-1` admits each completed, validated source independently.
+A partial/invalid source contributes no Cards, even when some of its chapters succeeded;
+it does not block other valid sources. Temporary nodes and default non-vectorized clues
+remain excluded. A sealed selection report records source IDs, archive identities, Card
+counts and all skipped reasons, and participates in index input identity. Preparation
+corruption blocks export globally; source-local failures are isolated. Later completions
+require a new index directory, permitting existing exact-window reuse. An empty selection
+produces a report without loading an encoder. Source Cards and historical archives/indexes
+remain unchanged. [Implementation and evidence](../research/phase-05/p05-card-evidence-selection-20261031.md).
+
+### Explicit bounded Card repair contract (2026-11-01)
+
+The fixed-66 repair campaign explicitly selects `deepseek-card-bounded-evidence-20261101`
+with `card-evidence-selection-3`; legacy strategy identities and prepared runtimes stay
+readable. Every semantic output item selects exact delivered segment ranges or inherited
+anchor IDs. Programs derive evidence_ids; models do not repeat that source binding.
+Unknown, cross-evidence, reversed or unprovided choices are rejected without approximate
+matching. Read/child receipts still account for the exact delivered inputs.
+
+The per-job Schema enumerates actual choices and bounds arrays/text. New unread source
+work is partitioned to at most 4000 body characters and finite request capacity; synthesis
+reduces bounded child groups. Source template module_group membership can pack observed
+sections together without inventing event order; multi-volume chapters remain distinct.
+All original selected ranges, exclusions, graph edges and source identities survive.
+
+One completed HTTP200, usage-accounted content/Schema/JSON/output-limit failure may
+create one sealed structural replacement; its replacement subtree cannot reorganize
+again. This does not authorize UNKNOWN or uncertain-transmission resends. Shared
+model_calls owns all attempts, budgets and cooldown. Historical successes can be
+imported with original wire/result hashes and explicit reuse origins; historical
+failures remain failures. Completion additionally follows actual document dependency
+edges to successful direct reads covering every required source range, rather than
+trusting a claimed coverage union. All outputs remain INACTIVE / NOT_REVIEWED;
+mechanical completion does not establish semantic accuracy. Current execution and
+acceptance are owned by [the fixed-66 repair report](../research/phase-05/p05-card-live66-repair-20261101.md).
+
+### Atomic-segment follow-up and review collection (2026-11-01)
+
+Real contract3 output exposed invalid cross-evidence endpoint combinations. The
+explicit `deepseek-card-single-segment-20261101` strategy uses
+`card-evidence-selection-4`: every read anchor selects one exact nonblank segment_id;
+multiple sentences require separate anchors (at most8 per item). Synthesis still
+selects exact inherited anchor_id. Programs derive evidence identities and extract
+unchanged source text; no guessed rebinding or fuzzy matching is accepted. A
+program-owned input_scope_id distinguishes identical text at distinct Canonical/RU
+positions, independently of request-local short aliases. No semantic acceptance is
+implied by a valid segment choice.
+
+Partial-source recovery can reuse validated successful reading subtrees with their
+actual original dependency jobs and generation context. Whole-source completion
+continues to require a unique document dependency closure over all required reads.
+`card_normalize` creates a separate sealed review revision whose contract labels
+come from actual part jobs (2/3/4), preserving semantic fields, evidence, IDs, parts,
+coverage and original job bytes. Consolidation sends zero requests and cannot import
+mock results. Compatibility defaults remain historical; fresh repair experiments
+must select contract4 explicitly. Current authorization and stopped/complete counts
+belong to current-phase and the repair report, not this durable contract.
+
+### Opt-in evidence judgment and explicit coverage (2026-11-02)
+
+`deepseek-card-evidence-judgment-20261102` retains atomic quote contract4 and
+bounded/shared-call behavior. It distinguishes explicit source statements,
+attributed claims, inference and missing evidence using the existing fields.
+Synthesis receives verified original anchors and source/branch context before
+fallible child judgments, and may correct those judgments from delivered quotes.
+It cannot invent quotations, merge identities across narratives, reify a
+counterfactual, or turn folklore into verified history. No semantic keyword
+judge or additional model review is introduced. Old source/subtree success
+imports cannot silently skip the new semantic policy; exact new-policy request
+reuse remains available. Compatibility defaults and frozen runtimes stay intact.
+
+The opt-in selection records narrow placeholder/numeric/technical/mechanic/
+walkthrough omissions while retaining unclassified equipment prose, including
+short dialogue and narrative mentions of damage. Raw/Canonical/RU are unchanged.
+New Card construction uses null whole_page_semantic_coverage plus NOT_ASSESSED;
+selected_scope_delivery separately counts exact delivered/inherited required
+ranges. This does not certify successful dependency closure or understanding.
+Historical fixed False values remain historical constants, not measurements.
+The [offline semantic improvement report](../research/phase-05/p05-card-semantic-improvement-20261102.md)
+owns case judgments, tests and limits. This implementation grants no paid-call
+authorization, production adoption or semantic acceptance.

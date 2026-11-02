@@ -85,6 +85,19 @@ class CallTests(unittest.TestCase):
         self.assertEqual(result['provider_reported_usage'] if 'provider_reported_usage' in result else result['usage'], self.good()['usage'])
         self.assertEqual(result['accounting']['provider_usage_observations'][0], 'UNKNOWN')
 
+    def test_batch_presend_zero_requires_trace_proof_and_preserves_raw_usage(self):
+        batch=m.Batch(self.base/'budget',max_requests=3,max_tokens=20)
+        not_sent={'state':'UNKNOWN','calls':1,'usage':'UNKNOWN','trace':['connection.start_tls.failed']}
+        self.run_call([not_sent,self.good()],batch=batch,token_allowance=10)
+        account=batch.accounting()
+        self.assertEqual(account['total_tokens'],5)
+        self.assertEqual(account['unknown_usage_requests'],0)
+        self.assertEqual(account['proven_not_sent_attempts'],1)
+        self.assertIsNone(read(self.base/'budget/requests/000001/outcome.json')['observed_tokens'])
+        self.assertEqual(read(self.root/'attempts/0001/result.json')['usage'],'UNKNOWN')
+        self.assertEqual(m.Batch(self.base/'budget',max_requests=3,max_tokens=20).accounting()['total_tokens'],5)
+        self.assertEqual(m.classify(not_sent,['http11.send_request_headers.started','connection.start_tls.failed'])['execution'],'UNKNOWN')
+
     def test_json_retry_is_explicit_and_does_not_retry_source_or_schema_errors(self):
         bad = self.good() | {'state': 'CONTENT_INVALID', 'error_codes': ['NON_JSON']}
         policy = m.Policy(format_retries=1, cost_risk_authorization='one new generation for JSON failure')

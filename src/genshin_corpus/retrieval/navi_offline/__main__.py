@@ -14,19 +14,21 @@ def main():
     p.add_argument('--total-request-limit',type=int,required=True)
     p.add_argument('--body-limit',type=int,default=8000)
     p.add_argument('--request-limit',type=int,default=100000)
+    p.add_argument('--context-token-limit',type=int)
     for name in ('card-prepare','card-census'):
         p=sub.add_parser(name)
         p.add_argument('--canonical',type=Path,default=Path(pipeline.CANONICAL))
         p.add_argument('--ru',type=Path,default=Path(pipeline.RU))
         p.add_argument('--body-limit',type=int,default=8000)
-        p.add_argument('--request-limit',type=int,default=24000)
+        p.add_argument('--request-limit',type=int,default=100000)
+        p.add_argument('--context-token-limit',type=int)
         if name=='card-prepare':
             p.add_argument('--run',type=Path,required=True)
             p.add_argument('--sources',nargs='+')
             p.add_argument('--revision',default='initial')
             p.add_argument('--reason',default='')
             p.add_argument('--regenerate-jobs',nargs='*',default=[])
-            p.add_argument('--generation-strategy',choices=['legacy-responses','deepseek-card-structured-1','qwen-card-structured-1'],default='deepseek-card-structured-1')
+            p.add_argument('--generation-strategy',choices=['legacy-responses',*sorted(card_build.card_generation.STRATEGIES)],default=card_build.card_generation.DEFAULT_STRATEGY)
             p.add_argument('--total-request-limit',type=int)
             p.add_argument('--combine-sections',action='store_true')
         else:p.add_argument('--out',type=Path,required=True)
@@ -89,16 +91,19 @@ def main():
             call_policy=card_build.model_calls.Policy(**card_build.read(args['call_policy'])) if args['call_policy'] else None)
     elif action=='card-audit':result=card_build.audit(root)
     elif action=='card-index':
-        if args.pop('embedding')=='mock':
-            from .testing import MockEncoder
-            encoder=MockEncoder()
+        if not card_build.card_selection(root)['card_count']:
+            result=card_build.build_index(root,args['out'],None,reuse_from=args['reuse_from'])
         else:
-            from .embedding import LocalEncoderProcess
-            encoder=LocalEncoderProcess(pipeline.REPO/'.local/embedding-runtime/Scripts/python.exe',args['model_path'],args['device'],
-                                         stderr_path=Path(root)/'card-embedding.stderr.log')
-        try:result=card_build.build_index(root,args['out'],encoder,reuse_from=args['reuse_from'])
-        finally:
-            if hasattr(encoder,'close'):encoder.close()
+            if args.pop('embedding')=='mock':
+                from .testing import MockEncoder
+                encoder=MockEncoder()
+            else:
+                from .embedding import LocalEncoderProcess
+                encoder=LocalEncoderProcess(pipeline.REPO/'.local/embedding-runtime/Scripts/python.exe',args['model_path'],args['device'],
+                                             stderr_path=Path(root)/'card-embedding.stderr.log')
+            try:result=card_build.build_index(root,args['out'],encoder,reuse_from=args['reuse_from'])
+            finally:
+                if hasattr(encoder,'close'):encoder.close()
     elif action=='prepare':
         result=pipeline.prepare(root,args.pop('canonical'),args.pop('ru'),args.pop('sources'),**args)
     elif action in {'run','resume'}:
@@ -118,7 +123,7 @@ def main():
         result=pipeline.export_review(root,args['out'])
     else:
         result=pipeline.record_review(root,**args)
-    print(json.dumps(result,ensure_ascii=False,indent=2))
+    print(json.dumps(result,ensure_ascii=True,indent=2))
     if result.get('failures',0) or result.get('archive_integrity','PASS')!='PASS':
         raise SystemExit(2)
 

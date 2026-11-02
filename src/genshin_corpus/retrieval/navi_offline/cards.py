@@ -107,7 +107,8 @@ def make_card(source_id, title, level, parent_id, parts, evidence, *, section=No
             **{k: [x for v in values for x in v[k]] for k in FIELDS},
             'coverage': {'direct_delivered_ids': [] if inherited else [q['id'] for q in evidence],
                          'inherited_evidence_ids': [q['id'] for q in evidence] if inherited else [],
-                         'whole_page_semantic_coverage': False, 'derived_from_cards': inherited},
+                         'whole_page_semantic_coverage': None,
+                         'semantic_coverage_status': 'NOT_ASSESSED', 'derived_from_cards': inherited},
             'human_acceptance': 'NOT_REVIEWED', 'navigation_status': 'INACTIVE', 'semantic_quality': 'NOT_VALIDATED'}
 
 

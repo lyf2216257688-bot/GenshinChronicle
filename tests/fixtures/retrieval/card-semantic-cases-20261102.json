@@ -1,0 +1,581 @@
+{
+  "status": "SOURCE_TIED_REFERENCE_CASES_NOT_MODEL_RESULTS",
+  "cases": [
+    {
+      "case_id": "3470",
+      "name": "白夜国馆藏",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\4a42045289700a831cce700ce1d1d5ff3a13a69c5f658d6d9d198b2a28c01ed1\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:3470",
+      "quotes": [
+        {
+          "evidence_id": "211d71e5592598c45f8a7f31bc24160837b2b548acbc9a7986f102565b8cf1c4",
+          "unit_id": "ffdaf5bfbc41b755658f3b14db7c109075066eadd484e506860db4415138c3c7",
+          "canonical_sha256": "00980e23d82caed3008501e9486e59862b157d58fe106a5e0ae9b5a85b75c10b",
+          "ru_start": 925,
+          "ru_end": 959,
+          "text": "-大日御舆\n最早的名字是「赫利俄斯」，乃是贤人阿倍良久所设计的高塔。",
+          "kind": "rich_text",
+          "section": 4,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "文献明确将赫利俄斯记为大日御舆最早的名字；这是本文命名关系，不是对所有传说史实的认证。",
+      "forbidden_conclusion": "仅因神车/高塔表述不同而称赫利俄斯可能是大日御舆，或反向将全部文献奉为客观史实。"
+    },
+    {
+      "case_id": "399",
+      "name": "捕风的异乡人",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\c737c306bdcc6a36ebec0f75bba5e635ccdc040e59af7fe9641176a66dc5a808\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:399",
+      "quotes": [
+        {
+          "evidence_id": "280bc97e4e2337373bf01dd957e940a32a971ba44ee53b7814729122b3499e1c",
+          "unit_id": "3595954e0627f5d85b1a0e834f6cb8e8a6e1d2bf44819788dc9c8347e76f5636",
+          "canonical_sha256": "c20083a4e2809df6149f5acbf2480e78154af553ed35e33796723ad49557c34a",
+          "ru_start": 27,
+          "ru_end": 61,
+          "text": "在带着疑惑继续前行的你面前，一位轻盈的少女突然出现，挡住了你的去路。",
+          "kind": "rich_text",
+          "section": 34,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "f636e0fc885baf3751a9a7ffd09bdffc2b7466cc438e3c457501001f729b90cf",
+          "unit_id": "c9f6c1d20380b1f440e664fb87f3b539103a9c5d8c37627df8fb6d52dd6dba63",
+          "canonical_sha256": "c20083a4e2809df6149f5acbf2480e78154af553ed35e33796723ad49557c34a",
+          "ru_start": 71,
+          "ru_end": 89,
+          "text": "安柏：我是西风骑士团侦察骑士，安柏。",
+          "kind": "rich_text",
+          "section": 35,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [
+              "source_component_id:interactive_dialogue"
+            ],
+            "labels": [
+              "dialogue"
+            ],
+            "rule_id": "obc-component-role",
+            "rule_version": "0.1",
+            "state": "classified",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "2e071f55280b26d8b12041d76bb81ad691abbf0caad1623b6dd82fc6d736de76",
+          "unit_id": "9e408f5efe1223488f2cdb4c63f20bc99346026dce0d92d4438a2e6c5787dccf",
+          "canonical_sha256": "c20083a4e2809df6149f5acbf2480e78154af553ed35e33796723ad49557c34a",
+          "ru_start": 0,
+          "ru_end": 26,
+          "text": "少女名为安柏，身为侦察骑士的她提出护送你们前往蒙德。",
+          "kind": "rich_text",
+          "section": 69,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "同一任务叙事明确指出拦路少女名为安柏，不再保留无依据的另有其人假说。",
+      "forbidden_conclusion": "在已交付直接指认后仍说轻盈少女可能不是安柏，或据此合并其他故事中的少女。"
+    },
+    {
+      "case_id": "507877",
+      "name": "月下的守望者",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\72dea107244d8c9757f5f920ec6d00428ef88767d4d6597b84ffdc95892d428c\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:507877",
+      "quotes": [
+        {
+          "evidence_id": "acd08a5821ae00dcc2eef99dae1315ff0589c507a3326ea3e32fb245f4e7aedd",
+          "unit_id": "fecd1be8daa94c653e14fd55f7ff914311488a2292b5c9c5e8a204bd97980ad8",
+          "canonical_sha256": "2ce710451a21019bc4714b3b051741b3342f2ae35b97184daf9318940a51fd8b",
+          "ru_start": 176,
+          "ru_end": 228,
+          "text": "瓦蒂什：非常抱歉！我会承担起责任的，接下来一个星期的值夜就由我…不，一个月，这一个月的值夜就由我承担了。",
+          "kind": "rich_text",
+          "section": 7,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [
+              "source_component_id:interactive_dialogue"
+            ],
+            "labels": [
+              "dialogue"
+            ],
+            "rule_id": "obc-component-role",
+            "rule_version": "0.1",
+            "state": "classified",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "7aabf2a138e1fbb3cabf12b2fac67e3262433a3e6af004ec5355e918b1d6be9f",
+          "unit_id": "6dd9900469c8b31107efa1e04d137fc69b14e48a4d05bcff08b4727b4d2bc291",
+          "canonical_sha256": "2ce710451a21019bc4714b3b051741b3342f2ae35b97184daf9318940a51fd8b",
+          "ru_start": 72,
+          "ru_end": 111,
+          "text": "叶洛亚：所以按照他自己的愿望，接下来一个月他都会负责保护那座还在建设中的灯塔。",
+          "kind": "rich_text",
+          "section": 7,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [
+              "source_component_id:interactive_dialogue"
+            ],
+            "labels": [
+              "dialogue"
+            ],
+            "rule_id": "obc-component-role",
+            "rule_version": "0.1",
+            "state": "classified",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "叶洛亚明确承接瓦蒂什自愿承担一月值夜，安排其一月保护在建灯塔；两种职责具体是否完全相同仍未展开。",
+      "forbidden_conclusion": "把安排承接整体降为悬空假说，或将值夜和所有灯塔职责无条件画等号。"
+    },
+    {
+      "case_id": "2287",
+      "name": "破魔之弓",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\5e902c98f04fc02fc179c6ecef8931e34c0a420dd6543b5e5b5e964f5bc0341a\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:2287",
+      "quotes": [
+        {
+          "evidence_id": "6c599e6530c451103dd0dcfd71be6b8c97b8f3354c508f84887a200d0f4c1088",
+          "unit_id": "775b5cdcef89be1522cde0e19d9872cdc4035094ab0ef45375e1274229c28bfe",
+          "canonical_sha256": "55049af2406d226a5c25e3e1e33e640f4e34036e3d7c089e976343bf089f984d",
+          "ru_start": 54,
+          "ru_end": 116,
+          "text": "如果当初教我射术的人没有随将军出征的话，\n那我们的儿子，如今应当是左卫门的年纪了，\n而我或许就应当姓高岭，或者由他姓浅濑了…",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "6c599e6530c451103dd0dcfd71be6b8c97b8f3354c508f84887a200d0f4c1088",
+          "unit_id": "775b5cdcef89be1522cde0e19d9872cdc4035094ab0ef45375e1274229c28bfe",
+          "canonical_sha256": "55049af2406d226a5c25e3e1e33e640f4e34036e3d7c089e976343bf089f984d",
+          "ru_start": 117,
+          "ru_end": 152,
+          "text": "左卫门的口吻，和故意背向我的模样，\n简直和他当年提着刀离开的时候一样。",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "儿子处于反事实设想，不能据此确认其存在；比较左卫门与回忆中的他不证明二者身份同一。",
+      "forbidden_conclusion": "巫女已育有一子，或左卫门就是当年教射术并出征者。"
+    },
+    {
+      "case_id": "4943",
+      "name": "千夜故事集",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\79edf5df6694339889e38ee04d0a21daaa559e6340f869e5fbafe8ad6753dce7\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:4943",
+      "quotes": [
+        {
+          "evidence_id": "6ea2a2e4341af6c7c3c9c374c6c9b65011b5f51518c4bf509356afcc090bdc50",
+          "unit_id": "29aa691b50e87b08e1eb4e3418092c41f5a0423a0bb01728b21162ea0bfa5ddc",
+          "canonical_sha256": "ccbc649fe535a36d8c7dcafeabb2fcd3b067c08a3cee9211c16f23abf0c06f76",
+          "ru_start": 688,
+          "ru_end": 743,
+          "text": "说话的是一个女人。他很快意识到，她就是冒险家所说的捕梦者，因为女人的影子像缀满宝石的帷幔，有着奇异的斑驳质感。",
+          "kind": "rich_text",
+          "section": 1,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 2,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "6ea2a2e4341af6c7c3c9c374c6c9b65011b5f51518c4bf509356afcc090bdc50",
+          "unit_id": "29aa691b50e87b08e1eb4e3418092c41f5a0423a0bb01728b21162ea0bfa5ddc",
+          "canonical_sha256": "ccbc649fe535a36d8c7dcafeabb2fcd3b067c08a3cee9211c16f23abf0c06f76",
+          "ru_start": 594,
+          "ru_end": 616,
+          "text": "在他几乎要承认自己的失败时，捕梦者找到了他。",
+          "kind": "rich_text",
+          "section": 1,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 2,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "45dc8db865937e182e3391d449052d506bc0148fccdc7f36e1f6d40e3bda38dc",
+          "unit_id": "a69b417ec7f1c3ed1acaf2c4d27c070803f1fae511b142d255ce1b764c22d751",
+          "canonical_sha256": "ccbc649fe535a36d8c7dcafeabb2fcd3b067c08a3cee9211c16f23abf0c06f76",
+          "ru_start": 1028,
+          "ru_end": 1069,
+          "text": "她困惑地、错愕地、宽慰地笑了，女人摘下面具，露出魔法师的面容，干枯的双唇微微颤动。",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "无影人故事中的女人在该叙事内被指为捕梦者；不能将此局部明确关系推广为其他卷中相似女人的共同身份。",
+      "forbidden_conclusion": "捕梦者、另一故事中的面具女人及其他相似人物已被证明是同一人。"
+    },
+    {
+      "case_id": "3076",
+      "name": "曚云之月",
+      "origin_job": "data\\retrieval\\p05-card-live66-1017-repair-v3-20261101-r1\\final-cards\\jobs\\d661e45f123456a0030f8accc025b8c547fe71a4b1a4b53d390494a96e6f228a\\plan.json",
+      "source_id": "mihoyo_obc:zh-cn:3076",
+      "quotes": [
+        {
+          "evidence_id": "4f7407f08292a18a975052c6a7030b651f5db6070bd240b68d74182d3cf898d3",
+          "unit_id": "1be86b5addbe21d75d21b033d7db82e11580e561cdd2a1dc1023423e1eb748f3",
+          "canonical_sha256": "8cb136caf74b8c6a917c2d3fd8143249f13c71d4cfb551b7cc24c9045e625281",
+          "ru_start": 168,
+          "ru_end": 223,
+          "text": "过去的歌曲曾经赞咏她曾与「海御前」身为海祗双子的默契，\n描绘她们沐浴在船艏激起的浅白浪花中，挽弓与提枪的形姿…",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "4f7407f08292a18a975052c6a7030b651f5db6070bd240b68d74182d3cf898d3",
+          "unit_id": "1be86b5addbe21d75d21b033d7db82e11580e561cdd2a1dc1023423e1eb748f3",
+          "canonical_sha256": "8cb136caf74b8c6a917c2d3fd8143249f13c71d4cfb551b7cc24c9045e625281",
+          "ru_start": 112,
+          "ru_end": 139,
+          "text": "「海祇大御神大人挑起的争战，或许从开始就注定无果了。」",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        },
+        {
+          "evidence_id": "4f7407f08292a18a975052c6a7030b651f5db6070bd240b68d74182d3cf898d3",
+          "unit_id": "1be86b5addbe21d75d21b033d7db82e11580e561cdd2a1dc1023423e1eb748f3",
+          "canonical_sha256": "8cb136caf74b8c6a917c2d3fd8143249f13c71d4cfb551b7cc24c9045e625281",
+          "ru_start": 364,
+          "ru_end": 397,
+          "text": "「待我带回传说中那大妖天狗的面具，阿姐可一定要如约完成未竟之事。」",
+          "kind": "rich_text",
+          "section": 3,
+          "selector": {
+            "kind": "rich_text",
+            "normalized_text_pointer": "/normalized_text"
+          },
+          "structure": {
+            "rich_text": {
+              "fragment_count": 1,
+              "fragment_index": 0
+            }
+          },
+          "content_role": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          },
+          "provenance": {
+            "basis": [],
+            "labels": [],
+            "rule_id": null,
+            "rule_version": null,
+            "state": "unknown",
+            "taxonomy_version": "phase02-draft-0.1"
+          }
+        }
+      ],
+      "reference_judgment": "保留歌曲对双子的赞咏和未署名引语；不能给引语擅定说话者或把歌谣升级为独立史证。",
+      "forbidden_conclusion": "未署名引语确定由曚云说出，或所有歌谣叙述均已独立证实。"
+    }
+  ]
+}

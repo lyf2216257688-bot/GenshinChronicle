@@ -88,7 +88,10 @@ def _attempt(root, view, evidence, *, live_authorized=False, api_key=None, trans
     body=actual_body(args);fp=fingerprint(args)
     plan={'version':'metro-card-chat-1','route':'tokenmetro','api_surface':'chat_completions',
           'wire':args,'actual_body':body,'view':view,'evidence':evidence,'fingerprint':fp,'backend':'mock' if mock else 'live'}
-    if strategy:plan.update(stage='card',strategy=strategy,prompt_sha256=digest(card_generation.PROMPT),schema_sha256=digest(cards_v2.SCHEMA))
+    if strategy:plan.update(stage='card',strategy=strategy,prompt_sha256=digest(card_generation.prompt(strategy)),
+                            schema_sha256=digest(card_generation.schema(strategy,view.get('mode','read'),view)))
+    if strategy in card_generation.EVIDENCE_STRATEGIES:
+        plan['quote_locations']=card_generation.anchors.location_map(view,evidence)
     if (root/'complete.json').exists():
         verify(root);require(read(root/'plan.json')==plan,'Completed Chat identity changed')
         return read(root/'result.json')
@@ -116,7 +119,7 @@ def _attempt(root, view, evidence, *, live_authorized=False, api_key=None, trans
     sdk_object=None
     try:
         transport=transport_override if mock else httpx.HTTPTransport(trust_env=False,retries=0)
-        with httpx.Client(transport=transport,trust_env=False,follow_redirects=False,timeout=httpx.Timeout(180,connect=15),
+        with httpx.Client(transport=transport,trust_env=False,follow_redirects=False,timeout=httpx.Timeout(900 if strategy in card_generation.STRUCTURED_32K else 180,connect=15),
                           event_hooks={'request':[request_hook],'response':[response_hook]}) as client:
             with openai.OpenAI(base_url=requests.METRO_URL,api_key='offline-mock' if mock else api_key,
                                max_retries=0,http_client=client) as sdk:
@@ -142,6 +145,8 @@ def _attempt(root, view, evidence, *, live_authorized=False, api_key=None, trans
     result.update(**state,elapsed_seconds=round(time.monotonic()-started,3),automatic_retry=False,
                   actual_fee='UNKNOWN',navigation_status='INACTIVE',human_acceptance='NOT_REVIEWED',
                   authority='MOCK_NOT_MODEL_OUTPUT' if mock else 'LIVE_NOT_HUMAN_REVIEWED')
+    if strategy in card_generation.STRUCTURED_32K:
+        result.setdefault('card_failure','NETWORK_FAILURE' if state['http_status']!=200 else 'PROTOCOL_INVALID')
     write(root/'trace.json',{'events':trace});write(root/'result.json',result);seal(root)
     return result
 
@@ -155,7 +160,10 @@ def execute(root, view, evidence, *, live_authorized=False, api_key=None, transp
     plan={'version':'metro-card-chat-1','route':'tokenmetro','api_surface':'chat_completions',
           'wire':args,'actual_body':actual_body(args),'view':view,'evidence':evidence,
           'fingerprint':fingerprint(args),'backend':'mock' if mock else 'live'}
-    if strategy:plan.update(stage='card',strategy=strategy,prompt_sha256=digest(card_generation.PROMPT),schema_sha256=digest(cards_v2.SCHEMA))
+    if strategy:plan.update(stage='card',strategy=strategy,prompt_sha256=digest(card_generation.prompt(strategy)),
+                            schema_sha256=digest(card_generation.schema(strategy,view.get('mode','read'),view)))
+    if strategy in card_generation.EVIDENCE_STRATEGIES:
+        plan['quote_locations']=card_generation.anchors.location_map(view,evidence)
     if mock:
         ledger=root.parent/'mock-chat-ledger'
         require((root/'complete.json').exists() or transport_override is not None,'Mock transport missing')

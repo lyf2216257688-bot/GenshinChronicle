@@ -34,8 +34,8 @@ server deduplication. The generic seam can carry a stable `Idempotency-Key`
 with a route-bound verified provider contract; neither current Metro adapter
 enables it. Otherwise another attempt may incur another charge and consumes
 risk allowance. Completed non-JSON can retry only with finite authorized
-`format_retries`. Source/Schema failures and truncation are isolated, never
-silently repaired/resampled. Existing deterministic Card conversions remain
+`format_retries`. Source/Schema failures and truncation are isolated by the shared transport layer, never
+silently repaired/resampled. The new Card-only domain policy below may replace an eligible completed task with an explicitly recorded structural reorganization. Existing deterministic Card conversions remain
 strictly source-bound. Successful retries never erase earlier UNKNOWN.
 
 `Batch` reserves each attempt under an OS process lock. Unknown usage consumes
@@ -348,16 +348,16 @@ It does not change Card defaults. One authorized DeepSeek/Chat/disabled-thinking
 showed no visible reasoning but failed token arithmetic and Card Schema; batch continuation
 was blocked at that checkpoint. Superseded by the bounded Card strategy below. See [actual evidence](research/phase-05/p05-metro-chat-disabled-live-20261029.md).
 
-### Card structured-generation strategy (2026-10-29)
+### Card structured-generation strategy (2026-10-29; historical checkpoint)
 
-Current Card CLI preparation defaults to `deepseek-card-structured-1`: Metro
+At that checkpoint Card CLI preparation defaulted to `deepseek-card-structured-1`: Metro
 `https://tokenmetro.com/v1/chat/completions`, `deepseek-v4.1-flash`, stream=false,
 max_tokens=12288, json_object, thinking.type=disabled via top-level extra-body forwarding.
 System Prompt carries the complete Card Schema and typed examples; deterministic aliases
 reduce wire IDs without changing provenance. The existing TOKENMETRO credential slot is reused.
 `qwen-card-structured-1` remains an explicit experimental candidate (Qwen3.8 Flash,
 json_schema/enable_thinking=false); its live probe HTTP524 is not a success or free-call proof.
-Card internal Python prepare defaults retain legacy compatibility; explicit legacy-responses
+At that checkpoint Python prepare retained legacy defaults; explicit legacy-responses
 selects the old Card execution path. E2 and frozen Link protocol rules are unaffected.
 
 Only this new Card adapter permits recorded token arithmetic warnings and the observed
@@ -367,14 +367,14 @@ and actual fees remain UNKNOWN. See [real batch, recovery and semantic limitatio
 
 ### 2026-10-31 Phase05 Card A/C qualification
 
-**Decision locked; runtime integration pending.** Machine-readable profile: `config/phase05-card-api-profile-20261031.json`. Original sealed A/C outputs: `data/retrieval/p05-card-api-ac-20261031-r1/`.
+**Historical qualification checkpoint; now superseded by the versioned runtime integration below.** Machine-readable profile: `config/phase05-card-api-profile-20261031.json`. Original sealed A/C outputs: `data/retrieval/p05-card-api-ac-20261031-r1/`.
 
 - Selected NEW Card profile: TokenMetro `deepseek-v4.1-flash`, Chat Completions, nonstream, `response_format={"type":"json_object"}`, `thinking.type=disabled`, 32,000 output cap, full local Schema and source/quotation checks. Native upstream identity unverified.
 - A: Responses `text.format=json_schema`, T01, 32k, thinking none: HTTP 400, `This response_format type is unavailable now`; provider usage UNKNOWN. Do not select Responses JSON Schema at current route.
 - C: Chat Low requested, T05, 32k: HTTP 200; mechanical/source PASS; 7,279 input + 16,008 output = 23,287 tokens, versus disabled 19,831. Response had neither reasoning_content nor reasoning-token breakdown, so effective Low is unverified. No clear semantic gain; remain disabled by default.
 - Shared model_calls remains required for retry, recovery, budgets, persistent raw records, channel fault control, UNKNOWN accounting. Unsupported HTTP 400 is not retried. Sent/unknown requests require bounded cost-risk authorization for resends.
-- Long-document B/truncation strategy deferred. Cards remain INACTIVE/NOT_REVIEWED.
-- **Migration note:** current production source still has 12,288 in legacy `deepseek-card-structured-1`. Do not overwrite sealed historical executable identity. Integrate a NEW versioned 32k Card strategy and make it the default for NEW campaigns only, with regression tests and unchanged historical resume behavior. The JSON decision file alone is not yet an active code switch.
+- Long-document B/truncation strategy was deferred at qualification; the new versioned structural implementation below supersedes that pending work. Cards remain INACTIVE/NOT_REVIEWED.
+- **Historical migration note:** qualification changed the JSON decision only. Runtime now implements the separate 32k strategy below; the 12,288 legacy strategy and sealed archives are retained.
 
 Official references: https://api-docs.deepseek.com/api/create-chat-completion/ , https://api-docs.deepseek.com/api/create-response/ , https://api-docs.deepseek.com/guides/thinking_mode/ .
 
@@ -382,4 +382,76 @@ Official references: https://api-docs.deepseek.com/api/create-chat-completion/ ,
 
 Isolated paid T01 probe: Chat Completions + forced `submit_navi_card` function (`strict:true`), thinking disabled, nonstream, 32k. On the **TokenMetro `/v1/chat/completions` route**, HTTP 200 with exactly one function call, `finish_reason=tool_calls`, and **full local source/Schema/quote PASS**. Tokens: input 2,956, output 13,839, total 16,795, fee UNKNOWN. Disabled-thinking JSON Object T01 reference total: 11,291; both passed. Note DeepSeek official strict tool calling requires a Beta endpoint, while this was through Metro; this successful output does not independently prove provider-side strict-enforcement guarantees.
 
-**No change to chosen default:** Chat Completions, JSON Object, thinking disabled, new-run 32k profile. Strict Function Calling is a *compatible alternate* only: around 49% higher observed total tokens on T01, no clear semantic gain, and a tool-call adapter would be required. Keep independent local Schema and exact-source checks. See `docs/research/phase-05/p05-chat-strict-function-20261031.md` and original raw artifacts at `data/retrieval/p05-card-strict-tools-20261031-r1/`. Legacy runtime still requires a versioned 32k integration; no silent update to old strategies.
+**No change to chosen default:** Chat Completions, JSON Object, thinking disabled, new-run 32k profile. Strict Function Calling is a *compatible alternate* only: around 49% higher observed total tokens on T01, no clear semantic gain, and a tool-call adapter would be required. Keep independent local Schema and exact-source checks. See `docs/research/phase-05/p05-chat-strict-function-20261031.md` and original raw artifacts at `data/retrieval/p05-card-strict-tools-20261031-r1/`. The separate versioned 32k implementation below preserves legacy strategies and archives.
+
+### New Card-only 32k runtime (2026-10-31)
+
+Both Python Card-only preparation entrypoints and the Card CLI default to
+`deepseek-card-evidence-32k-20261031`: TokenMetro DeepSeek v4.1 Flash,
+Chat Completions, stream=false, max_tokens=32000, JSON Object, thinking.type=disabled.
+All read and synthesis calls use this cap. Full local Schema, source aliases,
+program-extracted verbatim quotations, attribution/modality instructions and semantic review boundaries remain.
+Read timeout is 900s, connect 15s; SDK/HTTP retries remain zero. Prompt hash and
+versioned reading/reorganization policies are bound to preparation.
+
+8,000 body characters and 100,000 serialized request characters are input safety
+limits, not semantic split rules. `--context-token-limit` optionally binds an actual
+operator-confirmed context limit; a conservative UTF8 byte proxy plus 32,000 output
+reservation checks it. This is not a native tokenizer/context attestation.
+
+Network retries use shared Policy/Batch unchanged. New Cards require format_retries=0.
+One completed, usage-accounted JSON truncation or obvious final-answer planning leak
+may create one structural replacement decision, with multiple new reading/synthesis
+calls charged to the same campaign. No recursive content reorganization, UNKNOWN
+resend, Schema/source retry, model fallback or output-cap escalation is implicit.
+
+Required children must all succeed before document synthesis or completion. Formal
+semantic Cards and temporary reading/reduction nodes have separate roles; temporary
+nodes stay archived and are excluded from the default semantic index. Frozen runs
+resume in their hash-verified prepared interpreter snapshot, never by rewriting old
+wire/ledger/code identities. Full-corpus paid generation remains separately authorized.
+The previous `deepseek-card-structured-32k-20261031` strategy retains its copied-quote
+Schema and remains explicitly selectable; its archived jobs resume with their original code.
+
+The new `card-evidence-selection-1` wire contract supplies lossless sentence/paragraph
+segment IDs inside delivered evidence. Reading outputs choose evidence/start/end segment IDs;
+synthesis outputs choose verified inherited anchor IDs. Models never output quote text or
+character offsets. Programs extract continuous ranges into the existing Card v2 anchors;
+disjoint evidence stays as multiple anchors. Position maps and both read/synthesis Schema
+hashes are bound to preparation and raw-first jobs. Unknown IDs, invalid ranges and source
+violations are isolated without fuzzy search, rebinding or legacy quote-text repair.
+Reference validation is mechanical; semantic quality remains NOT_VALIDATED.
+
+Card index export independently selects completed, validated sources and seals a
+`card-selection.json` report of included/skipped sources. New completions require a new
+index identity/directory, with existing exact-window reuse; zero eligible Cards causes no
+encoder load. Historical Cards and indexes are not rewritten.
+See [current implementation and offline evidence](research/phase-05/p05-card-evidence-selection-20261031.md)
+and [structural integration/census checkpoint](research/phase-05/p05-card-integration-32k-20261031.md).
+
+### Fixed-66 bounded Card repair (2026-11-01)
+
+The initial stage of the now-closed fixed66 campaign explicitly selected `deepseek-card-bounded-evidence-20261101`,
+TokenMetro Chat Completions, exact model `deepseek-v4.1-flash-1017`, JSON Object,
+stream=false, thinking.type=disabled and max_tokens=32000. Legacy preparation defaults
+and frozen strategy identities are retained; this is a scoped new wire contract.
+Provider-reported completion_tokens exceeded32000 on archived requests; local
+validation keeps that request failed. Output shape and staged reduction control
+new generation length; they do not certify server enforcement or native tokenization.
+All semantic source bindings derive from exact selected anchors. Completed HTTP200
+content failures with known usage can receive one bounded structural replacement;
+UNKNOWN/uncertain billing is isolated and not blindly resent. Windows of8 sends and
+disjoint source workers still use shared Policy/Batch and raw-first adapters.
+Actual charges and native upstream attestation remain UNKNOWN. See the
+[repair report](research/phase-05/p05-card-live66-repair-20261101.md).
+
+The same fixed66 repair later introduced explicit
+`deepseek-card-single-segment-20261101` (contract4), preserving the exact1017 model,
+Chat/nonstream/disabled-thinking/JSON Object/max_tokens32000 wire settings. Reading
+selects atomic segment IDs instead of paired endpoints; inherited synthesis anchor
+choices and strict rejection remain. This bounds representable reference geometry,
+not provider token accounting or semantic truth. A single specifically authorized
+replacement of a post-send UNKNOWN scope succeeded; this is recorded authority for
+that one scope, not a general UNKNOWN retry policy. The operator then stopped new
+dispatches after repeated channel failures; this closed work unit has no standing
+authorization to resume remaining sources. Actual fees remain UNKNOWN.

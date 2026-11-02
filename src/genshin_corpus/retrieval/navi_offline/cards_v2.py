@@ -5,7 +5,7 @@ import json
 import re
 
 from . import cards, story_retrieval
-from .anchors import locate
+from .anchors import locate, verify_location, anchor_id
 from .common import digest, read, require
 
 VERSION = 'p05-navi-card-2'
@@ -46,8 +46,13 @@ def wire(view, cap=8192):
             'text': {'format': {'type': 'json_object'}}}
 
 
-def validate(value, view, evidence):
-    cards.Draft202012Validator(SCHEMA).validate(value)
+def validate(value, view, evidence, *, located=False):
+    schema_value=deepcopy(value)
+    if located:
+        for x in schema_value['source_observations']:
+            for a in x['anchors']:
+                for key in ('start','end','ru_start','ru_end'):a.pop(key,None)
+    cards.Draft202012Validator(SCHEMA).validate(schema_value)
     bound = {q['id']: q for q in evidence}
     delivered = {q['id'] for q in view['evidence']}
     children = view['children']
@@ -60,14 +65,18 @@ def validate(value, view, evidence):
             require(x['text'].strip() and set(x['evidence_ids']) <= allowed, 'Card cites unread/uninherited evidence')
     result = deepcopy(value)
     inherited_anchors = {(a['evidence_id'], a['quote']) for c in children for x in c['source_observations'] for a in x['anchors']}
+    inherited_locations = {anchor_id(a) for c in children for x in c['source_observations'] for a in x['anchors']} if located else set()
     for x in result['source_observations']:
         require({a['evidence_id'] for a in x['anchors']} == set(x['evidence_ids']), 'Observation references lack exact quotations')
         for a in x['anchors']:
             eid = a['evidence_id']
             require(eid in bound, 'Quotation not bound to source')
-            require(eid in delivered or (eid, a['quote']) in inherited_anchors, 'Synthesis invented a new source quotation')
-            start, end = locate(bound[eid]['text'], a['quote'])
-            a.update(start=start, end=end, ru_start=bound[eid]['ru_start']+start, ru_end=bound[eid]['ru_start']+end)
+            require(eid in delivered or (anchor_id(a) in inherited_locations if located else (eid, a['quote']) in inherited_anchors),
+                    'Synthesis invented a new source quotation')
+            if located:verify_location(a,bound[eid])
+            else:
+                start, end = locate(bound[eid]['text'], a['quote'])
+                a.update(start=start, end=end, ru_start=bound[eid]['ru_start']+start, ru_end=bound[eid]['ru_start']+end)
     return result
 
 
@@ -171,11 +180,12 @@ def model_excerpt(q):
             'content_role':q['content_role'],'provenance':q['provenance']}
 
 
-def synthesis_view(title, children, scope):
+def synthesis_view(title, children, scope, *, preserve_locations=False):
     model_children=[deepcopy({k:c[k] for k in ('card_id','level','section','overview',*cards.FIELDS)}) for c in children]
     for child in model_children:
         for observation in child['source_observations']:
-            observation['anchors']=[{k:a[k] for k in ('evidence_id','quote')} for a in observation['anchors']]
+            if not preserve_locations:
+                observation['anchors']=[{k:a[k] for k in ('evidence_id','quote')} for a in observation['anchors']]
     return {'card_version':VERSION,'mode':'synthesis','title':title,'scope':scope,'evidence':[], 'children':model_children}
 
 
@@ -203,7 +213,10 @@ def make_card(sources, source, level, section, part, evidence, *, children=(), p
         model_read_ids=part['value']['read_ids'] if part else [],
         model_child_ids=part['value']['child_ids'] if part else [],
         policy_exclusions=[u for u in (plan or {}).get('units',[]) if u['unread_ranges']],
-        upstream_skips=d['upstream_skips'],whole_page_semantic_coverage=False)
+        upstream_skips=d['upstream_skips'],whole_page_semantic_coverage=None,
+        semantic_coverage_status='NOT_ASSESSED')
+    from .card_semantics import delivery_coverage
+    card['coverage']['selected_scope_delivery']=delivery_coverage(plan,spans)
     return card
 
 
