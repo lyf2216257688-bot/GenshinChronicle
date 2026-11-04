@@ -10,6 +10,7 @@ import threading
 import uuid
 
 from genshin_corpus.rag.config import (
+    LOCAL_QWEN3_PROFILE,
     DEFAULT_PRODUCTION_RAG_ROOT,
     ProductionRagArtifactPaths,
 )
@@ -23,6 +24,7 @@ from genshin_corpus.ui.runtime import (
     ONLINE_QWEN_RERANKER_BACKEND,
     RERANKER_BACKEND_ENV,
     build_embedding_transport,
+    build_generation_provider,
     build_reranker,
     execute_query,
     production_artifact_paths,
@@ -34,14 +36,29 @@ from genshin_corpus.ui.runtime import (
 
 
 class UiRuntimeTests(TestCase):
+    def test_generation_selector_defaults_deepseek_with_explicit_bailian_rollback(self) -> None:
+        with patch("genshin_corpus.ui.runtime.BailianOpenAICompatibleTransport.from_environment"):
+            provider = build_generation_provider({"GENSHIN_GENERATION_BACKEND":"bailian","BAILIAN_BASE_URL": "https://test.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"})
+        from genshin_corpus.generation.generation import BailianGenerationProvider
+        self.assertIsInstance(provider, BailianGenerationProvider)
+        with patch("genshin_corpus.generation.deepseek.DeepSeekGenerationProvider.from_environment", return_value="deepseek") as build, patch(
+            "genshin_corpus.ui.runtime.BailianOpenAICompatibleTransport.from_environment", side_effect=AssertionError("No fallback")):
+            self.assertEqual(build_generation_provider({}), "deepseek")
+            build.assert_called_once()
+        with self.assertRaises(UiConfigurationError):
+            build_generation_provider({"GENSHIN_GENERATION_BACKEND": "other"})
+        with self.assertRaises(UiConfigurationError):
+            build_generation_provider({"GENSHIN_GENERATION_BACKEND": "deepseek"})
+
     def test_production_paths_are_owned_by_rag_config(self) -> None:
-        paths = production_artifact_paths()
+        paths = production_artifact_paths({})
         self.assertIsInstance(paths, ProductionRagArtifactPaths)
         self.assertEqual(paths.root, DEFAULT_PRODUCTION_RAG_ROOT)
         self.assertIn("field-aware-lexical", str(paths.lexical_manifest_path))
         self.assertNotIn("data\\retrieval\\p04-rag-production", str(paths.lexical_manifest_path))
         self.assertNotIn("generation.measure", production_artifact_paths.__module__)
-        self.assertEqual(len(paths.resolved_key()), 3)
+        self.assertEqual(len(paths.resolved_key()), 4)
+        self.assertEqual(paths.resolved_key()[-1], LOCAL_QWEN3_PROFILE)
 
     def test_closed_state_validation_and_release_delegate_to_backend(self) -> None:
         state = SimpleNamespace(closed=False, close=Mock())
@@ -146,13 +163,21 @@ class UiRuntimeTests(TestCase):
         ) as build_generation, patch(
             "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}
         ) as run:
-            result = execute_query(object(), query, environment={})
+            result = execute_query(SimpleNamespace(embedding_profile="online_qwen_2048"), query, environment={})
         self.assertEqual(result["status"], "succeeded")
         build_generation.assert_not_called()
         self.assertIsNone(run.call_args.kwargs["generation_provider"])
         self.assertTrue(run.call_args.kwargs["config"].reranker_enabled)
         self.assertEqual(run.call_args.kwargs["config"].candidate_supply_depth, 500)
         self.assertIsNotNone(run.call_args.kwargs["reranker"])
+
+    def test_local_profile_never_constructs_remote_embedding_transport(self) -> None:
+        query=UiQuery("问题","evidence_only",Path("output"))
+        with patch("genshin_corpus.ui.runtime.build_embedding_transport",side_effect=AssertionError("remote embedding forbidden")), patch(
+            "genshin_corpus.ui.runtime.build_reranker",return_value=None), patch(
+            "genshin_corpus.ui.runtime.run_single_question",return_value={"status":"succeeded"}) as run:
+            execute_query(SimpleNamespace(embedding_profile="local_qwen3_1024"),query,environment={RERANKER_BACKEND_ENV:"off"})
+        self.assertIsNone(run.call_args.kwargs["embedding_transport"])
 
     def test_execute_query_off_preserves_existing_backend_off_control(self) -> None:
         query = UiQuery("问题", "evidence_only", Path("output"))
@@ -162,7 +187,7 @@ class UiRuntimeTests(TestCase):
         ) as build, patch(
             "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}
         ) as run:
-            execute_query(object(), query, environment=environment)
+            execute_query(SimpleNamespace(embedding_profile="online_qwen_2048"), query, environment=environment)
         build.assert_called_once_with(environment)
         self.assertFalse(run.call_args.kwargs["config"].reranker_enabled)
         self.assertEqual(run.call_args.kwargs["config"].candidate_supply_depth, 500)
@@ -179,11 +204,11 @@ class UiRuntimeTests(TestCase):
         ) as build_generation, patch(
             "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"}
         ):
-            execute_query(object(), query, environment={})
+            execute_query(SimpleNamespace(embedding_profile="online_qwen_2048"), query, environment={})
         build_generation.assert_called_once_with({})
 
     def test_generate_answer_missing_generation_credentials_fails_closed(self) -> None:
-        with self.assertRaisesRegex(UiConfigurationError, "BAILIAN_BASE_URL"):
+        with self.assertRaisesRegex(UiConfigurationError, "DeepSeek"):
             from genshin_corpus.ui.runtime import build_generation_provider
 
             build_generation_provider({})

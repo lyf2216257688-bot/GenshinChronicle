@@ -1,5 +1,49 @@
 # Data Directory
 
+Phase 04 basic RAG V1 is the current development priority; Phase 05 semantic
+work is paused per [`current-phase.md`](../docs/current-phase.md). Existing Raw,
+Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
+their responsibilities and must be preserved. Phase 05 run roots, requests,
+failures/UNKNOWN ledgers, Cards and review exports below are retained historical
+evidence, not pending V1 build tasks or sources of new call authorization.
+
+The completed local 1024d original-RU index at
+`retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.
+The builder
+owns `build-plan.json`, `length-audit.json`, `shards/*/receipt.json`, per-shard
+vectors/rows, `progress.json`, append-only `events.jsonl`, failure diagnostics,
+`validation.json`, `report.json` and the final `metadata/manifest.json`.
+Only the last manifest advertises a serving-loadable complete index; shards
+remain for recovery. Kernel `build.lock` is retained and must not be deleted
+to bypass a running worker. Partial work is not adopted. The supported launcher
+runs in the operator's own PowerShell terminal, independent of Codex; keep that
+terminal open. Empty `launch-logs/`/`launcher.json` in the smoke root are retained
+unsuccessful host-detachment probes, not active workers or build completion.
+
+`retrieval/p04-local-qwen3-preparation-20261102/` owns the read-only token census,
+capped smoke selections and this work's test evidence. Separate
+`retrieval/p04-local-qwen3-smoke-20261102-r1/` (512) and `-r2/` (1024) own bounded
+real inference, process-death recovery and Dense/Hybrid/BGE loading evidence;
+they are never production candidates. Historical 2048d artifacts, the 909-RU
+pilot and Phase05 indexes are preserved. See the
+[operator runbook](../docs/research/phase-04/p04-local-qwen3-migration-20261102.md).
+Distinct `retrieval/p04-embedding-70q-*/` roots retain offline comparison
+manifests, per-question Packets, traces and separate review bundles. Preserve
+both index roots and the accepted 70Q runtime, query-vector and review inputs.
+
+The Phase04 V1-default DeepSeek QA path uses a caller-selected campaign root
+with `budget/` and `requests/<fingerprint>/` (plans, immutable raw attempts and
+sealed results). Live calls reserve fingerprints only in the separate
+`retrieval/p04-deepseek-request-ledger/`; they never consume Phase05 ledgers or
+permits. Offline fixtures use isolated mock roots/ledgers outside historical
+evidence. The separately authorized three-case live root is
+`retrieval/p04-deepseek-live3-20261102-r1/`: frozen original Packets and controls
+under `prepared/`, immutable shared calls under `execution/`, Generation results
+under `outputs/`, and terminal audit under `closure/`. Its three sends are
+consumed/closed; Q020's output-cap failure remains rejected and preserved.
+Per-question backend results still persist their Packet/Generation outputs
+under the existing selected output root, with a hash-bound raw-archive pointer.
+
 Shared model calls retain route fingerprint ledgers and immutable original
 reservations. New call roots contain `attempts/`, dispatch/retry records and a
 sealed aggregate result; explicit recoveries reference original artifact hashes

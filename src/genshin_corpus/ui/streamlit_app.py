@@ -24,7 +24,7 @@ from genshin_corpus.ui.runtime import (
     validate=validate_prepared_state,
     on_release=release_prepared_state,
 )
-def _prepared_state(paths_key: tuple[str, str, str]):
+def _prepared_state(paths_key: tuple[str, str, str, str]):
     return prepare_production_state(paths_key)
 
 
@@ -67,6 +67,7 @@ def _render_result(result: dict) -> None:
     st.subheader("运行信息")
     st.write({
         "执行身份": summary["execution_identity"],
+        "Embedding 配置": result["audit"]["embedding_profile"],
         "阶段耗时（秒）": summary["timing_seconds"],
     })
     if summary["error"]:

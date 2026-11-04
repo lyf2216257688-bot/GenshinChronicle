@@ -24,6 +24,7 @@ from genshin_corpus.generation.generation import (
     workspace_from_bailian_base_url,
 )
 from genshin_corpus.generation.measure import load_m2_runtime_questions
+from genshin_corpus.rag.config import ONLINE_QWEN_PROFILE
 from genshin_corpus.rag.backend import (
     PreparedRagState,
     SingleQuestionBackendConfig,
@@ -346,7 +347,11 @@ def _reconcile_recovery(output_root: Path, manifest: Mapping[str, Any], ledger: 
 def _build_state(windows: Mapping[str, Mapping[str, Any]]) -> PreparedRagState:
     context = prepare_evidence_assembly_context(RU_MANIFEST)
     retriever = _PersistedRetriever(windows)
-    return PreparedRagState(RU_MANIFEST.resolve(), Path("persisted-current-C"), Path("accepted-qwen-dense"), retriever, context, str(context.retrieval_unit_build_identity), "persisted-current-C", "accepted-qwen-dense")
+    return PreparedRagState(
+        RU_MANIFEST.resolve(), Path("persisted-current-C"), Path("accepted-qwen-dense"),
+        retriever, context, str(context.retrieval_unit_build_identity),
+        "persisted-current-C", "accepted-qwen-dense", embedding_profile=ONLINE_QWEN_PROFILE,
+    )
 
 
 def run_gte_full70(*, output_root: Path = DEFAULT_ROOT, environment: Mapping[str, str] | None = None) -> dict[str, Any]:

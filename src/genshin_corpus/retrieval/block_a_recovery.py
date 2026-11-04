@@ -23,6 +23,7 @@ from genshin_corpus.collector.storage import atomic_write
 from genshin_corpus.generation.generation import project_generation_request, validate_citations
 from genshin_corpus.generation.measure import load_m2_runtime_questions
 from genshin_corpus.rag.backend import SingleQuestionBackendConfig, prepare_rag_state, run_single_question
+from genshin_corpus.rag.config import ONLINE_QWEN_PROFILE
 
 from .block_a_closure import BlockAQualityGateConfig
 from .block_a_paid_full70 import (
@@ -498,7 +499,7 @@ def run_block_a_continuation(
         if question_executor is None:
             gen_transport = BailianOpenAICompatibleTransport.from_environment(generation_config, environment=env)
             rerank_transport = DashScopeQwenRerankTransport.from_environment(rerank_config, environment=env)
-            vnext_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=context["field_manifest"], dense_manifest_path=dense_manifest_path)
+            vnext_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=context["field_manifest"], dense_manifest_path=dense_manifest_path, embedding_profile=ONLINE_QWEN_PROFILE)
             vnext_config = SingleQuestionBackendConfig(candidate_supply_depth=500, rerank_depth=500, final_top_n=20, rerank_output_k=20, reranker_enabled=True, rrf_k=60, reranker_projection_max_chars=6000, fusion_config=config.fusion_config, assembly_config=config.assembly_config)
             def execute(question: Any, binding: Any, record: Callable[[str, Callable[[], Any]], Any]) -> Mapping[str, Any]:
                 del record

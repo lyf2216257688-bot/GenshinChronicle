@@ -170,10 +170,15 @@ def _gzip_jsonl(rows: Sequence[Mapping[str, Any]]) -> bytes:
     return out.getvalue()
 
 
-def _read_gzip_jsonl(path: Path) -> list[Mapping[str, Any]]:
+def _read_gzip_jsonl(path: Path, *, intern_keys: bool = False) -> list[Mapping[str, Any]]:
+    from sys import intern
+
+    decoder = json.JSONDecoder(
+        object_pairs_hook=(lambda pairs: {intern(key): value for key, value in pairs}) if intern_keys else None
+    )
     try:
         with gzip.open(path, "rt", encoding="utf-8") as handle:
-            values = [json.loads(line) for line in handle if line.strip()]
+            values = [decoder.decode(line) for line in handle if line.strip()]
     except (OSError, UnicodeError, json.JSONDecodeError, gzip.BadGzipFile) as exc:
         raise CandidateRetrievalError(f"cannot read candidate artifact: {path}") from exc
     return [_mapping(value, f"candidate artifact row {index}") for index, value in enumerate(values, 1)]
@@ -358,7 +363,7 @@ def _load_lexical(path: Path) -> tuple[Mapping[str, Any], list[Mapping[str, Any]
     body = body_path.read_bytes()
     if sha256(body).hexdigest() != artifact.get("sha256"):
         raise CandidateRetrievalError("lexical index SHA-256 mismatch")
-    rows = _read_gzip_jsonl(body_path)
+    rows = _read_gzip_jsonl(body_path, intern_keys=True)
     if artifact.get("row_count") != len(rows):
         raise CandidateRetrievalError("lexical index row accounting mismatch")
     if manifest.get("schema_version") == FIELD_AWARE_LEXICAL_INDEX_SCHEMA_VERSION:
@@ -493,41 +498,44 @@ def _field_aware_lexical_candidates_from_loaded(
     if not any(weights.values()):
         raise CandidateRetrievalError("at least one field-aware lexical weight must be positive")
 
-    field_lengths: dict[str, list[int]] = {field: [] for field in FIELD_AWARE_LEXICAL_FIELDS}
-    corpus_df: dict[str, int] = {}
+    field_lengths = dict.fromkeys(FIELD_AWARE_LEXICAL_FIELDS, 0)
+    corpus_df: Counter[str] = Counter()
+    matching_rows = []
+    query_terms = terms.keys()
     for row in rows:
         fields = _mapping(row.get("fields"), "field-aware lexical row fields")
         row_terms: set[str] = set()
         for field in FIELD_AWARE_LEXICAL_FIELDS:
             value = _mapping(fields.get(field), f"field-aware lexical {field} statistics")
             tf = _mapping(value.get("tf"), f"field-aware lexical {field}.tf")
-            field_lengths[field].append(int(value.get("length", 0)))
-            row_terms.update(token for token in terms if int(tf.get(token, 0)) > 0)
-        for token in row_terms:
-            corpus_df[token] = corpus_df.get(token, 0) + 1
-    averages = {field: (sum(lengths) / len(lengths) if lengths else 0.0) for field, lengths in field_lengths.items()}
+            field_lengths[field] += int(value.get("length", 0))
+            row_terms.update(token for token in tf.keys() & query_terms if int(tf[token]) > 0)
+        if row_terms:
+            corpus_df.update(row_terms)
+            matching_rows.append((row, row_terms))
+    averages = {field: (length / len(rows) if rows else 0.0) for field, length in field_lengths.items()}
+    idf = {token: math.log(1 + (len(rows) - df + 0.5) / (df + 0.5)) for token, df in corpus_df.items()}
     scored: list[tuple[float, tuple[tuple[Any, ...], ...], str]] = []
-    for row in rows:
-        fields = _mapping(row.get("fields"), "field-aware lexical row fields")
-        score = 0.0
-        for token, query_frequency in terms.items():
-            normalized_tf = 0.0
-            for field in FIELD_AWARE_LEXICAL_FIELDS:
-                if not weights[field]:
-                    continue
-                value = _mapping(fields.get(field), f"field-aware lexical {field} statistics")
-                tf = _mapping(value.get("tf"), f"field-aware lexical {field}.tf")
-                frequency = int(tf.get(token, 0))
-                if not frequency:
-                    continue
+    for row, row_terms in matching_rows:
+        field_inputs = []
+        for field, weight in weights.items():
+            if weight:
+                value = row["fields"][field]
                 length = int(value.get("length", 0))
                 average = averages[field]
                 normalization = 1 - b + b * (length / average if average else 0.0)
-                normalized_tf += weights[field] * frequency / normalization
+                field_inputs.append((weight, value["tf"], normalization))
+        score = 0.0
+        for token, query_frequency in terms.items():
+            if token not in row_terms:
+                continue
+            normalized_tf = 0.0
+            for weight, tf, normalization in field_inputs:
+                frequency = int(tf.get(token, 0))
+                if frequency:
+                    normalized_tf += weight * frequency / normalization
             if normalized_tf:
-                document_frequency = corpus_df.get(token, 0)
-                idf = math.log(1 + (len(rows) - document_frequency + 0.5) / (document_frequency + 0.5))
-                score += query_frequency * idf * ((normalized_tf * (k1 + 1)) / (normalized_tf + k1))
+                score += query_frequency * idf[token] * ((normalized_tf * (k1 + 1)) / (normalized_tf + k1))
         if score > 0:
             scored.append((score, (), str(row["unit_id"])))
     scored.sort(key=lambda item: (-item[0], item[1], item[2]))
@@ -665,6 +673,7 @@ def _load_dense(
     *,
     use_mmap: bool = False,
     artifacts_already_validated: bool = False,
+    keep_lineage: bool = True,
 ) -> tuple[Mapping[str, Any], Any, list[Mapping[str, Any]]]:
     manifest = _mapping(json.loads(Path(path).read_text(encoding="utf-8")), "Dense manifest")
     if manifest.get("status") != "complete" or manifest.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION:
@@ -687,17 +696,30 @@ def _load_dense(
             vectors = np.load(BytesIO(vectors_path.read_bytes()), allow_pickle=False)
     except (OSError, ValueError) as exc:
         raise CandidateRetrievalError("Dense vector artifact is unreadable") from exc
-    rows = _read_gzip_jsonl(rows_path)
+    if keep_lineage:
+        rows = _read_gzip_jsonl(rows_path)
+    else:
+        # Scoring needs only the ordered RU IDs. The verified row artifact
+        # keeps full provenance, and Assembly reads the original RU snapshot.
+        rows = []
+        with gzip.open(rows_path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                row = _mapping(json.loads(line), "Dense mapping row")
+                rows.append({"unit_id": row.get("unit_id"), "occurrence_index": row.get("occurrence_index")})
     if vectors.ndim != 2 or vectors.dtype != np.dtype("float32"):
         raise CandidateRetrievalError("Dense vector dtype/shape contract is invalid")
     expected_dimension = manifest.get("embedding_dimension")
     if not isinstance(expected_dimension, int) or vectors.shape[1] != expected_dimension:
         raise CandidateRetrievalError("Dense vector dimension does not match manifest")
-    if not np.isfinite(vectors).all():
-        raise CandidateRetrievalError("Dense vectors contain non-finite values")
-    norms = np.linalg.norm(vectors, axis=1)
-    if np.any(norms == 0) or not np.allclose(norms, 1.0, rtol=0.0, atol=1e-5):
-        raise CandidateRetrievalError("Dense vectors violate L2 normalization contract")
+    # A full FP32 matrix can be gigabytes; validation must not materialize a
+    # second matrix (norm's square) when the caller deliberately uses mmap.
+    for start in range(0, vectors.shape[0], 1024):
+        part = vectors[start:start + 1024]
+        if not np.isfinite(part).all():
+            raise CandidateRetrievalError("Dense vectors contain non-finite values")
+        norms = np.linalg.norm(part, axis=1)
+        if np.any(norms == 0) or not np.allclose(norms, 1.0, rtol=0.0, atol=1e-5):
+            raise CandidateRetrievalError("Dense vectors violate L2 normalization contract")
     if vectors.shape[0] != len(rows) or len(rows) != manifest.get("row_count"):
         raise CandidateRetrievalError("Dense row/vector accounting mismatch")
     seen: set[str] = set()
@@ -978,6 +1000,13 @@ class BatchCandidateRetriever:
         }
         if lexical_builder is _field_aware_lexical_candidates_from_loaded:
             lexical_kwargs["field_weights"] = field_weights
+        bound_query = None
+        if self.dense_manifest.get("local_qwen3_contract") is not None:
+            from .local_qwen3_embedding import validate_query_binding, QUERY_INSTRUCTION
+            validate_query_binding(self.dense_manifest, query_vector)
+            bound_query = query_vector
+            query_vector = bound_query.vectors[0]
+            instruction = QUERY_INSTRUCTION
         started = perf_counter()
         lexical = lexical_builder(**lexical_kwargs)
         if telemetry is not None:
@@ -993,6 +1022,10 @@ class BatchCandidateRetriever:
         )
         if telemetry is not None:
             telemetry["dense"] = perf_counter() - started
+        if bound_query is not None:
+            for row in dense:
+                row["retrieval"]["vector_space_identity"] = bound_query.space_identity
+                row["retrieval"]["query_text_sha256"] = bound_query.text_sha256[0]
         started = perf_counter()
         hybrid = hybrid_candidates(
             lexical,
@@ -1012,6 +1045,7 @@ def load_batch_candidate_retriever(
     dense_manifest_path: Path,
     *,
     accepted_qwen: bool = False,
+    use_mmap: bool = False,
 ) -> BatchCandidateRetriever:
     """Load and fully validate both existing production indexes once per batch."""
 
@@ -1021,8 +1055,9 @@ def load_batch_candidate_retriever(
         validate_accepted_qwen_dense_manifest(dense_path)
     dense_manifest, dense_vectors, dense_rows = _load_dense(
         dense_path,
-        use_mmap=accepted_qwen,
+        use_mmap=accepted_qwen or use_mmap,
         artifacts_already_validated=accepted_qwen,
+        keep_lineage=False,
     )
     return BatchCandidateRetriever(
         lexical_manifest=lexical_manifest,

@@ -53,7 +53,7 @@ semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **closed / adopted (Block A adopted per `docs/current-phase.md`)**
+Status: **ACTIVE — basic RAG V1 delivery; existing Block A remains adopted**
 
 The first end-to-end baseline now includes rebuildable Retrieval Units,
 BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence
@@ -64,9 +64,34 @@ intentionally outside this phase-level roadmap and are owned by
 retrieval winner, Dense model, reranker, vector database, or Generation
 provider.
 
+The 2026-11-02 priority change reuses Phases 01-03 and the existing RU/index,
+Assembly, Generation and local presentation modules. Near-term milestones are
+staged so that real failures can be attributed; an unresolved Generation issue
+does not block independently authorized offline Embedding preparation:
+
+1. **DeepSeek QA:** reuse the implemented provider/shared accounting and the
+   operator-selected V1 default; retain explicit Qwen rollback. The closed
+   fixed-Packet live evidence and open cap issue stay separate from adoption
+   and future paid authorization; current facts belong to current-phase.
+2. **Local original-RU embeddings:** use the completed Qwen3-Embedding-0.6B /
+   1024d index and matching query encoder by default. Keep the historical 2048d
+   pair available as explicit rollback. Use the repeatable 70Q Packet
+   comparison to identify retrieval and Assembly weaknesses after adoption.
+3. **Local V1 acceptance:** reuse the backend/Streamlit entry point for repeated
+   real questions, traceable citations, restart/resource/error checks and
+   measured latency/usage. Use existing 70Q/story materials plus actual questions;
+   use the existing 70Q comparison and record residual quality limits before
+   release.
+
+Detailed acceptance and migration requirements belong to the
+[Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
+Current progress and the immediate next action remain in `docs/current-phase.md`.
+These model/dimension choices are stage operating choices, not permanent
+architecture restrictions. Basic V1 does not depend on Phase 05 completion.
+
 ## Phase 05 — Source-Bound Semantic Navigation
 
-Status: **active; P05-W1 mechanical contracts PASS; real-story-slice acceptance OPEN**
+Status: **PAUSED — resume only from demonstrated basic-RAG needs**
 
 Phase 05 provides a versioned source-bound semantic build lineage, distinct
 hierarchy and event/relation graph views, and bounded provider-neutral
@@ -74,6 +99,14 @@ navigation over official RU candidates. It preserves Phase 04 Block A,
 Evidence Packet authority, and the Generation-visible contract. P05-W1 proves
 only mechanical contracts and does not establish semantic extraction quality,
 corpus-scale view quality, answer improvement, or production/default adoption.
+
+NaviRAG, Card generation/repair, Link improvements and KG construction are not
+the current next steps. Preserve all implementations, historical results,
+failed attempts and inactive artifacts. The pause is a priority decision,
+not a declaration that these capabilities failed or are permanently rejected.
+After V1 use exposes a concrete navigation/semantic bottleneck, select the
+smallest useful capability, bounded cost and source-based acceptance scope
+before separately authorizing resumption.
 
 ## Later semantic layers
 

@@ -1,19 +1,29 @@
 # Phase 05 — Source-Bound Semantic Navigation
 
-Status: **active; P05-W1 mechanical contracts PASS; P05-W2-U1 provider-free
-projection/accounting PASS; B JSON-object formal local-contract canaries PASS;
-B v2 prompt/contract and v3 review-hardening provider-free validation PASS;
-semantic-quality and real-story-slice acceptance OPEN**
+Status: **PAUSED (2026-11-02). Phase 04 basic RAG V1 is the development
+priority; NaviRAG/Card/Link/KG continuation and corpus-scale semantic work are
+deferred. Pause is not abandonment, failure or deletion.**
 
 This specification is the durable Phase 05 boundary. Current authorization,
 production/default behavior, and immediate next action remain owned by
 `docs/current-phase.md`.
 
+The contracts and completed research checkpoints below are retained for audit
+and possible future resumption. P05-W1/W2 mechanical passes do not establish
+semantic quality or production adoption. Prospective/next-work language below
+is conditional on explicit resumption; it is not a current task or live-call
+authorization. Existing code, prompts, reports, model experiments, failed/UNKNOWN
+attempts, raw archives and inactive outputs must remain intact. Phase 05 is
+not a dependency of basic RAG V1. Resume only when actual V1 question failures
+justify a bounded semantic capability and current-phase records that scope.
+
 ## Purpose
 
 Phase 04 established the first complete end-to-end RAG baseline. Its Block A
 retrieval/ranking behavior, accepted identities, Evidence Packet authority, and
-Generation-visible contract remain frozen. The valid targeted 9Q evidence
+Generation-visible contract formed its historical control. Phase 04 may now
+evolve under its own V1 contract; Phase 05 does not control those choices.
+The valid targeted 9Q evidence
 showed mechanical execution PASS but `0/9` materially improved final answers;
 Block B v0.1 production/default adoption remains blocked. Phase 05 addresses
 the remaining navigation, admission visibility, and multi-hop story-reasoning

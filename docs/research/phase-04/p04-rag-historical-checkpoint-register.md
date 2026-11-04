@@ -20,6 +20,25 @@
 
 ## Checkpoints
 
+### Local original-RU migration preparation (2026-11-02)
+
+- [Preparation and operator runbook](p04-local-qwen3-migration-20261102.md):
+  bounded transactional builder, verified resume, kernel lock, manual launcher,
+  source/row/vector acceptance and paired local/online query profiles.
+  Full tokenizer census: 535,802 rows, longest1,189, zero over2048.
+  Real capped512/1024 builds and process-death recovery PASS; no full vector
+  build or retrieval adoption. The operator separately selected DeepSeek as
+  V1 default, preserving the closed paid gate and unresolved cap evidence below.
+
+### Basic RAG V1 limited DeepSeek gate (2026-11-02)
+
+- The [three-case final-QA report](p04-deepseek-live3-20261102.md) records the
+  separately authorized 3 sends: Q014/Q003 accepted with case-local source
+  review, Q020 rejected for reported output above the actual request cap.
+  30,041 reported tokens, zero retries/unknown usage, actual fee UNKNOWN.
+  No production adoption; paid allowance consumed/closed. Current next work
+  and authorization remain owned by `docs/current-phase.md`.
+
 ### Foundation and historical benchmark path
 
 - **P01-EB / Phase 02 / Phase 03 closure:** accepted OBC `zh-cn` corpus and

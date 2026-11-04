@@ -14,6 +14,9 @@ import re
 from time import perf_counter
 from typing import Any, Mapping
 from uuid import uuid4
+import json
+
+from .config import DEFAULT_EMBEDDING_PROFILE, LOCAL_QWEN3_PROFILE, ONLINE_QWEN_PROFILE, dense_manifest_for_profile
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
@@ -24,7 +27,6 @@ from genshin_corpus.generation.generation import (
     validate_citations,
 )
 from genshin_corpus.retrieval.candidate_retrieval import (
-    DEFAULT_QWEN_DENSE_MANIFEST,
     BatchCandidateRetriever,
     load_batch_candidate_retriever,
 )
@@ -152,6 +154,8 @@ class PreparedRagState:
     retrieval_unit_build_identity: str
     lexical_build_identity: str
     dense_build_identity: str
+    embedding_profile: str = DEFAULT_EMBEDDING_PROFILE
+    local_encoding_contract: Mapping[str, Any] | None = None
     _closed: bool = field(default=False, init=False, repr=False, compare=False)
 
     @property
@@ -189,17 +193,39 @@ def prepare_rag_state(
     *,
     retrieval_unit_manifest_path: Path,
     lexical_manifest_path: Path,
-    dense_manifest_path: Path = DEFAULT_QWEN_DENSE_MANIFEST,
+    dense_manifest_path: Path | None = None,
+    embedding_profile: str = DEFAULT_EMBEDDING_PROFILE,
 ) -> PreparedRagState:
     """Validate and load heavy accepted state once for a caller's query batch."""
 
     retriever: BatchCandidateRetriever | None = None
     try:
+        dense_manifest_path = dense_manifest_for_profile(embedding_profile, dense_manifest_path)
         retriever = load_batch_candidate_retriever(
             Path(lexical_manifest_path),
             Path(dense_manifest_path),
-            accepted_qwen=True,
+            accepted_qwen=embedding_profile == ONLINE_QWEN_PROFILE,
+            **({"use_mmap": True} if embedding_profile == LOCAL_QWEN3_PROFILE else {}),
         )
+        local_contract = None
+        if embedding_profile == LOCAL_QWEN3_PROFILE:
+            from genshin_corpus.retrieval.local_qwen3_embedding import LocalQwen3Config, LocalQwen3Embedding, MODEL_ID, REVISION, WEIGHT_SHA256, file_sha256
+            from genshin_corpus.retrieval.local_qwen3_build import DEFAULT_MODEL
+            expected = LocalQwen3Embedding(LocalQwen3Config(DEFAULT_MODEL))
+            manifest = retriever.dense_manifest
+            source_manifest = json.loads(Path(retrieval_unit_manifest_path).read_text(encoding="utf-8"))
+            validation = json.loads((Path(dense_manifest_path).parent.parent/"validation.json").read_text(encoding="utf-8"))
+            if (manifest.get("local_qwen3_contract") != expected.contract
+                    or manifest.get("vector_space_identity") != expected.space_identity
+                    or manifest.get("scope") != "full-original-RU-candidate"
+                    or manifest.get("embedding_dimension") != 1024
+                    or manifest.get("model_name") != MODEL_ID or manifest.get("model_revision") != REVISION
+                    or manifest.get("model_sha256") != WEIGHT_SHA256
+                    or manifest.get("source_ru_manifest_sha256") != file_sha256(Path(retrieval_unit_manifest_path))
+                    or manifest.get("row_count") != source_manifest["accounting"]["retrieval_unit_count"]
+                    or validation.get("status") != "PASS" or validation.get("coverage_rows") != manifest.get("row_count")):
+                raise RagBackendPreparationError("local index must be complete, fully covered, validated and model-bound; smoke indexes cannot serve production")
+            local_contract = expected.contract
         assembly_context = prepare_evidence_assembly_context(Path(retrieval_unit_manifest_path))
         ru_identity = assembly_context.retrieval_unit_build_identity
         lexical_identity = str(retriever.lexical_manifest.get("arm_build_identity"))
@@ -219,6 +245,8 @@ def prepare_rag_state(
             retrieval_unit_build_identity=ru_identity,
             lexical_build_identity=lexical_identity,
             dense_build_identity=dense_identity,
+            embedding_profile=embedding_profile,
+            local_encoding_contract=local_contract,
         )
     except RagBackendPreparationError:
         if retriever is not None:
@@ -368,6 +396,7 @@ def run_single_question(
     *,
     embedding_transport: QwenEmbeddingTransport | None = None,
     precomputed_query: AcceptedQwenQueryVector | None = None,
+    local_query: Any | None = None,
     generation_provider: GenerationProvider | None = None,
     config: SingleQuestionBackendConfig | None = None,
     reranker: Reranker | None = None,
@@ -398,6 +427,7 @@ def run_single_question(
             "lexical_build_identity": prepared_state.lexical_build_identity,
             "dense_build_identity": prepared_state.dense_build_identity,
             "config": config.audit_projection(),
+            "embedding_profile": prepared_state.embedding_profile,
         },
         "timing_seconds": timings,
         "telemetry": {
@@ -448,16 +478,38 @@ def run_single_question(
             raise ValueError("question_text must be a non-empty string")
         if request_label is not None and (not isinstance(request_label, str) or not request_label.strip()):
             raise ValueError("request_label must be a non-empty string when provided")
-        if precomputed_query is None and not callable(getattr(embedding_transport, "embed", None)):
-            raise QwenEmbeddingPreflightError("embedding transport lacks embed")
-        if precomputed_query is not None and embedding_transport is not None:
-            raise QwenEmbeddingPreflightError("precomputed query cannot be combined with an embedding transport")
+        is_local = prepared_state.embedding_profile == LOCAL_QWEN3_PROFILE
+        if is_local:
+            if embedding_transport is not None or precomputed_query is not None:
+                raise QwenEmbeddingPreflightError("local profile forbids online/2048d query inputs")
+        else:
+            if local_query is not None:
+                raise QwenEmbeddingPreflightError("online profile forbids local query embeddings")
+            if precomputed_query is None and not callable(getattr(embedding_transport, "embed", None)):
+                raise QwenEmbeddingPreflightError("embedding transport lacks embed")
+            if precomputed_query is not None and embedding_transport is not None:
+                raise QwenEmbeddingPreflightError("precomputed query cannot be combined with an embedding transport")
         if execution_mode == "generate_answer" and not callable(getattr(generation_provider, "generate", None)):
             raise TypeError("generation provider lacks generate")
 
         current_stage = "embedding"
         started = perf_counter()
-        if precomputed_query is None:
+        if is_local:
+            from genshin_corpus.retrieval.local_qwen3_embedding import validate_query_binding
+            from genshin_corpus.retrieval.local_qwen3_query import encode_local_query
+            from hashlib import sha256
+            if local_query is None:
+                result["telemetry"]["provider_call_counts"]["embedding"] = 1
+                local_query = encode_local_query(question_text,expected_contract=dict(prepared_state.local_encoding_contract))
+            validate_query_binding(prepared_state.retriever.dense_manifest,local_query)
+            if local_query.text_sha256 != (sha256(question_text.encode("utf-8")).hexdigest(),) or any(row["truncated"] for row in local_query.token_audit):
+                raise QwenEmbeddingPreflightError("local query text binding/truncation mismatch")
+            query_vector = local_query
+            query_request_identity = sha256_json({"space":local_query.space_identity,"question_sha256":local_query.text_sha256[0]})
+            result["audit"]["embedding"] = {"source":"isolated_local_qwen3","request_identity":query_request_identity,
+                "vector_space_identity":local_query.space_identity,"dimension":1024,"token_audit":local_query.token_audit,
+                "model_lifecycle":"short-lived isolated process exits before BGE; no online fallback"}
+        elif precomputed_query is None:
             result["telemetry"]["provider_call_counts"]["embedding"] = 1
             query_vector, query_request, query_response = encode_qwen_query(embedding_transport, question_text)
             query_request_identity = query_request.request_identity

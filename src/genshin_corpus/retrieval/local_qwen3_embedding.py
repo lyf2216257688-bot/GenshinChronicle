@@ -246,16 +246,7 @@ def local_candidates(manifest_path: Path, query: EmbeddingBatch, *, top_k: int =
     if type(top_k) is not int or top_k <= 0:
         raise LocalQwen3Error("top_k must be a positive integer")
     manifest, vectors, rows = _load_dense(manifest_path, use_mmap=True)
-    contract = manifest.get("local_qwen3_contract")
-    if not isinstance(contract, dict) or sha256_json(contract) != query.space_identity or manifest.get("vector_space_identity") != query.space_identity:
-        raise LocalQwen3Error("query/index vector space mismatch")
-    if manifest.get("model_name") != MODEL_ID or manifest.get("model_revision") != REVISION or manifest.get("model_sha256") != WEIGHT_SHA256 or vectors.shape[1] != DIMENSION:
-        raise LocalQwen3Error("query/index model or dimension mismatch")
-    if query.vectors.shape != (1, DIMENSION):
-        raise LocalQwen3Error("candidate retrieval requires one 1024-dimensional query")
-    import numpy as np
-    if len(query.text_sha256) != 1 or query.vectors.dtype != np.float32 or not np.isfinite(query.vectors).all() or not np.allclose(np.linalg.norm(query.vectors,axis=1),1,atol=1e-5,rtol=0):
-        raise LocalQwen3Error("query violates bound text/FP32/L2 contract")
+    validate_query_binding(manifest, query)
     candidates = _dense_candidates_from_loaded(manifest, vectors, rows, query.vectors[0], top_k=top_k, query_instruction=QUERY_INSTRUCTION)
     locators = {r["unit_id"]: r for r in rows}
     for candidate in candidates:
@@ -265,3 +256,19 @@ def local_candidates(manifest_path: Path, query: EmbeddingBatch, *, top_k: int =
         candidate["retrieval"]["vector_space_identity"] = query.space_identity
         candidate["retrieval"]["query_text_sha256"] = query.text_sha256[0]
     return candidates
+
+
+def validate_query_binding(manifest: dict, query: EmbeddingBatch) -> None:
+    """Reusable typed guard for local Dense and the existing Hybrid retriever."""
+    if not isinstance(query, EmbeddingBatch) or query.role != "query":
+        raise LocalQwen3Error("identity-bound query embeddings required")
+    contract = manifest.get("local_qwen3_contract")
+    if not isinstance(contract, dict) or sha256_json(contract) != query.space_identity or manifest.get("vector_space_identity") != query.space_identity:
+        raise LocalQwen3Error("query/index vector space mismatch")
+    if manifest.get("model_name") != MODEL_ID or manifest.get("model_revision") != REVISION or manifest.get("model_sha256") != WEIGHT_SHA256 or manifest.get("embedding_dimension") != DIMENSION:
+        raise LocalQwen3Error("query/index model or dimension mismatch")
+    if query.vectors.shape != (1, DIMENSION):
+        raise LocalQwen3Error("candidate retrieval requires one 1024-dimensional query")
+    import numpy as np
+    if len(query.text_sha256) != 1 or query.vectors.dtype != np.float32 or not np.isfinite(query.vectors).all() or not np.allclose(np.linalg.norm(query.vectors,axis=1),1,atol=1e-5,rtol=0):
+        raise LocalQwen3Error("query violates bound text/FP32/L2 contract")

@@ -62,7 +62,19 @@ remain distinct: top-k candidates are not automatically final RAG context.
 Evidence Packets are provider-neutral, deterministic evidence interfaces;
 Generation consumes them without owning retrieval or assembly policy.
 
+The local product path composes the existing retrieval/ranking and Assembly
+interfaces through `rag/backend.py`; `generation/` owns provider adaptation and
+`ui/` owns presentation. Provider and embedding selection must bind explicit,
+compatible versioned configurations rather than alter evidence identity.
+Query encoders and document indexes must share the same vector-space contract;
+equal dimensions alone do not prove compatibility. Replacing embeddings builds
+new derivatives over existing RUs and preserves an explicit rollback profile.
+
 ### 5. Phase 05 Semantic Navigation Derivatives
+
+This section describes the retained optional layer. Development is paused in
+favor of Phase 04 basic RAG V1 per `docs/current-phase.md`; none of its semantic
+builds or acceptance gates is a prerequisite for local basic QA.
 Phase 05 adds a rebuildable, source-bound semantic build lineage over
 Canonical-first inputs and verified Retrieval Unit locators. It produces two
 distinct non-authoritative views: a cross-record hierarchy for coarse-to-fine
@@ -148,8 +160,18 @@ owned by `docs/current-phase.md`; this architecture document does not select a
 permanent model, retrieval winner, provider, reranker, or serving
 infrastructure.
 
-Phase 05 does not alter the accepted Phase 04 Block A retrieval/ranking
-behavior, Evidence Packet authority, or Generation-visible request contract.
+The current delivery direction uses the operator-selected DeepSeek final-answer
+and local Qwen3-Embedding-0.6B/1024d retrieval defaults. Those are reversible
+operating choices. A transactional streaming builder publishes a
+complete index only after source/row/vector verification; the local query
+worker exits before BGE uses the GPU. Explicit paired profiles preserve the
+old 2048d rollback. The CLI and thin Streamlit UI share backend profile
+selection. The detailed delivery/rollback contract is
+in [Phase 04](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
+
+The paused Phase 05 implementation does not alter the accepted Phase 04 Block A
+retrieval/ranking behavior, Evidence Packet authority, or Generation-visible
+request contract.
 Its provider-free first work unit proves only semantic-build/view and bounded
 navigation mechanics; it does not prove semantic extraction quality or answer
 improvement.
@@ -165,7 +187,7 @@ remain with `docs/current-phase.md`.
 The Card-only build path can prepare a whole-corpus snapshot, process adaptive
 reading and source-aware section/document synthesis in bounded batches, and
 build a new local Card index with exact-window reuse. Card observations,
-interpretations and hypotheses remain distinct derived content. Card-led Link
-research follows Card qualification; Canonical/RU retain original-evidence
-authority. The optional attribution sidecar is a diagnostic, not formal factual
+interpretations and hypotheses remain distinct derived content. If that research
+is resumed, Card-led Link work follows Card qualification; Canonical/RU retain
+original-evidence authority. The optional attribution sidecar is a diagnostic, not formal factual
 review or release authority. None of these paths selects a production default.

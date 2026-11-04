@@ -843,11 +843,21 @@ def _read_gzip_jsonl(
     *,
     timings: dict[str, float] | None = None,
     timing_key: str | None = None,
+    compact: bool = False,
 ) -> list[Mapping[str, Any]]:
+    from sys import intern
+
+    def compact_object(pairs):
+        return {
+            intern(key): intern(value) if isinstance(value, str) and len(value) <= 512 else value
+            for key, value in pairs
+        }
+
+    decoder = json.JSONDecoder(object_pairs_hook=compact_object if compact else None)
     started = perf_counter()
     try:
         with gzip.open(path, "rt", encoding="utf-8") as handle:
-            values = [json.loads(line) for line in handle if line.strip()]
+            values = [decoder.decode(line) for line in handle if line.strip()]
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, gzip.BadGzipFile) as exc:
         raise RetrievalUnitError(f"cannot read {label}: {path}") from exc
     if timings is not None and timing_key is not None:
@@ -909,7 +919,8 @@ def load_retrieval_units(
 
     descriptor, path, _ = artifact_body("retrieval_units")
     if scope is None:
-        rows = _read_gzip_jsonl(path, "Retrieval Unit artifact", timings=timings, timing_key="retrieval_units_decompress_and_parse")
+        rows = _read_gzip_jsonl(path, "Retrieval Unit artifact", timings=timings,
+                               timing_key="retrieval_units_decompress_and_parse", compact=True)
         observed_count = len(rows)
     else:
         rows = []

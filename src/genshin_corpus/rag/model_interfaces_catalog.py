@@ -32,6 +32,7 @@ from genshin_corpus.generation.generation import (
     _BAILIAN_COMPATIBLE_BASE_PATH,
     BailianControlConfig,
 )
+from genshin_corpus.generation.deepseek import DEFAULT_DEEPSEEK_MODEL, DEEPSEEK_BASE_URL
 from genshin_corpus.rag.navi_e2_routes import E2_ROUTES
 from genshin_corpus.retrieval.qwen_embedding import (
     DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION,
@@ -69,6 +70,17 @@ def build_model_interfaces_catalog() -> list[ModelInterfaceEntry]:
     """Inspect live codebase definitions and assemble the canonical interface catalog."""
     catalog: list[ModelInterfaceEntry] = []
 
+    catalog.append(ModelInterfaceEntry(
+        category="phase04_default_qa", logical_model="deepseek", route_name="deepseek_generation",
+        provider="TokenMetro", model_id=DEFAULT_DEEPSEEK_MODEL,
+        base_url_pattern=DEEPSEEK_BASE_URL, confirmed_base_url=DEEPSEEK_BASE_URL,
+        api_surface="chat_completions", endpoint_path="/v1/chat/completions",
+        api_key_env="TOKENMETRO_API_KEY", base_url_env="TOKENMETRO_BASE_URL", surface_env=None,
+        status="v1_default_limited_live",
+        applicable_modules=("genshin_corpus.generation.deepseek", "genshin_corpus.ui.runtime"),
+        notes="Operator-selected V1 default; output-cap incompatibility remains; finite live authorization still required; no new calls authorized by selector.",
+    ))
+
     # 1. Phase 04 Production QA: Generation
     bailian_dummy = BailianControlConfig(
         region="cn-beijing",
@@ -78,7 +90,7 @@ def build_model_interfaces_catalog() -> list[ModelInterfaceEntry]:
     )
     catalog.append(
         ModelInterfaceEntry(
-            category="phase04_production_qa",
+            category="phase04_generation_fallback",
             logical_model="qwen3.7-plus",
             route_name="bailian_generation",
             provider="Alibaba Cloud Bailian Model Studio",
@@ -90,12 +102,12 @@ def build_model_interfaces_catalog() -> list[ModelInterfaceEntry]:
             api_key_env=bailian_dummy.api_key_env,
             base_url_env="BAILIAN_BASE_URL",
             surface_env=None,
-            status="production_adopted",
+            status="explicit_fallback",
             applicable_modules=(
                 "genshin_corpus.generation.generation",
                 "genshin_corpus.ui.runtime",
             ),
-            notes="Formal Phase 04 generation baseline. Exact dated snapshot policy; no thinking; temperature 0.0.",
+            notes="Retained Qwen final-QA rollback; exact dated snapshot policy; no thinking; temperature 0.0.",
         )
     )
 
@@ -119,14 +131,14 @@ def build_model_interfaces_catalog() -> list[ModelInterfaceEntry]:
             api_key_env=embedding_dummy.api_key_env,
             base_url_env="DASHSCOPE_QWEN_EMBEDDING_ENDPOINT",
             surface_env=None,
-            status="production_adopted",
+            status="explicit_fallback",
             applicable_modules=(
                 "genshin_corpus.retrieval.qwen_embedding",
                 "genshin_corpus.retrieval.production_materialization",
                 "genshin_corpus.ui.runtime",
             ),
             notes=(
-                f"Production query seam ({DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION}). "
+                f"Explicit rollback query seam ({DASHSCOPE_QWEN_EMBEDDING_TRANSPORT_VERSION}). "
                 "2048 dims, FP32, role=query. Also requires DASHSCOPE_QWEN_WORKSPACE."
             ),
         )
@@ -243,6 +255,12 @@ def check_model_interfaces_documentation(doc_path: Path | None = None) -> list[s
 
     catalog = build_model_interfaces_catalog()
 
+    for entry in catalog:
+        if entry.category == "phase04_default_qa":
+            for value in (entry.route_name, entry.model_id, entry.status, entry.api_key_env):
+                if value not in content:
+                    errors.append(f"Default Phase04 interface field '{value}' missing from {doc_path.name}")
+
     # 1. Verify all active E2 routes from E2_ROUTES appear in the documentation
     for entry in catalog:
         if entry.category == "phase05_navi_e2":
@@ -259,7 +277,7 @@ def check_model_interfaces_documentation(doc_path: Path | None = None) -> list[s
             if entry.confirmed_base_url and entry.confirmed_base_url not in content:
                 errors.append(f"Confirmed base URL '{entry.confirmed_base_url}' for route '{entry.route_name}' missing from {doc_path.name}")
 
-        elif entry.category == "phase04_production_qa":
+        elif entry.category in {"phase04_production_qa", "phase04_generation_fallback"}:
             if entry.model_id not in content:
                 errors.append(f"Production model '{entry.model_id}' missing from {doc_path.name}")
             if entry.api_key_env not in content:
@@ -292,10 +310,18 @@ def generate_markdown_summary() -> str:
         "|---|---|---|---|---|---|---|---|",
     ]
     for e in catalog:
-        if e.category == "phase04_production_qa":
+        if e.category in {"phase04_production_qa", "phase04_generation_fallback"}:
             lines.append(
                 f"| `{e.route_name}` | `{e.logical_model}` | `{e.model_id}` | {e.provider} | `{e.api_surface}` | `{e.base_url_env}` (`{e.base_url_pattern}`) | `{e.api_key_env}` | **{e.status}** |"
             )
+
+    lines.extend([
+        "", "### Phase 04 V1 default final QA (limited live validation)", "",
+        "| Route | Model | Provider | Status |", "|---|---|---|---|",
+    ])
+    for e in catalog:
+        if e.category == "phase04_default_qa":
+            lines.append(f"| `{e.route_name}` | `{e.model_id}` | {e.provider} | **{e.status}** |")
 
     lines.extend([
         "",

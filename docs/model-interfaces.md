@@ -8,6 +8,27 @@ Code-level definitions in `src/genshin_corpus/` are authoritative. This document
 automatically checked against the codebase by `tests/retrieval/test_model_interfaces_consistency.py`
 and `src/genshin_corpus/rag/model_interfaces_catalog.py`.
 
+**2026-11-02 priority / catalog interpretation:** current authorization and
+adoption are owned by [`current-phase.md`](current-phase.md). Phase 04 basic
+RAG V1 is active; Phase 05 NaviRAG/Card/Link/KG work is paused. The tables below
+describe implemented interfaces and retained code-level lifecycle labels, not
+standing permission to call them. Phase 05 `e2_active_exploration` and
+`e2_authorized_candidate` labels are preserved catalog classifications; their
+dispatch is paused. Historical canaries and scoped permits do not reopen work.
+
+The V1 default answer provider is now operator-selected DeepSeek, retaining
+explicit Bailian/Qwen rollback and the unresolved limited-live cap issue.
+Original-RU local `Qwen/Qwen3-Embedding-0.6B` / 1024d retrieval is the
+operator-selected V1 default. The completed full index is paired with the local
+query encoder. The accepted online-Qwen 2048d profile is explicit rollback.
+Migration and acceptance follow the
+[Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
+The first QA route/model is configurable with the evidenced TokenMetro Chat
+default; the three-call live allowance is now consumed/closed. Existing Card/Responses
+routes are evidence for protocol reuse, not QA acceptance or permanent
+architecture restrictions. New/materially changed API execution uses the shared
+call layer; adopted legacy consumers remain unchanged until migrated.
+
 ---
 
 ## Shared model-call execution (2026-10-30)
@@ -58,7 +79,8 @@ validation. SDK/transport retries stay disabled.
 | Completed original blind roots / scoped permits | Historical immutable identities; no implicit migration/additional authorization |
 | Frozen native v0.3 / F2 / older semantic SDK / R1 and related research | Legacy, not migrated |
 | Navi E2 `E2SDK` and historical research retry modes | Legacy, not migrated |
-| Adopted Phase04 Generation / remote embedding / older SDK and urllib consumers | Legacy, production unchanged |
+| Existing Phase04 Bailian Generation / remote embedding / older SDK and urllib consumers | Legacy call policies retained; Bailian now explicit Generation fallback |
+| Phase04 V1-default DeepSeek final QA (`generation/deepseek.py`) | Shared one-attempt policy and finite persistent batch; raw-first urllib adapter; operator-selected default with limited live 2 accepted / 1 output-cap rejection; no new call permission |
 
 Card and new blind CLIs accept `--call-policy <json>`. It never substitutes for
 `--execute-authorized`, exact preparation acknowledgment or campaign budgets.
@@ -125,15 +147,15 @@ or experimental configurations as current production defaults.
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │ Tier 1: Phase 04 Production QA Serving Chain (Default / Adopted)                │
-│   • Generation: Alibaba Cloud Bailian (qwen3.7-plus-2026-05-26 via Chat Comp)    │
-│   • Query Seam: DashScope Text Embedding (qwen3.7-text-embedding 2048d)          │
+│   • Generation: DeepSeek V1 default; explicit Bailian/Qwen rollback             │
+│   • Query Seam: local Qwen3 1024d; explicit DashScope Qwen 2048d rollback        │
 │   • Rerank: Local BAAI/bge-reranker-v2-m3 (Local weight inference; 0 remote API) │
 └──────────────────────────────────────┬───────────────────────────────────────────┘
                                        │
 ┌──────────────────────────────────────▼───────────────────────────────────────────┐
-│ Tier 2: Phase 05 Navi E2 Autonomous Exploration Routes (Responses API Only)      │
-│   • Primary story exploration route: gpt-6-luna / tokenmetro                     │
-│   • Authorized candidate routes: glm-5.3-flash, qwen3.8-flash, deepseek-v4.1    │
+│ Tier 2: Phase 05 Navi E2 Routes (PAUSED; retained Responses API contracts)       │
+│   • Historical primary route: gpt-6-luna / tokenmetro                            │
+│   • Historical candidates: glm-5.3-flash, qwen3.8-flash, deepseek-v4.1          │
 │   • Dedicated credential slot isolation per route prefix; strict fail-closed     │
 └──────────────────────────────────────┬───────────────────────────────────────────┘
                                        │
@@ -155,43 +177,151 @@ or experimental configurations as current production defaults.
 
 ## 2. Canonical Model Interface Directory
 
-### Opt-in local embedding deployment (outside production serving)
+### Local embedding deployment (V1 migration asset; not adopted for serving)
 
 `genshin_corpus.retrieval.local_qwen3_embedding` loads official
 `Qwen/Qwen3-Embedding-0.6B`, revision
 `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, entirely from local files.
-It has no provider endpoint, credential slot, remote fallback or production
-selector. The first contract fixes 1024 dimensions, FP32/L2 output, 2048-token
-right truncation, left padding and last-token pooling. Query text uses the
+It has no provider endpoint, credential slot or remote fallback. The encoder
+contract fixes 1024 dimensions, FP32/L2 output, 2048-token right truncation,
+left padding and last-token pooling; the new full builder and local query path
+reject over-limit text before using a truncated vector. Query text uses the
 official `Instruct: ...\nQuery:...` template; documents use exact RU text.
 CUDA FP16 and CPU FP32 have different identities and require distinct indexes.
 The pinned file manifest, repeatability tolerance and measured validation are
 owned by [the deployment report](research/phase-05/p05-local-qwen3-embedding-20261025.md).
-All production tiers below retain their existing defaults.
+The historical deployment/pilot index contains 909 original RUs, preserved as
+experiment evidence. The new resumable builder, paired query profile and
+short-lived query-before-BGE lifecycle are implemented and smoke tested;
+the 535,802-RU candidate still awaits manual full inference, verification and
+comparative adoption. See the paired-profile section below. CUDA/CPU vector
+spaces must not be mixed. Generation defaults are described separately.
 
 ### 2.1 Tier 1: Phase 04 Production QA Serving Chain
 
 | Route Name | Logical Model | Model ID / Snapshot | Provider | Protocol Surface | Endpoint / Base URL | API Key Env | Status | Applicable Modules |
 |---|---|---|---|---|---|---|---|---|
-| `bailian_generation` | `qwen3.7-plus` | `qwen3.7-plus-2026-05-26` | Alibaba Cloud Bailian Model Studio | `chat_completions` (`/compatible-mode/v1/chat/completions`) | `BAILIAN_BASE_URL` (`https://{workspace}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`) | `DASHSCOPE_API_KEY` | **production_adopted** | `genshin_corpus.generation.generation`, `genshin_corpus.ui.runtime` |
-| `dashscope_query_embedding` | `qwen3.7-text-embedding` | `qwen3.7-text-embedding` | Alibaba Cloud DashScope | `native_http_post` (`/api/v1/services/embeddings/text-embedding/text-embedding`) | `DASHSCOPE_QWEN_EMBEDDING_ENDPOINT` (`https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding`) | `DASHSCOPE_API_KEY` | **production_adopted** | `genshin_corpus.retrieval.qwen_embedding`, `genshin_corpus.retrieval.production_materialization`, `genshin_corpus.ui.runtime` |
+| `bailian_generation` | `qwen3.7-plus` | `qwen3.7-plus-2026-05-26` | Alibaba Cloud Bailian Model Studio | `chat_completions` (`/compatible-mode/v1/chat/completions`) | `BAILIAN_BASE_URL` (`https://{workspace}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`) | `DASHSCOPE_API_KEY` | **explicit_fallback** | `genshin_corpus.generation.generation`, `genshin_corpus.ui.runtime` |
+| `dashscope_query_embedding` | `qwen3.7-text-embedding` | `qwen3.7-text-embedding` | Alibaba Cloud DashScope | `native_http_post` (`/api/v1/services/embeddings/text-embedding/text-embedding`) | `DASHSCOPE_QWEN_EMBEDDING_ENDPOINT` (`https://{workspace}.{region}.maas.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding`) | `DASHSCOPE_API_KEY` | **explicit_fallback** | `genshin_corpus.retrieval.qwen_embedding`, `genshin_corpus.retrieval.production_materialization`, `genshin_corpus.ui.runtime` |
 | `bge_reranker` | `bge-reranker-v2-m3` | `BAAI/bge-reranker-v2-m3` | Local Model Snapshot | `local_inference` | `GENSHIN_BGE_RERANKER_MODEL_ROOT` (local filesystem path) | None (0 remote API calls) | **production_adopted** | `genshin_corpus.retrieval.bge_reranker_v2_m3`, `genshin_corpus.ui.runtime` |
 
-#### Tier 1 Invariants & Parameters:
-- **Generation Policy**: `EXACT_SNAPSHOT_POLICY` requires explicit dated snapshot `qwen3.7-plus-2026-05-26`. Undated aliases (e.g. `qwen-plus`) fail closed before dispatch.
+#### Tier 1 implemented operating parameters (not permanent model constraints):
+- **Qwen rollback Generation Policy**: `EXACT_SNAPSHOT_POLICY` requires explicit dated snapshot `qwen3.7-plus-2026-05-26`. Undated aliases (e.g. `qwen-plus`) fail closed before dispatch. V1-default DeepSeek has the separate contract below.
 - **Generation Parameters**: `temperature=0.0`, `max_output_tokens=1024`, `enable_thinking=False`.
-- **Generation Retry**: Bounded to at most 3 attempts; retry is allowed only for explicit 429 status pairs in `_BAILIAN_RETRYABLE_ERROR_PAIRS` (e.g. `(429, "Throttling")`, `(429, "LimitRequests")`).
-- **Embedding Seam**: `role=query`, dimension 2048, FP32, L2 normalized. Requires `DASHSCOPE_QWEN_WORKSPACE` and `DASHSCOPE_QWEN_REGION` (default: `cn-beijing`).
+- **Generation Retry**: `BailianControlConfig` permits at most 3 attempts with the exact status/code allowlist in `_BAILIAN_RETRYABLE_ERROR_PAIRS` (including named 429/500/503 pairs). The product UI explicitly sets `max_attempts=1`. This legacy policy is not the policy for new DeepSeek execution.
+- **Online rollback Embedding** uses `role=query`, dimension 2048, FP32 and L2 normalization. Requires `DASHSCOPE_QWEN_WORKSPACE` and `DASHSCOPE_QWEN_REGION` (default `cn-beijing`).
 - **Reranking Default**: Local `BAAI/bge-reranker-v2-m3` over the Top-500 candidate window; rank-only fusion `0.35 Hybrid / 0.65 rerank`, denominator 60, final Top 20. Remote Qwen reranker (`qwen_rerank.py`) is a historical challenger and is not part of default serving.
+
+### Phase 04 V1-default DeepSeek final QA
+
+| Route | Model default | Provider / protocol | Credential / endpoint | Status |
+|---|---|---|---|---|
+| `deepseek_generation` | `deepseek-v4.1-flash-1017` | TokenMetro / nonstream Chat Completions | `TOKENMETRO_API_KEY`; `https://tokenmetro.com/v1/chat/completions` | **v1_default_limited_live** |
+
+`generation/deepseek.py` implements `GenerationProvider`; the existing UI factory
+selects it when `GENSHIN_GENERATION_BACKEND` is unset or `deepseek`, by operator
+decision in the Embedding-preparation work unit. Explicit `bailian` keeps the
+original exact-snapshot Qwen rollback. There is no automatic provider fallback.
+The known output-cap incompatibility remains open; this selector change is not
+a new live acceptance result and grants no paid calls. Retrieval, reranking and Assembly are
+unchanged; only the original Packet projection enters the shared message
+renderer. Expected answers, Card/Link content, retrieval traces and provider
+reasoning are not answer evidence. Citation checks retain
+`semantic_faithfulness=not_evaluated`.
+
+| Environment | Meaning |
+|---|---|
+| `GENSHIN_GENERATION_BACKEND` | `deepseek` (default) or explicit `bailian` rollback |
+| `TOKENMETRO_API_KEY` | Existing runtime credential slot, read only for the selected DeepSeek profile |
+| `TOKENMETRO_BASE_URL` | Optional; currently only the evidenced `https://tokenmetro.com/v1` route is supported |
+| `GENSHIN_DEEPSEEK_MODEL` | Optional request ID; default `deepseek-v4.1-flash-1017`; exact returned identity must match |
+| `GENSHIN_DEEPSEEK_RUN_ROOT` | Required new campaign root, preferably `data/retrieval/p04-deepseek-<scope>-<date>` |
+| `GENSHIN_DEEPSEEK_MAX_REQUESTS` | Required positive finite campaign attempt limit |
+| `GENSHIN_DEEPSEEK_MAX_TOKENS` | Required conservative input-plus-output campaign budget |
+| `GENSHIN_DEEPSEEK_LIVE_AUTHORIZATION` | Required description/ID of the explicitly granted **current Phase04** campaign; set only after paid authorization |
+| `GENSHIN_DEEPSEEK_MAX_OUTPUT_TOKENS` | Optional, default 1024, adapter request range 1-32000; not a promise of provider enforcement |
+| `GENSHIN_DEEPSEEK_TIMEOUT_SECONDS` | Optional positive finite timeout, default 120 seconds |
+
+No new credentials or dependencies are installed. The first route uses the
+historically observed Chat `thinking.type=disabled`, temperature 0, no tools or
+Card JSON schema. These are an initial operating point; another route requires
+its own verified adapter/configuration. Changing model/caps still needs live
+qualification; transport compatibility is not answer-quality evidence.
+
+Each logical request uses `model_calls.run` / `Batch`, `max_attempts=1`, zero
+format/UNKNOWN retries, and a Phase04-only persistent fingerprint ledger.
+Request bytes and sanitized metadata are archived before dispatch; response
+chunks, including partial/failed HTTP bodies, are saved before strict parsing.
+Usage arithmetic, exact model, terminal finish, output cap, disabled-thinking
+observations and citation IDs are checked separately. Reasoning is isolated in
+the raw archive and never returned as the answer. Missing/invalid usage stays
+UNKNOWN; actual money remains UNKNOWN. Exceptions do not expose key-bearing
+messages. A completed request replays without HTTP, recording `replayed` and
+`new_transport_attempts`; its accounting still describes the original attempt.
+Interrupted attempts remain UNKNOWN and are not automatically sent again.
+Budget or ledger conflicts fail closed without a Qwen fallback.
+
+**Offline verification:** fixture HTTP covers success, exact wire/archive
+identity, malformed/model/usage/length/citation failures, reasoning/final-text
+separation, HTTP524/transport/partial/crash recovery without resend, finite
+budgets, secret exclusion, provider selection and backend answer/Packet/result
+persistence. These are interface checks, not model-generated answers, source
+semantics, full-corpus retrieval or live provider qualification.
+
+**Closed live gate (2026-11-02):** user authorized exactly three fixed-Packet
+cases, 150,000 conservative tokens, 1024 requested output tokens per send,
+zero retries/new Embedding/Qwen calls. Q014/Q003 accepted; Q020 rejected because
+provider-reported output was 5384 despite a verified wire cap of 1024. HTTP200
+and exact model identity all three; 30,041 reported tokens, actual RMB UNKNOWN.
+This does not establish provider cap enforcement, broad QA quality or production
+readiness. All three sends are consumed; no further live authorization remains.
+See [source review, raw audit and limitations](research/phase-04/p04-deepseek-live3-20261102.md).
+
+For explicit rollback in PowerShell 7 (no call is made by this command):
+
+```powershell
+$env:GENSHIN_GENERATION_BACKEND = 'bailian'
+```
+
+### Phase 04 paired Embedding profiles
+
+| Selector | Query / Dense pair | Selection |
+|---|---|---|
+| `local_qwen3_1024` | Pinned CUDA FP16 local Qwen3 query / validated full original-RU 1024d index | Default with `GENSHIN_EMBEDDING_PROFILE` unset. Optional `GENSHIN_LOCAL_DENSE_MANIFEST` overrides the local path. |
+| `online_qwen_2048` | Existing synchronous online Qwen query / accepted 2048d manifest | Explicit `GENSHIN_EMBEDDING_PROFILE=online_qwen_2048`. The offline 70Q comparison uses retained query vectors. |
+
+`rag/config.py` binds both artifacts and profile in the UI prepared-state cache
+key. Local preparation retains source-build/count checks and requires full scope,
+validation PASS and matching model/space contract; bounded smoke indexes are
+rejected for product state. The existing accepted-online validator is unchanged.
+`BatchCandidateRetriever` accepts identity-bound `EmbeddingBatch` queries for
+local Dense/Hybrid, rejecting raw/foreign/2048d vectors. Original RU IDs feed
+unchanged BM25, RRF, BGE and Evidence Assembly/citations.
+
+`local_qwen3_query.py` invokes `.local/embedding-runtime/Scripts/python.exe`
+with offline-only local files. Its process exits before BGE runs in the existing
+separate runtime. Cold query loading is an explicit latency tradeoff, avoiding
+two GPU models remaining resident. Over-limit queries fail rather than truncate.
+No online Embedding transport is constructed for the local profile, and no
+automatic CPU/online fallback is allowed. Missing local resources fail clearly.
+
+The [migration runbook](research/phase-04/p04-local-qwen3-migration-20261102.md)
+owns build/resume/validation commands and historical measurements. The
+[70Q comparison](research/phase-04/p04-embedding-70q-20261103.md) evaluates
+Evidence Packets independently of the default choice. Model revisions,
+dimensions, batch budgets and selectors are operating choices.
 
 ---
 
 ### 2.2 Tier 2: Phase 05 Navi E2 Autonomous Exploration Routes
 
+**PAUSED.** The following protocol inventory and historical lifecycle strings
+remain available for audit/replay; none grants current dispatch authorization.
+
 All E2 routes are defined in [`src/genshin_corpus/rag/navi_e2_routes.py`](file:///d:/GenshinChronicle/src/genshin_corpus/rag/navi_e2_routes.py) under `E2_ROUTES`.
 E2 requires the **OpenAI Responses API** streaming SSE surface (`api_surface='responses'`, endpoint path `/responses`).
 
-The separately authorized G1 offline research runner reuses the existing
+The historically authorized G1 offline research runner reuses the existing
 `deepseek-v4.1-flash` / `jizhi` Responses transport for source Cards, B dual-source
 propositions/self-checks and bounded targeted checks. It reuses the configured
 Qwen query embedding seam for new cached queries. G1 creates no new provider,
@@ -225,12 +355,12 @@ authorization follows from that trial. See the
 [execution-readiness audit](research/phase-05/p05-navi-v03-run-readiness-20261028.md)
 and [limited live acceptance report](research/phase-05/p05-navi-v03-limited-live-20261028.md).
 
-| Logical Model (`model`) | Route Key (`route`) | Provider | Protocol Surface | Confirmed Base URL | API Key Env | Base URL Env | Surface Env | Current Lifecycle Status |
+| Logical Model (`model`) | Route Key (`route`) | Provider | Protocol Surface | Confirmed Base URL | API Key Env | Base URL Env | Surface Env | Retained catalog lifecycle label (dispatch paused) |
 |---|---|---|---|---|---|---|---|---|
-| `gpt-6-luna` | `tokenmetro` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` | `TOKENMETRO_BASE_URL` | `TOKENMETRO_API_SURFACE` | **e2_active_exploration** (Primary story exploration route; Run 1–3) |
-| `glm-5.3-flash` | `jizhi_glm` | Jizhi | `responses` | `https://jizhiapi.site/v1` | `NAVI_GLM_API_KEY` | `NAVI_GLM_BASE_URL` | `NAVI_GLM_API_SURFACE` | **e2_authorized_candidate** (New 2026-10-15 independent slot; probe passed; awaiting run auth) |
-| `qwen3.8-flash` | `tokenmetro_qwen` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `NAVI_QWEN_API_KEY` | `NAVI_QWEN_BASE_URL` | `NAVI_QWEN_API_SURFACE` | **e2_authorized_candidate** (Independent slot; probe passed; awaiting run auth) |
-| `deepseek-v4.1-flash` | `jizhi` | Jizhi | `responses` | `https://jizhiapi.site/v1` | `JIZHI_API_KEY` | `JIZHI_BASE_URL` | `JIZHI_API_SURFACE` | **e2_authorized_candidate** (Independent slot; probe passed; awaiting run auth) |
+| `gpt-6-luna` | `tokenmetro` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `TOKENMETRO_API_KEY` | `TOKENMETRO_BASE_URL` | `TOKENMETRO_API_SURFACE` | **e2_active_exploration** (Historical primary; Run 1–3; paused) |
+| `glm-5.3-flash` | `jizhi_glm` | Jizhi | `responses` | `https://jizhiapi.site/v1` | `NAVI_GLM_API_KEY` | `NAVI_GLM_BASE_URL` | `NAVI_GLM_API_SURFACE` | **e2_authorized_candidate** (2026-10-15 independent slot; historical probe passed; paused) |
+| `qwen3.8-flash` | `tokenmetro_qwen` | TokenMetro | `responses` | `https://tokenmetro.com/v1` | `NAVI_QWEN_API_KEY` | `NAVI_QWEN_BASE_URL` | `NAVI_QWEN_API_SURFACE` | **e2_authorized_candidate** (Independent slot; historical probe passed; paused) |
+| `deepseek-v4.1-flash` | `jizhi` | Jizhi | `responses` | `https://jizhiapi.site/v1` | `JIZHI_API_KEY` | `JIZHI_BASE_URL` | `JIZHI_API_SURFACE` | **e2_authorized_candidate** (Independent slot; historical probe passed; paused) |
 
 #### Tier 2 Invariants & Parameters:
 - **Credential Slot Isolation**: Each model and route pair binds to a dedicated uppercase prefix (e.g., `TOKENMETRO_*`, `NAVI_GLM_*`, `NAVI_QWEN_*`, `JIZHI_*`). Even when sharing a physical host (e.g. `tokenmetro.com`), credential slots are strictly segregated.

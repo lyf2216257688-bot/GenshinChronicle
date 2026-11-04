@@ -27,6 +27,8 @@ from genshin_corpus.rag.config import (
     DEFAULT_PRODUCTION_QWEN_RERANK_ENDPOINT,
     DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE,
     ProductionRagArtifactPaths,
+    artifact_paths_from_environment,
+    LOCAL_QWEN3_PROFILE,
 )
 from genshin_corpus.retrieval.qwen_embedding import (
     DashScopeQwenEmbeddingConfig,
@@ -134,10 +136,13 @@ def resolve_output_root(value: str | Path) -> Path:
     return path.resolve(strict=False)
 
 
-def production_artifact_paths() -> ProductionRagArtifactPaths:
+def production_artifact_paths(environment: Mapping[str,str] | None = None) -> ProductionRagArtifactPaths:
     """Return fixed production paths without reading files or preparing state."""
 
-    return ProductionRagArtifactPaths()
+    try:
+        return artifact_paths_from_environment(environment)
+    except ValueError as exc:
+        raise UiConfigurationError(str(exc)) from exc
 
 
 def validate_prepared_state(state: PreparedStateOwner) -> bool:
@@ -152,14 +157,15 @@ def release_prepared_state(state: PreparedStateOwner) -> None:
     state.close()
 
 
-def prepare_production_state(paths_key: tuple[str, str, str]) -> PreparedStateOwner:
+def prepare_production_state(paths_key: tuple[str, str, str, str]) -> PreparedStateOwner:
     """Prepare the fixed accepted baseline represented by a cache key."""
 
-    ru_manifest, lexical_manifest, dense_manifest = (Path(item) for item in paths_key)
+    ru_manifest, lexical_manifest, dense_manifest = (Path(item) for item in paths_key[:3])
     return PreparedStateOwner(prepare_rag_state(
         retrieval_unit_manifest_path=ru_manifest,
         lexical_manifest_path=lexical_manifest,
         dense_manifest_path=dense_manifest,
+        embedding_profile=paths_key[3],
     ))
 
 
@@ -187,9 +193,19 @@ def build_embedding_transport(environment: Mapping[str, str] | None = None) -> Q
 
 
 def build_generation_provider(environment: Mapping[str, str] | None = None) -> GenerationProvider:
-    """Build the current exact-snapshot Bailian/Qwen Generation control."""
+    """DeepSeek is V1 default; Bailian/Qwen remains explicit rollback."""
 
     values = os.environ if environment is None else environment
+    backend = values.get("GENSHIN_GENERATION_BACKEND", "deepseek")
+    if backend == "deepseek":
+        from genshin_corpus.generation.deepseek import DeepSeekGenerationProvider
+
+        try:
+            return DeepSeekGenerationProvider.from_environment(values)
+        except Exception as exc:
+            raise UiConfigurationError("DeepSeek requires a configured, explicitly authorized finite campaign; see docs/model-interfaces.md") from exc
+    if backend != "bailian":
+        raise UiConfigurationError("GENSHIN_GENERATION_BACKEND must be bailian or deepseek")
     endpoint = values.get("BAILIAN_BASE_URL")
     if not endpoint:
         raise UiConfigurationError("generate_answer requires BAILIAN_BASE_URL")
@@ -276,7 +292,7 @@ def execute_query(
     if not isinstance(query.question_text, str) or not query.question_text.strip():
         raise UiConfigurationError("question must be a non-empty string")
     resolved_output_root = resolve_output_root(query.output_root)
-    embedding_transport = build_embedding_transport(environment)
+    embedding_transport = None if prepared_state.embedding_profile == LOCAL_QWEN3_PROFILE else build_embedding_transport(environment)
     reranker_backend = resolve_reranker_backend(environment)
     reranker = build_reranker(environment)
     generation_provider = (

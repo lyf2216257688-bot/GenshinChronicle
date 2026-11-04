@@ -11,6 +11,7 @@ from uuid import uuid4
 import numpy as np
 
 from genshin_corpus.canonical.fingerprints import sha256_json
+from genshin_corpus.rag.config import ONLINE_QWEN_PROFILE
 from genshin_corpus.rag.backend import (
     PreparedRagState,
     SingleQuestionBackendConfig,
@@ -105,6 +106,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
             retrieval_unit_build_identity="ru",
             lexical_build_identity="lex",
             dense_build_identity="dense",
+            embedding_profile=ONLINE_QWEN_PROFILE,
         )
         self.embedding_calls = 0
         self.packet = {
@@ -548,6 +550,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
                 retrieval_unit_manifest_path=Path("ru.json"),
                 lexical_manifest_path=Path("lex.json"),
                 dense_manifest_path=Path("dense.json"),
+                embedding_profile=ONLINE_QWEN_PROFILE,
             )
             self.assertIs(prepared.retriever, self.retriever)
             self.assertEqual(load_retriever.call_count, 1)
@@ -619,6 +622,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
                     retrieval_unit_manifest_path=Path("ru.json"),
                     lexical_manifest_path=Path("lex.json"),
                     dense_manifest_path=Path("dense.json"),
+                    embedding_profile=ONLINE_QWEN_PROFILE,
                 )
         self.assertTrue(handle.closed)
         self.assertEqual(handle.close_calls, 1)

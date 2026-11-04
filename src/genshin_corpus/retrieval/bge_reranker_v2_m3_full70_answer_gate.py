@@ -25,6 +25,7 @@ from genshin_corpus.generation.generation import (
 )
 from genshin_corpus.generation.measure import load_m2_runtime_questions
 from genshin_corpus.rag.backend import PreparedRagState, SingleQuestionBackendConfig, run_single_question
+from genshin_corpus.rag.config import ONLINE_QWEN_PROFILE
 from genshin_corpus.retrieval.bge_reranker_v2_m3 import (
     MAX_LENGTH,
     MODEL_ID,
@@ -417,6 +418,7 @@ def _build_state(windows: Mapping[str, Mapping[str, Any]]) -> PreparedRagState:
         str(context.retrieval_unit_build_identity),
         "persisted-current-C",
         "accepted-qwen-dense",
+        embedding_profile=ONLINE_QWEN_PROFILE,
     )
 
 

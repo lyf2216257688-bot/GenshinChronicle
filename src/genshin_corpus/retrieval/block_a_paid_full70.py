@@ -29,6 +29,7 @@ from genshin_corpus.generation.generation import (
     workspace_from_bailian_base_url,
 )
 from genshin_corpus.generation.measure import load_m2_runtime_questions
+from genshin_corpus.rag.config import ONLINE_QWEN_PROFILE
 from genshin_corpus.rag.backend import (
     SingleQuestionBackendConfig,
     prepare_rag_state,
@@ -993,7 +994,7 @@ def resume_block_a_paid_full70_control_reuse(
     try:
         vnext_state = prepare_rag_state(
             retrieval_unit_manifest_path=Path(ru_manifest_path), lexical_manifest_path=context["field_manifest"],
-            dense_manifest_path=Path(dense_manifest_path),
+            dense_manifest_path=Path(dense_manifest_path), embedding_profile=ONLINE_QWEN_PROFILE,
         )
         vnext_config = SingleQuestionBackendConfig(
             candidate_supply_depth=500, rerank_depth=500, final_top_n=20, rerank_output_k=20,
@@ -1186,7 +1187,7 @@ def run_block_a_paid_full70(
             manifest["reused_control_questions"] = list(QUESTION_IDS)
             _write_json(output_root / "metadata" / "manifest.json", manifest)
         else:
-            control_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=legacy_lexical_manifest_path, dense_manifest_path=dense_manifest_path)
+            control_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=legacy_lexical_manifest_path, dense_manifest_path=dense_manifest_path, embedding_profile=ONLINE_QWEN_PROFILE)
             for question, binding in zip(questions, bindings, strict=True):
                 if question.question_id != binding.question_id or question.question != binding.question:
                     raise BlockAPaidGateError(f"query binding mismatch: {question.question_id}")
@@ -1219,7 +1220,7 @@ def run_block_a_paid_full70(
                 manifest["provider_attempts"]["row_count"] = _ledger_row_count(ledger_path)
                 _write_json(output_root / "metadata" / "manifest.json", manifest)
             control_state.close()
-        vnext_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=field_manifest, dense_manifest_path=dense_manifest_path)
+        vnext_state = prepare_rag_state(retrieval_unit_manifest_path=ru_manifest_path, lexical_manifest_path=field_manifest, dense_manifest_path=dense_manifest_path, embedding_profile=ONLINE_QWEN_PROFILE)
         vnext_config = SingleQuestionBackendConfig(candidate_supply_depth=500, rerank_depth=500, final_top_n=20, rerank_output_k=20, reranker_enabled=True, rrf_k=60, reranker_projection_max_chars=6000, fusion_config=config.fusion_config, assembly_config=config.assembly_config)
         for question, binding in zip(questions, bindings, strict=True):
             qid = question.question_id

@@ -15,6 +15,11 @@ from genshin_corpus.rag.model_interfaces_catalog import (
 
 
 class ModelInterfacesConsistencyTests(unittest.TestCase):
+    def test_deepseek_is_cataloged_as_v1_default_with_limited_live_evidence(self):
+        entry = next(e for e in build_model_interfaces_catalog() if e.route_name == "deepseek_generation")
+        self.assertEqual(entry.category, "phase04_default_qa")
+        self.assertEqual(entry.status, "v1_default_limited_live")
+
     def setUp(self):
         self.root = Path(__file__).resolve().parents[2]
         self.doc_path = self.root / "docs" / "model-interfaces.md"

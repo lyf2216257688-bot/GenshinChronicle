@@ -1,5 +1,12 @@
 # Project Structure
 
+The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
+-> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,
+Card, Link and KG development is paused per [`current-phase.md`](current-phase.md);
+the packages and evidence described below remain preserved. Reusing the local
+Qwen3 encoder/runtime for original-RU V1 migration does not make the paused
+semantic pipelines a product dependency or require moving their packages.
+
 Shared execution primitives: `src/genshin_corpus/model_calls.py` owns serial
 model-call attempts, budgets, retry/resume and channel cooldown;
 `src/genshin_corpus/evidence_io.py` owns reused create-only evidence IO.
@@ -118,6 +125,10 @@ the immediate next action are owned by `docs/current-phase.md`.
   generation-visible Evidence Packet projection, result/citation-integrity
   persistence, and explicitly scoped provider adapters. It consumes an
   Evidence Packet but does not own Retrieval or Evidence Assembly policy.
+  `deepseek.py` is the V1 default TokenMetro adapter; Bailian/Qwen remains explicit rollback. It implements
+  final QA using the shared model-call layer, raw-first HTTP archives and the
+  neutral renderer/citation checks. The existing runtime factory selects the
+  provider explicitly; Retrieval/Assembly do not own provider selection.
 - `src/genshin_corpus/rag/`: the small provider-neutral single-question RAG
   orchestration boundary. It owns prepared-state reuse and per-question
   composition across Retrieval, optional reranking, Formal Deferred Assembly,
@@ -179,14 +190,22 @@ the immediate next action are owned by `docs/current-phase.md`.
 
 ## Data directories
 
-The opt-in local Qwen3 deployment uses persistent ignored resources in the
+The default local Qwen3 deployment uses persistent ignored resources in the
 primary checkout: `.local/models/qwen3-embedding-0.6b/<revision>/`,
 `.local/embedding-runtime/`, `.local/embedding-dependency-cache/` and
 `.local/embedding-tests/`. The last directory owns this separately authorized
 small verification index, measurements and installation evidence; it does not
 replace the production `data/retrieval/` ownership or any historical index.
-`retrieval/local_qwen3_embedding.py` owns the explicit offline encoder/index
-binding; `local_qwen3_validation.py` owns the bounded deployment CLI. The
+`retrieval/local_qwen3_embedding.py` owns the offline encoder/index binding;
+`local_qwen3_build.py` adds bounded source streaming, transactional shard receipts,
+OS locking, verified resume, token audit and final validation/publication.
+`local_qwen3_query.py` runs the matching encoder in a short-lived isolated process
+which exits before BGE. `scripts/retrieval/build-local-embedding.ps1` owns the
+manual foreground Windows launcher; `rag/config.py` owns paired profile
+selection and the preserved 2048d rollback. `rag/__main__.py` is the shared-runtime
+single-question CLI. `rag/embedding_70q.py` runs the offline Packet comparison.
+`local_qwen3_validation.py` retains
+the historical bounded deployment CLI. The
 environment lock is `requirements-local-qwen3-embedding.txt`.
 
 - `data/raw/`: immutable local Raw evidence, including responses and auditable

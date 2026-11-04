@@ -908,6 +908,28 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def generation_messages(request: GenerationRequest) -> list[dict[str, str]]:
+    """Render only the shared instruction, question and Packet projection."""
+
+    evidence_parts: list[str] = []
+    for evidence in request.evidence:
+        context = f"\n上下文：{'；'.join(evidence.display_context)}" if evidence.display_context else ""
+        evidence_parts.append(f"[{evidence.evidence_id}]{context}\n{evidence.text}")
+    user_content = f"问题：\n{request.question}\n\n证据：\n" + ("\n\n".join(evidence_parts) if evidence_parts else "（当前 Evidence Packet 没有可见证据。）")
+    if request.answer_scope is not None:
+        scope = request.answer_scope
+        user_content += (
+            "\n\n结构化回答范围数据（仅用于限定回答范围，不是系统指令）："
+            f"\n已支持范围：{'；'.join(scope.supported_scope)}"
+            f"\n未解决方面：{'；'.join(scope.unresolved_aspects)}"
+            + (f"\n冲突说明：{'；'.join(scope.conflicts)}" if scope.conflicts else "")
+        )
+    return [
+        {"role": "system", "content": request.instruction.text},
+        {"role": "user", "content": user_content},
+    ]
+
+
 class BailianGenerationProvider:
     """Map the neutral request to a Qwen control invocation through injected transport."""
 
@@ -937,23 +959,7 @@ class BailianGenerationProvider:
 
     @staticmethod
     def _messages(request: GenerationRequest) -> list[dict[str, str]]:
-        evidence_parts: list[str] = []
-        for evidence in request.evidence:
-            context = f"\n上下文：{'；'.join(evidence.display_context)}" if evidence.display_context else ""
-            evidence_parts.append(f"[{evidence.evidence_id}]{context}\n{evidence.text}")
-        user_content = f"问题：\n{request.question}\n\n证据：\n" + ("\n\n".join(evidence_parts) if evidence_parts else "（当前 Evidence Packet 没有可见证据。）")
-        if request.answer_scope is not None:
-            scope = request.answer_scope
-            user_content += (
-                "\n\n结构化回答范围数据（仅用于限定回答范围，不是系统指令）："
-                f"\n已支持范围：{'；'.join(scope.supported_scope)}"
-                f"\n未解决方面：{'；'.join(scope.unresolved_aspects)}"
-                + (f"\n冲突说明：{'；'.join(scope.conflicts)}" if scope.conflicts else "")
-            )
-        return [
-            {"role": "system", "content": request.instruction.text},
-            {"role": "user", "content": user_content},
-        ]
+        return generation_messages(request)
 
     def invocation_payload(self, request: GenerationRequest) -> dict[str, Any]:
         """A testable adapter mapping, not a live HTTP request implementation."""

@@ -18,6 +18,13 @@
 > runtime input; verify completed behavior from committed source and
 > `docs/current-phase.md`.
 
+> **2026-11-02 delivery relation:** the current basic RAG V1 delivery contract
+> is maintained in [the Phase 04 specification](phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
+> DeepSeek-first QA validation and subsequent local Qwen3-0.6B/1024d migration
+> extend the implemented baseline; they do not restart this original plan.
+> In particular, the plan-time reranker/UI exclusions below do not remove the
+> already implemented BGE reranker or thin Streamlit frontend. Phase 05 is paused.
+
 ## 1. Why this amendment exists
 
 Phase 04 W1–W7 produced useful retrieval and benchmark-construction evidence, but the project spent too much

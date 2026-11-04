@@ -1,5 +1,7 @@
 # 本地 Qwen3-Embedding-0.6B 安装与验证（2026-10-25）
 
+> 2026-11-02 关系说明：Phase05 语义研发已暂停；本报告记录的本地模型、编码器及隔离运行时作为 Phase04 基础 RAG V1 的复用资产。以下仍是当时的909条RU部署实验及历史授权边界，不代表全库迁移或生产采纳。新的迁移/回退与验收要求见[Phase04规格](../../phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract)，当前执行状态以 [`current-phase.md`](../../current-phase.md) 为准。
+
 状态：**部署验证 PASS**。实际GPU/CPU离线加载、中文向量、正式RU小索引检索、
 BM25/Hybrid及分时BGE重排已运行成功。此状态不表示全库质量或生产采纳通过。
 当前授权及生产默认以

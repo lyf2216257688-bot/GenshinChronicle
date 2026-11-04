@@ -48,7 +48,7 @@ from .adaptive import (
     run_bounded_adaptive_question,
 )
 from .backend import PreparedRagState, SingleQuestionBackendConfig
-from .config import ProductionRagArtifactPaths
+from .config import ONLINE_QWEN_PROFILE, ProductionRagArtifactPaths
 from genshin_corpus.retrieval.bge_reranker_v2_m3 import (
     BgeRerankerV2M3,
     MODEL_ID as BGE_MODEL_ID,
@@ -1219,7 +1219,7 @@ def _validate_frozen_block_a_binding(block_a: Any) -> dict[str, Any]:
         )
     except Exception as exc:
         raise SemanticGateContractError("Block A embedding endpoint is not a valid frozen DashScope binding") from exc
-    paths = ProductionRagArtifactPaths()
+    paths = ProductionRagArtifactPaths(embedding_profile=ONLINE_QWEN_PROFILE)
     expected_paths = {
         "retrieval_unit_manifest_path": paths.retrieval_unit_manifest_path,
         "lexical_manifest_path": paths.lexical_manifest_path,
