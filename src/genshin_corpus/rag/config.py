@@ -17,6 +17,18 @@ DEFAULT_PRODUCTION_QWEN_DENSE_MANIFEST = DEFAULT_QWEN_DENSE_MANIFEST
 ONLINE_QWEN_PROFILE = "online_qwen_2048"
 LOCAL_QWEN3_PROFILE = "local_qwen3_1024"
 DEFAULT_EMBEDDING_PROFILE = LOCAL_QWEN3_PROFILE
+DEFAULT_ASSEMBLY_BACKEND = "combined"
+ASSEMBLY_BACKENDS = ("combined", "formal")
+
+
+def assembly_backend_from_environment(environment: Mapping[str, str] | None = None) -> str:
+    values = os.environ if environment is None else environment
+    backend = values.get("GENSHIN_ASSEMBLY_BACKEND", DEFAULT_ASSEMBLY_BACKEND)
+    if backend not in ASSEMBLY_BACKENDS:
+        raise ValueError("GENSHIN_ASSEMBLY_BACKEND must be combined or formal")
+    return backend
+
+
 DEFAULT_PRODUCTION_LOCAL_DENSE_MANIFEST = Path(
     "data/retrieval/p04-local-qwen3-1024-20261102-v1/metadata/manifest.json"
 )

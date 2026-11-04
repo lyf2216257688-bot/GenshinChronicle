@@ -17,6 +17,8 @@ from uuid import uuid4
 import json
 
 from .config import DEFAULT_EMBEDDING_PROFILE, LOCAL_QWEN3_PROFILE, ONLINE_QWEN_PROFILE, dense_manifest_for_profile
+from .config import DEFAULT_ASSEMBLY_BACKEND, ASSEMBLY_BACKENDS
+from genshin_corpus.retrieval.evidence_compaction import assemble_retained_evidence_packet
 
 from genshin_corpus.canonical.fingerprints import canonical_json_bytes, sha256_json
 from genshin_corpus.collector.storage import atomic_write
@@ -84,8 +86,11 @@ class SingleQuestionBackendConfig:
     reranker_projection_max_chars: int = 6000
     fusion_config: RankFusionConfig = field(default_factory=RankFusionConfig)
     final_top_n_explicit: bool = field(default=False, init=False, repr=False, compare=False)
+    assembly_backend: str = DEFAULT_ASSEMBLY_BACKEND
 
     def __post_init__(self) -> None:
+        if self.assembly_backend not in ASSEMBLY_BACKENDS:
+            raise ValueError("assembly_backend must be combined or formal")
         explicit_final_top_n = self.final_top_n is not None
         explicit_supply_depth = self.candidate_supply_depth is not None or self.candidate_depth != 500
         if self.candidate_supply_depth is None:
@@ -139,6 +144,7 @@ class SingleQuestionBackendConfig:
             "reranker_projection_max_chars": self.reranker_projection_max_chars,
             "fusion": self.fusion_config.to_dict(),
             "assembly_config": self.assembly_config.to_dict(),
+            "assembly_backend": self.assembly_backend,
         }
 
 
@@ -665,12 +671,13 @@ def run_single_question(
         current_stage = "assembly"
         diagnostics = EvidenceAssemblyDiagnostics()
         started = perf_counter()
-        packet = assemble_deferred_footprint_charge_packet(
+        assembler = assemble_retained_evidence_packet if config.assembly_backend == "combined" else assemble_deferred_footprint_charge_packet
+        packet = assembler(
             prepared_state.retrieval_unit_manifest_path,
             assembly_candidates,
             config=config.assembly_config,
             prepared_context=prepared_state.assembly_context,
-            diagnostics=diagnostics,
+            **({"variant": "combined"} if config.assembly_backend == "combined" else {"diagnostics": diagnostics}),
             retrieval_audit={
                 "query_text": question_text,
                 "mode": "hybrid_rerank_fusion" if config.reranker_enabled else "hybrid",

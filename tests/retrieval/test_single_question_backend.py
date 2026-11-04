@@ -124,6 +124,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
 
     def test_production_defaults_select_c_and_online_reranker(self) -> None:
         config = SingleQuestionBackendConfig()
+        self.assertEqual(config.assembly_backend, "combined")
         self.assertTrue(config.reranker_enabled)
         self.assertEqual(config.candidate_supply_depth, 500)
         self.assertEqual(config.rerank_depth, 500)
@@ -132,6 +133,27 @@ class SingleQuestionBackendTests(unittest.TestCase):
         self.assertEqual(config.fusion_config.to_dict()["hybrid_weight"], 0.35)
         self.assertEqual(config.fusion_config.to_dict()["rerank_weight"], 0.65)
         self.assertEqual(config.fusion_config.to_dict()["denominator"], 60)
+
+    def test_assembly_default_and_explicit_formal_rollback_dispatch(self):
+        for backend in ("combined", "formal"):
+            with self.subTest(backend=backend), patch(
+                "genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding,
+            ), patch("genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet) as combined, patch(
+                "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet,
+            ) as formal:
+                result = run_single_question(
+                    self.prepared, "问题", embedding_transport=_EmbeddingTransport(), execution_mode="evidence_only",
+                    config=SingleQuestionBackendConfig(reranker_enabled=False, assembly_backend=backend),
+                )
+                self.assertEqual(result["status"], "succeeded", result.get("error"))
+                self.assertEqual(result["audit"]["config"]["assembly_backend"], backend)
+                chosen, other = (combined, formal) if backend == "combined" else (formal, combined)
+                chosen.assert_called_once()
+                other.assert_not_called()
+                if backend == "combined":
+                    self.assertEqual(chosen.call_args.kwargs["variant"], "combined")
+        with self.assertRaisesRegex(ValueError, "assembly_backend"):
+            SingleQuestionBackendConfig(assembly_backend="unknown")
 
     def test_default_off_control_keeps_supply_and_sends_hybrid_top20_to_assembly(self) -> None:
         config = SingleQuestionBackendConfig(reranker_enabled=False)
@@ -145,7 +167,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
             "genshin_corpus.rag.backend.fuse_ranked_candidates",
             side_effect=AssertionError("OFF control must not call fusion"),
         ) as fusion, patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet",
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet",
             return_value=self.packet,
         ) as assemble:
             result = run_single_question(
@@ -200,7 +222,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_evidence_only_skips_generation_and_returns_packet(self):
         generation = _Generation()
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ) as assemble:
             result = run_single_question(
                 self.prepared,
@@ -226,7 +248,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_accepted_precomputed_query_reuses_vector_without_embedding_call(self):
         precomputed = self._accepted_precomputed_query()
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=AssertionError("must not embed")), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ):
             result = run_single_question(
                 self.prepared,
@@ -250,7 +272,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
         }
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=AssertionError("must not embed")), patch(
             "genshin_corpus.rag.backend._reranker_fields_from_verified_ru", return_value=fields
-        ), patch("genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet):
+        ), patch("genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet):
             control = run_single_question(
                 self.prepared,
                 "问题",
@@ -295,7 +317,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_disabled_legacy_rerank_output_does_not_truncate_hybrid_assembly(self):
         config = SingleQuestionBackendConfig(candidate_depth=3, rerank_output_k=1, reranker_enabled=False)
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ) as assemble:
             result = run_single_question(
                 self.prepared,
@@ -313,7 +335,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_explicit_final_top_n_truncates_disabled_hybrid_assembly(self):
         config = SingleQuestionBackendConfig(candidate_depth=3, final_top_n=1, reranker_enabled=False)
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ) as assemble:
             result = run_single_question(
                 self.prepared,
@@ -330,7 +352,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_generate_answer_runs_generation_and_citation_validation(self):
         generation = _Generation()
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ):
             result = run_single_question(
                 self.prepared,
@@ -349,7 +371,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_modes_share_upstream_behavior_and_each_question_embeds_freshly(self):
         generation = _Generation()
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ):
             evidence = run_single_question(self.prepared, "相同问题", embedding_transport=_EmbeddingTransport(), generation_provider=generation, config=self.disabled_config, execution_mode="evidence_only", execution_identity="run-a")
             answer = run_single_question(self.prepared, "相同问题", embedding_transport=_EmbeddingTransport(), generation_provider=generation, config=self.disabled_config, execution_mode="generate_answer", execution_identity="run-b")
@@ -361,7 +383,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
     def test_invalid_citation_fails_local_backend_gate_even_if_provider_claims_success(self):
         generation = _Generation(answer_text="回答 [E99]")
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ):
             result = run_single_question(
                 self.prepared,
@@ -386,7 +408,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
                 "u2": {"record_title": "标题", "section_name": "章节", "speaker": "", "retrieval_visible_text": "b"},
                 "u3": {"record_title": "标题", "section_name": "章节", "speaker": "", "retrieval_visible_text": "c"},
             }
-        ), patch("genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet):
+        ), patch("genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet):
             result = run_single_question(self.prepared, "问题", embedding_transport=_EmbeddingTransport(), generation_provider=_Generation(), config=config, reranker=reranker, execution_identity="run-rerank")
         self.assertEqual(result["rerank_trace"]["status"], "executed_successfully")
         self.assertEqual(result["rerank_trace"]["candidate_depth"], 3)
@@ -419,7 +441,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
                 "u1": {"record_title": "标题", "section_name": "章节", "speaker": "派蒙", "retrieval_visible_text": "正文一"},
                 "u2": {"record_title": "标题", "section_name": "章节", "speaker": "", "retrieval_visible_text": "正文二"},
             }
-        ) as fields, patch("genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet):
+        ) as fields, patch("genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet):
             result = run_single_question(
                 self.prepared,
                 "问题",
@@ -460,7 +482,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
                 "u1": {"record_title": "标题", "section_name": "章节", "speaker": "", "retrieval_visible_text": "a"},
                 "u2": {"record_title": "标题", "section_name": "章节", "speaker": "", "retrieval_visible_text": "b"},
             }
-        ), patch("genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet):
+        ), patch("genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet):
             result = run_single_question(
                 self.prepared,
                 "问题",
@@ -489,7 +511,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
         try:
             base = raw
             with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-                "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+                "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
             ), patch("genshin_corpus.rag.backend.write_evidence_packet", return_value={"json": {"path": "evidence_packet.json"}}) as packet_writer:
                 no_persist = run_single_question(self.prepared, "无落盘", embedding_transport=_EmbeddingTransport(), generation_provider=generation, config=self.disabled_config, execution_mode="evidence_only", execution_identity="run-none")
                 self.assertFalse(list(base.iterdir()))
@@ -512,7 +534,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
         raw.mkdir(parents=True)
         try:
             with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-                "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+                "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
             ), patch(
                 "genshin_corpus.rag.backend.write_evidence_packet", return_value={"json": {"path": "evidence_packet.json"}}
             ) as packet_writer, patch(
@@ -557,7 +579,7 @@ class SingleQuestionBackendTests(unittest.TestCase):
             self.assertEqual(prepare_context.call_count, 1)
 
         with patch("genshin_corpus.rag.backend.encode_qwen_query", side_effect=self._embedding), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=self.packet
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=self.packet
         ):
             first = run_single_question(prepared, "问题甲", embedding_transport=_EmbeddingTransport(), config=self.disabled_config, execution_mode="evidence_only", execution_identity="prepared-a")
             second = run_single_question(prepared, "问题乙", embedding_transport=_EmbeddingTransport(), config=self.disabled_config, execution_mode="evidence_only", execution_identity="prepared-b")

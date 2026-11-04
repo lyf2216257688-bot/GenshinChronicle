@@ -167,3 +167,20 @@ Returning to `bailian` preserves the original control without changing indexes.
 The full Raw corpus is local generated data and is ignored by Git. Small sanitized fixtures required for tests may be committed under `tests/fixtures/`.
 
 Browser `Copy as cURL` output can contain cookies or other credentials. Keep unredacted captures under `.local/` (ignored by Git); only sanitized facts should be copied into tracked research notes.
+
+### Evidence Assembly selector
+
+The backend, CLI and Streamlit default to the adopted `combined` Assembly,
+which reuses proved visible aliases, conservative HTML display projection and
+whole-RU refill. To select the original Formal Deferred Assembly in PowerShell 7,
+set the shared runtime selector before launching the CLI or Streamlit.
+
+```powershell
+$env:GENSHIN_ASSEMBLY_BACKEND = 'formal'
+```
+
+Use `combined` or remove this variable to restore the default. Direct backend
+callers select `SingleQuestionBackendConfig(assembly_backend="formal")` for
+rollback. The frozen Embedding 70Q comparison runner explicitly pins Formal.
+The [Assembly report](docs/research/phase-04/p04-assembly-retention-70q-20261104.md)
+records evaluation limits and the operator's adoption.

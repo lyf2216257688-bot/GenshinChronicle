@@ -201,7 +201,7 @@ class DeepSeekTests(unittest.TestCase):
                    SimpleNamespace(returned_model="qwen3.7-text-embedding", returned_role="query", provider_request_id="mock"))
         opener = FakeOpener()
         with patch("genshin_corpus.rag.backend.encode_qwen_query", return_value=encoded), patch(
-            "genshin_corpus.rag.backend.assemble_deferred_footprint_charge_packet", return_value=packet):
+            "genshin_corpus.rag.backend.assemble_retained_evidence_packet", return_value=packet):
             result = run_single_question(state, request().question,
                 embedding_transport=SimpleNamespace(embed=lambda _: None), generation_provider=self.provider(opener),
                 config=SingleQuestionBackendConfig(reranker_enabled=False), output_root=self.root / "qa-results")

@@ -67,7 +67,7 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Units and Phase 05
   source-bound semantic-build/view primitives; lexical, local Dense, and
   deterministic candidate retrieval; reranking adapters/primitives
-  and rank fusion; Formal Deferred Evidence Assembly; and rebuildable local
+  and rank fusion; combined retained-evidence Assembly with explicit Formal rollback; and rebuildable local
   materialization, comparison, parity, and bounded research tooling.
   `navi_exploration.py` owns the local E1 search/source-read tools and explicit
   review-to-topic projection. `navi_reading.py` owns the opt-in candidate V
@@ -131,7 +131,7 @@ the immediate next action are owned by `docs/current-phase.md`.
   provider explicitly; Retrieval/Assembly do not own provider selection.
 - `src/genshin_corpus/rag/`: the small provider-neutral single-question RAG
   orchestration boundary. It owns prepared-state reuse and per-question
-  composition across Retrieval, optional reranking, Formal Deferred Assembly,
+  composition across Retrieval, optional reranking, selectable combined/Formal Assembly,
   Evidence Packet handling, optional Generation, citation validation, and
   structured audit/persistence results. It also owns the opt-in provider-free
   bounded adaptive Evidence kernel and assessment contracts, plus the narrow

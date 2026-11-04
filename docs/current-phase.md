@@ -61,7 +61,7 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | BM25 | Adopted Diagnostic C field-aware scorer, `k1=1.2`, `b=0.75`, fields title/section/speaker/text, weights `2.0/1.25/1.5/1.0`; candidate depth 500. |
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
 | Reranking | Default local `BAAI/bge-reranker-v2-m3` over Hybrid Top500; rank-only fusion `0.35 Hybrid / 0.65 rerank`, denominator 60, final Top20. Online Qwen and off are explicit selectors, with no automatic fallback. |
-| Assembly / citation | Adopted Formal Deferred-Footprint-Charge, context budget 12,000 characters / 3,000 per block. Provider-neutral Evidence Packets retain original-source lineage. Citation validation is structural; semantic faithfulness remains `not_evaluated`. |
+| Assembly / citation | Adopted retained-evidence combined (proved aliases + conservative HTML display + existing refill); explicit formal rollback. Context budget 12,000 characters / 3,000 per block. Provider-neutral Evidence Packets retain original-source lineage. Citation validation is structural; semantic faithfulness remains `not_evaluated`. |
 | Generation | V1 default `deepseek`: TokenMetro Chat `deepseek-v4.1-flash-1017`, neutral messages, 1024 requested cap, disabled thinking, temperature 0, one shared attempt and finite authorized budget. Closed live gate 2 accepted / 1 output-cap rejection; cap issue unresolved. Explicit `bailian` retains `qwen3.7-plus-2026-05-26` control. No new paid call permission. |
 | Local Embedding | Pinned `Qwen/Qwen3-Embedding-0.6B` / 1024d full original-RU index is **complete and artifact-validated** (535,802 rows; 524 shards). Default `local_qwen3_1024` uses `data/retrieval/p04-local-qwen3-1024-20261102-v1/metadata/manifest.json` and the paired isolated query encoder. Semantic acceptance is separate. |
 | Local question flow | `rag/backend.py` provides reusable prepared state, candidate retrieval, reranking, Packet/Generation output, citation validation and persisted traces. `python -m genshin_corpus.rag` and Streamlit share the runtime selectors. |
@@ -130,9 +130,23 @@ Frozen input/47-RU verification, actual-wire/raw archives, shared ledger,
 control preservation and secret-scan audits PASS. Details and claim limits:
 [three-case live report](research/phase-04/p04-deepseek-live3-20261102.md).
 
-**Current work unit:** the operator authorized the local default switch and
-offline evaluation of both profiles with the retained 70Q. The full 535,802-RU
-build is complete.
+**Current work unit (2026-11-04):** the operator explicitly adopted the existing
+`phase04-retained-evidence-1` **combined** Assembly as the backend/CLI/Streamlit
+default. `GENSHIN_ASSEMBLY_BACKEND=formal` selects the original Formal
+Deferred-Footprint-Charge as explicit rollback. The shared runtime rejects
+unknown selectors before model construction. Direct backend callers can set
+`SingleQuestionBackendConfig(assembly_backend="formal")`.
+
+The adopted implementation reuses the completed 140-control/420-challenger
+Assembly replay over frozen 70Q inputs. Original RU, indexes and citation lineage
+remain the evidence owners. Existing whole-root refill and 12,000/3,000 character
+budgets apply. Q020 local key evidence is restored by combined; old-profile
+Q037's direct-dialogue gap and speculative refill content remain known limits.
+The operator's adoption does not regrade the pending full-Packet human review
+or establish DeepSeek answer quality. This work authorizes regression tests,
+related documentation and a scoped local Git commit. Full 70Q retrieval and paid
+API dispatch are outside this work unit. See the
+[Assembly experiment and adoption](research/phase-04/p04-assembly-retention-70q-20261104.md).
 
 1. **70Q retrieval baseline recorded:** the
    [70Q comparison](research/phase-04/p04-embedding-70q-20261103.md) completed
@@ -163,8 +177,9 @@ lineage, auditability and provider-neutral boundaries remain invariants.
 **Execution boundary:** the authorized three paid DeepSeek requests are complete
 and their allowance is consumed/closed. No further dispatch is authorized by
 that gate. This work permits local code/tests, the operator-requested paired
-retrieval default switch and offline 70Q evaluation. No online
-Embedding/Qwen/Generation calls, full-corpus rebuild, commit, merge or push.
+retrieval default switch, offline 70Q evaluation and the explicitly selected
+retained-Packet Assembly ablations. The operator has now adopted combined and authorized a scoped local commit. No online
+Embedding/Qwen/Generation calls, full-corpus rebuild, merge or push.
 Preserve immutable attempts and UNKNOWN evidence;
 new/materially changed API execution must use the shared call layer. Historical
 Phase05 permits remain unrelated to Phase04 execution.
@@ -194,6 +209,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Pinned local Qwen3 deployment and 909-RU pilot limits | [`Deployment report`](research/phase-05/p05-local-qwen3-embedding-20261025.md) (reused engineering asset, historically filed in Phase 05) |
 | Local original-RU full-build program, operator commands, recovery and smoke measurements | [`Migration preparation`](research/phase-04/p04-local-qwen3-migration-20261102.md) |
 | Offline paired retrieval quality and review procedure | [`70Q Evidence Packet comparison`](research/phase-04/p04-embedding-70q-20261103.md) |
+| Retained-Packet Assembly offline ablations and review | [`Assembly experiment`](research/phase-04/p04-assembly-retention-70q-20261104.md) |
 | Paused semantic-navigation contracts and research pointers | [`Phase 05`](phases/phase-05-source-bound-semantic-navigation.md) |
 
 ### Preserved Phase 05 checkpoints (lookup only)

@@ -36,6 +36,36 @@ from genshin_corpus.ui.runtime import (
 
 
 class UiRuntimeTests(TestCase):
+    def test_cli_entry_uses_shared_assembly_environment(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from genshin_corpus.rag.__main__ import main
+        for backend in ("combined", "formal"):
+            state = SimpleNamespace(embedding_profile="local_qwen3_1024", closed=False, close=Mock())
+            with patch.dict("os.environ", {"GENSHIN_ASSEMBLY_BACKEND": backend, "GENSHIN_RERANKER_BACKEND": "off"}, clear=True), patch(
+                "genshin_corpus.rag.__main__.prepare_production_state", return_value=PreparedStateOwner(state),
+            ), patch("genshin_corpus.ui.runtime.run_single_question", return_value={
+                "status": "succeeded", "audit": {"embedding_profile": "local_qwen3_1024"},
+            }) as run, redirect_stdout(StringIO()):
+                self.assertEqual(main(["问题"]), 0)
+                self.assertEqual(run.call_args.kwargs["config"].assembly_backend, backend)
+
+    def test_shared_cli_streamlit_assembly_selector_and_rollback(self):
+        for environment, expected in (({}, "combined"), ({"GENSHIN_ASSEMBLY_BACKEND": "formal"}, "formal")):
+            with self.subTest(environment=environment), patch(
+                "genshin_corpus.ui.runtime.build_embedding_transport", return_value=object(),
+            ), patch("genshin_corpus.ui.runtime.build_reranker", return_value=None), patch(
+                "genshin_corpus.ui.runtime.run_single_question", return_value={"status": "succeeded"},
+            ) as run:
+                execute_query(SimpleNamespace(embedding_profile="online_qwen_2048"),
+                              UiQuery("问题", "evidence_only", Path("output")), environment=environment)
+                self.assertEqual(run.call_args.kwargs["config"].assembly_backend, expected)
+        with patch("genshin_corpus.ui.runtime.build_embedding_transport") as remote:
+            with self.assertRaisesRegex(UiConfigurationError, "GENSHIN_ASSEMBLY_BACKEND"):
+                execute_query(SimpleNamespace(), UiQuery("问题", "evidence_only", Path("output")),
+                              environment={"GENSHIN_ASSEMBLY_BACKEND": "unknown"})
+            remote.assert_not_called()
+
     def test_generation_selector_defaults_deepseek_with_explicit_bailian_rollback(self) -> None:
         with patch("genshin_corpus.ui.runtime.BailianOpenAICompatibleTransport.from_environment"):
             provider = build_generation_provider({"GENSHIN_GENERATION_BACKEND":"bailian","BAILIAN_BASE_URL": "https://test.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"})

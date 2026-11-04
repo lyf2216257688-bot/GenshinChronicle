@@ -62,6 +62,11 @@ remain distinct: top-k candidates are not automatically final RAG context.
 Evidence Packets are provider-neutral, deterministic evidence interfaces;
 Generation consumes them without owning retrieval or assembly policy.
 
+The adopted retained-evidence combined Assembly preserves control-visible
+independent evidence, audits same-occurrence aliases and display projections,
+and admits whole roots using released budget. The original Formal entry point
+provides explicit rollback. Current operating selectors belong to current-phase.
+
 The local product path composes the existing retrieval/ranking and Assembly
 interfaces through `rag/backend.py`; `generation/` owns provider adaptation and
 `ui/` owns presentation. Provider and embedding selection must bind explicit,

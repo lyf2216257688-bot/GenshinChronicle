@@ -223,6 +223,7 @@ def main():
         }.items() if value is not None
     })
     config = SingleQuestionBackendConfig(
+        assembly_backend="formal",
         candidate_supply_depth=args.candidate_depth, rerank_depth=args.rerank_depth,
         rrf_k=args.rrf_k, final_top_n=args.final_top_n, assembly_config=assembly,
         fusion_config=RankFusionConfig(hybrid_weight=args.hybrid_weight, rerank_weight=1 - args.hybrid_weight),

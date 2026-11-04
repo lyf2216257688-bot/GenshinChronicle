@@ -28,6 +28,7 @@ from genshin_corpus.rag.config import (
     DEFAULT_PRODUCTION_QWEN_RERANK_WORKSPACE,
     ProductionRagArtifactPaths,
     artifact_paths_from_environment,
+    assembly_backend_from_environment,
     LOCAL_QWEN3_PROFILE,
 )
 from genshin_corpus.retrieval.qwen_embedding import (
@@ -292,6 +293,10 @@ def execute_query(
     if not isinstance(query.question_text, str) or not query.question_text.strip():
         raise UiConfigurationError("question must be a non-empty string")
     resolved_output_root = resolve_output_root(query.output_root)
+    try:
+        assembly_backend = assembly_backend_from_environment(environment)
+    except ValueError as exc:
+        raise UiConfigurationError(str(exc)) from exc
     embedding_transport = None if prepared_state.embedding_profile == LOCAL_QWEN3_PROFILE else build_embedding_transport(environment)
     reranker_backend = resolve_reranker_backend(environment)
     reranker = build_reranker(environment)
@@ -305,7 +310,10 @@ def execute_query(
         query.question_text,
         embedding_transport=embedding_transport,
         generation_provider=generation_provider,
-        config=SingleQuestionBackendConfig(reranker_enabled=reranker_backend != OFF_RERANKER_BACKEND),
+        config=SingleQuestionBackendConfig(
+            reranker_enabled=reranker_backend != OFF_RERANKER_BACKEND,
+            assembly_backend=assembly_backend,
+        ),
         reranker=reranker,
         execution_mode=query.execution_mode,
         output_root=resolved_output_root,

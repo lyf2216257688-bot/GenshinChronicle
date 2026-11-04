@@ -91,8 +91,8 @@ gate. Its code, research, failures, model-call archives and inactive outputs
 remain preserved. Any future resumption must address a measured basic-RAG
 bottleneck under a separately bounded scope.
 
-Retain BM25, Dense/RRF Hybrid, local BGE, Formal Deferred-Footprint-Charge
-Assembly, provider-neutral Generation and the original citation resolver.
+Retain BM25, Dense/RRF Hybrid, local BGE, versioned Evidence Assembly,
+provider-neutral Generation and the original citation resolver.
 The existing library/backend and thin Streamlit presentation are the first
 delivery vehicle; add only the usability needed for reproducible local use.
 A new UI framework, public cloud service, vector database, ANN engine, semantic
@@ -175,6 +175,16 @@ remain owned by current-phase.
   actionable error; users may explicitly choose the preserved control profile.
 
 ### Practical evaluation and release gates
+
+The operator adopted the existing 2026-11-04 retained-Packet combined Assembly
+as the shared backend/CLI/Streamlit default. It preserves independent control-visible evidence,
+suppresses only proved visible same-occurrence aliases with equal display
+labels, audits conservative structured HTML display edits against original RU
+ranges, and refills only whole omitted Top20 roots under the existing gates.
+Original RU text and lineage remain in the Packet. The explicit `formal`
+selector uses the original Formal Deferred Assembly. Current selectors and
+adoption are owned by current-phase. The bounded contract and results are in the
+[Assembly experiment](../research/phase-04/p04-assembly-retention-70q-20261104.md).
 
 Reuse `.local/p04-rag-m2/questions.runtime.jsonl` (70 historical questions),
 its separate review-only sidecar, existing story QA/review materials and a
