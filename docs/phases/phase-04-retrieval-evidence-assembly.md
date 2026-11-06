@@ -1,9 +1,13 @@
 # Phase 04 — Retrieval / Evidence Assembly
 
-Status: **Phase 04 basic RAG V1 is the active delivery track (2026-11-02).
+Status: **Phase 04 basic RAG V1 is the retained serving delivery contract.
 The previously adopted Block A remains the executable baseline while V1 changes
 are implemented and validated. Current work-unit status, authorization and
 adoption are owned by [`docs/current-phase.md`](../current-phase.md).**
+
+The separately approved [Clean V1 reconstruction](clean-v1.md) owns direct
+Raw extraction and its replacement-foundation readers. This document continues
+to own the deployed Canonical/RU serving path and its acceptance requirements.
 
 > Historical checkpoint / current relation: the P04-W1 authorization and its
 > non-authorization statements below apply to that completed work unit. They

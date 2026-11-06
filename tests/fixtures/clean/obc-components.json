@@ -1,0 +1,688 @@
+{
+  "note": "Bounded shape excerpts from the approved snapshot. Each array retains its first element. These are test inputs, not Raw artifacts.",
+  "cases": [
+    {
+      "content_id": "509294",
+      "title": "血红之证",
+      "module_name": "生之花",
+      "component_id": "artifact_list_v2",
+      "data": {
+        "title": "",
+        "name": {
+          "key": "生之花：",
+          "value": [
+            "感谢你的奉献"
+          ]
+        },
+        "icon_url": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/10/4521515/86ce0a07c8e2c0e658728110507f3af2_6948869828331469965.png",
+        "desc": {
+          "key": "描述：",
+          "value": [
+            "<p>颜色鲜红的花饰。象征如火的荣光。</p>"
+          ]
+        },
+        "story": {
+          "key": "故事",
+          "value": [
+            "<p>吉约丹小姐坐在至冬堡中央的广场上，像本地人一样喝露天红菜汤和掺了酒的热咖啡。咖啡端上来没一会儿就在寒风中冷掉，喝下去时却从喉咙一直烧到肚子里。吉约丹小姐聪慧过人，马上就理解了为何尖耳朵的侍者推荐她加双倍火水。</p><p>从枫丹到至冬，她花了不少功夫，大部分时间都耗在雪原上。天气比预想中要冷，路反而没那么难走，耽搁时间的就只能是这个怪地方。她撞见有人光着膀子从十米多高的树上往雪堆里跳，又瞧见小孩在冻湖上赛跑，比谁先踩破冰面掉进水里。倒霉的人是赢家，所以倒霉蛋更开心。这一切都比阿兰那勇者斗恶龙的小故事还要难懂，因为既看不出什么意义，又令她感到十分新奇。</p><p></p><p>几个月前，她端着茶杯坐在枫丹廷的长椅上，隔着雾蒙蒙的湿空气看对面那栋楼翻新，靠给施工队挑刺打发时间。负责监工的人并不恼，反而向她表示感谢，这给她留下了不错的印象，因此让她默许了对方自顾自的攀谈。自称什么协会分会长的人说话不温不火，听得人昏昏欲睡。这本是个用来休息的好时机，只可惜阿兰离开后，她总是有太多时间发呆和打瞌睡，并习惯了半睡半醒地处理研究之外的杂事。</p><p>就比如说，沫芒宫为阿兰·吉约丹公爵发放了一笔巨额抚恤金，她不想像守财奴一样抱着摩拉原地老死，因为显然她不会老死，也不想几百年后演变成地下室里有闹鬼人偶的惊悚故事。她听说过不远处的银行就提供不错的理财方案，但来自异国的银行本身就像个陷阱，无论身边这位分会长如何赞许它的慷慨资助，也不能叫聪明的吉约丹小姐信服。</p><p>再比如说，这世上怎么会有和黑咖啡一样苦的面包，以及尝起来像面包一样的饮料？阿兰为她精心准备了与人类无异的味觉与温感系统，那么她要如何验证这些机能可以在低温下长期平稳运行？</p><p>过于友好的分会长先生仍在讲述着有关异国冒险的轶事，并时不时穿插着夸奖她几句，称像她这样的淑女即使在见多识广的冒险家眼里也是难得一见的有识之士，仅仅在这里帮忙修正建筑结构错误，实在是有些屈才。</p><p>于是吉约丹小姐放下手中的空茶杯，决定去尝尝面包味的饮料。</p><p></p><p>在某个冰天雪地里的桌位边，她认识了愚人众的统括官。</p><p>那时她正思考着老庭院究竟有多老，并看着一个比普隆尼亚还要笨拙的兽怪试图端平整整一托盘满溢的酒杯。在这摇摇欲坠的事态下，戴着面具的人向她描述了一个试图拯救世界的理想。</p><p>他说不讲道理的命运是需要被打破的枷锁，摧毁旧世界就等同于拯救它。</p><p>命运与救世都是她听过的话题，当下却变得有些刻意。唉，阿兰…她想。你赋予我自由且杰出的灵魂，又可曾想过我会拿它来做什么？但紧接着她又想，这本来也不是阿兰该思考的东西，而是她自己的人生课题。</p><p>手持圣剑的勇者与无论应不应该被打倒的恶龙都是过去的故事了，而这世界竟然还在等着被拯救。</p><p></p><p>不久之后，她开始被称作「木偶」或者桑多涅，拥有了与之相配的责任。闲暇时分，她又坐回那个熟悉的座位，远远望向冒险家协会的窗口。名叫凯瑟琳的接待员优雅地站着，似乎永远不会因寒冬的风雪困扰。</p><p>有人往附近的布告栏上贴剧院节目单，也贴愚人众的征兵海报。后者上面印着鲜红的花，比女演员的舞裙更加艳丽，是许诺授予奉献者的勋章。自从知道了冒险家协会在至冬更深处的意义，桑多涅便对这一切见怪不怪。愚人众在培养名为理想的巨兽，人才与情报都是它必需的养料。</p><p>有时恍惚间，她感到自己也身在其中。</p>"
+          ]
+        }
+      }
+    },
+    {
+      "content_id": "509653",
+      "title": "影域的遗留",
+      "module_name": "影域的遗留",
+      "component_id": "base_info",
+      "data": {
+        "moduleName": "",
+        "layout_": "left",
+        "list": [
+          {
+            "key": "触发条件",
+            "value": [
+              "「影域保管库权限卡」6级，开启全部「影域保管库」后自动触发"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "名片",
+      "component_id": "business_card",
+      "data": {
+        "moduleName": "名片",
+        "layout_": "left",
+        "long_img": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/24/50494840/20f8f33cf84ef0baa3534cfba8ad6a5a_5568862006583978986.png",
+        "card_img": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/24/50494840/89aff8641d2a123989b532d1e8aab9c3_7055027989288214158.png"
+      }
+    },
+    {
+      "content_id": "500188",
+      "title": "海祇之冠",
+      "module_name": "基础信息",
+      "component_id": "card_base_info",
+      "data": {
+        "moduleName": "基础信息",
+        "layout_": "left",
+        "name": "海祇之冠",
+        "common_img": "https://act-upload.mihoyo.com/wiki-user-upload/2023/09/25/258999284/dfea4a0c2219c145125277f8eddb8269_3306254185680856587.png",
+        "gold_img": "",
+        "life": 1,
+        "life_bg": 9,
+        "energy": 0,
+        "energy_bg": 0,
+        "attr": [
+          {
+            "key": "类型：",
+            "value": [
+              "装备牌"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "1039",
+      "title": "东东",
+      "module_name": "【冒险挑战】：坏脾气的士兵",
+      "component_id": "card_group_info",
+      "data": {
+        "author": "东东",
+        "created_at": "2023.10.26",
+        "list": [
+          {
+            "energy_bg": 0,
+            "ep_id": 5600,
+            "img": "https://act-upload.mihoyo.com/ys-obc/2023/10/27/12233500/0d41d37e629212927a4e7a5b3499ff99_223200319167713201.png",
+            "life": 10,
+            "life_bg": 11,
+            "link": "/ys/obc/content/5600/detail?bbs_presentation_style=no_header"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509364",
+      "title": "杜林【角色牌】",
+      "module_name": "卡牌技能",
+      "component_id": "card_skill",
+      "data": {
+        "list": [
+          {
+            "tab_name": "芒焰之翼斩",
+            "skill_type": "普通攻击",
+            "icon": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/11/258999284/0f39b80bbd07ccf04b2ede69332fbdea_4425948608275294025.png",
+            "life": 1,
+            "life_bg": 4,
+            "energy": 2,
+            "energy_bg": 10,
+            "desc": {
+              "key": "技能效果",
+              "value": [
+                "<html><head></head><body><p><span style=\"color: rgb(0, 0, 0)\">造成2点</span><strong><u>物理伤害</u></strong><span data-type=\"详情\" data-name=\"&lt;p style=&#34;white-space: pre-wrap;&#34;&gt;物理伤害：&lt;/p&gt;&lt;p style=&#34;white-space: pre-wrap;&#34;&gt;物理伤害不会附着元素，也不会发生元素反应。&lt;/p&gt;\" class=\"wiki-note-text\"><sup class=\"wiki-sup\">[详情]</sup></span>。</p></body></html>"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509672",
+      "title": "「回响于暴风雪」",
+      "module_name": "基础信息",
+      "component_id": "cave_base_info",
+      "data": {
+        "name": "「回响于暴风雪」",
+        "image": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/24/50494840/412d61b2b285b29c6476e6fc1c2a1915_6207752476769574166.png",
+        "rate": 4,
+        "materials": "<p></p>"
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "特殊料理",
+      "component_id": "collapse_panel",
+      "data": {
+        "rich_text": "<p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/24/7887264/b04134bfd3f80ba856ef972c41fd91cb_8881912761245265516.png\" data-image-unit=\"px\" data-image-width=\"123\"><span class=\"custom-image-wrapper\" style=\"width: 123px\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/24/7887264/b04134bfd3f80ba856ef972c41fd91cb_8881912761245265516.png\" style=\"width: 123px\"></span></span></span>名称：<a href=\"https://bbs.mihoyo.com/ys/obc/content/7105/detail?bbs_presentation_style=no_header\" target=\"_blank\">炉火的往迹</a></p><p>使用效果：为选中的角色恢复生命值上限的40%，并额外恢复2350点生命值。</p>",
+        "switch": false,
+        "is_show_switch": false,
+        "without_border": false
+      }
+    },
+    {
+      "content_id": "501526",
+      "title": "【观测枢】原神兑换码查询",
+      "module_name": "国服永久兑换码",
+      "component_id": "copy_base_info",
+      "data": {
+        "list": [
+          {
+            "value": "yuanshen",
+            "key": "<p>原石*50、大英雄的经验*3</p>"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509146",
+      "title": "夏洛蒂「赫尔洛克变奏曲」",
+      "module_name": "夏洛蒂",
+      "component_id": "dress_base_info",
+      "data": {
+        "image": "https://act-upload.mihoyo.com/wiki-user-upload/2026/07/28/50494840/25b25bde9c69d6a341f32a47547d60f1_1007450092390340459.png",
+        "attr": [
+          {
+            "value": [
+              "<p>蒸汽鸟报社</p>"
+            ],
+            "key": "所属"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509224",
+      "title": "白湖冬羽",
+      "module_name": "",
+      "component_id": "equipment_base_info",
+      "data": {
+        "name": "白湖冬羽",
+        "image": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/10/75833613/827b920e53a3de275f75f7b34157b347_7634732761064697745.png",
+        "category": "单手剑",
+        "star": 5
+      }
+    },
+    {
+      "content_id": "500790",
+      "title": "千岩军士兵",
+      "module_name": "数据参考",
+      "component_id": "equipment_growth_info",
+      "data": {
+        "list": [
+          {
+            "attr": [
+              {
+                "key": "剧情敌人(按90级算)",
+                "value": [
+                  "<p>生命：3.89w<span data-type=\"1\" data-name=\"&lt;p&gt;本数据为实际测算模拟得出，结果可能不准确。&lt;strong&gt;&lt;span style=&quot;color: rgb(250, 140, 22)&quot;&gt;多人情况下的生命值与单人情况下生命值成一定倍数关系，该系数通常是固定的，可直接计算。&lt;/span&gt;&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;数据单位：生命值以&lt;strong&gt;&lt;span style=&quot;color: rgb(245, 34, 45)&quot;&gt;w&lt;/span&gt;(万)&lt;/strong&gt;为单位，向下保留两位小数。&lt;/p&gt;\" class=\"wiki-note-text\"><sup class=\"wiki-sup\">[1]</sup></span></p>"
+                ]
+              }
+            ],
+            "materials": [],
+            "tab_name": "正常"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "385",
+      "title": "秘境索引",
+      "module_name": "秘境索引",
+      "component_id": "filter_table",
+      "data": {
+        "options": [
+          {
+            "value": [
+              "武器突破素材"
+            ],
+            "key": "秘境类型"
+          }
+        ],
+        "table": {
+          "header": [
+            "秘境"
+          ],
+          "row": [
+            [
+              "<p><span class=\"custom-entry-wrapper\" data-entry-id=\"508676\" data-entry-ratio=\"small\" data-entry-img=\"https://act-upload.mihoyo.com/wiki-user-upload/2026/05/21/76362111/4722c29c507bb18bbce5cf729bb28eaa_5890026140638666888.png\" data-entry-name=\"万有涅槃缚境\" data-entry-link=\"/ys/obc/content/508676/detail?bbs_presentation_style=no_header\" data-entry-status=\"Online\"><a href=\"/ys/obc/content/508676/detail?bbs_presentation_style=no_header\" target=\"_blank\" class=\"entry-material-box entry-material-small\"><img class=\"image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2026/05/21/76362111/4722c29c507bb18bbce5cf729bb28eaa_5890026140638666888.png\"><span class=\"entry-material-wrap\"><span class=\"name\">万有涅槃缚境</span></span></a></span></p>"
+            ]
+          ],
+          "filter": [
+            [
+              [
+                "秘境类型"
+              ]
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "content_id": "500790",
+      "title": "千岩军士兵",
+      "module_name": "背景故事",
+      "component_id": "good_desc",
+      "data": {
+        "rich_text": "<p>千岩牢固，重嶂不移。</p>",
+        "attr": [
+          {
+            "key": "",
+            "value": [
+              "<p></p>"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509653",
+      "title": "影域的遗留",
+      "module_name": "剧情对话",
+      "component_id": "interactive_dialogue",
+      "data": {
+        "contents": null,
+        "list": [
+          {
+            "root_id": "ewllh0qqr0dT1711546416025",
+            "child_ids": {
+              "6mttjd5ntbaT1787134589088": [
+                "xw8gn2cly6oT1787134598748"
+              ],
+              "ewllh0qqr0dT1711546416025": [
+                "sriyhsrfz7T1787134572785"
+              ],
+              "m3crhuggnonT1787134589840": [
+                "xw8gn2cly6oT1787134598748"
+              ],
+              "sriyhsrfz7T1787134572785": [
+                "6mttjd5ntbaT1787134589088"
+              ],
+              "xw8gn2cly6oT1787134598748": []
+            },
+            "contents": {
+              "6mttjd5ntbaT1787134589088": {
+                "option": "旅行者：非常顺手！",
+                "dialogue": "",
+                "icon": ""
+              },
+              "ewllh0qqr0dT1711546416025": {
+                "option": "",
+                "dialogue": "<p><span>你终于将遗迹内的古代造物发掘完毕…</span></p><h2 class=\"custom-heading-cls\" style=\"text-align: center\"><strong><span>与塔佩兹尼科夫对话</span></strong></h2><p><span>塔佩兹尼科夫：这座遗迹内的古代造物已经被发掘完毕了，真是辛苦旅行者了，我收集到了不少一手的研究资料。</span></p>",
+                "icon": ""
+              },
+              "m3crhuggnonT1787134589840": {
+                "option": "旅行者：马马虎虎吧。",
+                "dialogue": "",
+                "icon": ""
+              },
+              "sriyhsrfz7T1787134572785": {
+                "option": "旅行者：我也获益良多。",
+                "dialogue": "<p><span>阿罗夏：怎么样，有了这么多配件，你那把枪用起来顺手了吗？</span></p>",
+                "icon": ""
+              },
+              "xw8gn2cly6oT1787134598748": {
+                "option": "",
+                "dialogue": "<p><span>阿罗夏：其实，枪这种武器用起来顺不顺手，跟配件多少关系不大。命中的次数多了，自然就会顺手的。</span></p><p><span>阿罗夏：有机会的话，跟我去打猎吧，我的枪法全是在野外学到的。</span></p>",
+                "icon": ""
+              }
+            }
+          }
+        ],
+        "root_id": "",
+        "child_ids": null
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "角色展示",
+      "component_id": "map_desc",
+      "data": {
+        "list": [
+          {
+            "tab_name": "角色待机1",
+            "image": "https://act-upload.mihoyo.com/wiki-user-upload/2024/04/24/7887264/74d878be311a6ace6837972d3f152afa_5495585282364652638.gif"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "502532",
+      "title": "不动鸣神，恒常乐土",
+      "module_name": "基础信息",
+      "component_id": "material_base_info",
+      "data": {
+        "name": "不动鸣神，恒常乐土",
+        "img": "https://act-upload.mihoyo.com/wiki-user-upload/2024/09/23/160031059/27ec1c00c5bb06745e16039a10ff3aaa_7482718532596063864.png",
+        "materials": {
+          "key": "成就集",
+          "value": "<p>天地万象</p>"
+        },
+        "attr": [
+          {
+            "key": "",
+            "value": [
+              "<p><strong>成就描述</strong>：完成「不动鸣神，恒常乐土」。</p>"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "500790",
+      "title": "千岩军士兵",
+      "module_name": "千岩军士兵",
+      "component_id": "monster_base_info",
+      "data": {
+        "attr": [
+          {
+            "key": "元素",
+            "value": [
+              "<p>无</p>"
+            ]
+          }
+        ],
+        "feedback": [],
+        "list": [
+          {
+            "image": "https://act-upload.mihoyo.com/wiki-user-upload/2024/02/01/258229537/a860450b43d43478055f61a4d992b707_3384527012537909463.gif",
+            "tab_name": "白缨枪狩"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "命之座",
+      "component_id": "multi_table",
+      "data": {
+        "tables": [
+          {
+            "tab_name": "命之座",
+            "header": [
+              ""
+            ],
+            "row": [
+              [
+                "<p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/e0ba99234ff284342ff31ef003034c22_8632547101862382362.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/e0ba99234ff284342ff31ef003034c22_8632547101862382362.png\" style=\"width: 40px;\"></span></span></span>「所有的仇与债皆由我偿…」</p><p>红死之宴提升进一步提高，提高值为100%；</p><p>此外，在红死之宴状态下进行普通攻击或重击时，提高阿蕾奇诺的抗打断能力。</p><hr><p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/9be4d5f8b23bae55f0659645cc298f5f_8102217892187231747.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/9be4d5f8b23bae55f0659645cc298f5f_8102217892187231747.png\" style=\"width: 40px;\"></span></span></span>「所有的赏与罚皆自我出…」</p><p><span style=\"color: rgb(212, 177, 6)\">血偿勒令</span>施加时即为血偿勒令·结。</p><p>阿蕾奇诺回收血偿勒令·结时，将在前方唤出厄月血火，造成相当于她的攻击力900%的<span style=\"color: rgb(245, 34, 45)\">火元素范围伤害</span>，并使她的所有元素抗性与物理抗性提升20%，持续15秒。此效果每10秒至多触发一次。</p><p>需要解锁突破天赋「唯苦痛可偿还」。</p><hr><p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/dfbb57e88bccc034e7f79d5a12fc1fd4_8432444106430044167.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/dfbb57e88bccc034e7f79d5a12fc1fd4_8432444106430044167.png\" style=\"width: 40px;\"></span></span></span>「你将成为我们新的家人…」</p><p><span style=\"color: rgb(212, 177, 6)\">普通攻击·斩首之邀</span>的技能等级提高3级。</p><p>至多提升至15级。</p><hr><p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/7e253f389b4404e7fbf9572e938669f6_5965177441303509108.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/7e253f389b4404e7fbf9572e938669f6_5965177441303509108.png\" style=\"width: 40px;\"></span></span></span>「此后，你们须相爱相护…」</p><p>阿蕾奇诺成功回收血偿勒令时，<span style=\"color: rgb(212, 177, 6)\">厄月将升</span>的冷却时间缩短2秒，并为她恢复15点元素能量，此效果每10秒至多触发一次。</p><hr><p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/d251660fd39f798ebf831c507d6cc23b_6602646669948849594.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/d251660fd39f798ebf831c507d6cc23b_6602646669948849594.png\" style=\"width: 40px;\"></span></span></span>「我们已孑然一身，与死无异…」</p><p><span style=\"color: rgb(212, 177, 6)\">厄月将升</span>的技能等级提高3级。</p><p>至多提升至15级。</p><hr><p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/f55133a7f46d551c532b0242bb9e9185_8041300125313588111.png\" data-image-unit=\"px\" data-image-width=\"40\"><span class=\"custom-image-wrapper\" style=\"width: 40px;\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/f55133a7f46d551c532b0242bb9e9185_8041300125313588111.png\" style=\"width: 40px;\"></span></span></span>「自此以后，我们将共飨新生。」</p><p><span style=\"color: rgb(212, 177, 6)\">厄月将升</span>造成的伤害提高，提升值相当于阿蕾奇诺的攻击力乘以当前生命之契百分比的700%。</p><p>施放<span style=\"color: rgb(212, 177, 6)\">万相化灰</span>后的20秒内，阿蕾奇诺的普通攻击与元素爆发的暴击率提升10%、暴击伤害提升70%。</p><p>该效果每15秒至多触发一次。</p>"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "1039",
+      "title": "东东",
+      "module_name": "东东",
+      "component_id": "npc_base_info",
+      "data": {
+        "extra_attr": [
+          {
+            "value": [
+              "<p>希望能快点长大去冒险的小孩</p>"
+            ],
+            "key": "编者注"
+          }
+        ],
+        "image": "https://uploadstatic.mihoyo.com/ys-obc/2023/01/17/288180982/1c3c469dd5701f0d2b58a096002d92bf_492459375188170679.png",
+        "attr": [
+          {
+            "key": "性别",
+            "value": [
+              "<p>男</p>"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "推荐装备",
+      "component_id": "recommend",
+      "data": {
+        "tables": [
+          {
+            "tab_name": "武器推荐",
+            "header": [
+              "推荐武器"
+            ],
+            "row": [
+              [
+                "<p><span class=\"custom-entry-wrapper\" data-entry-id=\"501137\" data-entry-ratio=\"small\" data-entry-img=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/18/75833613/6ddd818033e3b1b92e3fb00e9bedc682_5310546595493287693.png\" data-entry-name=\"赤月之形\" data-entry-link=\"/ys/obc/content/501137/detail?bbs_presentation_style=no_header\" data-entry-status=\"Online\"><a href=\"/ys/obc/content/501137/detail?bbs_presentation_style=no_header\" target=\"_blank\" class=\"entry-material-box entry-material-small\"><img class=\"image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/18/75833613/6ddd818033e3b1b92e3fb00e9bedc682_5310546595493287693.png\"><span class=\"entry-material-wrap\"><span class=\"name\">赤月之形</span></span></a></span></p>"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "509653",
+      "title": "影域的遗留",
+      "module_name": "任务概述",
+      "component_id": "rich_base_info",
+      "data": {
+        "list": [
+          {
+            "key": "前置任务",
+            "value": [
+              "<p><span class=\"custom-entry-wrapper\" data-entry-id=\"509643\" data-entry-ratio=\"text\" data-entry-img=\"https://act-upload.mihoyo.com/wiki-user-upload/2026/08/19/83684823/41a53cbf3d3742b30dd4261689b9e6fc_81630715739610107.png\" data-entry-name=\"影域的遗留\" data-entry-link=\"/ys/obc/content/509643/detail?bbs_presentation_style=no_header\" data-entry-status=\"Online\"><a href=\"/ys/obc/content/509643/detail?bbs_presentation_style=no_header\" target=\"_blank\" class=\"entry-material-box entry-material-text\"><span class=\"entry-material-wrap\"><span class=\"name\">影域的遗留</span></span></a></span></p>"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "角色突破",
+      "component_id": "role_ascension",
+      "data": {
+        "list": [
+          {
+            "tab_name": "1级属性/突破所需材料",
+            "materials": [
+              {
+                "ep_id": 853,
+                "amount": 1,
+                "nickname": "燃愿玛瑙碎屑",
+                "img": "https://uploadstatic.mihoyo.com/ys-obc/2020/07/01/80410800/f28118a7af63ddc06f9bf6d4fe2c269b_9096455923637930781.png",
+                "link": "/ys/obc/content/853/detail?bbs_presentation_style=no_header",
+                "status": "Online"
+              }
+            ],
+            "new_talent_unlocked": "<p></p>",
+            "attr": [
+              {
+                "key": "攻击方式",
+                "value": [
+                  "<p><span style=\"color: rgb(51, 51, 51)\">近战</span></p>"
+                ]
+              }
+            ]
+          }
+        ],
+        "link": "https://webstatic.mihoyo.com/ys/event/e20200923adopt_calculator/index.html?bbs_presentation_style=fullscreen&bbs_auth_required=true&utm_source=bbs&utm_medium=mys&utm_campaign=icon&type=1&aid=10000096"
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "基础信息",
+      "component_id": "role_base_info",
+      "data": {
+        "moduleName": "基础信息",
+        "layout_": "banner",
+        "name": "阿蕾奇诺",
+        "star": 5,
+        "role_attribute": "#B8584B",
+        "avatar_pc": "https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/0a0648f1ba43567d9c7fa47f14fca5c8_2979137229157555889.png",
+        "avatar_m": "https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/194a8259848f43f5f7f3e8fe7d17d44f_6276388807529602931.png",
+        "attr": [
+          {
+            "key": "生日",
+            "value": [
+              "8月22日"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "角色关系网",
+      "component_id": "role_relation",
+      "data": {
+        "tables": [
+          {
+            "row": [
+              [
+                "<p><span class=\"custom-entry-wrapper\" data-entry-id=\"509103\" data-entry-ratio=\"big\" data-entry-img=\"https://act-upload.mihoyo.com/wiki-user-upload/2026/08/04/50494840/739bbb437b9c7b38f87bc1fcad395def_7161795407666485206.png\" data-entry-name=\"奥黛塔\" data-entry-link=\"/ys/obc/content/509103/detail?bbs_presentation_style=no_header\" data-entry-status=\"Online\"><a href=\"/ys/obc/content/509103/detail?bbs_presentation_style=no_header\" target=\"_blank\" class=\"entry-material-icon\" style=\"display: inline-flex; width: unset; align-items: center\"><span class=\"entry-material-wrap\"><span class=\"image\"><img src=\"https://act-upload.mihoyo.com/wiki-user-upload/2026/08/04/50494840/739bbb437b9c7b38f87bc1fcad395def_7161795407666485206.png\"></span><span class=\"name\">奥黛塔</span></span></a></span></p>"
+              ]
+            ],
+            "tab_name": "角色关联语音",
+            "header": [
+              "角色"
+            ]
+          }
+        ],
+        "switch": false,
+        "is_show_switch": false
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "天赋",
+      "component_id": "role_talent",
+      "data": {
+        "list": [
+          {
+            "tab_name": "天赋1（普通攻击）",
+            "icon": "https://act-upload.mihoyo.com/wiki-user-upload/2024/04/19/4328207/ca403ce4fbb91fe2a46488f18c9029f1_6552077256968301322.png",
+            "title": "斩首之邀",
+            "desc": "<p><span style=\"color: rgb(212, 177, 6)\">普通攻击</span></p><p>进行至多六段的连续枪击。</p><p></p><p><span style=\"color: rgb(212, 177, 6)\">重击</span></p><p>消耗一定体力，向附近的敌人突进，并进行一次挥斩。</p><p>持续长按时，阿蕾奇诺将以消耗体力为代价，进行至多持续5秒的快速移动。</p><p></p><p><span style=\"color: rgb(212, 177, 6)\">下落攻击</span></p><p>从空中下坠冲击地面，攻击下落路径上的敌人，并在落地时造成范围伤害。</p><p></p><p><span style=\"color: rgb(212, 177, 6)\">红死之宴</span></p><p>阿蕾奇诺具有的生命之契大于或等于生命值上限的30%时，将进入红死之宴状态：普通攻击、重击与下落攻击造成的伤害将转为无法被附魔覆盖的<span style=\"color: rgb(245, 34, 45)\">火元素伤害</span>。</p><p>红死之宴状态下，阿蕾奇诺的普通攻击命中敌人时，将提升本次攻击造成的伤害，提升值相当于阿蕾奇诺的攻击力乘以当前生命之契百分比的一定比例，并消耗当前7.5%的生命之契，每0.03秒至多因此消耗一次生命之契；通过这种方式消耗生命之契时，会使元素战技「万相化灰」的冷却缩短0.8秒。</p>",
+            "attr": {
+              "tab_name": "",
+              "header": [
+                "详细属性"
+              ],
+              "row": [
+                [
+                  "<p>红死之宴提升</p>"
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "配音展示",
+      "component_id": "role_voice",
+      "data": {
+        "moduleName": "配音展示",
+        "layout_": "banner",
+        "list": [
+          {
+            "tab_name": "汉语",
+            "table": [
+              {
+                "name": "初次见面…",
+                "content": "我是愚人众执行官第四席，「仆人」阿蕾奇诺，也是壁炉之家的孩子们口中的「父亲」。希望我们相处愉快——这并非什么难事，现在的我们还没有冲突的理由，不是吗？",
+                "audio_url": "https://act-upload.mihoyo.com/wiki-user-upload/2024/04/28/16576950/cfbb4f00efb384632e4cb4a615c2c78a_1315066322748748691.mp3",
+                "isUploading": false,
+                "audio_name": "01初次见面…_cn.mp3"
+              }
+            ],
+            "tab_id": "1714299736007_1"
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "512",
+      "title": "深境螺旋第8层",
+      "module_name": "目标",
+      "component_id": "spiral_abyss_target",
+      "data": {
+        "list": [
+          {
+            "level": "8-1",
+            "target": "挑战剩余时间大于180秒\n挑战剩余时间大于330秒\n挑战剩余时间大于420秒",
+            "desc": "敌人等级：lv70",
+            "first_half": {
+              "list": [
+                {
+                  "name": "第一轮",
+                  "entry_pages": [
+                    {
+                      "ep_id": 154,
+                      "amount": 1,
+                      "nickname": "冰深渊法师",
+                      "img": "https://uploadstatic.mihoyo.com/ys-obc/2023/01/18/73961553/ebaac83a3457825834fcc3525de14c66_7877977277093983254.png"
+                    }
+                  ]
+                }
+              ]
+            },
+            "second_half": {
+              "list": [
+                {
+                  "name": "第一轮",
+                  "entry_pages": [
+                    {
+                      "ep_id": 155,
+                      "amount": 2,
+                      "nickname": "火深渊法师",
+                      "img": "https://uploadstatic.mihoyo.com/ys-obc/2023/01/18/73961553/1771d3890717d40f6d644e89a782ac89_6662628813505540107.png"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "攻略推荐",
+      "component_id": "strategy",
+      "data": {
+        "moduleName": "攻略推荐",
+        "layout_": "banner",
+        "list": [
+          {
+            "tab_name": "【V7.0】一次看懂仆人「阿蕾奇诺」配队与养成",
+            "cover": "https://act-upload.mihoyo.com/wiki-user-upload/2026/08/06/79695828/0fde965b61ffc7020875c90e7e734202_5612688661272070353.png",
+            "link": "https://www.miyoushe.com/ys/article/77185586",
+            "tab_id": "1785997823614_2"
+          }
+        ],
+        "more_link": "https://bbs.mihoyo.com/ys/strategy/channel/map/39/383?bbs_presentation_style=no_header"
+      }
+    },
+    {
+      "content_id": "501157",
+      "title": "阿蕾奇诺",
+      "module_name": "角色宣发时间轴",
+      "component_id": "timeline_base_info",
+      "data": {
+        "list": [
+          {
+            "attr": [
+              {
+                "key": "繁星晦暗，厄月孤存",
+                "value": [
+                  "<p><span class=\"custom-image-view\" data-image-url=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/24/50494840/0d84d1bdb738120492c6f6fa77c97b4e_6166187600231689831.jpg\" data-image-unit=\"px\" data-image-width=\"690\"><span class=\"custom-image-wrapper\" style=\"width: 690px\"><span style=\"\"><img class=\"custom-image\" src=\"https://act-upload.mihoyo.com/wiki-user-upload/2024/04/24/50494840/0d84d1bdb738120492c6f6fa77c97b4e_6166187600231689831.jpg\" style=\"width: 690px\"></span></span></span>「命运从不予人恩惠。唯有拼尽全力反抗的人，方有直面它的资格。」</p><p>——「丑角」皮耶罗</p><p>链接：<a href=\"https://www.miyoushe.com/ys/article/50199997\" target=\"_blank\">繁星晦暗，厄月孤存</a></p>"
+                ]
+              }
+            ],
+            "tab_name": "「2024.03.11」角色登场"
+          }
+        ]
+      }
+    }
+  ]
+}

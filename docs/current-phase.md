@@ -4,9 +4,26 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 1. Active priority and work unit (2026-11-03)
+## 1. Active priority and work unit (2026-11-06)
 
-**ACTIVE: Phase 04 basic RAG V1. PAUSED: Phase 05 NaviRAG / Card / Link / KG.**
+**Active implementation work unit — Clean V1 (2026-11-06).** The operator
+approved the Raw -> Clean technical plan for offline implementation and a bounded
+representative pilot. This work owns the direct Raw-to-Clean schema, structure
+and tag extraction, source locators, resumable file builds and downstream readers.
+The [Clean contract](phases/clean-v1.md) owns the durable interface and acceptance
+requirements. Full-corpus materialization, serving adoption, index rebuilds and
+legacy asset disposition remain subsequent work units. The existing Phase04
+runtime described below is the executable production baseline. Phase05 stays paused.
+
+The Clean V1 foundation and bounded pilot are implemented. 40 new regressions
+and 108 existing parser/Canonical/Collector/shared-lock regressions pass. The
+30-record pilot covers all 30 observed component types and accounts for 193
+components and 6,907 component source values. Independent checks retain 4,439
+meaningful HTML text-node occurrences, 49 tables and 5 dialogue groups with
+39 nodes and 41 edges. The [implementation record](research/clean-v1-implementation-20261106.md)
+owns the pilot paths, measurements, limitations and source evidence.
+
+**Serving baseline: Phase 04 basic RAG V1. PAUSED: Phase 05 NaviRAG / Card / Link / KG.**
 
 The operator has explicitly changed the phase priority. Reuse the existing
 Phase 01-03 Raw -> Parsed -> Canonical foundation and Phase 04 RU/RAG modules.
@@ -57,6 +74,7 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | Phase 01 Raw | CLOSED; immutable official discovery/detail evidence and audited collector. Reuse the accepted snapshot; no new crawl required. |
 | Phase 02 Parsed | CLOSED; deterministic source-specific parser, Raw lineage and explicit unknowns. Its draft contract remains evolutionary, not permanently frozen. |
 | Phase 03 Canonical | CLOSED; accepted 16,437-record structural corpus. Reuse it without semantic rewriting; closure does not establish semantic completeness. |
+| Clean V1 | Implemented direct Raw extraction, source locators, selectors, resumable builds and a verified 30-record pilot. Serving adoption belongs to a later work unit. |
 | Retrieval Units | 535,802 original RUs with Canonical/Parsed/Raw lineage; 32,955 explicit skips, zero reported failures in the accepted RU manifest. |
 | BM25 | Adopted Diagnostic C field-aware scorer, `k1=1.2`, `b=0.75`, fields title/section/speaker/text, weights `2.0/1.25/1.5/1.0`; candidate depth 500. |
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
@@ -117,6 +135,12 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
+The Clean implementation work unit is complete at its bounded-pilot boundary.
+The next reconstruction work is to review the Clean contract and representative
+outputs for the chunking branch. Whole-corpus materialization and the coordinated
+source/chunk/index/citation adoption require their own work unit. The following
+dated material describes retained serving-baseline gaps and evidence.
+
 **Latest work (2026-11-02; paid gate CLOSED):** user authorization was exactly
 3 requests / 150,000 conservative tokens / 1024 requested output cap / zero
 retries. Q014 and Q003 returned accepted answers with source-based Codex review
@@ -130,7 +154,7 @@ Frozen input/47-RU verification, actual-wire/raw archives, shared ledger,
 control preservation and secret-scan audits PASS. Details and claim limits:
 [three-case live report](research/phase-04/p04-deepseek-live3-20261102.md).
 
-**Current work unit (2026-11-04):** the operator explicitly adopted the existing
+**Adopted serving work unit (2026-11-04):** the operator explicitly adopted the existing
 `phase04-retained-evidence-1` **combined** Assembly as the backend/CLI/Streamlit
 default. `GENSHIN_ASSEMBLY_BACKEND=formal` selects the original Formal
 Deferred-Footprint-Charge as explicit rollback. The shared runtime rejects
@@ -160,9 +184,13 @@ API dispatch are outside this work unit. See the
    cold/warm latency, RAM/VRAM, restart and rollback behavior, and usability
    in the existing backend/Streamlit interface. DeepSeek output-cap reporting
    remains unresolved; any new paid live probe needs separate authorization.
-3. **Storage coordination:** Antigravity has a separate storage workstream.
-   Preserve both indexes, all 70Q materials and comparison results. Any
-   conflicting write stops the affected operation.
+3. **Authorized storage cleanup (2026-11-04):** the Card repair-v3 and Navi R1-QA
+   Phase05 roots were archived separately to F: and removed from D: only after
+   complete path, byte-count and per-file SHA-256 verification. Preserve both
+   indexes, all 70Q materials and comparison results. The old F: Navi scattered
+   copy remains because it contains six files absent from the D: source snapshot
+   and verified archive; do not remove it until those files are reconciled. See
+   [the storage cleanup closeout](research/phase-04/p04-storage-cleanup-closure-20261104.md).
 
 The DeepSeek output-cap/reporting problem remains a separate open Generation
 issue. Do not raise caps, retry paid calls or block offline Embedding preparation
@@ -174,7 +202,7 @@ new upstream corpus is required by this plan. DeepSeek, 1024d, model revisions,
 Top-K, fusion and budgets are stage operating choices. Immutable evidence,
 lineage, auditability and provider-neutral boundaries remain invariants.
 
-**Execution boundary:** the authorized three paid DeepSeek requests are complete
+**Serving authorization record (2026-11-04):** the authorized three paid DeepSeek requests are complete
 and their allowance is consumed/closed. No further dispatch is authorized by
 that gate. This work permits local code/tests, the operator-requested paired
 retrieval default switch, offline 70Q evaluation and the explicitly selected
@@ -184,7 +212,7 @@ Preserve immutable attempts and UNKNOWN evidence;
 new/materially changed API execution must use the shared call layer. Historical
 Phase05 permits remain unrelated to Phase04 execution.
 
-**Git inspection baseline:** `main@7b6454d` was clean before this work. Other
+**Historical Git inspection baseline (2026-11-02):** `main@7b6454d` was clean before that work. Other
 local worktrees exist and were not modified, merged or removed by this work.
 No branch consolidation or remote-state claim follows from this inspection.
 
@@ -199,6 +227,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Data roots and artifact responsibilities | [`Data README`](../data/README.md) |
 | Durable decisions / ADR policy | [`Decisions`](decisions/README.md) |
 | Raw acquisition contract | [`Phase 01`](phases/phase-01-raw-collection.md) |
+| Direct Raw-to-Clean schema, builds and read interfaces | [`Clean V1`](phases/clean-v1.md) |
+| Clean implementation and bounded pilot evidence | [`Implementation record`](research/clean-v1-implementation-20261106.md) |
 | Source-specific parsing contract | [`Phase 02`](phases/phase-02-parsed-schema.md) |
 | Canonical evidence contract | [`Phase 03`](phases/phase-03-canonical-schema.md) |
 | Basic RAG V1 contract, migration and acceptance | [`Phase 04`](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract) |

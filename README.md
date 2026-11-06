@@ -7,10 +7,12 @@ The long-term direction is:
 ```text
 Official sources
     -> Raw
-    -> Parsed
-    -> Canonical
-    -> Retrieval / RAG
-    -> Source-Bound Semantic Navigation
+    -> Clean
+    -> Chunking
+    -> Indexing
+    -> Retrieval
+    -> Reranking
+    -> Generation
 ```
 
 The project intentionally separates:
@@ -19,13 +21,16 @@ The project intentionally separates:
 2. how game content is structurally represented;
 3. how research or AI later interprets that content.
 
-Those are different layers and must not be collapsed into one schema.
+Source evidence, structural organization and semantic interpretation retain
+distinct responsibilities throughout this pipeline.
 
 ## Current status
 
 Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
-**CLOSED**. **Phase 04 basic RAG V1 is the active development priority**
-(2026-11-02), extending the previously adopted Block A over the accepted
+**CLOSED**. **Clean V1 reconstruction is the active implementation work unit**
+(2026-11-06). Its direct Raw adapter, evidence locators, resumable builder and
+readers are specified in the [Clean contract](docs/phases/clean-v1.md).
+The existing Phase 04 basic RAG V1 serving baseline extends the adopted Block A over the accepted
 16,437-record OBC `zh-cn` Canonical snapshot. It includes
 Retrieval Units, BM25, local Qwen3 Dense, RRF Hybrid, deterministic Evidence
 Assembly, Evidence Packets, and provider-neutral Generation contracts.
@@ -75,6 +80,7 @@ docs/
 │   ├── phase-01-raw-collection.md
 │   ├── phase-02-parsed-schema.md
 │   ├── phase-03-canonical-schema.md
+│   ├── clean-v1.md
 │   ├── phase-04-*.md
 │   └── phase-05-source-bound-semantic-navigation.md
 ├── research/
@@ -90,6 +96,7 @@ src/
     ├── collector/
     ├── parser/
     ├── canonical/
+    ├── clean/
     ├── retrieval/
     ├── generation/
     ├── rag/
@@ -100,6 +107,7 @@ data/
 ├── raw/
 ├── parsed/
 ├── canonical/
+├── clean/
 └── retrieval/
 
 tests/

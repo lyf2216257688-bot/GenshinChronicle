@@ -4,7 +4,13 @@
 Build a reliable, auditable research corpus for official Genshin Impact text.
 The long-term pipeline is:
 
-`Raw -> Parsed -> Canonical -> Retrieval/RAG -> Source-Bound Semantic Navigation`
+`Raw -> Clean -> Chunking -> Indexing -> Retrieval -> Reranking -> Generation`
+
+The Clean reconstruction target combines deterministic source parsing and
+structural organization into one persisted derived layer. The deployed legacy
+Parsed/Canonical/RU path retains its existing contracts until explicit adoption
+of a complete replacement. Current implementation/adoption status belongs to
+`docs/current-phase.md`.
 
 Derived layers must remain strictly grounded in verified source evidence. High-level
 semantic exploration is permitted only within approved, bounded phase contracts;
@@ -29,17 +35,25 @@ If a requested task conflicts with the active phase, stop and call out the confl
 
 ## Layer boundaries
 
-- **Parsed**: source-specific, deterministic, and auditable. It preserves
+- **Clean**: derives directly from immutable Raw observations, preserves all
+  actual text, values, source structure and relationships, and provides versioned
+  Raw locators. Source tags require evidence and scope. Content admission and
+  chunking policy belong to downstream derivatives. Clean normalization must
+  preserve wording and distinguish unknown source structure from interpretation.
+
+- **Preserved Parsed**: source-specific, deterministic, and auditable. It preserves
   meaningful source structure, ordering, hierarchy, Raw traceability, and
   unsupported/unknown content.
-- **Canonical**: establishes a stable research document representation within
+- **Preserved Canonical**: establishes a stable research document representation within
   the approved contract. It must preserve traceability through Parsed to Raw,
   keep source evidence separate from semantic normalization, and must not
   silently invent identity, provenance, content role, dialogue semantics, or
   semantic equivalence.
 - **Derived Retrieval / RAG**: Retrieval Units and Evidence Packets derive
   citation and evidence identity from Canonical lineage, not embedding chunk
-  identity. Evidence Packets are provider-neutral, deterministic evidence
+  identity in the deployed legacy path. New Clean-based derivatives bind to
+  Clean observations and Raw lineage under their approved contract.
+  Evidence Packets are provider-neutral, deterministic evidence
   interfaces; Generation consumes them without owning retrieval or assembly policy.
   RAG answers are query results and must not automatically become Canonical facts.
 - **Semantic Navigation**: derived views (such as hierarchy navigation and

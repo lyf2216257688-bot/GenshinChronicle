@@ -1,5 +1,11 @@
 # Project Structure
 
+`src/genshin_corpus/clean/` owns the direct Raw-to-Clean adapter, shared origin
+pool, HTML/table/dialogue projection, field-shape rules, resumable file builder,
+selectors, source resolution and on-demand rendering. Its contract is
+[Clean V1](phases/clean-v1.md). Existing serving packages below keep their
+current responsibilities until explicit replacement adoption.
+
 The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
 -> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,
 Card, Link and KG development is paused per [`current-phase.md`](current-phase.md);
@@ -64,6 +70,8 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `src/genshin_corpus/canonical/`: Phase 03 Canonical contracts,
   deterministic serialization, structural OBC projection, and the local
   Canonical run-storage/pipeline boundary.
+- `src/genshin_corpus/clean/`: deterministic Clean contracts, direct OBC
+  extraction, source locators, run storage and downstream reading interfaces.
 - `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Units and Phase 05
   source-bound semantic-build/view primitives; lexical, local Dense, and
   deterministic candidate retrieval; reranking adapters/primitives
@@ -180,6 +188,8 @@ the immediate next action are owned by `docs/current-phase.md`.
 - `tests/parser/`: deterministic Parsed contract, OBC adapter, and run-pipeline
   tests.
 - `tests/canonical/`: hand-built Canonical contract fixtures and focused tests.
+- `tests/clean/`: direct extraction, source round trips, selectors and build
+  recovery tests using bounded checked-in component excerpts.
 - `tests/retrieval/`: focused Phase 04 profiler, retrieval, Evidence Assembly,
   materialization, comparison, and Qwen-tooling tests.
 - `tests/generation/`: focused offline Generation contract and injected
@@ -212,6 +222,8 @@ environment lock is `requirements-local-qwen3-embedding.txt`.
   run metadata.
 - `data/parsed/`: generated Parsed run records and manifests derived from Raw;
   ignored by Git.
+- `data/clean/`: generated versioned Clean records, run manifests and bounded
+  pilot evidence; ignored by Git.
 
 `data/canonical/` is the ignored local output root for immutable Canonical run
 records and manifests. `data/retrieval/` is the ignored local root for

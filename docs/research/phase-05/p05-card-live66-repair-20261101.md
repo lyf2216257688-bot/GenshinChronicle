@@ -1,5 +1,7 @@
 # Phase05 Card：真实故障修复与66份实验收尾
 
+> **Artifact location update (2026-11-04):** the repair-v3 data root referenced below was archived and removed from D: after full path, byte-count and per-file SHA-256 verification. Its archive and file manifest are on F: at `F:\2_个人存档\GC存档\data\retrieval\p05-card-live66-1017-repair-v3-20261101-r1.tar.gz` and the neighboring `.files.sha256.jsonl`. See the [Phase04 storage cleanup closeout](../phase-04/p04-storage-cleanup-closure-20261104.md). The research findings below remain the historical checkpoint.
+
 更新时间：2026-11-01 23:34 JST。**完整资料 54/66；已停止新增付费派发；没有宣称66/66完成。**
 
 原选定的任务26、书籍20、其他20份全部保留，未重新抽样。用户最新指示为“授权重试，但不要无限重试，如果一直失败就停下吧，我感觉现在样本量基本够了”。本轮对唯一获准的未知状态片段做了一次替代并成功；接续中另有502和传输故障，故关闭新增派发，等待所有已发送请求终态后收尾，没有再创建扩批补跑版本。未完成项同时包含渠道故障、尚未阅读范围和未做完的上层综合，不把它们全部归因于不可消除的外部限制。
@@ -192,4 +194,4 @@
 
 单片段语法已消除跨证据端点这一类非法表达，不能证明模型选中的合法片段真的支持推论。人物行动归属、代词、证词立场、分支条件、时序、小说/传说可靠性、跨章联系及假说合理性仍需语义与人工评审。有限输出会产生摘要取舍，依赖完整也不等于所有剧情细节都被写进Card。渠道仍可能报告输出超限、502或未知用量；本轮没有消除这些外部不确定性，也没有证明无限规模稳定。
 
-没有启动Link、KG、Embedding、全库生产，没有更改Phase04采用路径，没有Git提交或Push，保留已有其他修改。下一步是审阅现有54份及失败样例；继续剩余12份付费补跑须按用户后续意愿重新确定有限批次，不能复用本次一次重试许可自动重发UNKNOWN。
+没有启动Link、KG、Embedding、全库生产，没有更改Phase04采用路径，没有Git提交或Push，保留已有其他修改。该历史检查点当时记录的下一步是审阅现有54份及失败样例；后续Phase05状态以 `docs/current-phase.md` 为准。继续剩余12份付费补跑须按用户后续意愿重新确定有限批次，不能复用本次一次重试许可自动重发UNKNOWN。

@@ -9,11 +9,17 @@ features are optional layers, not requirements of the foundational phases.
 
 ```text
 SOURCE / RAW
-    -> PARSED
-    -> CANONICAL
-    -> DERIVED RETRIEVAL / RAG
-    -> SOURCE-BOUND SEMANTIC NAVIGATION
+    -> CLEAN
+    -> CHUNKING
+    -> INDEXING
+    -> RETRIEVAL
+    -> RERANKING
+    -> GENERATION
 ```
+
+The Clean V1 reconstruction implements the new foundation and its read interface.
+The deployed Phase04 runtime continues to use the preserved Parsed/Canonical/RU
+assets described below. Current adoption belongs to `docs/current-phase.md`.
 
 ### 1. Source / Raw
 Answers: **What did we obtain, from which official source, and when?**
@@ -24,7 +30,18 @@ implement a database now.
 
 Raw is evidence and reprocessing input. It is not the normal application query layer.
 
-### 2. Parsed
+### Clean V1 reconstruction
+
+Clean directly binds one source observation to immutable Raw detail and discovery
+evidence. A record preserves ordered content blocks, source fields, tables,
+dialogue groups and edges, scoped evidence-backed tags, relations and media.
+Shared source locators support decoded JSON and HTML text ranges. Readable text
+is an on-demand projection. Chunking owns content selection and representation.
+The [Clean contract](phases/clean-v1.md) owns schema, readers, validation and
+incremental-build behavior. Parsed/Canonical logic remains available for reuse
+and historical citations.
+
+### 2. Preserved Parsed baseline
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
 
 Parsed schemas may remain source-specific. Unification is not required here.
@@ -35,7 +52,7 @@ Rules:
 - parsing rules must be based on observed source schemas;
 - do not pretend natural-language semantic judgments are deterministic parsing.
 
-### 3. Canonical
+### 3. Preserved Canonical baseline
 Answers: **What stable research document structure do we maintain independent of a source's page layout?**
 
 The approved minimum hierarchy is `CanonicalRecord -> CanonicalSection ->
@@ -54,7 +71,7 @@ source-specific lineage. It establishes no cross-source semantic identity,
 deduplication, or equivalence policy; any such behavior requires an explicit
 contract.
 
-### 4. Derived Retrieval / RAG
+### 4. Existing Derived Retrieval / RAG
 Full-text and vector representations are rebuildable derivatives. Retrieval
 and Evidence Assembly derive citation/evidence identity from Canonical lineage,
 not embedding chunk identity. Candidate retrieval and final Evidence Assembly

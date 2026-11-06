@@ -30,6 +30,7 @@ Thumbs.db
 !/data/raw/.gitkeep
 /data/parsed/
 /data/canonical/
+/data/clean/
 /data/retrieval/
 
 # Logs / temporary outputs

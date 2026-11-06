@@ -1,5 +1,7 @@
 # Phase05 Card：54份完整产物的语义抽样审计（2026-11-02）
 
+> **Artifact location update (2026-11-04):** the Card data root cited below was archived and removed from D: after full path, byte-count and per-file SHA-256 verification. Its archive and file manifest are on F: at `F:\2_个人存档\GC存档\data\retrieval\p05-card-live66-1017-repair-v3-20261101-r1.tar.gz` and the neighboring `.files.sha256.jsonl`. See the [Phase04 storage cleanup closeout](../phase-04/p04-storage-cleanup-closure-20261104.md). The audit findings below remain the historical checkpoint.
+
 > **更正提示（2026-11-02）**：本报告关于「0/54整页语义覆盖」的负面推断不成立；《月下的守望者》批评过重，且部分噪声/来源分类问题应归责于选读与上游元数据。详细逐项复核见 [语义反向审计](p05-card-semantic-reverse-audit-20261102.md)。原报告保留首次判断供追溯。
 
 ## 审计范围与口径

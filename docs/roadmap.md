@@ -2,6 +2,16 @@
 
 This roadmap describes direction, not a commitment to pre-design later phases.
 
+## Clean V1 reconstruction
+
+The approved reconstruction target uses Raw -> Clean -> Chunking -> Indexing ->
+Retrieval -> Reranking -> Generation. The Clean work unit owns direct extraction,
+structure and tag preservation, source resolution, file builds and a bounded
+representative pilot. Its contract is [Clean V1](phases/clean-v1.md).
+Existing Phase04 serving assets remain the executable baseline while replacement
+layers obtain their own implementation and adoption decisions. Current work-unit
+status is owned by [current-phase](current-phase.md).
+
 ## Phase 00 — Repository initialization
 
 Status: **complete**
@@ -53,7 +63,7 @@ semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **ACTIVE — basic RAG V1 delivery; existing Block A remains adopted**
+Status: **SERVING BASELINE — basic RAG V1; existing Block A remains adopted**
 
 The first end-to-end baseline now includes rebuildable Retrieval Units,
 BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence
@@ -64,8 +74,8 @@ intentionally outside this phase-level roadmap and are owned by
 retrieval winner, Dense model, reranker, vector database, or Generation
 provider.
 
-The 2026-11-02 priority change reuses Phases 01-03 and the existing RU/index,
-Assembly, Generation and local presentation modules. Near-term milestones are
+The 2026-11-02 priority change reused Phases 01-03 and the existing RU/index,
+Assembly, Generation and local presentation modules. Serving-baseline milestones are
 staged so that real failures can be attributed; an unresolved Generation issue
 does not block independently authorized offline Embedding preparation:
 

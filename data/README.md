@@ -1,11 +1,20 @@
 # Data Directory
 
-Phase 04 basic RAG V1 is the current development priority; Phase 05 semantic
-work is paused per [`current-phase.md`](../docs/current-phase.md). Existing Raw,
+Clean V1 reconstruction is the active implementation work unit. Phase04 remains
+the serving baseline and Phase05 semantic work is paused per
+[`current-phase.md`](../docs/current-phase.md). Existing Raw,
 Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
 their responsibilities and must be preserved. Phase 05 run roots, requests,
 failures/UNKNOWN ledgers, Cards and review exports below are retained historical
 evidence, not pending V1 build tasks or sources of new call authorization.
+
+`clean/<source>/<locale>/<clean_run_id>/` owns direct Raw-to-Clean records and
+`metadata/manifest.json`. `records/` uses observation-scoped hashed filenames.
+`build.lock` is an OS-managed single-writer lock. Partial manifests support
+recovery, completed manifests bind the selected input snapshot and record hashes.
+The bounded pilot and its `validation.json` live under this ignored root.
+Clean source locators use paths relative to the selected immutable Raw run.
+The [Clean contract](../docs/phases/clean-v1.md) owns the schema and reading API.
 
 The completed local 1024d original-RU index at
 `retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.
