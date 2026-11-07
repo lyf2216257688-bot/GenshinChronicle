@@ -8,11 +8,14 @@ current responsibilities until explicit replacement adoption.
 
 `src/genshin_corpus/chunking/` owns the opt-in Clean chunking pilot. Its admission
 rules and structure/graph adapters feed one token-bounded micro/macro core.
-The CLI writes finite downstream pilot artifacts, preserves CleanRef ranges and
+The CLI writes downstream derived artifacts, preserves CleanRef ranges and
 supports full natural-parent readback. The [V2 design](phases/chunking-v2.md)
 owns its provisional interfaces. `dialogue.py` observes source connections,
 conditions, local choices and reachability. `audit_unreachable.py` classifies
-existing graph artifacts into a source-tied ledger. These remain separate from
+existing graph artifacts into a source-tied ledger. `recover.py` owns the one-off
+2026-11-07 interrupted V2 recovery and local flat-export validation. It reuses
+the existing deterministic export writer and records original/repaired bindings.
+These remain separate from
 the deployed RU builders.
 
 `src/genshin_corpus/build_runtime.py` owns the shared bounded record-process

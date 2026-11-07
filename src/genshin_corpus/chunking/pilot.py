@@ -175,8 +175,13 @@ def _chunk_record_job(entry):
     if isinstance(_chunk_worker, Exception):
         raise _chunk_worker
     _, output, _, _, _, _ = _chunk_worker
-    with locked(output / "_records" / entry["observation_id"] / "work.lock"):
-        return _build_chunk_record(entry)
+    print(json.dumps({"event": "record_start", "record": entry["content_id"],
+                      "observation_id": entry["observation_id"]}), flush=True)
+    try:
+        with locked(output / "_records" / entry["observation_id"] / "work.lock"):
+            return _build_chunk_record(entry)
+    except Exception as error:
+        raise RuntimeError(f"Chunk record {entry['content_id']} ({entry['observation_id']}) failed") from error
 
 
 def _build_chunk_record(entry):
@@ -279,6 +284,65 @@ def _build_chunk_record(entry):
     files = {str((shard / name).relative_to(output).as_posix()): sha(shard / name) for name in names}
     atomic_json(receipt_path, {"binding": binding, "summary": summary, "files": files})
     return summary
+
+
+def _write_exports(output, selection, completed, shards, profiles, started):
+    """Write the existing flat exports from already verified record shards."""
+    selected = selection["content_ids"]
+    artifact_names = ["parents.jsonl", "graphs.jsonl", "admission.jsonl"]
+    artifact_names += [f"chunks-{profile.name}.jsonl" for profile in profiles]
+    for name in artifact_names:
+        with _atomic_text(output / name) as target:
+            for cid in selected:
+                shard = shards[cid]
+                with (shard / name).open(encoding="utf-8") as source_file:
+                    for line in source_file:
+                        target.write(line)
+    reviews = []
+    totals = {name: Counter() for name in ("kinds", "components", "decisions", "reasons")}
+    stats = {p.name: {"tokens": defaultdict(list), "bge_tokens": [], "chunks": 0,
+                     "split_reasons": Counter(), "retrieval_chars": 0} for p in profiles}
+    for cid in selected:
+        summary = completed[cid]
+        reviews.extend(read(shards[cid] / "review.json"))
+        for name, counter in totals.items():
+            counter.update(summary[name])
+        for name, s in stats.items():
+            other = summary["stats"][name]
+            for level, lengths in other["tokens"].items():
+                s["tokens"][level].extend(lengths)
+            s["bge_tokens"].extend(other["bge_tokens"])
+            s["split_reasons"].update(other["split_reasons"])
+            s["chunks"] += other["chunks"]
+            s["retrieval_chars"] += other["retrieval_chars"]
+    report = {"schema_version": SCHEMA_VERSION, "status": "complete",
+              "policy_version": POLICY_VERSION, "records": [completed[cid]["record"] for cid in selected],
+              "record_count": len(selected), "parents": sum(s["parents"] for s in completed.values()),
+              "graphs": sum(s["graphs"] for s in completed.values()),
+              "component_counts": dict(totals["components"]),
+              "exact_voice_alias_parents": sum(s["aliases"] for s in completed.values()),
+              "parent_kinds": dict(totals["kinds"]), "decisions": dict(totals["decisions"]),
+              "reasons": dict(totals["reasons"]),
+              "official_ref_checks": sum(s["official_ref_checks"] for s in completed.values()),
+              "all_admitted_ranges_checked": True, "profiles": {},
+              "elapsed_seconds": round(time.monotonic()-started, 3)}
+    for profile in profiles:
+        s = stats[profile.name]
+        report["profiles"][profile.name] = {"config": profile.__dict__, "chunks": s["chunks"],
+            "tokens": {key: distribution(value) for key, value in s["tokens"].items()},
+            "bge_probe_pair_tokens": distribution(s["bge_tokens"]),
+            "split_reasons": dict(s["split_reasons"]), "retrieval_chars": s["retrieval_chars"]}
+    atomic_json(output / "report.json", report)
+    atomic_json(output / "review.json", reviews)
+    lines = ["# 双粒度分片试点实际样例", "", "2026-11-07。以下候选完整展示，正文与来源上下文分开。源连接标记为派生显示信息。", ""]
+    for chunk in reviews:
+        lines += [f"## {chunk['title']} · {chunk['section_id']} · {'/'.join(chunk['granularities'])}", "",
+                  f"`{chunk['chunk_id']}`，Qwen {chunk['tokens']} Token，BGE问文对 {chunk['bge_probe_pair_tokens']} Token。", "",
+                  f"上下文为 {chunk['context_text']}", "", chunk["retrieval_text"], "",
+                  f"父层 `{chunk['parent_id']}`，{len(chunk['clean_refs'])}条CleanRef。", ""]
+    with _atomic_text(output / "review.md", newline=None) as handle:
+        handle.write("\n".join(lines))
+    return report, artifact_names + ["report.json", "review.json", "review.md"]
 
 
 def run_pilot(manifest_path: Path, selection_path: Path, qwen_path: Path,
@@ -400,59 +464,9 @@ def run_pilot(manifest_path: Path, selection_path: Path, qwen_path: Path,
             artifact_names += [f"chunks-{p.name}.jsonl" for p in profiles]
             for cid in selected:
                 checked_receipt(output / "_records" / entries[cid]["observation_id"] / "receipt.json", output, binding)
-            for name in artifact_names:
-                with _atomic_text(output / name) as target:
-                    for cid in selected:
-                        shard = output / "_records" / entries[cid]["observation_id"]
-                        with (shard / name).open(encoding="utf-8") as source_file:
-                            for line in source_file:
-                                target.write(line)
-            reviews = []
-            totals = {name: Counter() for name in ("kinds", "components", "decisions", "reasons")}
-            stats = {p.name: {"tokens": defaultdict(list), "bge_tokens": [], "chunks": 0,
-                             "split_reasons": Counter(), "retrieval_chars": 0} for p in profiles}
-            for cid in selected:
-                summary = completed[cid]
-                reviews.extend(read(output / "_records" / entries[cid]["observation_id"] / "review.json"))
-                for name, counter in totals.items():
-                    counter.update(summary[name])
-                for name, s in stats.items():
-                    other = summary["stats"][name]
-                    for level, lengths in other["tokens"].items():
-                        s["tokens"][level].extend(lengths)
-                    s["bge_tokens"].extend(other["bge_tokens"])
-                    s["split_reasons"].update(other["split_reasons"])
-                    s["chunks"] += other["chunks"]
-                    s["retrieval_chars"] += other["retrieval_chars"]
-            report = {"schema_version": SCHEMA_VERSION, "status": "complete",
-                      "policy_version": POLICY_VERSION, "records": [completed[cid]["record"] for cid in selected],
-                      "record_count": len(selected), "parents": sum(s["parents"] for s in completed.values()),
-                      "graphs": sum(s["graphs"] for s in completed.values()),
-                      "component_counts": dict(totals["components"]),
-                      "exact_voice_alias_parents": sum(s["aliases"] for s in completed.values()),
-                      "parent_kinds": dict(totals["kinds"]), "decisions": dict(totals["decisions"]),
-                      "reasons": dict(totals["reasons"]),
-                      "official_ref_checks": sum(s["official_ref_checks"] for s in completed.values()),
-                      "all_admitted_ranges_checked": True, "profiles": {},
-                      "elapsed_seconds": round(time.monotonic()-started, 3)}
-            for profile in profiles:
-                s = stats[profile.name]
-                report["profiles"][profile.name] = {"config": profile.__dict__, "chunks": s["chunks"],
-                    "tokens": {key: distribution(value) for key, value in s["tokens"].items()},
-                    "bge_probe_pair_tokens": distribution(s["bge_tokens"]),
-                    "split_reasons": dict(s["split_reasons"]), "retrieval_chars": s["retrieval_chars"]}
-            atomic_json(output / "report.json", report)
-            atomic_json(output / "review.json", reviews)
-            lines = ["# 双粒度分片试点实际样例", "", "2026-11-07。以下候选完整展示，正文与来源上下文分开。源连接标记为派生显示信息。", ""]
-            for chunk in reviews:
-                lines += [f"## {chunk['title']} · {chunk['section_id']} · {'/'.join(chunk['granularities'])}", "",
-                          f"`{chunk['chunk_id']}`，Qwen {chunk['tokens']} Token，BGE问文对 {chunk['bge_probe_pair_tokens']} Token。", "",
-                          f"上下文为 {chunk['context_text']}", "", chunk["retrieval_text"], "",
-                          f"父层 `{chunk['parent_id']}`，{len(chunk['clean_refs'])}条CleanRef。", ""]
-            with _atomic_text(output / "review.md", newline=None) as handle:
-                handle.write("\n".join(lines))
+            shards = {cid: output / "_records" / entries[cid]["observation_id"] for cid in selected}
+            report, artifact_names = _write_exports(output, selection, completed, shards, profiles, started)
             verify_inputs()
-            artifact_names += ["report.json", "review.json", "review.md"]
             atomic_json(output / "manifest.json", {"schema_version": SCHEMA_VERSION, "status": "complete", "build_binding": binding,
                   "clean_manifest": str(manifest_path.resolve()), "clean_manifest_sha256": initial_manifest_hash,
                   "selection": selection, "selection_sha256": initial_selection_hash,

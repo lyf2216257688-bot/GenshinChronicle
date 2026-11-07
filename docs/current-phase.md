@@ -4,29 +4,56 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 1. Active priority and work unit (2026-11-07)
+## 1. Active priority and work unit (2026-11-08)
 
-**Active work unit — Clean-based chunking V2 (2026-11-07).**
+**Active work unit — Clean-based chunking V2.1 finite quality repair (2026-11-08).**
+The operator authorized admission/text-projection repairs and a bounded real-source
+pilot over the completed V2 full artifacts. Implementation uses admission policy
+`gc-story-admission-pilot-4` with the existing V2 candidate schema and balanced
+dual granularity. The 46-record pilot has 3,663 candidates and passed serial,
+12-worker and process-interruption/resume byte comparisons. The
+[V2.1 report](research/clean-chunking-v2-1-20261108.md) owns source-value dispositions,
+actual before/after text, duplicate classification, regression and source/Token checks.
+The immediate action is operator review and a decision on V2.1 full rebuilding.
+V2.1 full rebuilding and formal indexing adoption await that decision and their
+respective acceptance. Phase04 remains the serving baseline and Phase05 is paused.
+
+**Prior V2 full recovery checkpoint (2026-11-07).**
+The operator approved the minimal reward-matcher repair and one-off recovery of
+`clean-chunking-full-v2-20261107`, which stopped with 16,435 of 16,437 records.
+The two pending records were 7370 and 7233. Recovery verified and reused existing
+shards, built only those two records, and wrote self-contained flat exports in
+`clean-chunking-full-v2-20261107-recovered-r1`. Recovery and full artifact acceptance
+are complete with 16,437 records, 122,527 balanced candidates, 214,870 parents
+and 5,087 original dialogue groups. All source/alias ranges, per-granularity
+coverage, display order, original graphs, flat-shard hashes and candidate token
+counts passed. The [recovery report](research/chunking-v2-recovery-20261107.md)
+owns bindings, actual timings, provenance and validation evidence.
+That authorization covered the recovery. Future incremental-build infrastructure
+and indexing/serving adoption remain separate work units.
+
 The operator approved V2 admission, local dialogue/condition representation,
 display-only ordering, separation of retrieval fields and a fixed 35-record pilot.
-Implementation and finite validation are complete. The [V2 contract](phases/chunking-v2.md)
-owns the current opt-in interface and the [V2 result](research/clean-chunking-v2-20261107.md)
+The original implementation and finite validation are complete. The [V2 contract](phases/chunking-v2.md)
+owns the opt-in interface including V2.1 and the [V2 result](research/clean-chunking-v2-20261107.md)
 owns actual comparisons, source checks and remaining noise. Complete classification
 of 7,759 unreachable source nodes reads the existing full graph artifact and preserves
 source edges and occurrence identities. It does not construct full V2 chunks.
 
 The existing V1 full run `clean-chunking-full-parallel-20261107` is complete with
 16,437 selected records and 124,545 balanced candidates. It and its independent
-audit remain comparison assets. V2 full rebuilding requires review of the finite
-result and explicit execution authorization. Raw/Clean and serving artifacts remain
+audit remain comparison assets. The operator subsequently authorized the V2 full
+run and the recovery above. Further rebuilding requires explicit execution
+authorization. Raw/Clean and serving artifacts remain
 preserved. Phase04 is the serving baseline and Phase05 stays paused.
 
 Parallel micro/macro retrieval and balanced remain the selected architecture and
 default profile. Compact is historical material. The [V2 design](phases/chunking-v2.md)
 retains structure-first admission, natural parents, CleanRef, the fixed balanced
 budgets and the three scoped quality refinements. The [Clean contract](phases/clean-v1.md)
-owns extraction and read interfaces. Only orphan-diagnostic serialization order
-was stabilized to remove a pre-existing cross-process set-order variation.
+owns extraction and read interfaces. In the earlier Clean performance work,
+orphan-diagnostic serialization order was stabilized to remove a pre-existing
+cross-process set-order variation.
 
 The prior Clean V1 foundation and bounded pilot are implemented. 40 new regressions
 and 108 existing parser/Canonical/Collector/shared-lock regressions pass. The
@@ -136,7 +163,7 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | Phase 02 Parsed | CLOSED; deterministic source-specific parser, Raw lineage and explicit unknowns. Its draft contract remains evolutionary, not permanently frozen. |
 | Phase 03 Canonical | CLOSED; accepted 16,437-record structural corpus. Reuse it without semantic rewriting; closure does not establish semantic completeness. |
 | Clean V1 | Direct Raw extraction, source locators, selectors and default 12-worker resumable builds. The local 16,437-record full run remains complete and record-hash checked. Whole-corpus Raw fidelity acceptance and serving adoption remain open. |
-| Clean-based chunking | Opt-in V2 uses parallel micro/macro candidates, balanced budgets, scoped admission, source-literal conditions, display-only ordering and CleanRef. Default 12-worker builds retain `--resume`. The 35-record V2 pilot and 7,759-node classification are complete. V1 full output remains the comparison baseline. Serving RU/index/Assembly continue through Phase04. |
+| Clean-based chunking | Opt-in V2.1 uses admission policy 4 with the V2 schema, parallel micro/macro candidates, balanced budgets, source-literal conditions, display-only ordering and CleanRef. Default 12-worker builds retain `--resume`. The 46-record V2.1 pilot has 3,663 candidates. The accepted recovered V2 full output has 16,437 records and 122,527 candidates under historical policy 3. V2.1 full rebuilding awaits operator decision. Serving RU/index/Assembly continue through Phase04. |
 | Retrieval Units | 535,802 original RUs with Canonical/Parsed/Raw lineage; 32,955 explicit skips, zero reported failures in the accepted RU manifest. |
 | BM25 | Adopted Diagnostic C field-aware scorer, `k1=1.2`, `b=0.75`, fields title/section/speaker/text, weights `2.0/1.25/1.5/1.0`; candidate depth 500. |
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
@@ -197,10 +224,12 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate review is the [V2 finite result](research/clean-chunking-v2-20261107.md),
-including restored mixed text, exclusions, condition variants, actual before/after
-chunks and the full unreachable-node classification. V2 full rebuilding requires
-explicit authorization after this review. Balanced and parallel dual granularity
+The immediate review is the completed [V2.1 finite quality repair](research/clean-chunking-v2-1-20261108.md)
+and the operator's decision on full rebuilding. The [V2 recovery](research/chunking-v2-recovery-20261107.md)
+remains the accepted historical full artifact. Indexing/retrieval/serving adoption
+remain separate. The [V2 finite result](research/clean-chunking-v2-20261107.md)
+retains its 35-record comparisons and unreachable-node classification. Further
+full rebuilding requires explicit authorization. Balanced and parallel dual granularity
 remain settled. The prior [quality refinement](research/clean-chunking-refinement-20261107.md)
 owns its historical three-rule evidence. Independent whole-corpus Raw fidelity,
 index/recall work, fusion and serving/citation adoption retain their separate scopes.
@@ -298,6 +327,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Current Clean-based V2 chunking, source conditions, retrieval fields and display semantics | [`Chunking V2`](phases/chunking-v2.md) |
 | Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |
 | V2 35-record result, before/after text and 7,759-node classification | [`V2 result`](research/clean-chunking-v2-20261107.md) |
+| V2 full-build matcher repair, two-record recovery, mixed bindings and complete artifact acceptance | [`V2 recovery`](research/chunking-v2-recovery-20261107.md) |
+| V2.1 finite admission repair, 46-record text comparisons, duplicate audit and validation | [`V2.1 result`](research/clean-chunking-v2-1-20261108.md) |
 | Initial chunking comparison and 19 quality cases (historical r7 checkpoint) | [`Chunking pilot result`](research/clean-chunking-pilot-20261107.md) |
 | Historical three-rule refinement, 12-record rerun and ten before/after cases | [`Chunking refinement`](research/clean-chunking-refinement-20261107.md) |
 | Clean/Chunk default 12-worker builds, recovery, resource evidence and manual commands | [`Build performance`](research/build-performance-20261107.md) |

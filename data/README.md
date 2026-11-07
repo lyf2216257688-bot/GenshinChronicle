@@ -1,6 +1,6 @@
 # Data Directory
 
-Clean-based chunking V2 is the active finite work unit. Phase04 remains
+Clean-based chunking V2/V2.1 artifacts are stored under `retrieval/`. Phase04 remains
 the serving baseline and Phase05 semantic work is paused per
 [`current-phase.md`](../docs/current-phase.md). Existing Raw,
 Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
@@ -50,9 +50,32 @@ and `retrieval/chunk-audit-20261107/` owns its historical audit. Preserve both.
 serial/parallel/resumed V2 builds, byte comparisons, admission changes, actual
 text cases and the complete unreachable-node ledger under `unreachable/`.
 Earlier sibling runs are development checkpoints. The
-[V2 result](../docs/research/clean-chunking-v2-20261107.md) identifies current evidence.
-V2 full rebuilding has its own explicit authorization gate. These ignored data
+[V2 result](../docs/research/clean-chunking-v2-20261107.md) identifies that historical finite checkpoint.
+The operator authorized the V2 full run and its one-off two-record recovery.
+Further full rebuilding has its own explicit authorization gate. These ignored data
 roots require separate backup and do not select serving indexes.
+
+`retrieval/clean-chunking-full-v2-20261107/` preserves the interrupted V2 run and
+16,435 original record shards/receipts. Its recovery is written to
+`retrieval/clean-chunking-full-v2-20261107-recovered-r1/`. The recovered directory
+owns the accepted 16,437-record / 122,527-candidate self-contained flat
+Chunk/parent/graph/admission exports, final report,
+per-record origin ledger, validation and sealed pre-repair code/binding evidence.
+Its `pending/` subdirectory owns only the two repaired record builds. Original
+shards are read during recovery and remain in their original directory. Indexing
+reads the recovered flat exports independently of those historical shards.
+
+`retrieval/clean-chunking-v2-1-20261108-review/` owns the 46-record V2.1 finite
+repair evidence. `final-r6/parallel`, `serial` and `resumed` contain the final
+code-bound pilot builds and deterministic execution comparisons. The root owns
+filtered V2 baseline exports, source-value admission changes, independent
+validation, complete before/after text and a read-only full-artifact duplicate
+census. `evidence/` preserves the supplied audit JSON and pre-change admission
+code. `parallel/`, `final/` and `final-r2/` through `final-r5/` are development checkpoints, including the failed
+taskkill probe and its successful scoped process-kill replacement. These ignored
+derivatives require separate backup. The
+[V2.1 report](../docs/research/clean-chunking-v2-1-20261108.md) owns acceptance
+limits and current review pointers.
 
 The completed local 1024d original-RU index at
 `retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.

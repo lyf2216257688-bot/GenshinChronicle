@@ -1,7 +1,7 @@
 """Versioned, conservative admission rules over observed OBC structure."""
 from __future__ import annotations
 
-POLICY_VERSION = "gc-story-admission-pilot-3"
+POLICY_VERSION = "gc-story-admission-pilot-4"
 
 # These components have a single observed mechanical/editorial purpose.
 MECHANICAL_COMPONENTS = {
@@ -19,6 +19,8 @@ MECHANICAL_LABELS = {
     "技能伤害", "冷却时间", "元素能量", "购买价格", "售价", "价格", "库存",
     "数量", "好感度", "突破材料", "培养材料", "获得方式", "获取方式",
     "获取途径", "星级", "品质", "兑换价格", "刷新时间",
+    "天赋加点推荐", "等级材料汇总", "天赋材料汇总", "武器推荐", "圣遗物推荐",
+    "推荐属性", "生命修改", "首次制作获得信任度",
 }
 CONTROL_KEYS = {
     "moduleName", "tab_id", "tab_name", "id", "ep_id", "content_id", "icon",
@@ -36,8 +38,10 @@ TABLE_MECHANICAL_LABELS = MECHANICAL_LABELS | {
     "角色解析＆推荐手法", "角色解析&推荐手法", "队友角色属性及圣遗物推荐",
     "队友属性及圣遗物推荐", "圣遗物推荐", "武器推荐", "推荐手法",
     "突破材料", "食材", "消耗", "限购", "大致掉落奖励",
+    "副词条属性", "加工材料",
 }
-TABLE_IDENTITY_LABELS = {"名称", "角色", "武器", "编号", "等级", "材料名称", "食物", "食谱"}
+TABLE_IDENTITY_LABELS = {"名称", "角色", "武器", "编号", "等级", "材料名称", "食物", "食谱",
+                         "料理名", "详细属性", "时间", "祝福名称"}
 TABLE_MECHANICAL_TITLES = {"相性较好的角色", "相性较差的角色", "相性较好的队友", "相性较差的队友",
                            "推荐角色", "推荐装备", "配装推荐", "突破材料", "成长数值"}
 
@@ -71,6 +75,8 @@ def admission(component: str, section_title: str, field_keys: list[str],
         return "context", "dialogue_control_metadata"
     if component == "cave_base_info" and paths and paths[-1] == "/rate":
         return "exclude", "furnishing_quality_scalar"
+    if component == "material_base_info" and "食物" in channels and "使用效果" in labels:
+        return "exclude", "food_effect_field"
     if component in {"card_skill", "card_base_info"}:
         if labels.intersection({"充能", "攻击", "生命"}):
             return "context", "card_control_field"
@@ -78,6 +84,9 @@ def admission(component: str, section_title: str, field_keys: list[str],
             return "exclude", "card_effect_field"
         if paths and paths[-1].rsplit("/", 1)[-1] in {"life", "life_bg", "energy", "energy_bg", "skill_type"}:
             return "context", "card_control_field"
+    if component == "card_group_info" and paths and paths[-1].rsplit("/", 1)[-1] in {
+            "author", "created_at", "updated", "status", "life", "life_bg", "energy", "energy_bg"}:
+        return "context", "card_group_control_field"
     if any(path.endswith("/materials") or "/materials/" in path
            or path.endswith("/feedback") or "/feedback/" in path for path in paths):
         return "exclude", "materials_or_rewards"

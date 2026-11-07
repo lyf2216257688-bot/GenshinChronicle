@@ -13,6 +13,114 @@ from .policy import (admission, normalized_label, MECHANICAL_SECTIONS,
 from .dialogue import label, graph_order, analyze_graph, text_sources
 
 
+_AUDIO_PLACEHOLDER = re.compile(r"(?:汉语|英语|日语|韩语)[：:]\s*[\[【]当前音频暂无文件名[\]】]")
+_PLACEHOLDERS = {"提瓦特大地图", "套装展示", "部件展示", "暂无", "无", "-", "—", "--"}
+
+
+def is_audio_metadata_fold(block: dict) -> bool:
+    """A source voice fold containing only display metadata and resources."""
+    if block.get("source_tag") != "details":
+        return False
+    children = block.get("children", [])
+    summary = next((child for child in children if child.get("source_tag") == "summary"), None)
+    if summary is None or label(summary.get("value")).strip() != "语音":
+        return False
+    pending = [child for child in children if child is not summary]
+    found = False
+    while pending:
+        child = pending.pop()
+        if (child.get("kind") not in {"group", "container", "paragraph", "media", "separator"}
+                or label(child.get("title")).strip()):
+            return False
+        text = label(child.get("value")).strip()
+        if text:
+            if not _AUDIO_PLACEHOLDER.fullmatch(text):
+                return False
+            found = True
+        pending.extend(child.get("children", []))
+    return found
+
+
+def pure_talent_mechanics(text: str) -> bool:
+    """Recognize finite complete gameplay templates inside talent desc only.
+
+    Every sentence must match. A quotation, unknown clause or mixed paragraph
+    keeps the complete source value. Formatting alone never establishes use.
+    """
+    templates = (
+        r"普通攻击|重击|下落攻击",
+        r"进行至多[一二三四五六七八九十\d]+段的连续(?:剑击|枪击|射击|弓箭射击|攻击)[。]?",
+        r"消耗一定体力，瞬间向前方挥出两剑[。]?",
+        r"进行伤害更高、更为精准的瞄准射击[。]?",
+        r"从空中下坠冲击地面，攻击下落路径上的敌人，并在落地时造成范围伤害[。]?",
+        r"从空中射出箭雨，并迅速下坠冲击地面，攻击下落路径上的敌人，在落地时造成范围伤害[。]?",
+        r"(?:合成|锻造)(?:武器突破素材|角色培养素材|角色与武器培养素材)时，有\d+(?:\.\d+)?%概率获得2倍产出[。]?",
+        r"在[^，。\n]{1,20}执行探索派遣任务时，消耗的时间缩短\d+(?:\.\d+)?%[。]?",
+        r"(?:元素战技|元素爆发)[^，。\n]{1,60}的技能等级提高3级[。]?",
+        r"至多提升至15级[。]?",
+    )
+    lines = [line.strip() for line in re.split(r"(?<=。)|\n+", text) if line.strip()]
+    return bool(lines) and all(any(re.fullmatch(pattern, line) for pattern in templates) for line in lines)
+
+
+def _complete_reward_quantities(text: str) -> bool:
+    """Match the original quantity grammar with a bounded, non-backtracking NFA.
+
+    Names allow whitespace, so greedy splitting or possessive quantifiers would
+    change the accepted language. Keeping all active states costs O(40 * len(text))
+    time and constant space, including when the final item is incomplete.
+    """
+    states = {"start"}
+    for char in text:
+        # Epsilon transitions. Integer states count the 1..40 name characters.
+        if any(isinstance(state, int) for state in states):
+            states.add("before_operator")
+        if states.intersection({"integer", "fraction"}):
+            states.add("between_items")
+        if "between_items" in states:
+            states.add("start")
+        whitespace = char.isspace()
+        digit = char.isdecimal()  # Python's Unicode re \d uses decimal digits.
+        name_char = not digit and char not in "*×\n。！？；：:"
+        following = set()
+        for state in states:
+            if state == "start":
+                if whitespace:
+                    following.add("start")
+                if name_char:
+                    following.add(1)
+            elif isinstance(state, int):
+                if name_char and state < 40:
+                    following.add(state + 1)
+            elif state == "before_operator":
+                if whitespace:
+                    following.add(state)
+                if char in "*×":
+                    following.add("before_number")
+            elif state == "before_number":
+                if whitespace:
+                    following.add(state)
+                if digit:
+                    following.add("integer")
+            elif state == "integer":
+                if digit:
+                    following.add(state)
+                if char == ".":
+                    following.add("decimal_point")
+            elif state == "decimal_point":
+                if digit:
+                    following.add("fraction")
+            elif state == "fraction":
+                if digit:
+                    following.add(state)
+            elif state == "between_items" and whitespace:
+                following.add(state)
+        states = following
+        if not states:
+            return False
+    return bool(states.intersection({"integer", "fraction", "between_items"}))
+
+
 def article_titles(children: list[dict]) -> dict[str, list[dict]]:
     """Repeated, fully centered, bracketed titles in one source HTML container."""
     titles = {}
@@ -58,6 +166,15 @@ class _Adapter:
         self.blocks = blocks if blocks is not None else {block["block_id"]: block for block in iter_blocks(record)}
         self.document = record["document"]
         self.title = label(self.document.get("title"))
+        self.numeric_display_only = False
+        if re.fullmatch(r"[\d\s]+", self.title):
+            # A numeric title alone says nothing about a year or a story value.
+            # Restrict this case to wholly numeric generic rich-text bodies.
+            prose = [label(block.get("value")) for block in self.blocks.values()
+                     if block["kind"] in {"paragraph", "heading"}
+                     and block["context"].get("field_key") == "collapse_panel:/rich_text"]
+            self.numeric_display_only = bool(prose) and all(
+                not text.strip() or re.fullmatch(r"[\d\s]+", text) for text in prose)
         self.channels = deepcopy(self.document["memberships"])
         self.channel_names = {label(node["name"]) for member in self.channels for node in member["path"]}
         self.section = {}
@@ -128,16 +245,46 @@ class _Adapter:
             if value["value_pointer"] != "/value":
                 continue
             text = value["text"]
+            if (decision == "exclude" and reason == "mechanical_table_column" and labels
+                    and re.fullmatch(r"武器特效词缀（精炼\d+阶）", normalized_label(labels[-1]))
+                    and re.match(r"[^：\n]+：飘游风中的「千年的大乐章」的一部分。", text)):
+                # Observed narrative introduction and effects share one Clean
+                # value. Preserve that complete occurrence as mixed prose.
+                decision, reason = "include", "mixed_weapon_effect_description"
             if isinstance(block.get("value"), dict) and block["value"].get("source_type") == "null":
                 decision, reason = "context", "source_null_placeholder"
+            spoken = self.component in {"interactive_dialogue", "role_voice"}
+            if decision == "include" and not spoken:
+                if text.strip() in _PLACEHOLDERS:
+                    decision, reason = "context", "source_display_placeholder"
+                elif (self.numeric_display_only and kind == "paragraph"
+                      and self.component in {"", "collapse_panel"}
+                      and (not fields or fields[-1] == "collapse_panel:/rich_text")
+                      and re.fullmatch(r"[\d\s]+", text)):
+                    decision, reason = "context", "numeric_only_document_value"
+                elif (labels and normalized_label(text) in {"描述", "介绍", "名称", "技能效果"}
+                      and normalized_label(text) == normalized_label(labels[-1])):
+                    decision, reason = "context", "repeated_field_label"
+            if (decision == "include" and self.component == "interactive_dialogue" and fields
+                    and fields[-1].endswith("/dialogue") and _AUDIO_PLACEHOLDER.fullmatch(text.strip())):
+                decision, reason = "context", "audio_display_metadata"
+            if (decision == "include" and self.component == "role_talent" and fields
+                    and fields[-1].endswith("/desc") and pure_talent_mechanics(text)):
+                decision, reason = "exclude", "explicit_talent_mechanics_template"
+            if (decision == "include" and self.component == "multi_table" and parent["kind"] == "table"
+                    and label(self.section.get("title")).strip() == "命之座"
+                    and pure_talent_mechanics(text)):
+                decision, reason = "exclude", "explicit_constellation_mechanics_template"
+            if (decision == "include" and self.component == "collapse_panel"
+                    and re.fullmatch(r"玩家攻略推荐[：:][^\n]+作者[：:][^\n]+\s*", text.strip())):
+                decision, reason = "context", "editorial_guide_recommendation"
             # Exact source-written field labels in rich text are structurally usable.
             if decision == "include" and re.fullmatch(r"上线版本[：:]\s*\d+(?:\.\d+)*\s*", text):
                 decision, reason = "exclude", "explicit_mechanical_label_in_text"
-            quantity = r"[^\d*×\n。！？；：:]{1,40}\s*[*×]\s*\d+(?:\.\d+)?"
             quantity_text = re.sub(r"^达成奖励[：:]\s*", "", text.strip())
             quantity_scope = label(self.section.get("title")).strip() in {"任务奖励", "奖励", "商品列表", "商店"}
             if (decision == "include" and (quantity_scope or text.startswith(("达成奖励：", "达成奖励:")))
-                    and re.fullmatch(r"(?:\s*" + quantity + r"\s*)+", quantity_text)):
+                    and _complete_reward_quantities(quantity_text)):
                 decision, reason = "exclude", "explicit_reward_quantity"
             if (decision == "include" and self.component == "material_base_info"
                     and "千星奇域" in self.channel_names
@@ -174,6 +321,9 @@ class _Adapter:
         if not isinstance(value, dict) or "kind" not in value:
             return
         kind = value["kind"]
+        if (not force and self.component == "interactive_dialogue" and fields
+                and fields[-1].endswith("/dialogue") and is_audio_metadata_fold(value)):
+            force = ("context", "audio_display_metadata")
         if not force and self.component == "collapse_panel" and "成就" in self.channel_names and is_puzzle_fold(value):
             force = ("exclude", "achievement_puzzle_fold")
         if kind in {"paragraph", "heading", "scalar", "opaque", "media", "separator"}:
@@ -238,13 +388,33 @@ class _Adapter:
         column_names = {normalized_label(name) for name in headers or html_headers.values() if name.strip()}
         table_titles = {normalized_label(name) for name in [tab, label(self.section.get("title")), *parent["labels"]]}
         mechanical_columns = TABLE_MECHANICAL_LABELS
+        mechanical_columns = mechanical_columns | {name for name in column_names if re.fullmatch(
+            r"武器特效词缀（精炼\d+阶）|料理效果（(?:美味|普通|奇怪)）", name)}
+        if ("祝福效果" in column_names and {"时间", "祝福名称"} <= column_names):
+            mechanical_columns = mechanical_columns | {"祝福效果"}
+        if {"药剂名", "合成材料", "使用效果"} <= column_names:
+            mechanical_columns = mechanical_columns | {"合成材料", "使用效果"}
+        if label(self.section.get("title")).strip() == "基础属性祝福":
+            mechanical_columns = mechanical_columns | {"辉彩祝福"}
+        identity_columns = TABLE_IDENTITY_LABELS | {"药剂名", "图片", "图标"}
         if self.component == "filter_table" and "原神OST" in self.channel_names:
             mechanical_columns = mechanical_columns | {"时长"}
         mechanical_table = bool(column_names) and (
-            column_names <= mechanical_columns | TABLE_IDENTITY_LABELS
+            column_names <= mechanical_columns | identity_columns
             and bool(column_names & mechanical_columns)
             or bool(table_titles & TABLE_MECHANICAL_TITLES)
-                and column_names <= mechanical_columns | TABLE_IDENTITY_LABELS | {"角色解析"})
+                and column_names <= mechanical_columns | identity_columns | {"角色解析"})
+        # Some source reward tables use ordinary td cells for their header row.
+        # Recognize the observed inventory header plus a wholly numeric body.
+        reward_table = False
+        if (not column_names and label(self.section.get("title")).strip() in {"任务奖励", "活动奖励", "奖励"}
+                and block.get("rows")):
+            rows = block["rows"]
+            names = {label(cell["blocks"]).strip() for cell in rows[0]["cells"]}
+            reward_table = ("冒险等阶" in names and bool(names & {"原石", "摩拉", "冒险阅历"})
+                and names <= {"冒险等阶", "原石", "冒险阅历", "摩拉", "好感经验", "精锻用矿物"}
+                and all(re.fullmatch(r"[\d\s*×+~～—–.%-]*", label(cell["blocks"]))
+                        for row in rows[1:] for cell in row["cells"]))
         parent = self.parent(block["block_id"], [*parent["labels"][2:], tab], "table",
                              {"ancestor_parent_id": parent["parent_id"],
                               "table_block_id": block["block_id"], "table_headers": headers,
@@ -269,8 +439,11 @@ class _Adapter:
                 cell_force = force
                 if cell.get("is_header"):
                     cell_force = ("context", "html_table_header")
+                elif not force and reward_table:
+                    cell_force = (("context", "reward_table_header") if index == 0
+                                  else ("exclude", "reward_numeric_table"))
                 elif not force and mechanical_table:
-                    cell_force = (("context", "mechanical_table_identity") if normalized_label(column_label) in TABLE_IDENTITY_LABELS
+                    cell_force = (("context", "mechanical_table_identity") if normalized_label(column_label) in identity_columns
                                   else ("exclude", "mechanical_table_column"))
                 elif not force and normalized_label(column_label) in mechanical_columns:
                     cell_force = ("exclude", "mechanical_table_column")
