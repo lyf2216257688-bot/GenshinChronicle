@@ -50,8 +50,11 @@ with balanced as the default chunking profile. Candidates each carry retrieval-v
 natural-parent identity and local source scopes. Complete source parents remain
 readable independently of admission. Exact repeated voice representations keep
 all occurrence references. Source provenance and commentary memberships remain
-explicit, including unknown authority. The [pilot design](phases/chunking-pilot-v1.md)
-owns provisional formats and operating points. Later indexing, retrieval,
+explicit, including unknown authority. The [V2 design](phases/chunking-v2.md)
+owns provisional formats and operating points. Quotable body, necessary source
+context and structural metadata have separate retrieval responsibilities.
+Source conditions retain their literal evidence and unknown status, and sequence
+numbers express display order. Later indexing, retrieval,
 reranking and Evidence Assembly own their respective adoption and fusion policies.
 
 ### 2. Preserved Parsed baseline

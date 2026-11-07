@@ -9,8 +9,15 @@ current responsibilities until explicit replacement adoption.
 `src/genshin_corpus/chunking/` owns the opt-in Clean chunking pilot. Its admission
 rules and structure/graph adapters feed one token-bounded micro/macro core.
 The CLI writes finite downstream pilot artifacts, preserves CleanRef ranges and
-supports full natural-parent readback. The [pilot design](phases/chunking-pilot-v1.md)
-owns its provisional interfaces. It is separate from the deployed RU builders.
+supports full natural-parent readback. The [V2 design](phases/chunking-v2.md)
+owns its provisional interfaces. `dialogue.py` observes source connections,
+conditions, local choices and reachability. `audit_unreachable.py` classifies
+existing graph artifacts into a source-tied ledger. These remain separate from
+the deployed RU builders.
+
+`src/genshin_corpus/build_runtime.py` owns the shared bounded record-process
+scheduler, atomic checkpoint JSON and hash-checked completion receipts for
+Clean and Chunk builds. Each layer retains its own input binding and outputs.
 
 The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
 -> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,

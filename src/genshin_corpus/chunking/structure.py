@@ -4,22 +4,13 @@ from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import asdict
-import heapq
 import re
 
 from ..clean import CleanRef, iter_blocks, iter_text_values
 from .core import identity
-from .policy import admission, normalized_label
-
-
-def label(value) -> str:
-    if isinstance(value, dict):
-        if "text" in value:
-            return value["text"]
-        return label(value.get("value", value.get("children", [])))
-    if isinstance(value, list):
-        return "\n".join(text for child in value if (text := label(child)))
-    return ""
+from .policy import (admission, normalized_label, MECHANICAL_SECTIONS,
+                     TABLE_MECHANICAL_LABELS, TABLE_IDENTITY_LABELS, TABLE_MECHANICAL_TITLES)
+from .dialogue import label, graph_order, analyze_graph, text_sources
 
 
 def article_titles(children: list[dict]) -> dict[str, list[dict]]:
@@ -58,65 +49,39 @@ def is_puzzle_fold(block: dict) -> bool:
     return True
 
 
-def graph_order(group: dict) -> tuple[list[str], dict, dict, list[str]]:
-    """Root/edge-order traversal supplies tie order. Joins wait for all parents."""
-    nodes = {node["source_id"]: node for node in group["nodes"]}
-    children = {node_id: [] for node_id in nodes}
-    parents = {node_id: [] for node_id in nodes}
-    issues = []
-    for edge in group["edges"]:
-        a, b = edge["parent_id"], edge["child_id"]
-        if a not in nodes or b not in nodes:
-            issues.append("dangling_edge")
-            continue
-        children[a].append(b)
-        parents[b].append(a)
-    rank = {}
-    seeds = ([group["root_id"]] if group.get("root_id") in nodes else []) + list(nodes)
-    for seed in seeds:
-        stack = [seed]
-        while stack:
-            node_id = stack.pop()
-            if node_id in rank:
-                continue
-            rank[node_id] = len(rank)
-            stack.extend(reversed(children[node_id]))
-    remaining = {key: len(value) for key, value in parents.items()}
-    ready = [(rank[key], key) for key, degree in remaining.items() if degree == 0]
-    heapq.heapify(ready)
-    order = []
-    while ready:
-        _, node_id = heapq.heappop(ready)
-        order.append(node_id)
-        for child in children[node_id]:
-            remaining[child] -= 1
-            if remaining[child] == 0:
-                heapq.heappush(ready, (rank[child], child))
-    if len(order) != len(nodes):
-        issues.append("cycle_unsequenced")
-        order.extend(key for key in nodes if key not in set(order))
-    if nodes and group.get("root_id") not in nodes:
-        issues.append("missing_root")
-    return order, children, parents, sorted(set(issues))
-
-
 class _Adapter:
-    def __init__(self, record: dict):
+    def __init__(self, record: dict, blocks=None):
         self.record = record
         self.parents = {}
         self.audit = {}
         self.graphs = []
-        self.blocks = {block["block_id"]: block for block in iter_blocks(record)}
+        self.blocks = blocks if blocks is not None else {block["block_id"]: block for block in iter_blocks(record)}
         self.document = record["document"]
         self.title = label(self.document.get("title"))
         self.channels = deepcopy(self.document["memberships"])
         self.channel_names = {label(node["name"]) for member in self.channels for node in member["path"]}
         self.section = {}
         self.component = ""
+        self.task_context = []
+        source_relations = {r["relation_id"]: r for r in record["relations"]}
+        for block in self.blocks.values():
+            if block.get("kind") != "field" or normalized_label(label(block.get("label"))) not in {
+                    "前置任务", "后续任务", "触发条件", "起始NPC", "结束NPC"}:
+                continue
+            sources = list(text_sources(block.get("value"), record["observation_id"]))
+            relation_ids = list(dict.fromkeys(r for source in sources for r in source["relation_ids"]))
+            self.task_context.append({"label": label(block["label"]),
+                "section_id": block["context"].get("section_id"),
+                "sources": sources, "source_relations": [source_relations[r] for r in relation_ids]})
 
     def parent(self, key: str, labels: list[str], kind: str, context: dict | None = None) -> dict:
         parent_id = identity([self.record["observation_id"], self.section.get("section_id"), key])
         if parent_id not in self.parents:
+            sections = self.record["sections"]
+            section_index = next((i for i, s in enumerate(sections) if s["section_id"] == self.section.get("section_id")), None)
+            neighbors = {"previous": sections[section_index - 1]["section_id"] if section_index else None,
+                         "next": sections[section_index + 1]["section_id"]
+                         if section_index is not None and section_index + 1 < len(sections) else None}
             self.parents[parent_id] = {
                 "parent_id": parent_id, "observation_id": self.record["observation_id"],
                 "content_id": self.record["source_item"]["content_id"],
@@ -129,9 +94,15 @@ class _Adapter:
                     "section_tags": deepcopy(self.section.get("tags", [])),
                     "layout_observations": deepcopy(self.section.get("layout_observations", [])),
                     "section_source_order": self.section.get("ordering"),
+                    "order_semantics": "display_only",
+                    "task_context": self.task_context,
+                    "source_section_neighbors": neighbors,
                     "source_provenance": deepcopy(self.document["provenance"]),
                     "label_evidence": {"document_title": self.document.get("title"),
                                        "section_title": self.section.get("title")},
+                    "label_sources": [*text_sources(self.document.get("title"), self.record["observation_id"]),
+                                      *text_sources(self.section.get("title"), self.record["observation_id"]),
+                                      *text_sources((context or {}).get("group_title"), self.record["observation_id"])],
                     **(context or {})},
                 "units": [],
             }
@@ -157,9 +128,17 @@ class _Adapter:
             if value["value_pointer"] != "/value":
                 continue
             text = value["text"]
+            if isinstance(block.get("value"), dict) and block["value"].get("source_type") == "null":
+                decision, reason = "context", "source_null_placeholder"
             # Exact source-written field labels in rich text are structurally usable.
-            if decision == "include" and re.match(r"^(?:达成奖励|上线版本|使用效果)[：:]", text):
+            if decision == "include" and re.fullmatch(r"上线版本[：:]\s*\d+(?:\.\d+)*\s*", text):
                 decision, reason = "exclude", "explicit_mechanical_label_in_text"
+            quantity = r"[^\d*×\n。！？；：:]{1,40}\s*[*×]\s*\d+(?:\.\d+)?"
+            quantity_text = re.sub(r"^达成奖励[：:]\s*", "", text.strip())
+            quantity_scope = label(self.section.get("title")).strip() in {"任务奖励", "奖励", "商品列表", "商店"}
+            if (decision == "include" and (quantity_scope or text.startswith(("达成奖励：", "达成奖励:")))
+                    and re.fullmatch(r"(?:\s*" + quantity + r"\s*)+", quantity_text)):
+                decision, reason = "exclude", "explicit_reward_quantity"
             if (decision == "include" and self.component == "material_base_info"
                     and "千星奇域" in self.channel_names
                     and "特殊" in {normalized_label(item) for item in labels}
@@ -256,6 +235,16 @@ class _Adapter:
                 if cell.get("is_header"):
                     for column in range(cell["column_index"], cell["column_index"] + int(cell.get("colspan", 1))):
                         html_headers[column] = label(cell["blocks"])
+        column_names = {normalized_label(name) for name in headers or html_headers.values() if name.strip()}
+        table_titles = {normalized_label(name) for name in [tab, label(self.section.get("title")), *parent["labels"]]}
+        mechanical_columns = TABLE_MECHANICAL_LABELS
+        if self.component == "filter_table" and "原神OST" in self.channel_names:
+            mechanical_columns = mechanical_columns | {"时长"}
+        mechanical_table = bool(column_names) and (
+            column_names <= mechanical_columns | TABLE_IDENTITY_LABELS
+            and bool(column_names & mechanical_columns)
+            or bool(table_titles & TABLE_MECHANICAL_TITLES)
+                and column_names <= mechanical_columns | TABLE_IDENTITY_LABELS | {"角色解析"})
         parent = self.parent(block["block_id"], [*parent["labels"][2:], tab], "table",
                              {"ancestor_parent_id": parent["parent_id"],
                               "table_block_id": block["block_id"], "table_headers": headers,
@@ -277,7 +266,14 @@ class _Adapter:
                               "column_label": column_label, "row_label": row_label,
                               "row_label_blocks": [child["block_id"] for child in row["cells"][0]["blocks"]] if row["cells"] else [],
                               "display_prefix": "【" + " / ".join(display_labels) + "】" if display_labels else ""}
-                cell_force = ("context", "html_table_header") if cell.get("is_header") else force
+                cell_force = force
+                if cell.get("is_header"):
+                    cell_force = ("context", "html_table_header")
+                elif not force and mechanical_table:
+                    cell_force = (("context", "mechanical_table_identity") if normalized_label(column_label) in TABLE_IDENTITY_LABELS
+                                  else ("exclude", "mechanical_table_column"))
+                elif not force and normalized_label(column_label) in mechanical_columns:
+                    cell_force = ("exclude", "mechanical_table_column")
                 self.visit(cell["blocks"], parent, fields, labels + [column_label], cell_extra, cell_force)
             units = parent["units"][before:]
             parent["units"][before:] = ([{"parts": [part for unit in units for part in unit["parts"]],
@@ -286,52 +282,64 @@ class _Adapter:
 
     def dialogue(self, block):
         for group in block["groups"]:
-            order, children, incoming, issues = graph_order(group)
+            analysis = analyze_graph(group, self.record["observation_id"])
+            order = analysis["display_order"]
             parent = self.parent(block["block_id"] + "/" + group["group_id"], [], "dialogue_group",
-                                 {"dialogue_block_id": block["block_id"], "group_id": group["group_id"],
-                                  "graph_issues": issues})
+                {"dialogue_block_id": block["block_id"], "group_id": group["group_id"],
+                 "graph_issues": analysis["issues"], "order_semantics": "display_only"})
             nodes = {node["source_id"]: node for node in group["nodes"]}
-            ordinal = {node_id: i + 1 for i, node_id in enumerate(order)}
-            conditions = {}
             graph = {"parent_id": parent["parent_id"], "observation_id": self.record["observation_id"],
                      "content_id": self.record["source_item"]["content_id"],
-                     "section_id": self.section["section_id"], "group": deepcopy(group),
-                     "display_order": order, "issues": issues}
+                     "section_id": self.section["section_id"], "group": deepcopy(group), **analysis}
             for node_id in order:
                 node = nodes[node_id]
-                predecessor_sets = [conditions.get(source, {}) for source in incoming[node_id]]
-                inherited = dict(predecessor_sets[0]) if predecessor_sets else {}
-                for candidate in predecessor_sets[1:]:
-                    inherited = {key: value for key, value in inherited.items() if key in candidate}
+                info = analysis["derived_nodes"][node_id]
                 before = len(parent["units"])
-                fields = sorted(node["fields"], key=lambda field: {"option": 0, "dialogue": 1}.get(field["field_key"].rsplit("/", 1)[-1], 2))
+                fields = sorted(node.get("fields", []), key=lambda field:
+                    {"option": 0, "dialogue": 1}.get(field["field_key"].rsplit("/", 1)[-1], 2))
+                option_sources = [source for field in fields if field["field_key"].endswith("/option")
+                                  for source in text_sources(field["value"], self.record["observation_id"])
+                                  if source["text"].strip()]
                 for field in fields:
-                    suffix = field["field_key"].rsplit("/", 1)[-1]
-                    if suffix == "option":
-                        text = label(field["value"])
-                        if re.search(r"^(?:未完成|完成).*(?:触发|之后|以后|后)", text):
-                            inherited[node_id] = {"text": text, "source_block_id": field["value"]["block_id"]}
                     self.visit(field, parent, extra={"node_id": node_id,
-                               "node_source_order": node["ordering"], "speaker": node.get("speaker"),
-                               "condition_sources": list(inherited.values())})
-                conditions[node_id] = inherited
-                units = parent["units"][before:]
-                parts = [part for unit in units for part in unit["parts"]]
-                next_nodes = [str(ordinal[child]) for child in children[node_id]]
-                next_label = "、".join(next_nodes) if len(next_nodes) <= 8 else f"{len(next_nodes)}个后继，见连接表"
-                prefix = f"【节点{ordinal[node_id]}" + (f" → {next_label}" if next_label else "") + "】"
-                if inherited:
-                    prefix += "【来源条件 " + " / ".join(item["text"] for item in inherited.values()) + "】"
-                for part in parts:
-                    part["display_prefix"] = prefix
-                    part["node_has_heading"] = any(candidate["source_kind"] == "heading" for candidate in parts)
-                # A source node may contain several articles. Preserve those scopes
-                # before handing protected units to either granularity's packer.
+                        "node_source_order": node["ordering"], "node_display_order": info["display_order"],
+                        "speaker": node.get("speaker"), "condition_sources": info["condition_sources"],
+                        "condition_status": info["condition_status"],
+                        "source_annotations": info["source_annotations"],
+                        "incoming_condition_sources": info["incoming_condition_sources"],
+                        "incoming_node_ids": info["incoming_node_ids"], "outgoing_node_ids": info["outgoing_node_ids"],
+                        "source_component_id": info["source_component_id"], "reachability": info["reachability"],
+                        "branch_context": info["branch_context"], "branch_joins": info["branch_joins"],
+                        "choice_point": info["choice_point"], "source_fork": info["source_fork"],
+                        "option_context": option_sources})
+                parts = [part for unit in parent["units"][before:] for part in unit["parts"]]
+                markers = []
+                if info["choice_point"]:
+                    markers.append("【选择点】")
+                elif info["source_fork"]:
+                    markers.append("【源图分叉，关系待解释】")
+                if any(branch[2] == "choice" for branch in info["branch_context"]):
+                    markers.append("【并列选项，本次选择择一】")
+                if any(join["kind"] == "choice" for join in info["branch_joins"]):
+                    markers.append("【公共后续】")
+                elif len(info["incoming_node_ids"]) > 1:
+                    markers.append("【源图汇合】")
+                incoming_scopes = {tuple(s["condition_id"] for s in entry["sources"])
+                                   for entry in info["incoming_condition_sources"]}
+                if len(incoming_scopes) > 1:
+                    markers.append("【入边条件不同，见来源连接】")
+                if info["condition_status"] == "unresolved":
+                    markers.append("【条件或连接待解释】")
                 node_units = []
-                for part in parts:
+                for index, part in enumerate(parts):
+                    part["display_prefix"] = "".join(markers)
+                    part["node_part_order"] = index
+                    part["node_has_heading"] = any(p["source_kind"] == "heading" for p in parts)
                     if not node_units or node_units[-1]["parts"][-1].get("article_scope_id") != part.get("article_scope_id"):
-                        node_units.append({"parts": [], "boundary_before": len(incoming[node_id]) != 1,
-                                           "hard_boundary_before": not node_units and any(p["source_kind"] == "heading" for p in parts)})
+                        node_units.append({"parts": [], "boundary_before": len(info["incoming_node_ids"]) != 1,
+                            "hard_boundary_before": not node_units and (part["node_has_heading"]
+                                or (not info["incoming_node_ids"] and node_id != group.get("root_id"))
+                                or "cycle_unsequenced" in analysis["issues"])})
                     node_units[-1]["parts"].append(part)
                 parent["units"][before:] = node_units
             node_parts = defaultdict(list)
@@ -339,19 +347,26 @@ class _Adapter:
                 for part in unit["parts"]:
                     node_parts[part["node_id"]].append(part)
             for node_id, parts in node_parts.items():
-                has_option = any(part["field_keys"][-1].endswith("/option") for part in parts)
-                if has_option and len(incoming[node_id]) == 1 and not any(part["node_has_heading"] for part in parts):
-                    source_parts = [part for part in node_parts.get(incoming[node_id][0], [])
-                                    if part["field_keys"][-1].endswith("/dialogue")]
-                    # A bounded complete source paragraph, not a generated summary.
-                    if source_parts and len(source_parts[-1]["text"]) <= 140:
-                        source = {"text": source_parts[-1]["text"], "clean_ref": source_parts[-1]["clean_ref"]}
+                info = analysis["derived_nodes"][node_id]
+                if len(info["incoming_node_ids"]) != 1 or any(p["node_has_heading"] for p in parts):
+                    continue
+                predecessor = info["incoming_node_ids"][0]
+                source_parts = [p for p in node_parts.get(predecessor, []) if p["field_keys"][-1].endswith("/dialogue")]
+                if source_parts:
+                    source = source_parts[-1]
+                    text = source["text"]
+                    start = 0
+                    if len(text) > 140:
+                        ends = [m.end() for m in re.finditer(r"[。！？!?]+[”’」』）)]*", text)]
+                        start = next((end for end in ends if len(text) - end <= 140 and text[end:].strip()), len(text))
+                    if text[start:].strip():
+                        ref = {**source["clean_ref"], "char_start": source["clean_ref"]["char_start"] + start}
                         for part in parts:
-                            part["upstream_context"] = [source]
+                            part["upstream_context"] = [{"text": text[start:], "clean_ref": ref}]
             self.graphs.append(graph)
-            graph["local_scopes"] = [{"local_scope_id": identity([parent["parent_id"], node_id]),
-                                       "node_id": node_id, "ordering": nodes[node_id]["ordering"]}
-                                      for node_id in order]
+            graph["local_scopes"] = [{"local_scope_id": identity([parent["parent_id"], key]),
+                                     "node_id": key, "ordering": nodes[key]["ordering"],
+                                     "order_semantics": "source_array_only"} for key in order]
             self.visit(group.get("children", []), parent)
         fallback = self.parent(block["block_id"] + "/metadata", [], "dialogue_metadata")
         self.visit(block.get("children", []), fallback)
@@ -359,9 +374,11 @@ class _Adapter:
     def run(self):
         description = self.document.get("description")
         channel_names = {label(node["name"]) for member in self.channels for node in member["path"]}
-        if description and (label(description) != self.title or "成就" in channel_names):
+        if description:
             parent = self.parent("document_description", [], "document_description")
-            self.visit(description, parent, force=("include", "source_document_description"))
+            redundant = label(description).strip() == self.title.strip() and "成就" not in channel_names
+            self.visit(description, parent, force=("context", "duplicate_title_description") if redundant
+                       else ("include", "source_document_description"))
         for section in self.record["sections"]:
             self.section = section
             for index, component in enumerate(section.get("components", [])):
@@ -405,6 +422,6 @@ class _Adapter:
                 "graphs": self.graphs}
 
 
-def adapt_record(record: dict) -> dict:
+def adapt_record(record: dict, *, blocks=None) -> dict:
     """Return natural parents, admitted source units, graph sidecars and dispositions."""
-    return _Adapter(record).run()
+    return _Adapter(record, blocks).run()

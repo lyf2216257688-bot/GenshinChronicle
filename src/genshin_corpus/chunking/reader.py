@@ -4,7 +4,7 @@ from copy import deepcopy
 from ..clean import iter_blocks
 
 
-def read_natural_parent(parent: dict, record: dict):
+def read_natural_parent(parent: dict, record: dict, *, blocks=None):
     if parent["observation_id"] != record["observation_id"]:
         raise ValueError("Natural parent observation mismatch")
     if parent["kind"] == "document_description":
@@ -12,7 +12,8 @@ def read_natural_parent(parent: dict, record: dict):
     if parent["kind"] == "section":
         section = next(section for section in record["sections"] if section["section_id"] == parent["section_id"])
         return deepcopy(section["components"][parent["component_index"]])
-    blocks = {block["block_id"]: block for block in iter_blocks(record)}
+    if blocks is None:
+        blocks = {block["block_id"]: block for block in iter_blocks(record)}
 
     def original(block_id):
         block = deepcopy(blocks[block_id])

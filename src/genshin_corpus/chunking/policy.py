@@ -1,7 +1,7 @@
 """Versioned, conservative admission rules over observed OBC structure."""
 from __future__ import annotations
 
-POLICY_VERSION = "gc-story-admission-pilot-2"
+POLICY_VERSION = "gc-story-admission-pilot-3"
 
 # These components have a single observed mechanical/editorial purpose.
 MECHANICAL_COMPONENTS = {
@@ -12,6 +12,7 @@ MECHANICAL_SECTIONS = {
     "任务奖励", "奖励", "攻略方法", "攻略推荐", "推荐装备", "角色突破",
     "天赋演示", "获取方式", "获取途径", "商店", "商品列表", "配装推荐",
 }
+CARD_EFFECT_LABELS = {"技能效果", "天赋效果", "召唤物效果", "特技效果", "召唤物技能", "被动技能"}
 MECHANICAL_LABELS = {
     "攻击力", "基础攻击力", "防御力", "基础防御力", "生命值", "基础生命值",
     "生命值上限", "暴击率", "暴击伤害", "元素精通", "元素充能效率",
@@ -31,6 +32,14 @@ FURNISHING_MECHANICAL_LABELS = {
     "摆设获取途径", "摆设图纸获取途径", "摆设获取方式", "图纸获取方式",
     "洞天仙力", "摆放区域", "一级分类", "二级分类", "相关套装",
 }
+TABLE_MECHANICAL_LABELS = MECHANICAL_LABELS | {
+    "角色解析＆推荐手法", "角色解析&推荐手法", "队友角色属性及圣遗物推荐",
+    "队友属性及圣遗物推荐", "圣遗物推荐", "武器推荐", "推荐手法",
+    "突破材料", "食材", "消耗", "限购", "大致掉落奖励",
+}
+TABLE_IDENTITY_LABELS = {"名称", "角色", "武器", "编号", "等级", "材料名称", "食物", "食谱"}
+TABLE_MECHANICAL_TITLES = {"相性较好的角色", "相性较差的角色", "相性较好的队友", "相性较差的队友",
+                           "推荐角色", "推荐装备", "配装推荐", "突破材料", "成长数值"}
 
 
 def normalized_label(text: str) -> str:
@@ -46,8 +55,10 @@ def admission(component: str, section_title: str, field_keys: list[str],
         return "resource", "resource_or_separator"
     if component in MECHANICAL_COMPONENTS:
         return "exclude", "mechanical_component"
-    if section_title in MECHANICAL_SECTIONS:
-        return "exclude", "mechanical_section"
+    paths = [key.partition(":")[2] for key in field_keys]
+    if component == "filter_table" and any(path == "/options" or path.startswith("/options/")
+            or path == "/table/filter" or path.startswith("/table/filter/") for path in paths):
+        return "context", "filter_control_metadata"
     labels = {normalized_label(text) for text in field_labels}
     if labels.intersection(MECHANICAL_LABELS):
         return "exclude", "mechanical_field_label"
@@ -56,7 +67,17 @@ def admission(component: str, section_title: str, field_keys: list[str],
         return "exclude", "outfit_mechanical_field"
     if component in {"good_desc", "rich_base_info", "cave_base_info"} and "洞天" in channels and labels.intersection(FURNISHING_MECHANICAL_LABELS):
         return "exclude", "furnishing_mechanical_field"
-    paths = [key.partition(":")[2] for key in field_keys]
+    if component == "interactive_dialogue" and paths and paths[-1] in {"/contents", "/child_ids", "/root_id"}:
+        return "context", "dialogue_control_metadata"
+    if component == "cave_base_info" and paths and paths[-1] == "/rate":
+        return "exclude", "furnishing_quality_scalar"
+    if component in {"card_skill", "card_base_info"}:
+        if labels.intersection({"充能", "攻击", "生命"}):
+            return "context", "card_control_field"
+        if component == "card_skill" and labels.intersection(CARD_EFFECT_LABELS):
+            return "exclude", "card_effect_field"
+        if paths and paths[-1].rsplit("/", 1)[-1] in {"life", "life_bg", "energy", "energy_bg", "skill_type"}:
+            return "context", "card_control_field"
     if any(path.endswith("/materials") or "/materials/" in path
            or path.endswith("/feedback") or "/feedback/" in path for path in paths):
         return "exclude", "materials_or_rewards"
@@ -70,4 +91,6 @@ def admission(component: str, section_title: str, field_keys: list[str],
         return "review", "unsupported_payload"
     if component == "role_talent":
         return "include", "mixed_talent_description"
+    if section_title.strip() in MECHANICAL_SECTIONS:
+        return "include", "mixed_or_uncertain"
     return "include", "conservative_text"

@@ -27,8 +27,8 @@ distinct responsibilities throughout this pipeline.
 ## Current status
 
 Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
-**CLOSED**. **Clean-based chunking is the active finite pilot work unit**
-(2026-11-07), specified in the [pilot design](docs/phases/chunking-pilot-v1.md).
+**CLOSED**. **Clean-based chunking V2 is the active finite pilot work unit**
+(2026-11-07), specified in the [V2 design](docs/phases/chunking-v2.md).
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The existing Phase 04 basic RAG V1 serving baseline extends the adopted Block A over the accepted

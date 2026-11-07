@@ -1,6 +1,6 @@
 # Data Directory
 
-Clean-based chunking is the active finite pilot work unit. Phase04 remains
+Clean-based chunking V2 is the active finite work unit. Phase04 remains
 the serving baseline and Phase05 semantic work is paused per
 [`current-phase.md`](../docs/current-phase.md). Existing Raw,
 Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
@@ -10,7 +10,8 @@ evidence, not pending V1 build tasks or sources of new call authorization.
 
 `clean/<source>/<locale>/<clean_run_id>/` owns direct Raw-to-Clean records and
 `metadata/manifest.json`. `records/` uses observation-scoped hashed filenames.
-`build.lock` is an OS-managed single-writer lock. Partial manifests support
+`build.lock` is the coordinator's OS-managed single-writer lock. Worker records
+have independent locks and atomic `metadata/completed/` receipts. Partial manifests support
 recovery, completed manifests bind the selected input snapshot and record hashes.
 The bounded pilot and its `validation.json` live under this ignored root.
 Clean source locators use paths relative to the selected immutable Raw run.
@@ -33,6 +34,25 @@ full text comparisons, every newly excluded source value and source/coverage
 rechecks. After-r1/r2 are development checkpoints. Compact remains in the
 initial r7 historical root. These derivatives are ignored data requiring separate
 backup, with no serving index responsibility.
+
+New Chunk builds also retain `_records/<observation_id>/` shards and completion
+receipts for recovery, plus `build-state.json` for progress. Final JSONL filenames,
+selection order, evidence identity and read interfaces remain compatible.
+`retrieval/build-performance-20261107/` owns the finite 16-record serial/12-worker
+measurements, archived pre-change code, comparison and interruption evidence.
+Its intermediate development runs remain checkpoints. The
+[performance report](../docs/research/build-performance-20261107.md) identifies
+the final code-bound runs and the operator's full-build/resume commands.
+
+`retrieval/clean-chunking-full-parallel-20261107/` owns the completed V1 full run,
+and `retrieval/chunk-audit-20261107/` owns its historical audit. Preserve both.
+`retrieval/clean-chunking-v2-20261107-review/final-r3/` owns the final 35-record
+serial/parallel/resumed V2 builds, byte comparisons, admission changes, actual
+text cases and the complete unreachable-node ledger under `unreachable/`.
+Earlier sibling runs are development checkpoints. The
+[V2 result](../docs/research/clean-chunking-v2-20261107.md) identifies current evidence.
+V2 full rebuilding has its own explicit authorization gate. These ignored data
+roots require separate backup and do not select serving indexes.
 
 The completed local 1024d original-RU index at
 `retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.

@@ -86,6 +86,7 @@ class CleanTests(unittest.TestCase):
         return root
 
     def build(self, raw, run="clean", **kwargs):
+        kwargs.setdefault("workers", 1)
         return build_clean_run(raw_run_root=raw, clean_run_id=run, output_root=self.root / "out", **kwargs)
 
     def manifest_path(self, run="clean", locale="fixture-locale"):

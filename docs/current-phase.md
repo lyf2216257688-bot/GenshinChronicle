@@ -6,16 +6,27 @@ Phase specifications own contracts; research notes own dated experiment facts.
 
 ## 1. Active priority and work unit (2026-11-07)
 
-**Active work unit — targeted Clean chunking refinement (2026-11-07).**
-The operator adopted parallel micro/macro retrieval as the new architecture
-direction and balanced as the default chunking profile. Compact remains
-historical experiment material. The authorized refinement covers achievement
-puzzle folds, within-node article boundaries and explicit outfit/furnishing
-mechanical fields. It reuses structure-first rule admission, natural parents
-and CleanRef. The [pilot design](phases/chunking-pilot-v1.md) owns the interface
-and fixed balanced budgets. Raw/Clean are read-only inputs. Full processing,
-embedding/index rebuilding, paid calls and production adoption are outside this
-work unit. Phase04 is the existing serving baseline and Phase05 stays paused.
+**Active work unit — Clean-based chunking V2 (2026-11-07).**
+The operator approved V2 admission, local dialogue/condition representation,
+display-only ordering, separation of retrieval fields and a fixed 35-record pilot.
+Implementation and finite validation are complete. The [V2 contract](phases/chunking-v2.md)
+owns the current opt-in interface and the [V2 result](research/clean-chunking-v2-20261107.md)
+owns actual comparisons, source checks and remaining noise. Complete classification
+of 7,759 unreachable source nodes reads the existing full graph artifact and preserves
+source edges and occurrence identities. It does not construct full V2 chunks.
+
+The existing V1 full run `clean-chunking-full-parallel-20261107` is complete with
+16,437 selected records and 124,545 balanced candidates. It and its independent
+audit remain comparison assets. V2 full rebuilding requires review of the finite
+result and explicit execution authorization. Raw/Clean and serving artifacts remain
+preserved. Phase04 is the serving baseline and Phase05 stays paused.
+
+Parallel micro/macro retrieval and balanced remain the selected architecture and
+default profile. Compact is historical material. The [V2 design](phases/chunking-v2.md)
+retains structure-first admission, natural parents, CleanRef, the fixed balanced
+budgets and the three scoped quality refinements. The [Clean contract](phases/clean-v1.md)
+owns extraction and read interfaces. Only orphan-diagnostic serialization order
+was stabilized to remove a pre-existing cross-process set-order variation.
 
 The prior Clean V1 foundation and bounded pilot are implemented. 40 new regressions
 and 108 existing parser/Canonical/Collector/shared-lock regressions pass. The
@@ -61,6 +72,17 @@ recomputed, and 26 chunking plus 40 Clean tests pass. Review the
 [refinement report](research/clean-chunking-refinement-20261107.md) and ten actual
 before/after cases. Unstructured puzzle prose and mixed mechanism descriptions
 remain conservative admissions. Retrieval relevance has not been evaluated.
+
+**Build performance completed (2026-11-07).** The same 16 real records ran with
+the old builder, new serial execution, 12 workers and forced-interruption recovery.
+Final Clean record bytes match between the three new runs. Against the old build,
+14 records are byte-identical and two differ only in orphan diagnostic order,
+with all content, structure, lineage and diagnostic multisets equal. Chunk's
+2,256 candidates, 706 parents, 12 graphs and admission JSONL are byte-identical
+to the old implementation. 79 regressions pass. New 12-worker elapsed times are
+4.86s Clean and 12.75s Chunk for this finite sample. Resource measurements and
+limits belong to the performance report. These results leave whole-corpus Raw
+fidelity acceptance and serving adoption at their existing scopes.
 
 **Serving baseline: Phase 04 basic RAG V1. PAUSED: Phase 05 NaviRAG / Card / Link / KG.**
 
@@ -113,8 +135,8 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | Phase 01 Raw | CLOSED; immutable official discovery/detail evidence and audited collector. Reuse the accepted snapshot; no new crawl required. |
 | Phase 02 Parsed | CLOSED; deterministic source-specific parser, Raw lineage and explicit unknowns. Its draft contract remains evolutionary, not permanently frozen. |
 | Phase 03 Canonical | CLOSED; accepted 16,437-record structural corpus. Reuse it without semantic rewriting; closure does not establish semantic completeness. |
-| Clean V1 | Implemented direct Raw extraction, source locators, selectors and resumable builds, with a verified 30-record pilot. The local 16,437-record full run is complete and record-hash checked. Whole-corpus Raw fidelity acceptance and serving adoption remain open. |
-| Clean-based chunking | Opt-in `genshin_corpus.chunking` uses parallel micro/macro candidates, default balanced budgets, scoped rule admission, source coverage and natural-parent readback. Compact is historical. The pilot design and targeted refinement report own interfaces and finite observations. Serving RU/index/Assembly continue through Phase04. |
+| Clean V1 | Direct Raw extraction, source locators, selectors and default 12-worker resumable builds. The local 16,437-record full run remains complete and record-hash checked. Whole-corpus Raw fidelity acceptance and serving adoption remain open. |
+| Clean-based chunking | Opt-in V2 uses parallel micro/macro candidates, balanced budgets, scoped admission, source-literal conditions, display-only ordering and CleanRef. Default 12-worker builds retain `--resume`. The 35-record V2 pilot and 7,759-node classification are complete. V1 full output remains the comparison baseline. Serving RU/index/Assembly continue through Phase04. |
 | Retrieval Units | 535,802 original RUs with Canonical/Parsed/Raw lineage; 32,955 explicit skips, zero reported failures in the accepted RU manifest. |
 | BM25 | Adopted Diagnostic C field-aware scorer, `k1=1.2`, `b=0.75`, fields title/section/speaker/text, weights `2.0/1.25/1.5/1.0`; candidate depth 500. |
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
@@ -175,14 +197,13 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The Clean foundation, local full run and read-only structure investigation are
-complete at the scope recorded above. The operator subsequently authorized the
-finite chunking implementation and the subsequent three targeted refinements.
-The immediate review is the [refinement result](research/clean-chunking-refinement-20261107.md),
-especially actual before/after text, explicit fold admission and remaining
-unstructured noise. Balanced and parallel dual granularity are settled for this
-pilot. Independent whole-corpus Raw fidelity acceptance, index/recall work,
-fusion and coordinated serving/citation adoption retain their separate scopes.
+The immediate review is the [V2 finite result](research/clean-chunking-v2-20261107.md),
+including restored mixed text, exclusions, condition variants, actual before/after
+chunks and the full unreachable-node classification. V2 full rebuilding requires
+explicit authorization after this review. Balanced and parallel dual granularity
+remain settled. The prior [quality refinement](research/clean-chunking-refinement-20261107.md)
+owns its historical three-rule evidence. Independent whole-corpus Raw fidelity,
+index/recall work, fusion and serving/citation adoption retain their separate scopes.
 The following dated material describes retained serving baseline gaps and evidence.
 
 **Latest work (2026-11-02; paid gate CLOSED):** user authorization was exactly
@@ -274,9 +295,12 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Direct Raw-to-Clean schema, builds and read interfaces | [`Clean V1`](phases/clean-v1.md) |
 | Clean implementation and bounded pilot evidence | [`Implementation record`](research/clean-v1-implementation-20261106.md) |
 | Full Clean structure census and chunking discussion candidates | [`Chunking investigation`](research/clean-chunking-full-survey-20261106.md) |
-| Clean-based chunking pilot interface and reversible operating points | [`Chunking pilot design`](phases/chunking-pilot-v1.md) |
+| Current Clean-based V2 chunking, source conditions, retrieval fields and display semantics | [`Chunking V2`](phases/chunking-v2.md) |
+| Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |
+| V2 35-record result, before/after text and 7,759-node classification | [`V2 result`](research/clean-chunking-v2-20261107.md) |
 | Initial chunking comparison and 19 quality cases (historical r7 checkpoint) | [`Chunking pilot result`](research/clean-chunking-pilot-20261107.md) |
-| Current scoped rule changes, 12-record rerun and ten before/after cases | [`Chunking refinement`](research/clean-chunking-refinement-20261107.md) |
+| Historical three-rule refinement, 12-record rerun and ten before/after cases | [`Chunking refinement`](research/clean-chunking-refinement-20261107.md) |
+| Clean/Chunk default 12-worker builds, recovery, resource evidence and manual commands | [`Build performance`](research/build-performance-20261107.md) |
 | Source-specific parsing contract | [`Phase 02`](phases/phase-02-parsed-schema.md) |
 | Canonical evidence contract | [`Phase 03`](phases/phase-03-canonical-schema.md) |
 | Basic RAG V1 contract, migration and acceptance | [`Phase 04`](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract) |

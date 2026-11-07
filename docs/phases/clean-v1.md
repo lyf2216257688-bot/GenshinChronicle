@@ -126,9 +126,20 @@ map 预览列表以独立观测保存。
 
 ## 4. 构建、续跑与读取接口
 
-单个 run 使用复用的操作系统文件锁。记录先原子写入，随后更新进度清单。
-出现中断时，已登记记录通过 SHA-256 校验复用，未登记文件通过确定性重建比较。
-已完成 run 校验全部绑定输入与记录，冲突保持可见。
+单个 run 由协调进程持有操作系统文件锁，默认12个独立Worker进程按记录动态领任务。
+`--workers 1`使用同一处理逻辑串行执行，`--workers N`可调整并行度。
+Worker只写自己负责的记录和`metadata/completed/<observation_id>.json`完成凭据，
+逐记录文件锁保护协调进程意外退出后仍存活的Worker。记录及凭据依次原子发布。
+协调进程按原选择顺序汇总，进度清单约每2秒刷新，最终清单完整写入。
+
+使用相同命令、run ID及输入即可续跑。完成凭据绑定原输入和清洗版本，
+恢复时校验输入、记录身份及SHA-256，复用已验证结果。未登记文件仍通过确定性重建比较。
+既有清单内已验证且输入及输出哈希未变的记录复用原校验结果。
+已完成run保持只读，校验全部绑定输入与记录文件哈希，冲突保持可见。
+Worker异常退出会终止本次构建并保留进度，修复运行环境后可再次续跑。
+构建序列化将同一来源中的`DIALOGUE_ORPHAN_NODE`诊断按完整诊断值排序，
+固定旧解析器无序集合造成的进程间排列差异。其诊断集合、正文、源结构、定位及清洗版本保持一致。
+已完成旧记录保持原字节，未登记旧文件恢复时仅容许这类诊断顺序差异，仍保留其原字节。
 
 运行清单绑定 Raw manifest、inventory、发现响应、选择集合及规则版本。
 记录依赖采用实际使用的文件校验和与定位信息。因此，同一列表文件变化会使
@@ -178,6 +189,7 @@ $env:PYTHONPATH = "src"
 python -m genshin_corpus.clean build `
   --raw-run-root data/raw/mihoyo_obc/zh-cn/p01eb_full_20260824 `
   --clean-run-id clean-sample-review `
+  --workers 12 `
   --content-id 501157 --content-id 509653
 
 python -m genshin_corpus.clean export `
@@ -186,6 +198,8 @@ python -m genshin_corpus.clean export `
 ```
 
 export 同时支持 `markdown` 和 `jsonl`。读取与构建使用现有 Python 标准库和仓库能力。
+两条构建流程的全量命令、续跑及资源实测见
+[并行构建记录](../research/build-performance-20261107.md)。本轮实测范围为有限资料。
 
 独立保真检查入口如下，它读取所选清单中的记录与对应 Raw。
 

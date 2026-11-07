@@ -1,8 +1,11 @@
 # Clean 双粒度分片试点 V1
 
+本文保存2026-11-07 V1历史合同。当前代码的V2准入、条件与展示接口见
+[V2合同](chunking-v2.md)，当前采用及执行授权查[current-phase](../current-phase.md)。
+
 2026-11-07用户授权实现和运行有限真实资料试点。当前工作状态由
 [current-phase](../current-phase.md)维护，初次结果见[历史试点报告](../research/clean-chunking-pilot-20261107.md)。
-本文是可修订的试点接口与工程设计。用户随后确定双粒度并行检索、balanced默认配置，
+本文保存V1当时的试点接口与工程设计。用户随后确定双粒度并行检索、balanced默认配置，
 compact保留为历史实验资料。双路融合和生产采用由相应后续工作单决定。
 三类结构规则的后续修改见[定向优化报告](../research/clean-chunking-refinement-20261107.md)。
 
@@ -13,9 +16,10 @@ compact保留为历史实验资料。双路融合和生产采用由相应后续�
 普通分片仅使用结构规则和本地 Tokenizer。
 
 初次试点选择配置在[chunking-pilot-v1.json](../../config/chunking-pilot-v1.json)，
-包含51条资料，当前只启用balanced。原选择集合来自Clean组件试点、全量调查案例及森林书其余三章。
+包含51条资料，V1选择配置只启用balanced。原选择集合来自Clean组件试点、全量调查案例及森林书其余三章。
 后续三类优化使用[12条定向选择](../../data/retrieval/clean-chunking-refinement-20261107-review/selection.json)，
-单次处理范围以工作单授权和显式选择文件为准。新的试点使用新输出目录，已存在的目录会被拒绝覆盖。
+单次处理范围以工作单授权和显式选择文件为准。首次运行使用新输出目录，
+新构建流程的中断目录可显式加`--resume`续跑。
 
 `genshin_corpus.chunking` 提供独立入口，产物写到 `data/retrieval/` 下。
 Raw/Clean 作为只读输入，输出目录检查阻止写进选定 Clean run 和名为 Raw/Clean 的目录树。
@@ -47,7 +51,7 @@ Raw/Clean 作为只读输入，输出目录检查阻止写进选定 Clean run �
 无法解释的非空 opaque 留下待查项，空组件留下资源处置。
 这些处置只影响派生表示，完整自然源容器通过 Clean 回读。
 
-当前准入版本为`gc-story-admission-pilot-2`。缺少可靠子结构的解谜操作仍可能保守纳入。
+V1检查点的准入版本为`gc-story-admission-pilot-2`。缺少可靠子结构的解谜操作仍可能保守纳入。
 明确解谜标签提供编辑用途依据，未单独标记的内嵌背景仍有误排风险。
 组件目录、标签和字段不能提供全文的语义判决。
 
@@ -159,7 +163,7 @@ compact的160/256与480/768及其产物保留在[初次试点历史报告](../re
 ## 6. 运行和检查
 
 以下命令在项目根目录的 PowerShell 7 运行，复用已安装的本地分词环境。
-输出目录必须尚未存在。
+首次运行使用尚未存在的输出目录，默认12个独立Worker按记录动态领任务。
 
 ```powershell
 $env:PYTHONPATH = 'src'
@@ -169,12 +173,28 @@ $env:PYTHONIOENCODING = 'utf-8'
   --selection data/retrieval/clean-chunking-refinement-20261107-review/selection.json `
   --qwen-tokenizer .local/models/qwen3-embedding-0.6b/97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3/tokenizer.json `
   --bge-tokenizer .local/models/bge-reranker-v2-m3/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e/tokenizer.json `
-  --output data/retrieval/clean-chunking-pilot-new-run
+  --output data/retrieval/clean-chunking-pilot-new-run --workers 12
 ```
 
 实现复用已有 Clean 版本和来源解析接口，核心本身只依赖标准库。
 CLI 的 Tokenizer 来自既有本地环境。试点目录缺少完成 manifest 时按未完成处理。
-有限运行失败后保留部分目录，使用新目录复跑。
+同一命令加`--resume`复用已完成记录。`--workers 1`使用同一规则串行执行，
+续跑允许改变Worker数量。原始JSONL、manifest、report和回读接口保持兼容。
+
+协调进程持有运行锁。Worker在`_records/<observation_id>/`内独立原子写入
+原有结构的JSONL、review和最后发布的`receipt.json`，逐记录锁阻止恢复期间重叠写入。
+凭据绑定Clean清单、选择文件、代码、Tokenizer文件及库版本，全部文件哈希核对后才复用。
+已完成记录不再适配、分词或重复执行来源范围检查。
+协调进程最终按选择顺序流式汇总，通过输入和产物校验后发布完成manifest。
+`build-state.json`提供约2秒一次的进度快照。最终汇总中断时，续跑从已完成记录重新汇总。
+Worker异常退出会明确报错，进程终止后已完成凭据继续有效。
+
+Token计数采用有界记录内缓存。BGE固定问文对长度复用正文Token数及后处理特殊Token数，
+超长段落从后向前寻找最后可用句末，保留原实现的边界选择。
+适配、父层回读及来源检查复用同一块索引，完整父层Token数仍精确计算。
+原文覆盖、两个粒度的独立构建、balanced参数及准入规则保持原合同。
+旧版无逐条凭据的中断Chunk目录使用新输出目录重建。
+全量构建命令、有限性能实测及恢复证据见[并行构建记录](../research/build-performance-20261107.md)。
 
 自动检查覆盖每种粒度的全部准入字符范围、所有片段/别名/上接原文/文章标题引用、
 候选 Token 硬上限、自然父层可回读性和输入前后哈希。

@@ -4,7 +4,7 @@ import hashlib
 import json
 import unittest
 
-from genshin_corpus.clean import CleanRef, clean_obc_detail, resolve_clean_ref
+from genshin_corpus.clean import CleanRef, clean_obc_detail, resolve_clean_ref, iter_blocks
 from genshin_corpus.chunking import ChunkProfile, adapt_record, chunk_parent, read_natural_parent
 from genshin_corpus.chunking.core import retrieval_text
 from genshin_corpus.chunking.structure import graph_order
@@ -76,7 +76,10 @@ class ChunkingTests(unittest.TestCase):
         self.assertEqual(adapted["graphs"][0]["display_order"], ["r", "a", "b", "join"])
         parent = next(p for p in adapted["parents"] if p["kind"] == "dialogue_group")
         self.assertEqual(sum(part["text"] == "join台词" for unit in parent["units"] for part in unit["parts"]), 1)
-        self.assertIn("→", retrieval_text(parent, [part for unit in parent["units"] for part in unit["parts"]]))
+        self.assertIn("源图汇合", retrieval_text(parent, [part for unit in parent["units"] for part in unit["parts"]]))
+        self.assertEqual(adapted["graphs"][0]["group"]["edges"], next(
+            b for b in iter_blocks(record)
+            if b["kind"] == "dialogue")["groups"][0]["edges"])
 
     def test_completion_conditions_propagate_locally_then_clear_at_join(self):
         data = {"root_id": "r", "contents": {n: {"option": "", "dialogue": "<p>正文</p>", "icon": ""}
@@ -88,7 +91,7 @@ class ChunkingTests(unittest.TestCase):
         parts = [part for p in adapted["parents"] for u in p["units"] for part in u["parts"]]
         self.assertTrue(next(p for p in parts if p["node_id"] == "aa")["condition_sources"])
         self.assertFalse(next(p for p in parts if p["node_id"] == "j")["condition_sources"])
-        self.assertIn("未完成", next(p for p in parts if p["node_id"] == "bb")["display_prefix"])
+        self.assertIn("未完成", next(p for p in parts if p["node_id"] == "bb")["condition_sources"][0]["text"])
 
     def test_missing_root_cycle_dangling_do_not_drop_nodes(self):
         group = {"root_id": "missing", "nodes": [{"source_id": "a"}, {"source_id": "b"}],

@@ -1,0 +1,8 @@
+{
+  "schema_version": "gc-chunking-pilot-2",
+  "selection_reason": "Approved bounded V2 admission, dialogue and display-order pilot. Production indexes are outside this run.",
+  "content_ids": ["503751", "504089", "503755", "509517", "508720", "5225", "509672", "500282", "506967", "4690", "509653", "509469", "503380", "505526", "385", "501157", "4691", "7237", "5095", "506499", "5802", "507891", "504779", "5111", "508279", "3076", "505223", "501968", "501872", "4066", "7489", "1053", "6667", "500362", "506557"],
+  "profiles": [{"name": "balanced", "micro_target": 240, "micro_hard": 384, "macro_target": 720, "macro_hard": 1024}],
+  "bge_document_token_cap": 1792,
+  "review_content_ids": ["508279", "509653", "5095", "506499", "503380", "504779", "5111", "501157", "385", "505223", "501968", "506557", "4691", "507891", "6667"]
+}
