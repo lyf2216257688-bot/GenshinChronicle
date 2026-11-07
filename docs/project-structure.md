@@ -6,6 +6,12 @@ selectors, source resolution and on-demand rendering. Its contract is
 [Clean V1](phases/clean-v1.md). Existing serving packages below keep their
 current responsibilities until explicit replacement adoption.
 
+`src/genshin_corpus/chunking/` owns the opt-in Clean chunking pilot. Its admission
+rules and structure/graph adapters feed one token-bounded micro/macro core.
+The CLI writes finite downstream pilot artifacts, preserves CleanRef ranges and
+supports full natural-parent readback. The [pilot design](phases/chunking-pilot-v1.md)
+owns its provisional interfaces. It is separate from the deployed RU builders.
+
 The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
 -> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,
 Card, Link and KG development is paused per [`current-phase.md`](current-phase.md);
@@ -72,6 +78,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   Canonical run-storage/pipeline boundary.
 - `src/genshin_corpus/clean/`: deterministic Clean contracts, direct OBC
   extraction, source locators, run storage and downstream reading interfaces.
+- `src/genshin_corpus/chunking/`: finite Clean-based story-admission and dual-granularity
+  chunking pilot, graph/field/table projection and natural-parent source readback.
 - `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Units and Phase 05
   source-bound semantic-build/view primitives; lexical, local Dense, and
   deterministic candidate retrieval; reranking adapters/primitives

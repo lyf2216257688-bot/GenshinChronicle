@@ -41,6 +41,19 @@ The [Clean contract](phases/clean-v1.md) owns schema, readers, validation and
 incremental-build behavior. Parsed/Canonical logic remains available for reuse
 and historical citations.
 
+### Clean-based chunking pilot
+
+An opt-in derivative consumes versioned Clean records, applies scoped story
+admission and adapts source structures/graphs into a shared packing core.
+The operator-selected direction searches micro and macro candidates in parallel,
+with balanced as the default chunking profile. Candidates each carry retrieval-visible text, CleanRef coverage,
+natural-parent identity and local source scopes. Complete source parents remain
+readable independently of admission. Exact repeated voice representations keep
+all occurrence references. Source provenance and commentary memberships remain
+explicit, including unknown authority. The [pilot design](phases/chunking-pilot-v1.md)
+owns provisional formats and operating points. Later indexing, retrieval,
+reranking and Evidence Assembly own their respective adoption and fusion policies.
+
 ### 2. Preserved Parsed baseline
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
 

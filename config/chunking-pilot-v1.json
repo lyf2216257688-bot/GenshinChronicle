@@ -1,0 +1,10 @@
+{
+  "schema_version": "gc-chunking-pilot-1",
+  "selection_reason": "Union of 30 Clean component-coverage pilot records, 22 full-survey text cases and the other three Forest Book chapters. Purposive structure/quality coverage, not a random sample.",
+  "content_ids": ["385", "512", "624", "1039", "2283", "3629", "3810", "4275", "4516", "4690", "4691", "4692", "4693", "4943", "5225", "5778", "7509", "7574", "500188", "500282", "500790", "501157", "501394", "501526", "502057", "502532", "503380", "503751", "505526", "506755", "506967", "507896", "508720", "509109", "509146", "509224", "509294", "509364", "509392", "509456", "509469", "509517", "509541", "509644", "509645", "509653", "509654", "509666", "509671", "509672", "509680"],
+  "profiles": [
+    {"name": "balanced", "micro_target": 240, "micro_hard": 384, "macro_target": 720, "macro_hard": 1024}
+  ],
+  "bge_document_token_cap": 1792,
+  "review_content_ids": ["501157", "509469", "624", "509653", "4690", "4516", "7509", "502057", "5225", "501394", "3629", "3810", "508720", "509517", "503380", "503751"]
+}

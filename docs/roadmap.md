@@ -8,6 +8,9 @@ The approved reconstruction target uses Raw -> Clean -> Chunking -> Indexing ->
 Retrieval -> Reranking -> Generation. The Clean work unit owns direct extraction,
 structure and tag preservation, source resolution, file builds and a bounded
 representative pilot. Its contract is [Clean V1](phases/clean-v1.md).
+The following finite [chunking pilot](phases/chunking-pilot-v1.md) explores scoped
+admission, shared structure-aware packing, independently searchable micro/macro
+representations and natural-parent readback on actual Clean inputs.
 Existing Phase04 serving assets remain the executable baseline while replacement
 layers obtain their own implementation and adoption decisions. Current work-unit
 status is owned by [current-phase](current-phase.md).

@@ -1,6 +1,6 @@
 # Data Directory
 
-Clean V1 reconstruction is the active implementation work unit. Phase04 remains
+Clean-based chunking is the active finite pilot work unit. Phase04 remains
 the serving baseline and Phase05 semantic work is paused per
 [`current-phase.md`](../docs/current-phase.md). Existing Raw,
 Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
@@ -15,6 +15,24 @@ recovery, completed manifests bind the selected input snapshot and record hashes
 The bounded pilot and its `validation.json` live under this ignored root.
 Clean source locators use paths relative to the selected immutable Raw run.
 The [Clean contract](../docs/phases/clean-v1.md) owns the schema and reading API.
+
+`retrieval/clean-chunking-pilot-20261107-r7/` owns the initial historical Clean-based chunking
+run, selection/source/Tokenizer/code bindings, admission dispositions, natural
+parents, graph sidecars and two micro/macro size profiles. Its completed manifest
+is required to interpret it as a complete pilot. The sibling `-r7-review/` root
+holds source-tied quality cases and independent Tokenizer checks. Earlier r1-r6
+roots are development iterations and are not the final pilot reference.
+These ignored derivatives do not select serving indexes. Their contract and
+results are routed from [current-phase](../docs/current-phase.md).
+
+`retrieval/clean-chunking-refinement-20261107-before/` and
+`retrieval/clean-chunking-refinement-20261107-after-r3/` own the same twelve-record
+balanced-only runs before and after the scoped admission/article fixes. The
+sibling `-review/` owns the selection, archived pre-change implementation, ten
+full text comparisons, every newly excluded source value and source/coverage
+rechecks. After-r1/r2 are development checkpoints. Compact remains in the
+initial r7 historical root. These derivatives are ignored data requiring separate
+backup, with no serving index responsibility.
 
 The completed local 1024d original-RU index at
 `retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.
