@@ -4,7 +4,43 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 1. Active priority and work unit (2026-11-09)
+## 0. Current decision — selected Dense index (2026-11-10)
+
+**Adopted: BAAI/bge-m3 as the sole Clean/Chunk V2.1 Dense model.**
+The 20-question blind-review comparison found BGE-M3 and Jina v5 closely matched;
+the operator explicitly selected BGE-M3 for its quality, permissive MIT license,
+and compatibility with the planned Sparse-increment experiment. No further
+Dense model comparison is required before continuing the pipeline.
+
+The canonical selection record is config/index-selected-v1.json.
+The active indexing artifacts are the completed BGE-M3 1024-dimensional Dense
+index and Whoosh3 BM25F lexical index, sharing the validated 119,557 unique
+Chunk inputs, 104,879 micro memberships and 78,658 macro memberships.
+
+By explicit operator authorization, the unused Qwen3-0.6B and Jina v5 local
+model weights and their new Dense candidate index directories were deleted.
+The old Phase04 local Qwen3 Dense index was also deleted. The old online
+Qwen 2048-dimensional Dense index was absent locally before this cleanup;
+any independent external archives were not touched.
+Raw, Clean, Chunk, source lineage, input export, BM25F, BGE-M3 model/index,
+BGE reranker, original 70-question raw retrieval and blind-review records
+were retained. Small retired Phase05 trial vector/mock index artifacts were also\nremoved; the surrounding research reports and source data remain.\nThe exact deletion manifest is
+.local/index-cleanup-20261110/cleanup-audit.json (local-only).
+
+**Serving status:** The existing Phase04 RAG runtime remains configured to
+load the removed Qwen3 index/encoder; it is intentionally no longer a working
+local fallback. Selecting BGE-M3 does not mean a new Clean-based online RAG
+runtime was deployed. Retrieval, Reranking and Generation integration remain
+future work. The four-arm benchmark complete.json remains historical and its
+old Run/Resume/Validate are not suitable after candidate removal.
+
+**Next scope:** integrate/query the selected BGE-M3 + BM25F indexes via the
+new Retrieval branch, compare fusion and reranking operating points, and then
+study BGE-M3 Sparse as an optional incremental route.
+
+---
+
+## 1. Prior completed work unit (2026-11-09)
 
 **Completed development work unit — standalone full-index experiment launcher.** The operator
 authorized implementing Preflight / Run / Resume / Validate over formal Chunk
@@ -64,13 +100,13 @@ responsibilities belong to [data README](../data/README.md). The full V2.1 flat
 artifacts are the source for this work unit. Long-term incremental build
 infrastructure remains separate.
 
-**Serving baseline: Phase 04 basic RAG V1. PAUSED: Phase 05 NaviRAG / Card / Link / KG.**
+**Legacy Phase04 baseline (retired locally on 2026-11-10); Phase05 NaviRAG / Card / Link / KG remains paused.**
 
 The operator has explicitly changed the phase priority. Reuse the existing
 Phase 01-03 Raw -> Parsed -> Canonical foundation and Phase 04 RU/RAG modules.
 Use DeepSeek as the V1 default final-answer provider. The original RU
 full-corpus 1024d embedding build with `Qwen/Qwen3-Embedding-0.6B` is complete.
-The operator selected that paired query encoder/index as the default. The 70Q
+That paired query encoder/index was the earlier default but its local model and index have now been removed. The legacy Phase04 RAG runtime is not a working local serving path. The 70Q
 comparison measures quality and guides later improvements independently of adoption.
 The V1 goal remains a stable local question -> official evidence -> answer
 -> traceable citation workflow.

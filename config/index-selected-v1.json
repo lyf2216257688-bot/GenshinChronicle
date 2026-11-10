@@ -1,0 +1,37 @@
+{
+  "schema": "gc-index-selection-v1",
+  "adopted_on": "2026-11-10",
+  "decision": "BGE-M3 adopted as only Clean/Chunk V2.1 Dense retrieval model; BGE-M3 Sparse considered later.",
+  "status": "selected-index-artifacts-only; new RAG serving integration is not implemented",
+  "source": {
+    "chunk_manifest": "data/retrieval/clean-chunking-full-v2-1-20261108/manifest.json",
+    "input_bundle_id": "07aa27f71c6187f489d57f8255281e20847f3bb3de3ec1c0053324eab2d6fb95",
+    "shared_chunk_count": 119557,
+    "micro_route_count": 104879,
+    "macro_route_count": 78658
+  },
+  "dense": {
+    "key": "bge-m3",
+    "model": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "dimension": 1024,
+    "weights_dir": ".local/rag-index-prep-20261109/models/bge-m3",
+    "manifest": "data/retrieval/index-benchmark-v1-20261109/dense/bge-m3/manifest.json",
+    "manifest_sha256": "bd297feb7895a69bfc11289f772f0476e460c4727896376a4d466f0733b05c70"
+  },
+  "lexical": {
+    "key": "bm25f",
+    "manifest": "data/retrieval/index-benchmark-v1-20261109/bm25f/manifest.json",
+    "manifest_sha256": "c4fbf6fc85a95b82d4e643400e40c34c21d206124ba935fd94696c54d75df3c9"
+  },
+  "retired": {
+    "dense_models": [
+      "Qwen/Qwen3-Embedding-0.6B",
+      "jinaai/jina-embeddings-v5-text-small-retrieval"
+    ],
+    "legacy_dense": "data/retrieval/p04-local-qwen3-1024-20261102-v1",
+    "phase04_legacy_rag_operational": false,
+    "note": "Old Phase04 code defaults to deleted Qwen3 model/index and has not been rewired; do not use legacy serving path."
+  },
+  "historical_experiment_note": "The original index-benchmark-v1-20261109/complete.json and 4-arm experiment.json record historic completion, not currently available indexes. Do not run its old four-model Validate/Run/Resume without updating the experiment config."
+}
