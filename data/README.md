@@ -17,6 +17,38 @@ The bounded pilot and its `validation.json` live under this ignored root.
 Clean source locators use paths relative to the selected immutable Raw run.
 The [Clean contract](../docs/phases/clean-v1.md) owns the schema and reading API.
 
+`retrieval/index-input-v1-20261109-review/` owns work-unit 1's read-only full-source
+survey and finite 16-record indexing input validation. `sample-final-a/` and `sample-final-b/`
+contain byte-identical shared `inputs.jsonl`, text-free `micro.jsonl` /
+`macro.jsonl` route maps and last-published complete manifests. `survey-accepted.json`
+and `validation-accepted.json` bind source artifacts, projections and readback
+results. `sample-a/`, `sample-b/`, `sample-c/`, `survey.json`, `survey-final.json`
+and `validation-final.json` are earlier engineering checkpoints.
+These are input/audit derivatives with their original Chunk/Parent/Graph/Clean
+dependencies. The [input contract](../docs/phases/indexing-input-v1.md) owns the
+format, and the [work-unit report](../docs/research/indexing-input-v1-20261109.md)
+owns observations and limitations.
+
+`retrieval/index-benchmark-v1-20261109/` is the default operator-run full-index
+experiment root. `input-attempts/` owns create-only unified input exports,
+`dense/<model-key>/` owns each model's no-truncation audit, preflight, committed
+vector shards and independently validated manifest, and `bm25f/` owns separate
+micro/macro Whoosh3 indexes. Reports, questions, query results, events and failure
+attempts preserve experiment progress and configuration. Complete manifests bind
+the shared input and original Chunk/Clean dependencies. Resume reuses verified
+commits and retains incomplete attempts. This path describes responsibility,
+and its presence or completeness must be checked from actual manifests.
+
+`retrieval/index-benchmark-launcher-20261109-review/` owns bounded launcher
+validation, including a seven-Chunk subset of the accepted input. Its subset
+completion markers carry scope=subset. The [launcher report](../docs/research/index-benchmark-launcher-20261109.md)
+owns exact trials and results, and the [launcher contract](../docs/phases/index-benchmark-v1.md)
+owns file protocols and standalone commands.
+
+The following V1/V2 paths describe historical responsibilities. Earlier Chunk
+build directories were subsequently removed or archived, so these paragraphs
+do not assert current path availability. The full V2.1 source is identified below.
+
 `retrieval/clean-chunking-pilot-20261107-r7/` owns the initial historical Clean-based chunking
 run, selection/source/Tokenizer/code bindings, admission dispositions, natural
 parents, graph sidecars and two micro/macro size profiles. Its completed manifest
@@ -45,7 +77,7 @@ Its intermediate development runs remain checkpoints. The
 the final code-bound runs and the operator's full-build/resume commands.
 
 `retrieval/clean-chunking-full-parallel-20261107/` owns the completed V1 full run,
-and `retrieval/chunk-audit-20261107/` owns its historical audit. Preserve both.
+and `retrieval/chunk-audit-20261107/` owned its historical audit.
 `retrieval/clean-chunking-v2-20261107-review/final-r3/` owns the final 35-record
 serial/parallel/resumed V2 builds, byte comparisons, admission changes, actual
 text cases and the complete unreachable-node ledger under `unreachable/`.
@@ -62,12 +94,14 @@ owns the accepted 16,437-record / 122,527-candidate self-contained flat
 Chunk/parent/graph/admission exports, final report,
 per-record origin ledger, validation and sealed pre-repair code/binding evidence.
 Its `pending/` subdirectory owns only the two repaired record builds. Original
-shards are read during recovery and remain in their original directory. Indexing
-reads the recovered flat exports independently of those historical shards.
+shards were read during that recovery. The current indexing input is the full
+V2.1 flat export identified below.
 
 `retrieval/clean-chunking-v2-1-20261108-review/` owns the 46-record V2.1 finite
-repair evidence. `final-r6/parallel`, `serial` and `resumed` contain the final
-code-bound pilot builds and deterministic execution comparisons. The root owns
+repair evidence. `final-r6/parallel` retains the final code-bound pilot on D:;
+`final-r6/serial` and `resumed` were archived to F: on 2026-11-09, with their
+hash-verified bytes available for restoration. The deterministic execution
+comparisons and source-bound review evidence remain on D:. The root owns
 filtered V2 baseline exports, source-value admission changes, independent
 validation, complete before/after text and a read-only full-artifact duplicate
 census. `evidence/` preserves the supplied audit JSON and pre-change admission
@@ -76,6 +110,21 @@ taskkill probe and its successful scoped process-kill replacement. These ignored
 derivatives require separate backup. The
 [V2.1 report](../docs/research/clean-chunking-v2-1-20261108.md) owns acceptance
 limits and current review pointers.
+
+`retrieval/clean-chunking-full-v2-1-20261108/` is the completed 16,437-record
+V2.1 full build (admission policy 4): 119,557 balanced chunks, 214,870 natural
+parents and 5,087 graphs. The flat `chunks-balanced.jsonl`, `parents.jsonl`,
+`graphs.jsonl`, `admission.jsonl`, report, review JSON/Markdown and `manifest.json`
+remain on D:; seven manifest-listed flat artifacts passed SHA-256 checks on
+2026-11-09. The 16,437 per-record `_records/` recovery shards and receipts
+(115,059 files) were independently archived into FAT32-safe ZIP packages at
+`F:/2_个人存档/GC存档/archive-20261109/data-retrieval/` and removed from D: only after
+archive and source re-verification. Re-running no-op resume or shard-level checks
+requires restoring `_records/` first with the archive `restore_retrieval.py`.
+Five earlier Phase04 experiment roots were archived to the same location; current
+Phase04 RU, BM25, local Dense and accepted r3 comparison/Assembly results remain.
+The full V2.1 Chunk exports have **not** been adopted as serving indexes and
+still require separate retrieval-quality evaluation and explicit adoption.
 
 The completed local 1024d original-RU index at
 `retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.

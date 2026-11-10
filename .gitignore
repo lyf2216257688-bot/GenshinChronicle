@@ -41,6 +41,11 @@ Thumbs.db
 /p01ea-test-temp/
 /tmp*/
 /scripts/
+!/scripts/
+/scripts/*
+!/scripts/retrieval/
+/scripts/retrieval/*
+!/scripts/retrieval/run-index-benchmark.ps1
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

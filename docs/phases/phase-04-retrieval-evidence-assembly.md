@@ -9,6 +9,12 @@ The separately approved [Clean V1 reconstruction](clean-v1.md) owns direct
 Raw extraction and its replacement-foundation readers. This document continues
 to own the deployed Canonical/RU serving path and its acceptance requirements.
 
+The Assembly implementation and placement described here belong to the retained
+legacy Phase 04 path. The agreed Clean-based target architecture assigns
+candidate-to-Packet Assembly policy to the Generation workstream; that decision
+does not retroactively change this Phase 04 contract or move its implementation.
+A future migration requires its own implementation scope and acceptance.
+
 > Historical checkpoint / current relation: the P04-W1 authorization and its
 > non-authorization statements below apply to that completed work unit. They
 > do not override the later implemented post-W7 first end-to-end RAG path.

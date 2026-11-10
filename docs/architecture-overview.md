@@ -41,7 +41,7 @@ The [Clean contract](phases/clean-v1.md) owns schema, readers, validation and
 incremental-build behavior. Parsed/Canonical logic remains available for reuse
 and historical citations.
 
-### Clean-based chunking pilot
+### Clean-based chunking
 
 An opt-in derivative consumes versioned Clean records, applies scoped story
 admission and adapts source structures/graphs into a shared packing core.
@@ -56,6 +56,25 @@ context and structural metadata have separate retrieval responsibilities.
 Source conditions retain their literal evidence and unknown status, and sequence
 numbers express display order. Later indexing, retrieval,
 reranking and Evidence Assembly own their respective adoption and fusion policies.
+
+### Clean-based indexing input
+
+The opt-in `indexing/` package projects completed V2.1 artifacts into a shared
+Chunk-keyed input table. Micro/macro routes contain membership and display-order
+mappings. Both lexical and Dense representations retain the original Chunk,
+Parent, Clean observation and Raw lineage. Six lexical text fields separate
+source title, headings, field labels, body, delivered context and literal
+conditions. Dense consumes unchanged retrieval_text. Byte/hash locators keep
+complete Chunk, Parent and graph structures available for readback.
+Representation identities bind the selected input bundle, granularity and
+explicit analyzer or vector-space configuration. The
+[input contract](phases/indexing-input-v1.md) owns these interfaces.
+The opt-in [index experiment launcher](phases/index-benchmark-v1.md) adds isolated
+serial local encoders, transactional shared Dense vector shards and separate
+macro/micro Whoosh3 BM25F indexes. Exact cosine search filters shared vectors by
+route. Lexical statistics are computed independently per route and physical
+field/analyzer channel. Completion follows source/mapping/artifact validation.
+Retrieval ordering and final Packet assembly retain their respective layer owners.
 
 ### 2. Preserved Parsed baseline
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
@@ -88,21 +107,32 @@ deduplication, or equivalence policy; any such behavior requires an explicit
 contract.
 
 ### 4. Existing Derived Retrieval / RAG
-Full-text and vector representations are rebuildable derivatives. Retrieval
-and Evidence Assembly derive citation/evidence identity from Canonical lineage,
-not embedding chunk identity. Candidate retrieval and final Evidence Assembly
-remain distinct: top-k candidates are not automatically final RAG context.
-Evidence Packets are provider-neutral, deterministic evidence interfaces;
-Generation consumes them without owning retrieval or assembly policy.
+Full-text and vector representations are rebuildable derivatives. In the
+retained Phase 04 path, Retrieval and Evidence Assembly derive citation/evidence
+identity from Canonical lineage, not embedding chunk identity. Clean-based
+derivatives bind identity to Clean observations and Raw lineage under their
+approved contract. Candidate retrieval and final Evidence Assembly remain
+distinct: top-k candidates are not automatically final RAG context.
+Evidence Packets remain provider-neutral, deterministic evidence interfaces.
+In the Clean-based target architecture, the Generation workstream owns the
+candidate-to-Packet assembly policy after Retrieval and Reranking: source/parent
+readback, duplicate handling, context-budget admission and final Packet
+composition. Retrieval owns candidate discovery; Reranking owns candidate
+ordering. Generation must not take over either upstream responsibility. This
+is a workstream boundary, not a requirement to move the legacy Phase 04
+implementation into `generation/`.
 
-The adopted retained-evidence combined Assembly preserves control-visible
-independent evidence, audits same-occurrence aliases and display projections,
-and admits whole roots using released budget. The original Formal entry point
-provides explicit rollback. Current operating selectors belong to current-phase.
+The retained Phase 04 serving path continues to use the adopted
+retained-evidence combined Assembly. It preserves control-visible independent
+evidence, audits same-occurrence aliases and display projections, and admits
+whole roots using released budget. The original Formal entry point provides
+explicit rollback. This describes the existing legacy runtime; the Clean-based
+target ownership above does not retroactively move or change this
+implementation. Current operating selectors belong to current-phase.
 
-The local product path composes the existing retrieval/ranking and Assembly
-interfaces through `rag/backend.py`; `generation/` owns provider adaptation and
-`ui/` owns presentation. Provider and embedding selection must bind explicit,
+In the retained Phase 04 runtime, the local product path composes the
+existing retrieval/ranking and Assembly interfaces through `rag/backend.py`;
+`generation/` owns provider adaptation and `ui/` owns presentation. Provider and embedding selection must bind explicit,
 compatible versioned configurations rather than alter evidence identity.
 Query encoders and document indexes must share the same vector-space contract;
 equal dimensions alone do not prove compatibility. Replacing embeddings builds

@@ -27,8 +27,14 @@ distinct responsibilities throughout this pipeline.
 ## Current status
 
 Phases 01 — Raw Collection, 02 — Parsing, and 03 — Canonical Corpus are
-**CLOSED**. **Clean-based chunking V2 is the active finite pilot work unit**
-(2026-11-07), specified in the [V2 design](docs/phases/chunking-v2.md).
+**CLOSED**. Clean V1 and Chunk V2.1 full artifacts provide the new-chain input
+baseline. **Indexing work unit 1 owns unified input and field design**
+(2026-11-09), specified in the [input contract](docs/phases/indexing-input-v1.md).
+Current authorization and adoption belong to [current-phase](docs/current-phase.md).
+The standalone [index experiment launcher](docs/phases/index-benchmark-v1.md)
+provides serial local Dense/BM25F construction, recovery and independent search.
+Its development acceptance uses bounded offline trials. Full-corpus results
+and quality comparison remain separate operator-run work.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The existing Phase 04 basic RAG V1 serving baseline extends the adopted Block A over the accepted

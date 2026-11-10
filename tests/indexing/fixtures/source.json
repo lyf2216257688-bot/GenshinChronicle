@@ -1,0 +1,19 @@
+{
+  "source": "mihoyo_obc",
+  "locale": "fixture-locale",
+  "records": [
+    {
+      "id": "story",
+      "name": "原始标题",
+      "desc": "简介原句😀。",
+      "modules": [{"name": "来源章节", "components": [{"component_id": "collapse_panel", "data": {"rich_text": "<h2>小节标题</h2><p>相同原句仍有独立出处。</p><p>相同原句仍有独立出处。</p>"}}]}]
+    },
+    {
+      "id": "dialogue",
+      "name": "对白资料",
+      "desc": "对白资料",
+      "modules": [{"name": "源对话", "components": [{"component_id": "interactive_dialogue", "data": {"root_id": "root", "contents": {"root": {"option": "【白天】", "dialogue": "<p>未解释的条件原句。</p>"}, "later": {"option": "继续", "dialogue": "<p>后续原句。</p>"}}, "child_ids": {"root": ["later"]}}}]}]
+    },
+    {"id": "empty", "name": "无正文资料", "desc": "无正文资料", "modules": []}
+  ]
+}

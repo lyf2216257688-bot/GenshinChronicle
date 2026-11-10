@@ -4,112 +4,65 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 1. Active priority and work unit (2026-11-08)
+## 1. Active priority and work unit (2026-11-09)
 
-**Active work unit — Clean-based chunking V2.1 finite quality repair (2026-11-08).**
-The operator authorized admission/text-projection repairs and a bounded real-source
-pilot over the completed V2 full artifacts. Implementation uses admission policy
-`gc-story-admission-pilot-4` with the existing V2 candidate schema and balanced
-dual granularity. The 46-record pilot has 3,663 candidates and passed serial,
-12-worker and process-interruption/resume byte comparisons. The
-[V2.1 report](research/clean-chunking-v2-1-20261108.md) owns source-value dispositions,
-actual before/after text, duplicate classification, regression and source/Token checks.
-The immediate action is operator review and a decision on V2.1 full rebuilding.
-V2.1 full rebuilding and formal indexing adoption await that decision and their
-respective acceptance. Phase04 remains the serving baseline and Phase05 is paused.
+**Completed development work unit — standalone full-index experiment launcher.** The operator
+authorized implementing Preflight / Run / Resume / Validate over formal Chunk
+V2.1, three prepared local Dense models and Whoosh3 BM25F. Execution in this
+work unit is limited to offline regressions and finite model/index trials.
+The [launcher contract](phases/index-benchmark-v1.md) owns serial runtime
+isolation, no-truncation audits, recoverable independent indexes, exact Dense
+search, lexical operating points and standalone PowerShell commands. The
+[implementation report](research/index-benchmark-launcher-20261109.md) owns
+measured finite validation. Full-corpus encoding will be started separately by
+the operator with the delivered launcher. Paid calls remain outside this work
+unit. The operator authorized a local Git commit on 2026-11-10.
+The finite environment matrix covered 181 passing test cases. All four launcher
+modes passed over seven formal-source Chunk inputs, with four vector shards per
+model and separate 6-member micro / 5-member macro coverage. Actual Resume
+preserved 47 committed artifact hashes. These are bounded development results.
 
-**Prior V2 full recovery checkpoint (2026-11-07).**
-The operator approved the minimal reward-matcher repair and one-off recovery of
-`clean-chunking-full-v2-20261107`, which stopped with 16,435 of 16,437 records.
-The two pending records were 7370 and 7233. Recovery verified and reused existing
-shards, built only those two records, and wrote self-contained flat exports in
-`clean-chunking-full-v2-20261107-recovered-r1`. Recovery and full artifact acceptance
-are complete with 16,437 records, 122,527 balanced candidates, 214,870 parents
-and 5,087 original dialogue groups. All source/alias ranges, per-granularity
-coverage, display order, original graphs, flat-shard hashes and candidate token
-counts passed. The [recovery report](research/chunking-v2-recovery-20261107.md)
-owns bindings, actual timings, provenance and validation evidence.
-That authorization covered the recovery. Future incremental-build infrastructure
-and indexing/serving adoption remain separate work units.
+**Accepted foundation — new RAG indexing, work unit 1, unified input and field design.**
+The operator authorized design, minimal opt-in engineering and offline validation
+against completed Chunk V2.1. The [input contract](phases/indexing-input-v1.md)
+owns shared Chunk identity, six lexical fields, unchanged retrieval_text Dense
+input, micro/macro route membership, source readback and independent representation
+bindings. Implementation and finite source validation are recorded in the
+[work-unit report](research/indexing-input-v1-20261109.md).
+The complete source survey passed. Two 16-record exports produced identical
+718-row shared inputs with 650 micro and 548 macro memberships. Readback passed
+for 15 populated Clean records, 474 natural parents and six original graphs.
+145 offline regressions passed, including 17 new indexing tests. The launcher
+now records explicit experimental analyzer/weight choices and three pinned
+Dense candidate configurations. Retrieval-quality comparison and final model,
+dictionary and field-weight choices remain follow-up work. Full-index execution
+is outside this development turn, and serving migration requires its own decision.
 
-The operator approved V2 admission, local dialogue/condition representation,
-display-only ordering, separation of retrieval fields and a fixed 35-record pilot.
-The original implementation and finite validation are complete. The [V2 contract](phases/chunking-v2.md)
-owns the opt-in interface including V2.1 and the [V2 result](research/clean-chunking-v2-20261107.md)
-owns actual comparisons, source checks and remaining noise. Complete classification
-of 7,759 unreachable source nodes reads the existing full graph artifact and preserves
-source edges and occurrence identities. It does not construct full V2 chunks.
+**Completed input baseline.** Clean V1 has 16,437 records in
+`data/clean/mihoyo_obc/zh-cn/clean-v1-full-20261106/`.
+Chunk V2.1 full construction and engineering acceptance are complete in
+`data/retrieval/clean-chunking-full-v2-1-20261108/`, with 119,557 unique balanced
+candidates, 214,870 natural parents and 5,087 original dialogue groups under
+`gc-story-admission-pilot-4`. Of those candidates, 63,980 belong to both routes,
+40,899 only to micro and 14,678 only to macro. Logical route totals are 104,879
+micro and 78,658 macro. 460 selected source records have no candidates. The
+[V2.1 report](research/clean-chunking-v2-1-20261108.md) retains the finite repair
+checkpoint and subsequent full-build/archive facts. Complete flat exports are
+the indexing input. Shard restoration is unnecessary for reading these exports.
 
-The existing V1 full run `clean-chunking-full-parallel-20261107` is complete with
-16,437 selected records and 124,545 balanced candidates. It and its independent
-audit remain comparison assets. The operator subsequently authorized the V2 full
-run and the recovery above. Further rebuilding requires explicit execution
-authorization. Raw/Clean and serving artifacts remain
-preserved. Phase04 is the serving baseline and Phase05 stays paused.
+Balanced and parallel micro/macro remain the selected direction. Source literal
+conditions, unknown provenance, exact occurrence aliases, CleanRef and full
+natural-parent readback retain the [Chunk V2 contract](phases/chunking-v2.md).
+The [Clean contract](phases/clean-v1.md) owns deterministic extraction and readers.
+Whole-corpus independent Raw semantic/structural fidelity and retrieval/answer
+quality retain their separate acceptance scopes.
 
-Parallel micro/macro retrieval and balanced remain the selected architecture and
-default profile. Compact is historical material. The [V2 design](phases/chunking-v2.md)
-retains structure-first admission, natural parents, CleanRef, the fixed balanced
-budgets and the three scoped quality refinements. The [Clean contract](phases/clean-v1.md)
-owns extraction and read interfaces. In the earlier Clean performance work,
-orphan-diagnostic serialization order was stabilized to remove a pre-existing
-cross-process set-order variation.
-
-The prior Clean V1 foundation and bounded pilot are implemented. 40 new regressions
-and 108 existing parser/Canonical/Collector/shared-lock regressions pass. The
-30-record pilot covers all 30 observed component types and accounts for 193
-components and 6,907 component source values. Independent checks retain 4,439
-meaningful HTML text-node occurrences, 49 tables and 5 dialogue groups with
-39 nodes and 41 edges. The [implementation record](research/clean-v1-implementation-20261106.md)
-owns the pilot paths, measurements, limitations and source evidence.
-
-**Full Clean observation and chunking investigation (2026-11-06).** The
-operator-requested read-only investigation inspected the completed local
-`clean-v1-full-20261106` run. All 16,437 listed record files matched their
-manifest SHA-256 and identity, covering 84,072 components and 5,087 dialogue
-groups. Independent full-corpus Raw fidelity acceptance remains open. The
-[chunking investigation](research/clean-chunking-full-survey-20261106.md) owns
-the full structure census, 27 source-text cases, filtering risks and proposed
-shared rule-based processing. It incorporates the operator's generally linear
-plot premise with ordinary expression choices and local completion-order
-variants, including observed Forest Book condition labels. Its processing and
-size proposals describe the historical 2026-11-06 discussion checkpoint.
-
-**Initial chunking pilot completed (2026-11-07 historical checkpoint).** The opt-in implementation ran 51
-real Clean records with all 30 component types, 582 components and 33 dialogue
-groups. Final `clean-chunking-pilot-20261107-r7` contains 3,553 balanced and
-5,036 compact candidates, with independent micro/macro eligibility, 225 exact
-voice-occurrence aliases, natural-parent readback and checked CleanRef coverage.
-17 new chunking and 40 Clean regressions pass. Both installed Tokenizer
-environments matched 66 final candidates each, with no 2,048-token truncation.
-No embedding inference or retrieval relevance evaluation was performed. The
-[pilot result](research/clean-chunking-pilot-20261107.md) owns the 19 quality cases,
-remaining admission noise, structural limits and then-proposed comparisons.
-The subsequent operator decision above selects balanced and dual-granularity
-retrieval. Downstream indexing/fusion and serving adoption remain separate.
-
-**Targeted refinement completed (2026-11-07).** The same 12 real records ran
-before and after the three scoped rule changes, using balanced only. Final
-`clean-chunking-refinement-20261107-after-r3` has 389 candidates, 199 readable
-natural parents and 6 preserved dialogue graphs. The changes exclude 67 explicit
-source values (945 code points) and identify 32 newspaper article scopes.
-Cross-article candidates over those scopes fall from 20 micro / 18 macro to zero.
-All other admitted ranges match in both granularities, all coverage links were
-recomputed, and 26 chunking plus 40 Clean tests pass. Review the
-[refinement report](research/clean-chunking-refinement-20261107.md) and ten actual
-before/after cases. Unstructured puzzle prose and mixed mechanism descriptions
-remain conservative admissions. Retrieval relevance has not been evaluated.
-
-**Build performance completed (2026-11-07).** The same 16 real records ran with
-the old builder, new serial execution, 12 workers and forced-interruption recovery.
-Final Clean record bytes match between the three new runs. Against the old build,
-14 records are byte-identical and two differ only in orphan diagnostic order,
-with all content, structure, lineage and diagnostic multisets equal. Chunk's
-2,256 candidates, 706 parents, 12 graphs and admission JSONL are byte-identical
-to the old implementation. 79 regressions pass. New 12-worker elapsed times are
-4.86s Clean and 12.75s Chunk for this finite sample. Resource measurements and
-limits belong to the performance report. These results leave whole-corpus Raw
-fidelity acceptance and serving adoption at their existing scopes.
+Earlier V1/V2/recovery/pilot artifacts and claims are historical checkpoints,
+routed through their dated research reports. Some historical local directories
+were subsequently removed or archived. Current data-root and restoration
+responsibilities belong to [data README](../data/README.md). The full V2.1 flat
+artifacts are the source for this work unit. Long-term incremental build
+infrastructure remains separate.
 
 **Serving baseline: Phase 04 basic RAG V1. PAUSED: Phase 05 NaviRAG / Card / Link / KG.**
 
@@ -163,7 +116,8 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | Phase 02 Parsed | CLOSED; deterministic source-specific parser, Raw lineage and explicit unknowns. Its draft contract remains evolutionary, not permanently frozen. |
 | Phase 03 Canonical | CLOSED; accepted 16,437-record structural corpus. Reuse it without semantic rewriting; closure does not establish semantic completeness. |
 | Clean V1 | Direct Raw extraction, source locators, selectors and default 12-worker resumable builds. The local 16,437-record full run remains complete and record-hash checked. Whole-corpus Raw fidelity acceptance and serving adoption remain open. |
-| Clean-based chunking | Opt-in V2.1 uses admission policy 4 with the V2 schema, parallel micro/macro candidates, balanced budgets, source-literal conditions, display-only ordering and CleanRef. Default 12-worker builds retain `--resume`. The 46-record V2.1 pilot has 3,663 candidates. The accepted recovered V2 full output has 16,437 records and 122,527 candidates under historical policy 3. V2.1 full rebuilding awaits operator decision. Serving RU/index/Assembly continue through Phase04. |
+| Clean-based chunking | Opt-in V2.1 uses admission policy 4 with the V2 schema, parallel micro/macro candidates, balanced budgets, source-literal conditions, display-only ordering and CleanRef. Default 12-worker builds retain `--resume`. The 46-record V2.1 pilot has 3,663 candidates. The historical recovered V2 full output has 16,437 records / 122,527 candidates under policy 3. **V2.1 full build completed on 2026-11-08:** 16,437 records, 119,557 balanced candidates, 214,870 natural parents and 5,087 graphs under policy 4; on 2026-11-09 its seven flat exports passed SHA-256 verification. Per-record `_records` recovery shards were archived and removed from D: after independent verification, so any no-op resume or shard-level recheck requires restoring them first. This output has not been adopted for serving; Phase04 continues to use the original RU/index/Assembly and full-corpus retrieval quality acceptance remains open. |
+| Clean-based indexing input | Opt-in `genshin_corpus.indexing` implements shared input projection, micro/macro route maps, six BM25F text fields, retrieval_text Dense input, hash-bound source readback and independent representation identities. The standalone benchmark adds three pinned local Dense encoders, exact vector-shard search and separate-route Whoosh3 with Han/Jieba channels. Experimental weights and the default Jieba dictionary are explicit configuration. Final quality choices remain follow-up work. |
 | Retrieval Units | 535,802 original RUs with Canonical/Parsed/Raw lineage; 32,955 explicit skips, zero reported failures in the accepted RU manifest. |
 | BM25 | Adopted Diagnostic C field-aware scorer, `k1=1.2`, `b=0.75`, fields title/section/speaker/text, weights `2.0/1.25/1.5/1.0`; candidate depth 500. |
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
@@ -224,16 +178,17 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate review is the completed [V2.1 finite quality repair](research/clean-chunking-v2-1-20261108.md)
-and the operator's decision on full rebuilding. The [V2 recovery](research/chunking-v2-recovery-20261107.md)
-remains the accepted historical full artifact. Indexing/retrieval/serving adoption
-remain separate. The [V2 finite result](research/clean-chunking-v2-20261107.md)
-retains its 35-record comparisons and unreachable-node classification. Further
-full rebuilding requires explicit authorization. Balanced and parallel dual granularity
-remain settled. The prior [quality refinement](research/clean-chunking-refinement-20261107.md)
-owns its historical three-rule evidence. Independent whole-corpus Raw fidelity,
-index/recall work, fusion and serving/citation adoption retain their separate scopes.
-The following dated material describes retained serving baseline gaps and evidence.
+The immediate next action after launcher acceptance is the operator's independent
+Run command in a system PowerShell terminal. Run automatically prepares the full
+shared input, audits all Tokenizer lengths, performs bounded resource probes and
+serially builds the three Dense candidates plus Whoosh3 BM25F. Blocked lengths or
+resources are recorded, and Resume retains committed work under the same binding.
+Full-build results then need integrity review and a shared-question quality
+comparison. The finite launcher checks do not establish full-corpus resource
+feasibility, recall relevance, fusion policy, reranking quality, final Packet
+policy or serving adoption. Generation owns Clean-based candidate-to-Packet
+assembly after Retrieval and Reranking.
+The following dated material records retained legacy serving evidence and gaps.
 
 **Latest work (2026-11-02; paid gate CLOSED):** user authorization was exactly
 3 requests / 150,000 conservative tokens / 1024 requested output cap / zero
@@ -325,6 +280,10 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Clean implementation and bounded pilot evidence | [`Implementation record`](research/clean-v1-implementation-20261106.md) |
 | Full Clean structure census and chunking discussion candidates | [`Chunking investigation`](research/clean-chunking-full-survey-20261106.md) |
 | Current Clean-based V2 chunking, source conditions, retrieval fields and display semantics | [`Chunking V2`](phases/chunking-v2.md) |
+| Unified Clean-based indexing input, field projections, analyzers and representation bindings | [`Indexing input V1`](phases/indexing-input-v1.md) |
+| Standalone serial full-index experiment, commands, encoding, recovery and independent search | [`Index benchmark V1`](phases/index-benchmark-v1.md) |
+| Launcher finite validation, environment reuse and measured limitations | [`Launcher report`](research/index-benchmark-launcher-20261109.md) |
+| Indexing work unit 1 source survey, finite export and readback evidence | [`Work-unit report`](research/indexing-input-v1-20261109.md) |
 | Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |
 | V2 35-record result, before/after text and 7,759-node classification | [`V2 result`](research/clean-chunking-v2-20261107.md) |
 | V2 full-build matcher repair, two-record recovery, mixed bindings and complete artifact acceptance | [`V2 recovery`](research/chunking-v2-recovery-20261107.md) |

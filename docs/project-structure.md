@@ -6,7 +6,7 @@ selectors, source resolution and on-demand rendering. Its contract is
 [Clean V1](phases/clean-v1.md). Existing serving packages below keep their
 current responsibilities until explicit replacement adoption.
 
-`src/genshin_corpus/chunking/` owns the opt-in Clean chunking pilot. Its admission
+`src/genshin_corpus/chunking/` owns opt-in Clean-based chunking. Its admission
 rules and structure/graph adapters feed one token-bounded micro/macro core.
 The CLI writes downstream derived artifacts, preserves CleanRef ranges and
 supports full natural-parent readback. The [V2 design](phases/chunking-v2.md)
@@ -21,6 +21,20 @@ the deployed RU builders.
 `src/genshin_corpus/build_runtime.py` owns the shared bounded record-process
 scheduler, atomic checkpoint JSON and hash-checked completion receipts for
 Clean and Chunk builds. Each layer retains its own input binding and outputs.
+
+`src/genshin_corpus/indexing/` owns the opt-in Clean-based shared index input,
+six-field text projection, micro/macro membership maps, hash-bound source
+readback, Chinese analyzer interfaces and independent representation identities.
+Its CLI surveys V2.1 artifacts, exports complete input bundles and validates
+finite source readback. The [input contract](phases/indexing-input-v1.md) owns
+these interfaces. The [benchmark contract](phases/index-benchmark-v1.md) owns
+standalone serial execution, local model contracts, vector-shard recovery,
+exact search and six-field multi-analyzer Whoosh3 construction. benchmark.py
+supervises isolated benchmark_worker.py stages, benchmark_dense.py and
+benchmark_lexical.py own their index implementations, and benchmark_io.py reuses
+repository transactional IO/locking. config/index-benchmark-v1.json owns the
+experimental operating point. scripts/retrieval/run-index-benchmark.ps1 is the
+PowerShell entry point. Serving integration retains its separate adoption scope.
 
 The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
 -> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,
@@ -90,6 +104,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   extraction, source locators, run storage and downstream reading interfaces.
 - `src/genshin_corpus/chunking/`: finite Clean-based story-admission and dual-granularity
   chunking pilot, graph/field/table projection and natural-parent source readback.
+- `src/genshin_corpus/indexing/`: shared Clean-based lexical/Dense input,
+  logical route maps, analyzers, representation bindings and offline validation.
 - `src/genshin_corpus/retrieval/`: Phase 04 Retrieval Units and Phase 05
   source-bound semantic-build/view primitives; lexical, local Dense, and
   deterministic candidate retrieval; reranking adapters/primitives
@@ -149,17 +165,23 @@ the immediate next action are owned by `docs/current-phase.md`.
   not establish a permanent technology winner.
 - `src/genshin_corpus/generation/`: provider-neutral Generation contracts,
   generation-visible Evidence Packet projection, result/citation-integrity
-  persistence, and explicitly scoped provider adapters. It consumes an
-  Evidence Packet but does not own Retrieval or Evidence Assembly policy.
+  persistence, and explicitly scoped provider adapters. The module consumes an
+  assembled Evidence Packet; it does not own Retrieval candidate discovery or
+  Reranking candidate ordering. The agreed Clean-based target architecture
+  assigns Evidence Assembly policy to the Generation workstream; this logical
+  ownership does not mean this package already implements the assembly step.
   `deepseek.py` is the V1 default TokenMetro adapter; Bailian/Qwen remains explicit rollback. It implements
   final QA using the shared model-call layer, raw-first HTTP archives and the
   neutral renderer/citation checks. The existing runtime factory selects the
   provider explicitly; Retrieval/Assembly do not own provider selection.
 - `src/genshin_corpus/rag/`: the small provider-neutral single-question RAG
-  orchestration boundary. It owns prepared-state reuse and per-question
-  composition across Retrieval, optional reranking, selectable combined/Formal Assembly,
-  Evidence Packet handling, optional Generation, citation validation, and
-  structured audit/persistence results. It also owns the opt-in provider-free
+  orchestration boundary. In the retained Phase 04 runtime, it owns
+  prepared-state reuse and per-question composition across Retrieval, optional
+  reranking, selectable combined/Formal Assembly, Evidence Packet handling,
+  optional Generation, citation validation, and structured audit/persistence
+  results. This describes the existing legacy runtime placement; it does not
+  override the Clean-based target assignment of Assembly policy to the
+  Generation workstream. It also owns the opt-in provider-free
   bounded adaptive Evidence kernel and assessment contracts, plus the narrow
   opt-in targeted-gate assessor adapter/parser and review persistence seam;
   these remain evaluation mechanics only and are not the production/default

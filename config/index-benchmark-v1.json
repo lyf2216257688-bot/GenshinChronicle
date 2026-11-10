@@ -1,0 +1,73 @@
+{
+  "version": "gc-index-benchmark-1",
+  "chunk_manifest": "data/retrieval/clean-chunking-full-v2-1-20261108/manifest.json",
+  "coordinator_python": ".local/embedding-runtime/Scripts/python.exe",
+  "minimum_free_gib": 6,
+  "minimum_available_ram_gib": 1.5,
+  "minimum_running_ram_gib": 0.25,
+  "shard_rows": 128,
+  "max_batch": 2,
+  "padded_token_budget": 2048,
+  "smoke_documents": 4,
+  "models": [
+    {
+      "key": "qwen3-0.6b",
+      "model": "Qwen/Qwen3-Embedding-0.6B",
+      "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "path": ".local/models/qwen3-embedding-0.6b/97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+      "python": ".local/embedding-runtime/Scripts/python.exe",
+      "weight_file": "model.safetensors",
+      "weight_sha256": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd",
+      "dimensions": 1024,
+      "pooling": "last_nonpadding_token",
+      "padding_side": "left",
+      "compute_dtype": "float16",
+      "max_tokens": 32768,
+      "document_prefix": "",
+      "query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+    },
+    {
+      "key": "bge-m3",
+      "model": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "path": ".local/rag-index-prep-20261109/models/bge-m3",
+      "python": ".local/rag-index-prep-20261109/candidate-runtime/Scripts/python.exe",
+      "weight_file": "pytorch_model.bin",
+      "weight_sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38",
+      "dimensions": 1024,
+      "pooling": "cls_token",
+      "padding_side": "right",
+      "compute_dtype": "float16",
+      "max_tokens": 8192,
+      "document_prefix": "",
+      "query_prefix": ""
+    },
+    {
+      "key": "jina-v5-small",
+      "model": "jinaai/jina-embeddings-v5-text-small-retrieval",
+      "revision": "6856e76bb72982e58de0620458a4e8b3614da340",
+      "path": ".local/rag-index-prep-20261109/models/jina-embeddings-v5-text-small-retrieval",
+      "python": ".local/rag-index-prep-20261109/candidate-runtime/Scripts/python.exe",
+      "weight_file": "model.safetensors",
+      "weight_sha256": "0362107c2b13e18284c5152c4d4f667a4dec4665abdfe4f5e43a9bb799ba2276",
+      "dimensions": 1024,
+      "pooling": "last_nonpadding_token",
+      "padding_side": "left",
+      "compute_dtype": "bfloat16",
+      "max_tokens": 32768,
+      "document_prefix": "Document: ",
+      "query_prefix": "Query: "
+    }
+  ],
+  "bm25f": {
+    "python": ".local/rag-index-prep-20261109/bm25f-runtime/Scripts/python.exe",
+    "field_weights": {"title": 1, "headings": 1, "field_labels": 1, "body": 1, "context": 1, "conditions": 1},
+    "field_b": {"title": 0.75, "headings": 0.75, "field_labels": 0.75, "body": 0.75, "context": 0.75, "conditions": 0.75},
+    "k1": 1.2,
+    "analyzer_weights": {"han_unigram": 0.2, "han_bigram": 0.3, "word": 0.5},
+    "jieba_mode": "precise",
+    "hmm": false,
+    "writer_mb": 64,
+    "commit_rows": 1024
+  }
+}

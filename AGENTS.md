@@ -53,8 +53,15 @@ If a requested task conflicts with the active phase, stop and call out the confl
   citation and evidence identity from Canonical lineage, not embedding chunk
   identity in the deployed legacy path. New Clean-based derivatives bind to
   Clean observations and Raw lineage under their approved contract.
-  Evidence Packets are provider-neutral, deterministic evidence
-  interfaces; Generation consumes them without owning retrieval or assembly policy.
+  Evidence Packets remain provider-neutral, deterministic evidence
+  interfaces. In the Clean-based target architecture, the Generation workstream
+  owns the policy that turns retrieved/reranked candidates into the final
+  Packet: source/parent readback, duplicate handling, context-budget admission,
+  and Packet composition. Retrieval owns candidate discovery; Reranking owns
+  candidate ordering. Generation must not take over either upstream
+  responsibility. The model-generation step consumes the assembled Packet.
+  This target ownership does not require moving or changing the legacy Phase 04
+  implementation before explicit migration/adoption.
   RAG answers are query results and must not automatically become Canonical facts.
 - **Semantic Navigation**: derived views (such as hierarchy navigation and
   event/relation graphs) remain non-authoritative structures grounded strictly
@@ -77,12 +84,14 @@ Raw/Collector constraints below remain binding whenever Raw acquisition or Colle
 - Do not bypass access controls, anti-bot protections, 403/429 responses, or other site protections.
 - API contracts must be evidence-driven. Never invent endpoints, required headers, or schemas from assumptions.
 - Never commit cookies, authorization material, or unredacted browser cURL containing secrets. Put sensitive local samples under `.local/`.
-- Evidence Packet convenience must not cause corruption of structure, provenance,
-  traceability, or other information required by an upstream contract. It may
-  perform deterministic query-time ranking, finite-budget admission, and
-  candidate truncation only when the operating-point policy records the
-  disposition in an auditable form; silent evidence destruction and invented semantics are
-  not permitted.
+- Evidence Packet assembly must not corrupt structure, provenance, traceability,
+  or information required by an upstream contract. After Retrieval and
+  Reranking, the Generation workstream owns deterministic, auditable assembly
+  from the ordered candidate set. Assembly may read back source/parent context,
+  suppress only verified duplicates, and admit or truncate candidates under a
+  finite context budget when the operating-point policy records each disposition.
+  It must not perform new candidate discovery or take over Reranking's candidate
+  ordering. Silent evidence loss and invented semantics are not permitted.
 
 ## Out-of-scope and separately authorized layers
 
