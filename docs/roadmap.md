@@ -14,9 +14,15 @@ The [indexing input contract](phases/indexing-input-v1.md) adds a shared input
 foundation for BM25F and Dense over completed V2.1 artifacts. The
 [standalone launcher](phases/index-benchmark-v1.md) implements physical index
 construction and independent search, with bounded development validation.
-Operator-run full-build acceptance and retrieval-quality evaluation follow.
-Existing Phase04 serving assets remain the executable baseline while replacement
-layers obtain their own implementation and adoption decisions. Current work-unit
+The selected BGE-M3/BM25F assets feed the opt-in
+[Clean Retrieval P0–P2](phases/clean-retrieval-v1.md) work: candidate discovery and
+fusion, then bounded Sparse validation before any full build. The
+[P3 Sparse path](phases/sparse-build-v1.md) prepares a standalone operator-run
+streaming full build and validation; Codex performs only finite development tests.
+Later 70Q comparison
+uses automatic diagnostics and representative original-text cases; final
+S0/S1/S2 adoption belongs to the operator. Retained Phase04 selectors reference
+retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).
 
 ## Phase 00 — Repository initialization
@@ -70,9 +76,9 @@ semantic identity.
 
 ## Phase 04 — Retrieval / RAG
 
-Status: **SERVING BASELINE — basic RAG V1; existing Block A remains adopted**
+Status: **retained implementation; local Qwen Serving assets retired**
 
-The first end-to-end baseline now includes rebuildable Retrieval Units,
+The historical first end-to-end baseline includes rebuildable Retrieval Units,
 BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence
 Assembly, Evidence Packets, and provider-neutral Generation contracts.
 Production/default configuration, challenger status, and authorization remain
@@ -81,7 +87,9 @@ intentionally outside this phase-level roadmap and are owned by
 retrieval winner, Dense model, reranker, vector database, or Generation
 provider.
 
-The 2026-11-02 priority change reused Phases 01-03 and the existing RU/index,
+The following ordered milestones record the 2026-11-02 historical checkpoint;
+their Qwen defaults/rollback do not override current selection or assert asset
+availability. The priority change reused Phases 01-03 and the existing RU/index,
 Assembly, Generation and local presentation modules. Serving-baseline milestones are
 staged so that real failures can be attributed; an unresolved Generation issue
 does not block independently authorized offline Embedding preparation:

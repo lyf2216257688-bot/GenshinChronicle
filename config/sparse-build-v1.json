@@ -1,0 +1,16 @@
+{
+  "version": "gc-sparse-build-job-1",
+  "retrieval_config": "config/clean-retrieval-v1.json",
+  "python": ".local/rag-index-prep-20261109/candidate-runtime/Scripts/python.exe",
+  "output": "data/retrieval/bge-m3-sparse-v1-20261112-ready",
+  "shard_rows": 256,
+  "max_batch": 1,
+  "padded_token_budget": 2048,
+  "heartbeat_seconds": 15,
+  "minimum_available_ram_gib": 2,
+  "minimum_running_ram_gib": 0.75,
+  "minimum_free_gib": 6,
+  "minimum_free_vram_gib": 1.5,
+  "p0p2_accepted": "data/retrieval/clean-retrieval-p0p2-20261111-review/validation-accepted.json",
+  "p0p2_sparse": "data/retrieval/clean-retrieval-p0p2-20261111-review/sparse-trial-final"
+}

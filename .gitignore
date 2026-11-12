@@ -46,6 +46,7 @@ Thumbs.db
 !/scripts/retrieval/
 /scripts/retrieval/*
 !/scripts/retrieval/run-index-benchmark.ps1
+!/scripts/retrieval/run-sparse-build.ps1
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

@@ -36,8 +36,22 @@ repository transactional IO/locking. config/index-benchmark-v1.json owns the
 experimental operating point. scripts/retrieval/run-index-benchmark.ps1 is the
 PowerShell entry point. Serving integration retains its separate adoption scope.
 
-The active delivery path is the existing Phase 04 `retrieval/` -> `rag/backend.py`
--> `generation/` composition with the thin `ui/` presentation. Phase 05 NaviRAG,
+`src/genshin_corpus/retrieval/clean_based/` owns opt-in Clean candidate discovery,
+bound source reading, isolated local query workers, replaceable F0/F1 fusion,
+conservative source-range organization and a single-question CLI. It emits
+candidates for Reranking, not final Packets. `indexing/sparse_trial.py` owns
+bounded BGE Sparse encoding/reference checks, recoverable trial shards and
+SciPy CSR exact queries; `clean_based/trial.py` owns finite real-source validation.
+The [Retrieval contract](phases/clean-retrieval-v1.md) defines their boundaries.
+`indexing/sparse_full.py` owns one-shard-at-a-time full Sparse storage/search;
+`sparse_job.py`, `config/sparse-build-v1.json` and
+`scripts/retrieval/run-sparse-build.ps1` own standalone preflight, explicit manual
+build/resume, progress and independent validation. Their
+[P3 contract](phases/sparse-build-v1.md) preserves the finite trial separately.
+
+The retained Phase04 `retrieval/` -> `rag/backend.py` -> `generation/` composition
+with the thin `ui/` presentation is not operational with its retired Qwen assets.
+New Retrieval does not switch that runtime. Phase 05 NaviRAG,
 Card, Link and KG development is paused per [`current-phase.md`](current-phase.md);
 the packages and evidence described below remain preserved. Reusing the local
 Qwen3 encoder/runtime for original-RU V1 migration does not make the paused

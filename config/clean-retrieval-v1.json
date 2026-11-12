@@ -1,0 +1,26 @@
+{
+  "version": "gc-clean-retrieval-1",
+  "selection": "config/index-selected-v1.json",
+  "dense_python": ".local/rag-index-prep-20261109/candidate-runtime/Scripts/python.exe",
+  "lexical_python": ".local/rag-index-prep-20261109/bm25f-runtime/Scripts/python.exe",
+  "combination": "S0",
+  "fusion": "f1_max",
+  "structural_cleanup": true,
+  "depth": 50,
+  "candidate_limit": 100,
+  "rrf_k": 60,
+  "channel_weights": {"dense": 0.5, "bm25f": 0.5},
+  "worker_timeout_seconds": 600,
+  "minimum_available_ram_gib": 1.5,
+  "minimum_running_ram_gib": 0.25,
+  "minimum_free_gib": 6,
+  "sparse_trial_rows": 32,
+  "sparse_trial_batch": 1,
+  "sparse_trial_shard_rows": 8,
+  "sparse_head_sha256": "45c93804d2142b8f6d7ec6914ae23a1eee9c6a1d27d83d908a20d2afb3595ad9",
+  "sparse_reference": {
+    "version": "1.4.2",
+    "wheel": ".local/clean-retrieval-p0p2-20261111/reference/flagembedding-1.4.2-py3-none-any.whl",
+    "sha256": "35e33a08e8ed5e299eabbe3bc23518eb66a424dd29ee08fb3802bf9aef9e9bf2"
+  }
+}

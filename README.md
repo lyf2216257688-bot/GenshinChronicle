@@ -33,11 +33,15 @@ baseline. **Indexing work unit 1 owns unified input and field design**
 Current authorization and adoption belong to [current-phase](docs/current-phase.md).
 The standalone [index experiment launcher](docs/phases/index-benchmark-v1.md)
 provides serial local Dense/BM25F construction, recovery and independent search.
-Its development acceptance uses bounded offline trials. Full-corpus results
-and quality comparison remain separate operator-run work.
+The selected BGE-M3/BM25F artifacts are reused by the opt-in
+[Clean Retrieval P0–P2](docs/phases/clean-retrieval-v1.md) work. Its candidate
+interface and bounded Sparse trial do not switch Serving or establish RAG quality.
+The [P3 Sparse runbook](docs/research/sparse-build-preparation-20261112.md) provides
+separate Preflight/Run/Resume/Status/Validate commands for the operator's manual
+full build; it does not automatically start encoding or change Serving.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
-The existing Phase 04 basic RAG V1 serving baseline extends the adopted Block A over the accepted
+The retained Phase04 implementation extends the historical adopted Block A over the accepted
 16,437-record OBC `zh-cn` Canonical snapshot. It includes
 Retrieval Units, BM25, local Qwen3 Dense, RRF Hybrid, deterministic Evidence
 Assembly, Evidence Packets, and provider-neutral Generation contracts.
@@ -47,11 +51,9 @@ evidence preserved. Future semantic work depends on measured basic-RAG needs.
 V1 uses the operator-selected DeepSeek default through `GenerationProvider`,
 with explicit Bailian/Qwen rollback. Its limited live gate accepted two cases
 and rejected one for an unresolved output-cap mismatch; no broad QA acceptance
-or new paid authorization follows. The operator selected the completed local
-`Qwen3-Embedding-0.6B` / 1024d query/index pair as the default. The historical
-online-Qwen 2048d pair remains an explicit rollback and comparison option.
-BM25, Dense/Hybrid, BGE and
-Evidence Packets are retained. The existing backend and Streamlit UI are reused.
+or new paid authorization follows. The old Qwen query/index selectors still
+exist in code, but their local assets were retired. They are not working local
+rollback. Backend/Streamlit adoption of the Clean-based pipeline remains separate.
 
 Read `docs/current-phase.md` for the sole current production/default Dense,
 historical challenger, reranker, attribution, authorization, and immediate-next
@@ -137,7 +139,20 @@ contains provider-neutral Generation contracts, V1-default DeepSeek and the
 scoped Bailian/Qwen control path. `data/canonical/` and `data/retrieval/` are ignored local
 generated-data roots; the latter is not a serving-system contract.
 
-The local Streamlit frontend is an optional presentation layer over the
+## Opt-in Clean candidate retrieval
+
+`python -m genshin_corpus.retrieval.clean_based` is the independent candidate
+entry point. The [P0–P2 report](docs/research/clean-retrieval-p0p2-20261111.md)
+provides single-query usage, finite source-text results and measured limitations.
+It does not invoke Generation or switch the retained backend/Streamlit selectors.
+
+## Historical Phase04 CLI/Streamlit checkpoint
+
+The instructions below describe the retained implementation before local Qwen
+asset retirement. They are not run instructions for the current workspace and
+do not provide working local rollback. Use current-phase for adoption status.
+
+The retained Streamlit frontend is an optional presentation layer over the
 single-question RAG backend. It shares the **local Qwen3/1024d default**
 and explicit online rollback with the CLI. The default local-BGE path uses
 the validated Python 3.12 runtime at

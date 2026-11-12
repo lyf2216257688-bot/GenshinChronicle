@@ -18,8 +18,9 @@ SOURCE / RAW
 ```
 
 The Clean V1 reconstruction implements the new foundation and its read interface.
-The deployed Phase04 runtime continues to use the preserved Parsed/Canonical/RU
-assets described below. Current adoption belongs to `docs/current-phase.md`.
+The retained Phase04 implementation uses the preserved Parsed/Canonical/RU
+contracts below; its retired local Qwen assets are not an operational fallback.
+Current adoption belongs to `docs/current-phase.md`.
 
 ### 1. Source / Raw
 Answers: **What did we obtain, from which official source, and when?**
@@ -75,6 +76,22 @@ macro/micro Whoosh3 BM25F indexes. Exact cosine search filters shared vectors by
 route. Lexical statistics are computed independently per route and physical
 field/analyzer channel. Completion follows source/mapping/artifact validation.
 Retrieval ordering and final Packet assembly retain their respective layer owners.
+
+### Clean-based Retrieval
+
+The opt-in `retrieval/clean_based/` package discovers candidates over the selected
+indexes with shared Chunk identity. Local runtime workers preserve independent
+query/index bindings; one Dense scan supplies both route lists. Replaceable F0/F1
+fusion and conservative source-range organization emit auditable candidates,
+not Packets. Full parent readback and final context budgets belong to Generation.
+`indexing/sparse_trial.py` reuses SciPy CSR for a bounded, separately bound Sparse
+trial; it is not a full-corpus build or Serving engine. Its
+[contract](phases/clean-retrieval-v1.md) owns interfaces and current experimental
+parameters; current-phase owns authorization and measured acceptance.
+The separate `indexing/sparse_full.py` / `sparse_job.py` path adds bounded,
+shared-encoding CSR shards, exact streaming search and standalone manual build,
+resume and independent validation under [Sparse build V1](phases/sparse-build-v1.md).
+It retains the trial's space contract and does not integrate S1/S2 into Serving.
 
 ### 2. Preserved Parsed baseline
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
@@ -228,14 +245,11 @@ owned by `docs/current-phase.md`; this architecture document does not select a
 permanent model, retrieval winner, provider, reranker, or serving
 infrastructure.
 
-The current delivery direction uses the operator-selected DeepSeek final-answer
-and local Qwen3-Embedding-0.6B/1024d retrieval defaults. Those are reversible
-operating choices. A transactional streaming builder publishes a
-complete index only after source/row/vector verification; the local query
-worker exits before BGE uses the GPU. Explicit paired profiles preserve the
-old 2048d rollback. The CLI and thin Streamlit UI share backend profile
-selection. The detailed delivery/rollback contract is
-in [Phase 04](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
+The retained Phase04 CLI/backend/UI still describe their historical Qwen paired
+profiles, but the local weights/indexes were retired; they must not be presented
+as working rollback. The selected Clean-based indexes have an independent opt-in
+Retrieval path and do not imply end-to-end RAG adoption. The historical delivery
+contract remains in [Phase 04](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
 
 The paused Phase 05 implementation does not alter the accepted Phase 04 Block A
 retrieval/ranking behavior, Evidence Packet authority, or Generation-visible

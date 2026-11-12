@@ -4,7 +4,7 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current decision — selected Dense index (2026-11-10)
+## 0. Current work — P3 Sparse build preparation (2026-11-12)
 
 **Adopted: BAAI/bge-m3 as the sole Clean/Chunk V2.1 Dense model.**
 The 20-question blind-review comparison found BGE-M3 and Jina v5 closely matched;
@@ -24,19 +24,53 @@ Qwen 2048-dimensional Dense index was absent locally before this cleanup;
 any independent external archives were not touched.
 Raw, Clean, Chunk, source lineage, input export, BM25F, BGE-M3 model/index,
 BGE reranker, original 70-question raw retrieval and blind-review records
-were retained. Small retired Phase05 trial vector/mock index artifacts were also\nremoved; the surrounding research reports and source data remain.\nThe exact deletion manifest is
+were retained. Small retired Phase05 trial vector/mock index artifacts were also
+removed; the surrounding research reports and source data remain. The exact deletion manifest is
 .local/index-cleanup-20261110/cleanup-audit.json (local-only).
 
 **Serving status:** The existing Phase04 RAG runtime remains configured to
 load the removed Qwen3 index/encoder; it is intentionally no longer a working
 local fallback. Selecting BGE-M3 does not mean a new Clean-based online RAG
-runtime was deployed. Retrieval, Reranking and Generation integration remain
-future work. The four-arm benchmark complete.json remains historical and its
+runtime was deployed. An opt-in candidate Retrieval runtime is now implemented;
+integration with Reranking and Generation remains future work. The four-arm benchmark complete.json remains historical and its
 old Run/Resume/Validate are not suitable after candidate removal.
 
-**Next scope:** integrate/query the selected BGE-M3 + BM25F indexes via the
-new Retrieval branch, compare fusion and reranking operating points, and then
-study BGE-M3 Sparse as an optional incremental route.
+**Completed prior authorization (2026-11-11): P0–P2 Clean-based Retrieval.**
+The operator approved the revised [Retrieval V1 contract](phases/clean-retrieval-v1.md):
+an opt-in S0 runtime over the existing selected indexes, replaceable F1/F0 fusion,
+conservative structural candidate handling, and at most 128 real-source Sparse
+trial rows with resource checks. **P0–P2 engineering validation is complete:**
+the real selected-index S0 query matches original independent search; a reusable
+two-question session passed; the 32-row Sparse trial passed official-kernel,
+padding, exact-dot and recovery checks. The environment matrix covers 215 passing
+test IDs. Exact observations and limits belong to the
+[implementation report](research/clean-retrieval-p0p2-20261111.md).
+These are finite engineering results, not relevance or end-to-end acceptance.
+That work did not execute a full Sparse build, 70Q experiment, paid
+API, Serving switch, Git commit or push. Sparse component reuse is
+preferred; final S0/S1/S2 adoption remains the operator's decision. Later quality
+evaluation uses automatic 70Q comparisons and representative source-text cases,
+not mandatory blind review, complete relevance labeling or nDCG.
+
+**Active authorization (2026-11-12): P3 preparation and short tests only.**
+The operator will run full 119,557-row encoding in an independent PowerShell;
+Codex must not start it, keep it alive, poll or monitor that manual run.
+The [Sparse build contract](phases/sparse-build-v1.md) owns streaming SciPy shards,
+shared micro/macro membership, resource protection, recovery and independent
+Preflight/Run/Resume/Validate/Status entry points. The
+[preparation report and operator commands](research/sparse-build-preparation-20261112.md)
+own finite results and readiness. Preparation is complete: 32 real source vectors
+match P0–P2 exactly, official kernel/streaming queries/recovery/source readback
+pass, and the final source/model/code bindings are reverified. The environment
+matrix covers 104 passing test IDs, including 17 new streaming/job fault tests.
+The initial 0.6GiB-RAM preflight correctly stopped before model load; a later
+resource-qualified preflight passed in about94 seconds. The ready output is
+`data/retrieval/bge-m3-sparse-v1-20261112-ready/`; there is no root-level full
+Sparse manifest or shard. The user may manually start Run after resource checks.
+No P4/P5 quality selection, 70Q, paid API, default Serving change or push
+is authorized. The operator separately authorized a local Git commit of the
+completed P0–P2 and P3 preparation work on 2026-11-12. Existing
+Raw/Clean/Chunk/Dense/BM25F remain read-only.
 
 ---
 
@@ -142,7 +176,12 @@ V1 use identifies a specific bottleneck and a bounded scope is recorded here.
 Previous research plans and spent/closed call allowances do not authorize work
 under the new priority.
 
-## 2. Executable baseline and verified capabilities
+## 2. Historical Phase04 executable baseline and verified capabilities
+
+The table below records the retained Phase04 implementation checkpoint. Its Qwen
+model/index paths have since been retired locally; references to defaults and
+rollback here do not assert an operational local Serving path. Section 0 owns
+current selection and authorization.
 
 Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 
@@ -214,16 +253,13 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate next action after launcher acceptance is the operator's independent
-Run command in a system PowerShell terminal. Run automatically prepares the full
-shared input, audits all Tokenizer lengths, performs bounded resource probes and
-serially builds the three Dense candidates plus Whoosh3 BM25F. Blocked lengths or
-resources are recorded, and Resume retains committed work under the same binding.
-Full-build results then need integrity review and a shared-question quality
-comparison. The finite launcher checks do not establish full-corpus resource
-feasibility, recall relevance, fusion policy, reranking quality, final Packet
-policy or serving adoption. Generation owns Clean-based candidate-to-Packet
-assembly after Retrieval and Reranking.
+The immediate next action is the operator's independent PowerShell Preflight/Run
+using the delivered P3 commands. Full Sparse encoding is reserved
+for the operator's independent terminal; Codex does not start or monitor it.
+P4 70Q remains separately authorized future work. Do not run the historical four-arm launcher against removed
+Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
+Clean-based candidate-to-Packet assembly after Retrieval and Reranking; this work
+does not implement that downstream policy or establish retrieval/answer quality.
 The following dated material records retained legacy serving evidence and gaps.
 
 **Latest work (2026-11-02; paid gate CLOSED):** user authorization was exactly
@@ -318,6 +354,10 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Current Clean-based V2 chunking, source conditions, retrieval fields and display semantics | [`Chunking V2`](phases/chunking-v2.md) |
 | Unified Clean-based indexing input, field projections, analyzers and representation bindings | [`Indexing input V1`](phases/indexing-input-v1.md) |
 | Standalone serial full-index experiment, commands, encoding, recovery and independent search | [`Index benchmark V1`](phases/index-benchmark-v1.md) |
+| Clean-based Retrieval P0–P2, fusion, candidate interface and bounded Sparse trial | [`Retrieval V1`](phases/clean-retrieval-v1.md) |
+| Retrieval P0–P2 measured results, component reuse, resources and finite limits | [`Implementation report`](research/clean-retrieval-p0p2-20261111.md) |
+| P3 streaming Sparse build, recovery, resource and validation contract | [`Sparse build V1`](phases/sparse-build-v1.md) |
+| P3 preparation, finite test evidence and standalone PowerShell commands | [`P3 runbook`](research/sparse-build-preparation-20261112.md) |
 | Launcher finite validation, environment reuse and measured limitations | [`Launcher report`](research/index-benchmark-launcher-20261109.md) |
 | Indexing work unit 1 source survey, finite export and readback evidence | [`Work-unit report`](research/indexing-input-v1-20261109.md) |
 | Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |

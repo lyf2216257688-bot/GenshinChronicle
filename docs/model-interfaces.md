@@ -18,9 +18,11 @@ dispatch is paused. Historical canaries and scoped permits do not reopen work.
 
 The V1 default answer provider is now operator-selected DeepSeek, retaining
 explicit Bailian/Qwen rollback and the unresolved limited-live cap issue.
-Original-RU local `Qwen/Qwen3-Embedding-0.6B` / 1024d retrieval is the
-operator-selected V1 default. The completed full index is paired with the local
-query encoder. The accepted online-Qwen 2048d profile is explicit rollback.
+The original-RU Qwen selectors below describe retained code, not a working local
+fallback: their local model/index assets were retired. Selected Clean BGE-M3
+indexes and the opt-in [Retrieval P0–P2](phases/clean-retrieval-v1.md) path are
+separate from Serving adoption. The bounded and P3 streaming Sparse adapters perform local Torch
+inference only; they add no external API/provider or paid-call authorization.
 Migration and acceptance follow the
 [Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
 The first QA route/model is configurable with the evidenced TokenMetro Chat
@@ -146,9 +148,9 @@ or experimental configurations as current production defaults.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ Tier 1: Phase 04 Production QA Serving Chain (Default / Adopted)                │
+│ Tier 1: Retained Phase04 QA code (local Qwen assets retired)                    │
 │   • Generation: DeepSeek V1 default; explicit Bailian/Qwen rollback             │
-│   • Query Seam: local Qwen3 1024d; explicit DashScope Qwen 2048d rollback        │
+│   • Query Seam: historical Qwen3 1024d / Qwen 2048d selectors; not local fallback│
 │   • Rerank: Local BAAI/bge-reranker-v2-m3 (Local weight inference; 0 remote API) │
 └──────────────────────────────────────┬───────────────────────────────────────────┘
                                        │
@@ -177,7 +179,7 @@ or experimental configurations as current production defaults.
 
 ## 2. Canonical Model Interface Directory
 
-### Local embedding deployment (V1 migration asset; not adopted for serving)
+### Local embedding deployment (historical migration asset; retired locally)
 
 `genshin_corpus.retrieval.local_qwen3_embedding` loads official
 `Qwen/Qwen3-Embedding-0.6B`, revision
@@ -198,6 +200,10 @@ comparative adoption. See the paired-profile section below. CUDA/CPU vector
 spaces must not be mixed. Generation defaults are described separately.
 
 ### 2.1 Tier 1: Phase 04 Production QA Serving Chain
+
+This is the retained implementation catalog. Its local Qwen model/index assets
+were retired; the Tier label and code-level defaults do not assert a functioning
+Serving path or override current-phase adoption.
 
 | Route Name | Logical Model | Model ID / Snapshot | Provider | Protocol Surface | Endpoint / Base URL | API Key Env | Status | Applicable Modules |
 |---|---|---|---|---|---|---|---|---|
@@ -284,6 +290,9 @@ $env:GENSHIN_GENERATION_BACKEND = 'bailian'
 ```
 
 ### Phase 04 paired Embedding profiles
+
+These selectors remain in code and still default as listed, but their local
+Qwen assets were removed. Do not treat either profile as working local rollback.
 
 | Selector | Query / Dense pair | Selection |
 |---|---|---|

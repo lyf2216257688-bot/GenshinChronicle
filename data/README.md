@@ -1,10 +1,12 @@
 # Data Directory
 
-Clean-based chunking V2/V2.1 artifacts are stored under `retrieval/`. Phase04 remains
-the serving baseline and Phase05 semantic work is paused per
+Clean-based chunking V2/V2.1 artifacts are stored under `retrieval/`. The retained
+Phase04 local runtime references retired Qwen assets and is not a working fallback.
+Phase05 semantic work is paused per
 [`current-phase.md`](../docs/current-phase.md). Existing Raw,
-Parsed, Canonical, original RU, BM25 and historical 2048d Dense artifacts retain
-their responsibilities and must be preserved. Phase 05 run roots, requests,
+Parsed, Canonical, original RU and retained lexical artifacts preserve their
+responsibilities; this paragraph does not assert deleted Dense assets are present.
+Phase 05 run roots, requests,
 failures/UNKNOWN ledgers, Cards and review exports below are retained historical
 evidence, not pending V1 build tasks or sources of new call authorization.
 
@@ -44,6 +46,25 @@ validation, including a seven-Chunk subset of the accepted input. Its subset
 completion markers carry scope=subset. The [launcher report](../docs/research/index-benchmark-launcher-20261109.md)
 owns exact trials and results, and the [launcher contract](../docs/phases/index-benchmark-v1.md)
 owns file protocols and standalone commands.
+
+`retrieval/clean-retrieval-p0p2-20261111-review/` owns new, opt-in single-query
+candidate outputs, original-search parity checks, bounded Sparse trial selection,
+CSR shards/receipts, kernel/padding/dot-product/resume checks, resource records and
+actual source-text previews. Failed development attempts remain separate. These
+are finite engineering derivatives, not a full Sparse index, 70Q quality result,
+Serving switch or final Evidence Packet. The
+[Retrieval contract](../docs/phases/clean-retrieval-v1.md) owns the format/boundary;
+current-phase routes the accepted measured report.
+
+`retrieval/bge-m3-sparse-v1-20261112-ready/` is the standalone P3 job root: plans,
+preflight-attempts with bounded source samples and probe indexes, events,
+per-invocation logs, and later operator-built full shards/manifest and independent
+validation reports. Probe indexes carry scope=finite-probe; the root-level full
+index carries scope=full-selected and is published only by explicit Run/Resume.
+Preflight alone creates no root-level full shards or manifest. This directory
+does not replace selected Dense/BM25F or imply adoption. The
+[P3 runbook](../docs/research/sparse-build-preparation-20261112.md) owns commands
+and dated readiness evidence.
 
 The following V1/V2 paths describe historical responsibilities. Earlier Chunk
 build directories were subsequently removed or archived, so these paragraphs
@@ -121,14 +142,16 @@ remain on D:; seven manifest-listed flat artifacts passed SHA-256 checks on
 `F:/2_个人存档/GC存档/archive-20261109/data-retrieval/` and removed from D: only after
 archive and source re-verification. Re-running no-op resume or shard-level checks
 requires restoring `_records/` first with the archive `restore_retrieval.py`.
-Five earlier Phase04 experiment roots were archived to the same location; current
-Phase04 RU, BM25, local Dense and accepted r3 comparison/Assembly results remain.
+Five earlier Phase04 experiment roots were archived to the same location. At that
+historical checkpoint RU, BM25, local Dense and r3 comparison/Assembly results
+remained; the later local Dense retirement is recorded in current-phase.
 The full V2.1 Chunk exports have **not** been adopted as serving indexes and
 still require separate retrieval-quality evaluation and explicit adoption.
 
-The completed local 1024d original-RU index at
-`retrieval/p04-local-qwen3-1024-20261102-v1/` is the default serving index.
-The builder
+The historical local 1024d original-RU index at
+`retrieval/p04-local-qwen3-1024-20261102-v1/` was the default before its local
+retirement on 2026-11-10. This paragraph documents its builder protocol, not
+current file availability or a supported rollback. The builder
 owns `build-plan.json`, `length-audit.json`, `shards/*/receipt.json`, per-shard
 vectors/rows, `progress.json`, append-only `events.jsonl`, failure diagnostics,
 `validation.json`, `report.json` and the final `metadata/manifest.json`.
@@ -143,8 +166,8 @@ unsuccessful host-detachment probes, not active workers or build completion.
 capped smoke selections and this work's test evidence. Separate
 `retrieval/p04-local-qwen3-smoke-20261102-r1/` (512) and `-r2/` (1024) own bounded
 real inference, process-death recovery and Dense/Hybrid/BGE loading evidence;
-they are never production candidates. Historical 2048d artifacts, the 909-RU
-pilot and Phase05 indexes are preserved. See the
+they are never production candidates. Their reports are historical evidence;
+deleted/archived Dense paths do not become available through these references. See the
 [operator runbook](../docs/research/phase-04/p04-local-qwen3-migration-20261102.md).
 Distinct `retrieval/p04-embedding-70q-*/` roots retain offline comparison
 manifests, per-question Packets, traces and separate review bundles. Preserve
