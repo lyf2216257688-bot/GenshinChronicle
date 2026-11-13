@@ -66,6 +66,16 @@ does not replace selected Dense/BM25F or imply adoption. The
 [P3 runbook](../docs/research/sparse-build-preparation-20261112.md) owns commands
 and dated readiness evidence.
 
+`retrieval/recall-p4-70q-v1-20261112/` is the new P4 experiment root: immutable
+plans, preflight evidence, per-question neural/BM25F/comparison attempt receipts,
+full original candidate text, events/progress, worker logs, reports and validation.
+`retrieval/recall-p4-smoke-v1-20261112/` is separate and binds only the independent
+one-question engineering smoke. Completion scopes distinguish it from70Q.
+These roots never contain rebuilt index artifacts or final Evidence Packets.
+The [P4 contract](../docs/phases/recall-experiment-v1.md) owns protocols; the
+[P4 runbook](../docs/research/recall-experiment-preparation-20261112.md) owns tests,
+resource limitations and manual commands.
+
 The following V1/V2 paths describe historical responsibilities. Earlier Chunk
 build directories were subsequently removed or archived, so these paragraphs
 do not assert current path availability. The full V2.1 source is identified below.

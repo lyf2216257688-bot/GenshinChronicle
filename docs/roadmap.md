@@ -19,8 +19,8 @@ The selected BGE-M3/BM25F assets feed the opt-in
 fusion, then bounded Sparse validation before any full build. The
 [P3 Sparse path](phases/sparse-build-v1.md) prepares a standalone operator-run
 streaming full build and validation; Codex performs only finite development tests.
-Later 70Q comparison
-uses automatic diagnostics and representative original-text cases; final
+The separate [P4 experiment](phases/recall-experiment-v1.md) prepares operator-run
+70Q comparison with automatic diagnostics and representative original-text cases; final
 S0/S1/S2 adoption belongs to the operator. Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

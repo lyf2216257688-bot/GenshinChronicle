@@ -92,6 +92,10 @@ The separate `indexing/sparse_full.py` / `sparse_job.py` path adds bounded,
 shared-encoding CSR shards, exact streaming search and standalone manual build,
 resume and independent validation under [Sparse build V1](phases/sparse-build-v1.md).
 It retains the trial's space contract and does not integrate S1/S2 into Serving.
+The separate [P4 experiment](phases/recall-experiment-v1.md) captures all three
+channels once per question and reuses them across opt-in S0/S1/S2 and fusion
+controls. Its recoverable checkpoints and source-text diagnostics do not add
+Reranking, Generation assembly, query rewriting or a new Serving selector.
 
 ### 2. Preserved Parsed baseline
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**

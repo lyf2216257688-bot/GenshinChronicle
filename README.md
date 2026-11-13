@@ -39,6 +39,9 @@ interface and bounded Sparse trial do not switch Serving or establish RAG qualit
 The [P3 Sparse runbook](docs/research/sparse-build-preparation-20261112.md) provides
 separate Preflight/Run/Resume/Status/Validate commands for the operator's manual
 full build; it does not automatically start encoding or change Serving.
+The [P4 recall experiment](docs/phases/recall-experiment-v1.md) reuses the completed
+indexes for operator-run S0/S1/S2 comparisons, resumable raw hits and source-text
+reports. Preflight and a separate one-question Smoke precede manual70Q Run.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The retained Phase04 implementation extends the historical adopted Block A over the accepted

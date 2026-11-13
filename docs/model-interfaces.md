@@ -23,6 +23,8 @@ fallback: their local model/index assets were retired. Selected Clean BGE-M3
 indexes and the opt-in [Retrieval P0–P2](phases/clean-retrieval-v1.md) path are
 separate from Serving adoption. The bounded and P3 streaming Sparse adapters perform local Torch
 inference only; they add no external API/provider or paid-call authorization.
+The separate P4 experiment reuses the same local adapters in serial isolated
+query workers; its opt-in S0/S1/S2 comparisons do not change Serving defaults.
 Migration and acceptance follow the
 [Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
 The first QA route/model is configurable with the evidenced TokenMetro Chat

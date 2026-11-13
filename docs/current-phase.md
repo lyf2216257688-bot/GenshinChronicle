@@ -4,7 +4,7 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — P3 Sparse build preparation (2026-11-12)
+## 0. Current work — P4 recall experiment preparation (2026-11-12)
 
 **Adopted: BAAI/bge-m3 as the sole Clean/Chunk V2.1 Dense model.**
 The 20-question blind-review comparison found BGE-M3 and Jina v5 closely matched;
@@ -13,7 +13,7 @@ and compatibility with the planned Sparse-increment experiment. No further
 Dense model comparison is required before continuing the pipeline.
 
 The canonical selection record is config/index-selected-v1.json.
-The active indexing artifacts are the completed BGE-M3 1024-dimensional Dense
+The selected Dense/lexical indexing artifacts are the completed BGE-M3 1024-dimensional Dense
 index and Whoosh3 BM25F lexical index, sharing the validated 119,557 unique
 Chunk inputs, 104,879 micro memberships and 78,658 macro memberships.
 
@@ -52,9 +52,8 @@ preferred; final S0/S1/S2 adoption remains the operator's decision. Later qualit
 evaluation uses automatic 70Q comparisons and representative source-text cases,
 not mandatory blind review, complete relevance labeling or nDCG.
 
-**Active authorization (2026-11-12): P3 preparation and short tests only.**
-The operator will run full 119,557-row encoding in an independent PowerShell;
-Codex must not start it, keep it alive, poll or monitor that manual run.
+**Completed P3 foundation (2026-11-12).**
+The operator ran full 119,557-row Sparse encoding in an independent PowerShell.
 The [Sparse build contract](phases/sparse-build-v1.md) owns streaming SciPy shards,
 shared micro/macro membership, resource protection, recovery and independent
 Preflight/Run/Resume/Validate/Status entry points. The
@@ -63,14 +62,29 @@ own finite results and readiness. Preparation is complete: 32 real source vector
 match P0–P2 exactly, official kernel/streaming queries/recovery/source readback
 pass, and the final source/model/code bindings are reverified. The environment
 matrix covers 104 passing test IDs, including 17 new streaming/job fault tests.
-The initial 0.6GiB-RAM preflight correctly stopped before model load; a later
-resource-qualified preflight passed in about94 seconds. The ready output is
-`data/retrieval/bge-m3-sparse-v1-20261112-ready/`; there is no root-level full
-Sparse manifest or shard. The user may manually start Run after resource checks.
-No P4/P5 quality selection, 70Q, paid API, default Serving change or push
-is authorized. The operator separately authorized a local Git commit of the
-completed P0–P2 and P3 preparation work on 2026-11-12. Existing
-Raw/Clean/Chunk/Dense/BM25F remain read-only.
+The completed `data/retrieval/bge-m3-sparse-v1-20261112-ready/` manifest binds
+468 shards, 10,015,176 nonzero weights and zero empty rows. Its independent
+validation report is PASS and matches the full manifest hash
+`c6897d8b1fc7289fcd26bf0c5d98cb35ab7f5ad8abfb31b0a0b8da8a599f937b`.
+This is mechanical/source validation, not relevance or adoption.
+
+**Active authorization (2026-11-12): P4 preparation and short tests.**
+The operator requests S0/S1/S2 automatic comparison using the existing70 questions,
+plus representative original-text cases and necessary F0/F1 controls. The
+[P4 contract](phases/recall-experiment-v1.md) owns the experiment interface,
+recovery, validation and reports. After the actual preflight stopped at about
+1.1GiB available RAM before any inference, the operator requested running the
+real preflight and one-question Smoke manually after closing the desktop app.
+Codex completes fixture tests and preparation; no real model Smoke or70Q was run
+in this work unit. The operator starts both Smoke and the complete70Q in an independent
+PowerShell. Codex must not launch, keep alive, poll or monitor the manual run.
+Final S0/S1/S2 adoption remains the operator's decision. No paid API, default
+Serving switch, index rebuild, P5, or automatic Git commit/push is authorized.
+Existing Raw/Clean/Chunk/Dense/BM25F/Sparse remain read-only. The prior local
+commit authorization applied only to the completed P0–P3 work unit.
+P4 fixture validation covers54 distinct passing tests across the isolated
+runtimes; the actual entry points and explicit real-Smoke limitation are in the
+[P4 preparation runbook](research/recall-experiment-preparation-20261112.md).
 
 ---
 
@@ -214,8 +228,10 @@ verification; its pilot index at
 `.local/embedding-tests/qwen3-0.6b-20261025-r1/dense/` has 909 rows and passed
 artifact checks. The separate Embedding/BGE runtime executables and BGE weights
 exist. This is artifact integrity, not a new model-inference or full upstream
-corpus re-audit. The 70Q runtime and review-only JSONL files both exist with
-70 rows. The initial priority audit's 181-test offline regression run covered Generation/measure,
+corpus re-audit. At that2026-11-02 checkpoint the70Q runtime and review-only
+JSONL files both existed with70 rows; the original temporary copies are absent
+now. P4 binds the retained question-set.jsonl identified in its contract.
+The initial priority audit's 181-test offline regression run covered Generation/measure,
 backend, RU/Assembly/retrieval, local embedding guards, BGE/ranking, UI runtime
 and model-interface documentation. After the DeepSeek adapter/selector work,
 193 affected offline tests passed in the existing BGE/UI runtime and 20 shared
@@ -253,10 +269,10 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate next action is the operator's independent PowerShell Preflight/Run
-using the delivered P3 commands. Full Sparse encoding is reserved
-for the operator's independent terminal; Codex does not start or monitor it.
-P4 70Q remains separately authorized future work. Do not run the historical four-arm launcher against removed
+The immediate next action after P4 preparation is the operator's manual
+Preflight, one-question Smoke, then70Q Run using the P4 entry point. Run/Resume
+for70Q require a matching independently validated Smoke. Codex does not
+start or monitor the full run. Do not run the historical four-arm launcher against removed
 Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
 Clean-based candidate-to-Packet assembly after Retrieval and Reranking; this work
 does not implement that downstream policy or establish retrieval/answer quality.
@@ -358,6 +374,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Retrieval P0–P2 measured results, component reuse, resources and finite limits | [`Implementation report`](research/clean-retrieval-p0p2-20261111.md) |
 | P3 streaming Sparse build, recovery, resource and validation contract | [`Sparse build V1`](phases/sparse-build-v1.md) |
 | P3 preparation, finite test evidence and standalone PowerShell commands | [`P3 runbook`](research/sparse-build-preparation-20261112.md) |
+| P4 S0/S1/S2 comparison, recovery and report contract | [`P4 experiment`](phases/recall-experiment-v1.md) |
+| P4 preparation tests, real-Smoke limitation and manual commands | [`P4 runbook`](research/recall-experiment-preparation-20261112.md) |
 | Launcher finite validation, environment reuse and measured limitations | [`Launcher report`](research/index-benchmark-launcher-20261109.md) |
 | Indexing work unit 1 source survey, finite export and readback evidence | [`Work-unit report`](research/indexing-input-v1-20261109.md) |
 | Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |

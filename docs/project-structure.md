@@ -48,6 +48,12 @@ The [Retrieval contract](phases/clean-retrieval-v1.md) defines their boundaries.
 `scripts/retrieval/run-sparse-build.ps1` own standalone preflight, explicit manual
 build/resume, progress and independent validation. Their
 [P3 contract](phases/sparse-build-v1.md) preserves the finite trial separately.
+`clean_based/experiment.py`, `experiment_worker.py`, `experiment_analysis.py` and
+`experiment_report.py` own P4's operator-run capture/recovery, serial isolated
+query processes, replayable diagnostics and original-text reports. The separate
+`config/recall-experiment-v1.json` and `scripts/retrieval/run-recall-experiment.ps1`
+implement [P4](phases/recall-experiment-v1.md), without changing the S0 runtime or
+formal index selection.
 
 The retained Phase04 `retrieval/` -> `rag/backend.py` -> `generation/` composition
 with the thin `ui/` presentation is not operational with its retired Qwen assets.
