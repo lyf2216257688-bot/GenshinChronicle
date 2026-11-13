@@ -118,9 +118,16 @@ def prepare_pinned_model_stage(model_path: Path, custom_code_path: Path, stage_p
     if stage_path.exists():
         raise FileExistsError(f"refusing to overwrite GTE staging path: {stage_path}")
     stage_path.mkdir(parents=True)
+    weight_hardlinked = True
     for name in PINNED_MODEL_FILE_SHA256:
         if name == "model.safetensors":
-            os.link(Path(model_path) / name, stage_path / name)
+            try:
+                os.link(Path(model_path) / name, stage_path / name)
+            except OSError:
+                shutil.copy2(Path(model_path) / name, stage_path / name)
+                weight_hardlinked = False
+            if _sha256_file(stage_path / name) != PINNED_MODEL_FILE_SHA256[name]:
+                raise GteRerankerError("staged GTE weight SHA-256 mismatch")
         else:
             shutil.copy2(Path(model_path) / name, stage_path / name)
     for name in PINNED_CUSTOM_CODE_SHA256:
@@ -138,7 +145,7 @@ def prepare_pinned_model_stage(model_path: Path, custom_code_path: Path, stage_p
     return {
         "source_inventory": inventory,
         "stage_path": str(stage_path.resolve()),
-        "stage_weight_hardlinked": True,
+        "stage_weight_hardlinked": weight_hardlinked,
         "patched_auto_map": patched,
     }
 

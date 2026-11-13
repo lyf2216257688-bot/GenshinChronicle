@@ -97,7 +97,19 @@ channels once per question and reuses them across opt-in S0/S1/S2 and fusion
 controls. Its recoverable checkpoints and source-text diagnostics do not add
 Reranking, Generation assembly, query rewriting or a new Serving selector.
 
+### Clean-based Reranking and runtime migration
+
+The opt-in Clean-based Reranking path consumes
+fixed CandidateSets and emits complete RankedCandidateSets. Dedicated local
+Cross-Encoders score relevance; conservative source coverage and optional local
+MMR record priority adjustments without deleting candidates. Generation retains
+source/Parent readback and Packet assembly. Python runtime migration is admitted
+only by an explicit sealed compatibility record against immutable index identity;
+it does not rewrite representation metadata. The
+[Reranking contract](phases/clean-reranking-v1.md) owns these interfaces.
+
 ### 2. Preserved Parsed baseline
+
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
 
 Parsed schemas may remain source-specific. Unification is not required here.

@@ -12,6 +12,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+if (Test-Path -LiteralPath (Join-Path $projectRoot '.local/runtime-py314/retired-entrypoints.json')) {
+    throw 'The historical four-arm benchmark is retired after asset removal and runtime migration. Inspect preserved reports.'
+}
 $configPath = [IO.Path]::GetFullPath($Config, $projectRoot)
 $settings = Get-Content -LiteralPath $configPath -Raw -Encoding utf8 | ConvertFrom-Json
 $python = [IO.Path]::GetFullPath($settings.coordinator_python, $projectRoot)

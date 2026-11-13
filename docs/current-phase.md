@@ -4,7 +4,47 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — P4 70Q quality review complete; adoption pending (2026-11-13)
+## 0. Current work — S0 Reranking; Python 3.14 migration complete (2026-11-13)
+
+**Latest operator decision:** pause Sparse use and fusion tuning; use S0
+(BM25F + BGE-M3 Dense) to proceed to Clean-based Reranking. Preserve Sparse,
+S1/S2 and P3/P4 evidence. This supersedes the adoption-pending checkpoint below;
+it does not adopt an online Serving path or establish end-to-end quality.
+
+**Authorized implementation:** the operator approved the revised
+[Reranking/Python migration contract](phases/clean-reranking-v1.md): preserve
+existing indexes and upstream data; prepare independent Python 3.14.5 runtimes,
+an explicit old-index compatibility gate, fixed saved S0 candidates, BGE/GTE
+relevance comparison, then structural processing and local score-gap-protected
+MMR after model selection. Generation continues to own Evidence Assembly.
+The [historical preparation report](research/clean-reranking-preparation-20261113.md)
+records the initial software/fixture checkpoint. The model-free fixed input
+export is complete: 70 questions / 6,963 candidates. New ordering, recovery,
+validation and migration software is opt-in; model adoption remains undecided.
+Both isolated Python 3.14.5 environments are installed; dependency imports,
+GTE custom-class imports and finite fixture checks pass. The operator's real
+BGE/GTE Preflight, four-group FP16 CUDA Smoke and independent Validate pass.
+**Python migration and cleanup are complete:** matched r3 witnesses reproduce the
+old index and agree across3.12/3.14 (Dense bitwise equal, Sparse exact values,
+token IDs/rankings/kernel checks PASS). Active configs use3.14, the old-base-disabled
+actual S0 query passes, four old virtual environments and the old shared base are
+removed. By subsequent explicit authorization, global3.14 registration is repaired
+and global3.12 registration retired with backups. E1 lock/code/models are retained.
+The [migration report](research/python314-migration-20261113.md) owns exact versions,
+finite evidence and cleanup; no Reranker quality/model selection is established.
+
+**Execution boundary and immediate next action:** the operator now authorizes
+Codex to start and inspect finite local checks expected within three to five
+minutes. Longer full70Q remains operator-started, never polled by Codex. The next
+step is the saved-S0 BGE/GTE full70Q Run, independent Validate and relevance report,
+followed by operator model selection and only then structural/MMR ablation.
+Existing Reranker Smoke remains valid; do not rerun retired3.12 commands or relax
+tolerances. Implementation and validation performed no paid call, index rebuild
+or Serving switch. The operator subsequently authorized committing and pushing
+the reviewed code, configuration, tests and documentation; local runtime and
+generated evidence remain excluded. Historical worktree source pins remain frozen records.
+
+### Historical P4 completion checkpoint (before the S0 decision)
 
 **Adopted: BAAI/bge-m3 as the sole Clean/Chunk V2.1 Dense model.**
 The 20-question blind-review comparison found BGE-M3 and Jina v5 closely matched;
@@ -104,7 +144,8 @@ Sparse has not been shown to replace BM25F safely. If adding Sparse, the review
 prefers S2 with F1_max; S0 remains the baseline/lower-cost choice. This is a
 recommendation only: no S0/S1/S2 or fusion adoption, selector/default switch,
 Reranking integration or Generation integration was performed. Final adoption
-remains the operator's decision.
+remained the operator's decision at this historical checkpoint; the later S0
+choice is recorded at the start of this section.
 
 ---
 
@@ -289,12 +330,12 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate next action is the operator's decision on the completed P4
-[70Q quality review](research/recall-p4-70q-quality-review-20261113.md): retain S0
-or adopt the recommended S2/F1_max candidate direction, with its documented
-cost and residual losses. No further retrieval run is required by this review.
-The earlier manual Preflight/Smoke/70Q instructions remain recovery/history
-references, not unfinished work. Do not run the historical four-arm launcher
+Follow the current validation gate in section 0 and the
+[Reranking/migration runbook](research/clean-reranking-preparation-20261113.md).
+The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
+does not require another retrieval run; the subsequent S0 decision is recorded
+in section 0. Earlier P4 Preflight/Smoke/70Q instructions remain recovery/history
+references, not unfinished P4 work. Do not run the historical four-arm launcher
 against removed Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
 Clean-based candidate-to-Packet assembly after Retrieval and Reranking; this work
 does not implement that downstream policy or establish retrieval/answer quality.
@@ -380,6 +421,9 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Topic / responsibility | Primary owner |
 | --- | --- |
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
+| Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
+| Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
+| Completed Python migration, compatibility measurements, global entrypoints and cleanup | [`Migration report`](research/python314-migration-20261113.md) |
 | Architecture and boundaries | [`Architecture overview`](architecture-overview.md) |
 | Phase priorities and milestones | [`Roadmap`](roadmap.md) |
 | Directory/package responsibilities | [`Project structure`](project-structure.md) |

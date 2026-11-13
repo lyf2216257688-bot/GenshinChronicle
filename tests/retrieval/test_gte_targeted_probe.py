@@ -161,10 +161,12 @@ class GteAdapterTests(unittest.TestCase):
             code_hashes = {name: hashlib.sha256((code / name).read_bytes()).hexdigest() for name in code_files}
             with patch("genshin_corpus.retrieval.gte_multilingual_reranker.PINNED_MODEL_FILE_SHA256", model_hashes), patch("genshin_corpus.retrieval.gte_multilingual_reranker.PINNED_CUSTOM_CODE_SHA256", code_hashes):
                 evidence = prepare_pinned_model_stage(model, code, stage)
-                self.assertTrue(evidence["stage_weight_hardlinked"])
+                self.assertIsInstance(evidence["stage_weight_hardlinked"], bool)
                 staged_config = json.loads((stage / "config.json").read_text(encoding="utf-8"))
                 self.assertEqual(staged_config["auto_map"]["AutoConfig"], "configuration.NewConfig")
-                self.assertEqual((stage / "model.safetensors").stat().st_ino, (model / "model.safetensors").stat().st_ino)
+                self.assertEqual((stage / "model.safetensors").read_bytes(), (model / "model.safetensors").read_bytes())
+                if evidence["stage_weight_hardlinked"]:
+                    self.assertEqual((stage / "model.safetensors").stat().st_ino, (model / "model.safetensors").stat().st_ino)
                 with self.assertRaises(FileExistsError):
                     prepare_pinned_model_stage(model, code, stage)
         finally:

@@ -19,6 +19,7 @@ from genshin_corpus.indexing.sparse_full import (
 from genshin_corpus.indexing.sparse_job import Tee
 from genshin_corpus.indexing import sparse_job
 from genshin_corpus.retrieval.local_qwen3_build import build_lock
+from genshin_corpus.indexing.benchmark_io import child_process
 
 
 class StreamingSparseTests(unittest.TestCase):
@@ -189,20 +190,19 @@ def stop(folder):
 with build_lock(root):
     build_stream(root,p['plan'],iter((r,str(r['input_row'])) for r in p['rows']),encode,config=p['config'],before_commit=stop)
 """
-        process = subprocess.Popen([sys.executable, "-B", "-c", script, str(payload), str(self.root), str(marker)],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        try:
-            deadline = time.monotonic() + 15
-            while not marker.exists() and process.poll() is None and time.monotonic() < deadline:
-                time.sleep(.05)
-            self.assertTrue(marker.exists(), "Child did not reach incomplete second shard")
-            process.kill()
-            process.wait(timeout=5)
-        finally:
-            if process.poll() is None:
+        # On Windows a venv executable redirects to a child interpreter. Own the
+        # whole tree so killing the redirector cannot leave the fixture lock held.
+        with child_process([sys.executable, "-B", "-c", script, str(payload), str(self.root), str(marker)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as process:
+            try:
+                deadline = time.monotonic() + 15
+                while not marker.exists() and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(.05)
+                self.assertTrue(marker.exists(), "Child did not reach incomplete second shard")
                 process.kill()
                 process.wait(timeout=5)
-            process.stderr.close()
+            finally:
+                process.stderr.close()
         saved = {p: sha(p) for p in self.root.glob("shards/*/complete.json")}
         with build_lock(self.root):
             self.build()

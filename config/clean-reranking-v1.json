@@ -1,0 +1,20 @@
+{
+  "version": "gc-clean-reranking-1",
+  "python": ".local/runtime-py314/reranker/Scripts/python.exe",
+  "recall_output": "data/retrieval/recall-p4-70q-v1-20261112",
+  "input": "data/retrieval/rerank-v1-input-20261113",
+  "output": "data/retrieval/rerank-v1-70q-20261113",
+  "smoke_output": "data/retrieval/rerank-v1-smoke-20261113",
+  "profile": "S0/f1_max",
+  "expected_questions": 70,
+  "expected_candidates": 6963,
+  "initial_pair_budget": 2048,
+  "worker_timeout_seconds": 900,
+  "models": ["bge", "gte"],
+  "limits": {"minimum_running_ram_bytes": null},
+  "resource_advice": {"available_ram_gib": 4, "free_vram_gib": 2, "admission_gate": false},
+  "local_depth": 30,
+  "protected_top": 3,
+  "protected_gap": 0.1,
+  "mmr_lambdas": [1.0, 0.85, 0.7]
+}

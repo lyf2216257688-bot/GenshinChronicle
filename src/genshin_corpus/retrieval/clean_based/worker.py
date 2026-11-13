@@ -37,7 +37,8 @@ def main(argv=None):
                 from ...indexing.benchmark_dense import Encoder
                 session = DenseSession(path)
                 encoder = Encoder(model_spec(selection, manifest), Path(args.repo))
-                require(encoder.space_id == manifest["space_id"], "Actual query encoder differs from selected index")
+                from ...runtime_compatibility import index_space
+                admitted_space = index_space(Path(args.repo), config, manifest, encoder.contract)
             else:
                 session = LexicalSession(path, args.scratch)
             emit({"status": "ready", "channel": args.channel,
@@ -53,7 +54,7 @@ def main(argv=None):
                 if encoder is not None:
                     ram_guard(config, model_loaded=encoder.model is not None)
                     vector = encoder.encode([query.text], role="query")[0]
-                    routes = session.search(vector, space_id=encoder.space_id, top_k=depth)
+                    routes = session.search(vector, space_id=admitted_space, top_k=depth)
                 else:
                     routes = session.search(query.text, top_k=depth)
                 if request.get("verify_reference", False):

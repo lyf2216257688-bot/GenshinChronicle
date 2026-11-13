@@ -1,0 +1,16 @@
+{
+  "version": "gc-python314-migration-1",
+  "baseline_python": ".local/rag-index-prep-20261109/candidate-runtime/Scripts/python.exe",
+  "python": ".local/runtime-py314/dense-sparse/Scripts/python.exe",
+  "reranker_python": ".local/runtime-py314/reranker/Scripts/python.exe",
+  "retrieval_config": "config/clean-retrieval-v1.json",
+  "sparse_root": "data/retrieval/bge-m3-sparse-v1-20261112-ready",
+  "baseline": "data/retrieval/python314-baseline-20261113-r3",
+  "candidate": "data/retrieval/python314-candidate-20261113-r3",
+  "certificate": "data/retrieval/python314-compatibility-20261113-r3",
+  "replay_output": "data/retrieval/python314-baseline-replay-20261113",
+  "sample_rows": 32,
+  "queries": ["塔利雅的新颂歌灵感来自哪里？", "至冬先驱报里的交互文本"],
+  "rtol": 0.00001,
+  "atol": 0.000001
+}

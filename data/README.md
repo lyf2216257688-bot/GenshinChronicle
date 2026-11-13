@@ -1,5 +1,15 @@
 # Data Directory
 
+`retrieval/rerank-v1-input-20261113/` owns a create-only, model-free snapshot of
+validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate
+`rerank-v1-smoke-20261113/` own operator-run scores, length audits, immutable
+attempts, complete candidate ordering references and independent validation.
+They are candidates, not final Evidence Packets. `python314-baseline-20261113/`,
+`python314-candidate-20261113/` and `python314-compatibility-20261113/` own finite
+migration witnesses and sealed admission records. Those roots do not replace
+or modify existing index manifests. Presence/readiness belongs to current-phase;
+the [Reranking contract](../docs/phases/clean-reranking-v1.md) owns the protocols.
+
 Clean-based chunking V2/V2.1 artifacts are stored under `retrieval/`. The retained
 Phase04 local runtime references retired Qwen assets and is not a working fallback.
 Phase05 semantic work is paused per

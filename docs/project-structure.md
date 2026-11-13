@@ -36,6 +36,17 @@ repository transactional IO/locking. config/index-benchmark-v1.json owns the
 experimental operating point. scripts/retrieval/run-index-benchmark.ps1 is the
 PowerShell entry point. Serving integration retains its separate adoption scope.
 
+`runtime_migration.py` and `runtime_compatibility.py` own environment inventory,
+operator-run finite old/new witnesses and explicit admission to preserved index
+spaces. The Python 3.14 requirement profiles and independent migration launcher
+prepare isolated runtimes. Cleanup is a separately audited lifecycle step, not an
+automatic consequence of activation; the [migration report](research/python314-migration-20261113.md)
+records the completed scope and retired historical startup paths.
+`retrieval/clean_based/rerank_{core,model,worker,job}.py` owns fixed-input export,
+local BGE/GTE scoring, deterministic complete candidate ordering and manual
+experiment/recovery/report entry points under the
+[Reranking contract](phases/clean-reranking-v1.md). It does not own Packet assembly.
+
 `src/genshin_corpus/retrieval/clean_based/` owns opt-in Clean candidate discovery,
 bound source reading, isolated local query workers, replaceable F0/F1 fusion,
 conservative source-range organization and a single-question CLI. It emits

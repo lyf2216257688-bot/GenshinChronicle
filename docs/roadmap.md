@@ -21,7 +21,11 @@ fusion, then bounded Sparse validation before any full build. The
 streaming full build and validation; Codex performs only finite development tests.
 The separate [P4 experiment](phases/recall-experiment-v1.md) supports operator-run
 70Q comparison with automatic diagnostics and original-text review; final
-S0/S1/S2 adoption belongs to the operator. Retained Phase04 selectors reference
+S0/S1/S2 adoption belongs to the operator. The subsequent
+[Reranking and Python migration work](phases/clean-reranking-v1.md) prepares
+saved-S0 BGE/GTE comparison and incremental structural/MMR ordering. Runtime
+admission to immutable indexes is explicit; model selection and true-model jobs
+remain operator-controlled. Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).
 
