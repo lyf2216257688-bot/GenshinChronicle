@@ -76,6 +76,13 @@ The [P4 contract](../docs/phases/recall-experiment-v1.md) owns protocols; the
 [P4 runbook](../docs/research/recall-experiment-preparation-20261112.md) owns tests,
 resource limitations and manual commands.
 
+`retrieval/p4-quality-review-20261113/` owns the separate read-only review
+derivatives over the completed P4 results: 70 reviewer judgments, 88 literal
+evidence witnesses with all fusion ranks/source locators, saved-list Top20
+references, summary and receipt/quote/rank audit. It contains no new retrieval,
+index or Evidence Packet. The [quality review](../docs/research/recall-p4-70q-quality-review-20261113.md)
+owns its finite semantic assessments; these are not gold labels or adoption.
+
 The following V1/V2 paths describe historical responsibilities. Earlier Chunk
 build directories were subsequently removed or archived, so these paragraphs
 do not assert current path availability. The full V2.1 source is identified below.

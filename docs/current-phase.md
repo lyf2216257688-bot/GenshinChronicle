@@ -4,7 +4,7 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — P4 recall experiment preparation (2026-11-12)
+## 0. Current work — P4 70Q quality review complete; adoption pending (2026-11-13)
 
 **Adopted: BAAI/bge-m3 as the sole Clean/Chunk V2.1 Dense model.**
 The 20-question blind-review comparison found BGE-M3 and Jina v5 closely matched;
@@ -68,7 +68,7 @@ validation report is PASS and matches the full manifest hash
 `c6897d8b1fc7289fcd26bf0c5d98cb35ab7f5ad8abfb31b0a0b8da8a599f937b`.
 This is mechanical/source validation, not relevance or adoption.
 
-**Active authorization (2026-11-12): P4 preparation and short tests.**
+**Completed preparation authorization (2026-11-12): P4 preparation and short tests.**
 The operator requests S0/S1/S2 automatic comparison using the existing70 questions,
 plus representative original-text cases and necessary F0/F1 controls. The
 [P4 contract](phases/recall-experiment-v1.md) owns the experiment interface,
@@ -85,6 +85,26 @@ commit authorization applied only to the completed P0–P3 work unit.
 P4 fixture validation covers54 distinct passing tests across the isolated
 runtimes; the actual entry points and explicit real-Smoke limitation are in the
 [P4 preparation runbook](research/recall-experiment-preparation-20261112.md).
+
+**Completed operator experiment and authorized offline review (2026-11-13).**
+The operator completed the 70Q run at
+`data/retrieval/recall-p4-70q-v1-20261112/`. Its independent Validate report is
+PASS for scope=70q, questions=70, bound to complete SHA256
+`16b73821c78bab9a53da3473232d6c6ae17b1c0da8d4179c129f5a51e4c5c815`.
+This establishes mechanical/source binding and replay, not semantic acceptance.
+The operator then authorized a lightweight question-by-question review of the
+saved Top10/Top20 and F0/F1 controls, with no retrieval rerun, paid API,
+index/Serving change, complex labeling, blind review or automatic commit/push.
+The [quality review](research/recall-p4-70q-quality-review-20261113.md) records
+S1 versus S0 as 7 improved / 36 comparable / 6 degraded / 21 uncertain, and
+S2 as 3 / 45 / 1 / 21 under F1_max plus existing structural cleanup.
+These are bounded non-blind reviewer judgments, not a gold relevance set or
+global quality rates. Most confirmed gains concern ranking of existing evidence;
+Sparse has not been shown to replace BM25F safely. If adding Sparse, the review
+prefers S2 with F1_max; S0 remains the baseline/lower-cost choice. This is a
+recommendation only: no S0/S1/S2 or fusion adoption, selector/default switch,
+Reranking integration or Generation integration was performed. Final adoption
+remains the operator's decision.
 
 ---
 
@@ -269,11 +289,13 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-The immediate next action after P4 preparation is the operator's manual
-Preflight, one-question Smoke, then70Q Run using the P4 entry point. Run/Resume
-for70Q require a matching independently validated Smoke. Codex does not
-start or monitor the full run. Do not run the historical four-arm launcher against removed
-Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
+The immediate next action is the operator's decision on the completed P4
+[70Q quality review](research/recall-p4-70q-quality-review-20261113.md): retain S0
+or adopt the recommended S2/F1_max candidate direction, with its documented
+cost and residual losses. No further retrieval run is required by this review.
+The earlier manual Preflight/Smoke/70Q instructions remain recovery/history
+references, not unfinished work. Do not run the historical four-arm launcher
+against removed Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
 Clean-based candidate-to-Packet assembly after Retrieval and Reranking; this work
 does not implement that downstream policy or establish retrieval/answer quality.
 The following dated material records retained legacy serving evidence and gaps.
@@ -376,6 +398,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | P3 preparation, finite test evidence and standalone PowerShell commands | [`P3 runbook`](research/sparse-build-preparation-20261112.md) |
 | P4 S0/S1/S2 comparison, recovery and report contract | [`P4 experiment`](phases/recall-experiment-v1.md) |
 | P4 preparation tests, real-Smoke limitation and manual commands | [`P4 runbook`](research/recall-experiment-preparation-20261112.md) |
+| Completed P4 validation, bounded 70Q quality judgments and selection recommendation | [`P4 quality review`](research/recall-p4-70q-quality-review-20261113.md) |
 | Launcher finite validation, environment reuse and measured limitations | [`Launcher report`](research/index-benchmark-launcher-20261109.md) |
 | Indexing work unit 1 source survey, finite export and readback evidence | [`Work-unit report`](research/indexing-input-v1-20261109.md) |
 | Historical V1 chunking interface and operating points | [`Chunking V1`](phases/chunking-pilot-v1.md) |
