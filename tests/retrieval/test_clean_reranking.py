@@ -4,12 +4,13 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from genshin_corpus.evidence_io import digest, read, seal, sha, write
 from genshin_corpus.indexing.benchmark_io import receipt
 from genshin_corpus.retrieval.clean_based.rerank_core import ranked_candidates, candidate_vectors
 from genshin_corpus.retrieval.clean_based import rerank_job as job
+from genshin_corpus.retrieval.clean_based.rerank_model import LocalReranker
 from tests.retrieval.test_clean_based import document
 
 
@@ -77,6 +78,26 @@ class OrderingTests(unittest.TestCase):
         result = ranked_candidates(bundle(rows), {"0": 10., "1": 9.99, "2": 9.98, "3": 0.},
                                    mmr_lambda=.85, vectors={str(n): [1., n + 1.] for n in range(4)}, protected_top=1)
         self.assertAlmostEqual(result["candidates"][1]["reranking"]["mmr"]["relevance"], .999)
+
+    def test_score_band_boundary_ties_protect_beyond_top_three(self):
+        rows = [candidate(str(n), n, n * 10, n * 10 + 5) for n in range(6)]
+        scores = dict(zip([str(n) for n in range(6)], [10., 9.9, 9.8, 9., 9., 0.]))
+        result = ranked_candidates(bundle(rows), scores, mmr_lambda=.7,
+                                   vectors={str(n): [1., 0.] for n in range(6)})
+        protected = [r for r in result["candidates"] if r["reranking"]["mmr"]["protected"]]
+        self.assertEqual([r["chunk_id"] for r in protected], ["0", "1", "2", "3", "4"])
+        self.assertTrue(all(r["reranking"]["mmr"]["protected"] == "score_band" for r in protected[3:]))
+
+    def test_covered_duplicate_is_deferred_and_pool_does_not_refill_past_relevance_depth(self):
+        rows = [candidate("macro", 0, 0, 10), candidate("micro", 1, 2, 5),
+                candidate("independent", 2, 20, 25), candidate("outside", 3, 30, 35)]
+        result = ranked_candidates(bundle(rows), {"macro": 10., "micro": 9.9, "independent": 9.8, "outside": 9.7},
+            mmr_lambda=.7, local_depth=3, vectors={r["chunk_id"]: [1., 0.] for r in rows})
+        byid = {r["chunk_id"]: r["reranking"] for r in result["candidates"]}
+        self.assertEqual(byid["micro"]["covered_by"], "macro")
+        self.assertIsNone(byid["micro"]["mmr"])
+        self.assertIsNone(byid["outside"]["mmr"])
+        self.assertEqual([r["chunk_id"] for r in result["candidates"]], ["macro", "independent", "outside", "micro"])
 
     def test_equal_scores_and_lambda_one_preserve_order(self):
         rows = [candidate(str(n), n, n * 10, n * 10 + 5) for n in range(5)]
@@ -195,9 +216,90 @@ class JobTests(unittest.TestCase):
         with patch.object(job, "code_files", return_value={"changed": "hash"}):
             with self.assertRaises(ValueError): job.load_plan(self.repo, self.config, self.repo / self.config["output"])
 
+    def test_interrupted_scoring_preserves_committed_questions_and_resumes_only_pending(self):
+        self.prepared()
+        output = self.repo / self.config["output"]
+        requests = []
+
+        class SimulatedCudaOOM(RuntimeError):
+            pass
+
+        @contextmanager
+        def interrupted_worker(repo, config, model, target):
+            with self.fake_worker(repo, config, model, target) as (ready, request):
+                def fail_second(value):
+                    requests.append((model, read(value["input"])["query"]["question_id"]))
+                    if len(requests) == 2:
+                        raise SimulatedCudaOOM("fixture: CUDA out of memory")
+                    return request(value)
+                yield ready, fail_second
+
+        with patch.object(job, "code_files", return_value={}):
+            smoke = self.repo / self.config["smoke_output"]
+            with patch.object(job, "worker", self.fake_worker):
+                job.execute(self.repo, self.config, smoke, smoke=True)
+            job.validate(self.repo, self.config, smoke)
+            with patch.object(job, "worker", interrupted_worker):
+                with self.assertRaises(SimulatedCudaOOM):
+                    job.execute(self.repo, self.config, output)
+            plan = read(output / "plan.json")
+            saved = job.checkpoints(output, plan)
+            self.assertEqual(set(saved), {("bge", "Q001")})
+            checkpoint = saved["bge", "Q001"] / "complete.json"
+            original = sha(checkpoint)
+            self.assertFalse((output / "complete.json").exists())
+            # The kernel lock is released; its persistent marker stays on disk.
+            # Successful Resume below proves another owner can reacquire it.
+
+            resumed = []
+            @contextmanager
+            def tracking_worker(repo, config, model, target):
+                with self.fake_worker(repo, config, model, target) as (ready, request):
+                    def track(value):
+                        resumed.append((model, read(value["input"])["query"]["question_id"]))
+                        return request(value)
+                    yield ready, track
+            with patch.object(job, "worker", tracking_worker):
+                job.execute(self.repo, self.config, output, resume=True)
+            self.assertEqual(resumed, [("bge", "Q002"), ("gte", "Q001"), ("gte", "Q002")])
+            self.assertEqual(sha(checkpoint), original)
+            self.assertEqual(job.validate(self.repo, self.config, output)["groups"], 4)
+
     def test_output_cannot_overwrite_parent_or_existing_source(self):
         with self.assertRaises(ValueError): job.new_root(self.repo, self.repo / "data/retrieval")
         with self.assertRaises(FileExistsError): job.new_root(self.repo, self.source)
+
+
+class AdapterFailureTests(unittest.TestCase):
+    def adapter(self):
+        value = LocalReranker.__new__(LocalReranker)
+        value.cap = 8192
+        value.model = object()
+        value.load = Mock()
+        value.count = Mock(return_value=2049)
+        value.tokenizer = Mock()
+        return value
+
+    def test_overlength_fails_without_truncating_or_scoring(self):
+        from types import SimpleNamespace
+        adapter = self.adapter()
+        torch_stub = SimpleNamespace(cuda=SimpleNamespace(reset_peak_memory_stats=Mock()))
+        with patch.dict("sys.modules", torch=torch_stub), patch(
+                "genshin_corpus.retrieval.clean_based.rerank_model.resources", return_value={}):
+            with self.assertRaisesRegex(ValueError, "Overlength"):
+                adapter.score(bundle([candidate("a", 0)]), 2048)
+        adapter.tokenizer.assert_not_called()
+
+    def test_model_load_oom_propagates_without_cpu_fallback(self):
+        adapter = self.adapter()
+        failure = RuntimeError("fixture: CUDA out of memory")
+        adapter.load.side_effect = failure
+        with patch.dict("sys.modules", torch=Mock()):
+            with self.assertRaises(RuntimeError) as caught:
+                adapter.score(bundle([candidate("a", 0)]), 2048)
+        self.assertIs(caught.exception, failure)
+        adapter.load.assert_called_once_with()
+        adapter.tokenizer.assert_not_called()
 
 
 if __name__ == "__main__": unittest.main()

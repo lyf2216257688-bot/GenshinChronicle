@@ -1,0 +1,60 @@
+{
+  "version": "gc-clean-reranking-selection-1",
+  "adopted_on": "2026-11-13",
+  "decision": "Operator-selected BGE + conservative structural processing; MMR off. Candidate ordering only.",
+  "model": "BAAI/bge-reranker-v2-m3",
+  "python": ".local/runtime-py314/reranker/Scripts/python.exe",
+  "input_bundle_id": "07aa27f71c6187f489d57f8255281e20847f3bb3de3ec1c0053324eab2d6fb95",
+  "default_profile": "bge_structural",
+  "fallback_profile": "bge_relevance",
+  "automatic_fallback": false,
+  "profiles": {
+    "bge_structural": {
+      "structural": true,
+      "mmr_lambda": 1.0
+    },
+    "bge_relevance": {
+      "structural": false,
+      "mmr_lambda": 1.0
+    }
+  },
+  "score_binding": {
+    "model": "bge",
+    "files": {
+      "config.json": "13dcd6c31d9fec9d1d8e158702072f62d7fa7d312a64b9fe057bec9a08cfe41a",
+      "sentencepiece.bpe.model": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
+      "special_tokens_map.json": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835",
+      "tokenizer.json": "69564b696052886ed0ac63fa393e928384e0f8caada38c1f4864a9bfbf379c15",
+      "tokenizer_config.json": "7e4c1cc848840aeccdd763458c18dd525eb0f795c992e00ebe9c28554e7db2d4",
+      "model.safetensors": "d9e3e081faff1eefb84019509b2f5558fd74c1a05a2c7db22f74174fcedb5286"
+    },
+    "runtime": {
+      "python": "3.14.5",
+      "platform": "windows-amd64",
+      "gil_disabled": false,
+      "packages": {
+        "torch": "2.11.0+cu128",
+        "transformers": "4.57.3",
+        "tokenizers": "0.22.2",
+        "numpy": "2.5.3",
+        "safetensors": "0.8.0"
+      }
+    },
+    "dtype": "float16",
+    "device": "cuda",
+    "attention": "eager",
+    "batch_size": 1,
+    "pairing": "query_full_retrieval_text",
+    "truncation": false
+  },
+  "native_pair_cap": 8192,
+  "experiment_config": "config/clean-reranking-v1.json",
+  "experiment_config_sha256": "73863ea8a156011b8292b252d72a10eb606ab98b396a6f336b90eb549dc99498",
+  "plan_binding": "6360c2c0b1a896dbb336b26e32e5bce7e35c05e1f29f9f79dce324545137fb8c",
+  "run_complete_sha256": "4e2c274140cc4dc304c8a43b6748f5a88cb33911eac619c1c8e1e019ec2b9842",
+  "analysis": "data/retrieval/rerank-v1-70q-20261113/reports/analysis-1794573175075181400-9b661cc2",
+  "analysis_complete_sha256": "bb18cd05be19b4a603c60bcbf413db78ebc58ac0e689ade7f29a50476d1c915e",
+  "p3_review": "data/retrieval/rerank-p3-review-20261113",
+  "p3_review_complete_sha256": "caedc5fb3ad53e7d04a16ae9106bf4657a50d2c62230a7712fe722e493d0bd7f",
+  "handoff_output": "data/retrieval/rerank-v1-handoff-20261113"
+}

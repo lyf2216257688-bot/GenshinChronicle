@@ -158,7 +158,11 @@ budget 2048. Four actual Smoke groups pass (independent-question pair lengths 26
 and 1,129). These verify local loading/scalar logits and finite resources, not a
 quality winner. No extra Reranker inference was needed for the migration fix.
 
-The full70Q BGE/GTE comparison has **not run**. It comprises 6,963 pairs per model
+At the migration-closure checkpoint, the full70Q BGE/GTE comparison had **not run**.
+The operator subsequently completed it; the later
+[P2 comparison report](clean-reranking-p2-comparison-20261113.md) owns those results
+and the model-decision pause. The commands below preserve the earlier handoff;
+do not restart the completed comparison. It comprises 6,963 pairs per model
 and about 2.47 million input tokens per model, beyond the short validation scope.
 In the independently operated long-run window:
 

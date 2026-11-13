@@ -4,6 +4,26 @@
 validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate
 `rerank-v1-smoke-20261113/` own operator-run scores, length audits, immutable
 attempts, complete candidate ordering references and independent validation.
+`rerank-p0p1-review-20261113/` separately preserves the finite readiness audit and
+exact original-pair length-boundary CUDA checks; it is not a full70Q result.
+`rerank-p2-review-20261113/` owns the completed saved-output audit, finite 70Q
+review, source/rank readbacks and timing/resource summaries; it does not adopt a
+model or perform structural/MMR ablation. Its sealed reviewer opinions remain
+separate from the unchanged mechanical run/validation/report receipts.
+After the operator's BGE decision, the run's `reports/analysis-*/` preserves the
+four-arm offline structural/MMR replay. `rerank-p3-review-20261113/` owns its
+independent audit, source coverage/readbacks, high-relevance protection checks and
+finite70Q review. It reuses stored scores/vectors, keeps every candidate and
+records no adopted final ordering policy; it is not P4 or Generation integration.
+After the final operator policy decision, `rerank-v1-handoff-20261113/` owns the
+sealed P4 default export: full RankedCandidateSets for all70Q/6,963 candidates,
+the selected-config snapshot and manifest. Its sibling
+`rerank-v1-handoff-20261113-checks/` owns independent validation receipts, leaving
+the sealed export unchanged. The executable choice and explicit same-score
+relevance-only fallback are in `config/reranking-selected-v1.json`; the original
+P2/P3 records retain their historical pending/adoption fields. These handoffs
+contain all original candidates and do not perform final evidence admission,
+source/Parent readback, context budgeting or Packet assembly.
 They are candidates, not final Evidence Packets. `python314-baseline-20261113/`,
 `python314-candidate-20261113/` and `python314-compatibility-20261113/` own finite
 migration witnesses and sealed admission records. Those roots do not replace

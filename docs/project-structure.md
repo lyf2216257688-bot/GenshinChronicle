@@ -46,6 +46,11 @@ records the completed scope and retired historical startup paths.
 local BGE/GTE scoring, deterministic complete candidate ordering and manual
 experiment/recovery/report entry points under the
 [Reranking contract](phases/clean-reranking-v1.md). It does not own Packet assembly.
+The separate `rerank_handoff.py`, `config/reranking-selected-v1.json` and
+`scripts/retrieval/run-rerank-handoff.ps1` own the selected CandidateSet interface,
+model-free full saved-score export, independent validation and explicit
+relevance-only fallback. They preserve the experiment bindings and do not
+implement Generation or Serving integration.
 
 `src/genshin_corpus/retrieval/clean_based/` owns opt-in Clean candidate discovery,
 bound source reading, isolated local query workers, replaceable F0/F1 fusion,

@@ -137,3 +137,56 @@ cold load separately from scoring, per-question median/P95, GPU allocated/reserv
 peaks and process memory observations. Mechanical PASS remains NOT_REVIEWED for
 semantics. The operator selects the base model and whether MMR is worth keeping;
 no incremental gain permits the simpler no-MMR outcome.
+
+## Selected candidate interface and P4 handoff
+
+`config/reranking-selected-v1.json` records the operator's chosen model, exact
+score/runtime identity, default ordering and explicit fallback. It is separate
+from the frozen two-model experiment configuration; adoption must not rewrite
+P2/P3 plans, scores or receipts. The current decision/status belongs to
+`docs/current-phase.md`.
+
+`retrieval/clean_based/rerank_handoff.py:rank_candidate_set` accepts the complete
+`gc-clean-candidates-1` CandidateSet, the adapter's exact bound score result and
+the selected configuration. It requires an explicit pair budget, matching input
+digest/model/runtime, complete finite score coverage, ordered complete token
+audits and consistent Chunk/source/text identity. The caller obtains scores
+through the validated adapter; the handoff interface itself performs no inference.
+2048 remains a working point, not a ceiling: the explicit budget may exceed it
+within the pinned BGE capability, following the established finite Smoke policy.
+This does not itself validate new lengths on4GiB hardware.
+
+It emits one `gc-clean-ranked-candidates-1` RankedCandidateSet containing ALL
+input candidates, complete Chunk/source fields, original hits/fusion/recall
+metadata, original query and upstream dispositions. Only the top-level version
+is replaced; the input version is recorded under `reranking_run`. Original
+upstream counts/dispositions retain their original meaning. New ordering fields
+are `policy`, `policy_id`, per-candidate `reranking`, and `reranking_run` with
+selection/profile, score/model/runtime identity, full token audit, input/score
+digests and ordering code/Python identity. Raw logit is not a correctness
+probability. No TopK argument, Packet construction or automatic fallback exists.
+
+The selected interface supports `bge_structural` (conservative coverage deferral,
+MMR off) and the explicitly requested `bge_relevance` fallback (same BGE scores,
+structure/MMR off). It does not accept an MMR or GTE fallback selector. Failures
+propagate; they never trigger a different profile, CPU scoring or truncation.
+Research-only P3 MMR traces remain preserved in their original reports.
+
+`run-rerank-handoff.ps1` exposes model-free Export/Validate. Export verifies
+the frozen experiment, independent score validation and reviewed P3 bindings,
+then writes full per-question CandidateSets, selected-config snapshot and manifest
+into a new direct `data/retrieval/` child. Export must reproduce the selected P3
+ordering exactly. Outputs are create-only, sealed last and never overwritten;
+failed incomplete outputs remain evidence. Validate independently reads all
+exports, verifies all original fields/order/bindings and checks the explicit
+pure-relevance fallback against the saved P2/P3 baseline without rescoring.
+Validation receipts use a separate sibling `<output-name>-checks/` directory,
+so a sealed handoff never gains mutable validation pointers.
+
+`read_handoff` reads a sealed self-contained question without source readback;
+consumers must use the validated handoff and its declared profile. An explicit
+fallback artifact cannot be consumed as the default profile. Source locators
+still require hash-checked readback by Generation. Full original/Parent readback,
+evidence selection, context budgets, duplicate suppression and Packet composition
+remain Generation-owned. P4 closure does not wire a new Serving path or execute
+Generation.

@@ -4,11 +4,11 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — S0 Reranking; Python 3.14 migration complete (2026-11-13)
+## 0. Current work — Clean Reranking P4 complete; stage closed (2026-11-13)
 
 **Latest operator decision:** pause Sparse use and fusion tuning; use S0
 (BM25F + BGE-M3 Dense) to proceed to Clean-based Reranking. Preserve Sparse,
-S1/S2 and P3/P4 evidence. This supersedes the adoption-pending checkpoint below;
+S1/S2 and Retrieval P3/P4 evidence. This supersedes the adoption-pending checkpoint below;
 it does not adopt an online Serving path or establish end-to-end quality.
 
 **Authorized implementation:** the operator approved the revised
@@ -20,10 +20,51 @@ MMR after model selection. Generation continues to own Evidence Assembly.
 The [historical preparation report](research/clean-reranking-preparation-20261113.md)
 records the initial software/fixture checkpoint. The model-free fixed input
 export is complete: 70 questions / 6,963 candidates. New ordering, recovery,
-validation and migration software is opt-in; model adoption remains undecided.
+validation and migration software is opt-in. The operator selected
+**BAAI/bge-reranker-v2-m3 as the current primary Reranker** after the P2 review;
+the subsequent P3 decision also adopts conservative structural processing with
+MMR off as the current Clean-based Reranking policy. This is not a Serving deployment.
 Both isolated Python 3.14.5 environments are installed; dependency imports,
 GTE custom-class imports and finite fixture checks pass. The operator's real
 BGE/GTE Preflight, four-group FP16 CUDA Smoke and independent Validate pass.
+The subsequent [P0–P1 readiness review](research/clean-reranking-p0p1-readiness-20261113.md)
+rechecks frozen inputs, current model/runtime/code bindings and all length audits.
+It adds a finite CUDA check of the actual longest saved question/candidate pair
+(1,150 tokens) for both models, plus interruption/Resume, overlength and OOM
+failure fixtures. The 40 relevant fixtures pass. P0–P1 engineering preparation
+is complete. The operator subsequently completed the full P2 Run, independent
+Validate and mechanical Report. Both models cover all 70 questions / 6,963 pairs;
+140 model/question groups pass engineering validation. Codex audited the saved
+outputs and completed bounded source-based quality review. The
+[P2 comparison report](research/clean-reranking-p2-comparison-20261113.md) owns
+measured timings/resources, evidence gains/losses, finite judgments and the
+conditional BGE recommendation at that checkpoint. The subsequent operator BGE
+decision supersedes its pending selection; mechanical PASS and the review opinion
+do not establish end-to-end answer accuracy.
+**P3 is complete:** four offline BGE permutations cover all70Q/6,963 candidates
+each; independent checks pass for280 ordering groups and140 MMR groups. No model
+inference or new encoding was performed. Structural processing defers498 proved
+covered candidates without deleting any; actual score-band protection extends
+beyond Top3 in two questions. The
+[P3 comparison](research/clean-reranking-p3-comparison-20261113.md) owns duplicate,
+source-witness, complementary-clue and protection findings. Its recommendation
+was subsequently adopted: the operator formally selected **BGE + structural processing,
+MMR off**: structural processing reduces proved macro/micro coverage redundancy,
+whereas MMR has not shown stable key-evidence gains and can promote off-topic
+content. The executable selection is
+[`config/reranking-selected-v1.json`](../config/reranking-selected-v1.json),
+separate from the unchanged frozen comparison config. Default `bge_structural`
+has MMR off; `bge_relevance` is an explicit same-score fallback, never automatic.
+**P4 candidate handoff and stage closure are complete:** the new
+`rerank_handoff.py` interface preserves every input candidate and original
+source/recall field, adds score/runtime and adjustment records, and exports
+`data/retrieval/rerank-v1-handoff-20261113/`. Independent Validate passes for
+all70Q/6,963 candidates, with498 retained covered candidates and all70 explicit
+fallback orders checked against the saved baseline. All33 relevant fixtures,
+the PowerShell entrypoint and a real consumer read pass. The
+[P4 handoff report](research/clean-reranking-p4-handoff-20261113.md) owns interface
+examples, exact receipts, fallback and finite acceptance limits. No inference,
+new vectors, new dependency or upstream change was needed for P4.
 **Python migration and cleanup are complete:** matched r3 witnesses reproduce the
 old index and agree across3.12/3.14 (Dense bitwise equal, Sparse exact values,
 token IDs/rankings/kernel checks PASS). Active configs use3.14, the old-base-disabled
@@ -31,18 +72,34 @@ actual S0 query passes, four old virtual environments and the old shared base ar
 removed. By subsequent explicit authorization, global3.14 registration is repaired
 and global3.12 registration retired with backups. E1 lock/code/models are retained.
 The [migration report](research/python314-migration-20261113.md) owns exact versions,
-finite evidence and cleanup; no Reranker quality/model selection is established.
+finite evidence and cleanup; that migration evidence itself establishes no
+Reranker quality or model selection.
 
 **Execution boundary and immediate next action:** the operator now authorizes
 Codex to start and inspect finite local checks expected within three to five
-minutes. Longer full70Q remains operator-started, never polled by Codex. The next
-step is the saved-S0 BGE/GTE full70Q Run, independent Validate and relevance report,
-followed by operator model selection and only then structural/MMR ablation.
+minutes. The operator started and completed full70Q in an independent PowerShell
+window; Codex only read the completed outputs and did not rerun scoring. **The
+P2 comparison report is delivered, BGE is selected and the authorized P3 offline
+replay/review is complete. The final policy is adopted, P4 is complete and this
+Reranking work unit is closed.**
+The four arms are relevance only, structural only, structural + lambda .85 MMR
+and structural + lambda .7 MMR, using frozen scores/stored vectors with no new
+inference or parameter search. Do not repeat Analyze for this completed comparison.
+Do not rerun Run/Resume/Preflight/Smoke or re-export to the completed output root.
+Deliver the selected complete candidate interface and saved handoff. Further
+Generation implementation/integration requires its own authorized scope;
+Generation retains Evidence Assembly. No Generation or Serving integration is
+authorized by this stage closure. No further experiment or parameter search is pending.
 Existing Reranker Smoke remains valid; do not rerun retired3.12 commands or relax
 tolerances. Implementation and validation performed no paid call, index rebuild
-or Serving switch. The operator subsequently authorized committing and pushing
-the reviewed code, configuration, tests and documentation; local runtime and
-generated evidence remain excluded. Historical worktree source pins remain frozen records.
+or Serving switch. The preceding implementation/migration unit was committed and
+pushed through `78b0d37` by explicit instruction. **This continuation authorizes
+no automatic Git commit/push or Serving switch.** Local runtime and generated
+evidence remain excluded. Historical worktree source pins remain frozen records.
+The operator subsequently explicitly requested a Git commit and push of this
+completed Reranking work unit. That authorization covers reviewed source,
+configuration, tests and documentation; it does not add model/data archives,
+Generation execution or a Serving switch.
 
 ### Historical P4 completion checkpoint (before the S0 decision)
 
@@ -423,6 +480,10 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
+| Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |
+| Completed Reranking P2 comparison, finite 70Q review and timing/resources; subsequent BGE choice above | [`P2 comparison`](research/clean-reranking-p2-comparison-20261113.md) |
+| Completed BGE P3 structural/MMR replay and bounded evidence review; subsequent policy adoption above | [`P3 comparison`](research/clean-reranking-p3-comparison-20261113.md) |
+| Selected candidate interface, explicit fallback, validated full P4 handoff and Reranking stage closure | [`P4 handoff`](research/clean-reranking-p4-handoff-20261113.md) |
 | Completed Python migration, compatibility measurements, global entrypoints and cleanup | [`Migration report`](research/python314-migration-20261113.md) |
 | Architecture and boundaries | [`Architecture overview`](architecture-overview.md) |
 | Phase priorities and milestones | [`Roadmap`](roadmap.md) |

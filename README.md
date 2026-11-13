@@ -44,9 +44,12 @@ indexes for operator-run S0/S1/S2 comparisons, resumable raw hits and source-tex
 reports. Preflight and a separate one-question Smoke precede manual70Q Run.
 The [Python 3.14 migration report](docs/research/python314-migration-20261113.md)
 records validated active runtimes, the explicit immutable-index compatibility
-gate and completed old-runtime cleanup. Clean Reranking reuses saved S0 candidates;
-its finite Smoke is validated, while full70Q model selection remains outstanding.
-This is not online RAG adoption.
+gate and completed old-runtime cleanup. Clean Reranking completed the saved70Q
+BGE/GTE comparison and structural/MMR review. The selected ordering is BGE +
+conservative structural processing, MMR off. Its complete candidate handoff and
+explicit relevance-only fallback are described in the
+[P4 handoff report](docs/research/clean-reranking-p4-handoff-20261113.md).
+This is not online RAG adoption or Generation integration.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The retained Phase04 implementation extends the historical adopted Block A over the accepted

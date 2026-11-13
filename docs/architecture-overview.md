@@ -103,7 +103,13 @@ The opt-in Clean-based Reranking path consumes
 fixed CandidateSets and emits complete RankedCandidateSets. Dedicated local
 Cross-Encoders score relevance; conservative source coverage and optional local
 MMR record priority adjustments without deleting candidates. Generation retains
-source/Parent readback and Packet assembly. Python runtime migration is admitted
+source/Parent readback and Packet assembly. The separate `rerank_handoff.py`
+interface applies the selected policy to exact bound scores and exports full,
+self-contained RankedCandidateSets with source/recall fields and adjustment
+records. `config/reranking-selected-v1.json` owns the executable selection;
+the original comparison config and reports remain frozen. Handoff validation
+and explicit fallback do not invoke new inference or integrate Serving.
+Python runtime migration is admitted
 only by an explicit sealed compatibility record against immutable index identity;
 it does not rewrite representation metadata. The
 [Reranking contract](phases/clean-reranking-v1.md) owns these interfaces.
