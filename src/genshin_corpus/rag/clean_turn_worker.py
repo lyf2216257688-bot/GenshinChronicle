@@ -22,9 +22,15 @@ def main(argv=None):
     write(folder / "worker.json", {"pid": os.getpid(), "mode": mode, "turn_id": args.turn})
     store.shutdown_file = folder / "shutdown.json"
     if mode == "LIVE":
-        from .clean_live import LivePipeline
+        settings = store.chat(store.turn(args.turn)["session"])["settings"]
+        if settings.get("engine") == "gc-clean-research-1":
+            from .clean_research import run_turn as execute
+            from .clean_research_live import ResearchPipeline as LivePipeline
+        else:
+            execute = run_turn
+            from .clean_live import LivePipeline
         pipeline = LivePipeline(store, args.turn, args.repo)
-        try: run_turn(store, args.turn, pipeline, continue_turn=args.continue_turn)
+        try: execute(store, args.turn, pipeline, continue_turn=args.continue_turn)
         finally: pipeline.close()
         return 0
     manifest = fixture_inputs(Path(args.repo), store.root / "mock_corpus")

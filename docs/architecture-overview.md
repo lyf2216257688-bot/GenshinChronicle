@@ -138,6 +138,19 @@ automatic live dispatch is introduced. Mock is the entry default. Explicit finit
 G4 live mode reuses S0/BGE, source Assembly and G3's unchanged sender/shared caller;
 all chats share its expiring campaign budget. Literal user context can accompany
 follow-up queries; this fixed chain adds no autonomous research controller.
+G5's explicit research engine extends this same executor/UI with one native-tool
+controller. It records optional query enhancement, subquestions, source readback,
+selection, counterevidence and stopping state; Generation deterministically
+assembles query-local ordered groups into a final Packet. All remote steps reuse
+G3/shared accounting and bounded same-chat persistence. The separate expiring G5
+permit cannot reopen G4 allowances. CPU readers can be reused within a turn while
+GPU workers retain serial leases and confirmed exit. G6/G7 are separate gates.
+The official-channel adoption selects manifest-bound DeepSeek endpoints and
+per-role thinking/output policy from `config/clean-generation-v1.json`, without
+moving layer ownership. Explicit model-requested analysis starts after a sealed
+ordinary tool unit; thinking-native continuation preserves exact history. All
+phases share the original turn/campaign budget and provenance controls. Metro
+remains explicit compatibility with immutable historical ledgers, not fallback.
 This independent workbench does not migrate the retained Phase04 backend/UI.
 
 ### 2. Preserved Parsed baseline

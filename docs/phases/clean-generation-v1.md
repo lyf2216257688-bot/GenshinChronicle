@@ -9,7 +9,9 @@ Current scope and results remain owned by current-phase.
 
 ## Decisions and boundaries
 
-All 24 decisions are retained, without a new architecture/model selection:
+The 24 architecture decisions are retained except the operator's explicit
+2026-11-15 route revision of D16 below. The original Plan remains a historical
+decision record; this contract and current-phase own the adopted revision.
 
 | Decisions | Binding contract |
 | --- | --- |
@@ -28,7 +30,7 @@ All 24 decisions are retained, without a new architecture/model selection:
 | D13 | Explicit sufficient/limited/no-gain/budget/cancel/fault stop reasons; no false sufficiency. |
 | D14 | LangGraph state/flow, GC retrieval/evidence/model_calls; reuse algorithms. |
 | D15 | One controller, task roles using one model; no agent team. |
-| D16 | TokenMetro/deepseek-v4.1-flash-1017 only, no route fallback. |
+| D16 | DeepSeek official API/deepseek-flash default; explicit Metro compatibility retained, no automatic route fallback. Revised by operator on 2026-11-15. |
 | D17 | Task-dependent thinking requires exact-route capability evidence. |
 | D18 | Native Chat tools first; JSON protocol needs an explicit separate decision. |
 | D19 | Preserve qualified partial evidence; source failures isolated, drafts never final. |
@@ -266,6 +268,157 @@ The optional `requirements-py314-generation-ui.lock` extends the immutable G1
 framework lock in the isolated regular-GIL 3.14.5 Generation environment. It must
 resolve with the original pins; no ML runtime or existing lock is changed.
 
+## G5 bounded active research contract
+
+`rag/clean_research.py` owns one LangGraph controller, not a team of agents.
+The explicit `engine=gc-clean-research-1` chat setting selects it in the existing
+G4 executor/UI. G4 fixed-chain chats and Mock entry defaults retain their behavior.
+Initial original-query S0 feedback precedes optional native `research_plan`, `search`, `read_source`,
+`select` and `finish` actions. Search records a concrete gap, subquestion, separate
+search/rerank text, kind and verified parent query/evidence handles. Whole ranked
+groups remain ordered by research action, never by cross-query BGE logits.
+
+Each model step checkpoints its immutable preview and stable operation before
+dispatch through G3 ChatSessions/model_calls. Only complete, schema-valid native
+tool batches execute serially. Tool receipts and resulting research snapshots
+precede history/checkpoint publication. Recovery reuses sealed calls and tool
+receipts, preserving complete assistant/tool protocol units and original budgets.
+UNKNOWN never creates a replacement operation. All calls, including final
+synthesis, consume the same finite campaign and turn budgets. No hidden retries.
+
+The program enforces finite requests/tokens, searches, reads, tools, controller
+rounds and elapsed time. Two read/search actions without new verified receipt
+identities stop as `no_gain`; duplicate query text does not rerun retrieval.
+At the last request allowance, control moves to synthesis. Budget/no-gain/limited
+stops do not imply sufficiency. Cancellation/expiry/deadline cannot start a summary
+call. Parent/fragment reads use discovered source handles; invalid identities fail
+closed. Source failures isolate affected reads and stop new live admission.
+
+The initial controller Packet has a smaller explicit admission budget to leave
+room for native protocol history; final synthesis uses the full configured budget.
+Every candidate retains a disposition, including unread and unselected material.
+Feedback retains whole fragments and records omitted fragments; very long natural
+Parents may be read/persisted but omitted from a bounded tool response. No semantic
+truncation or pagination claim is made. Model selections use program fragment IDs;
+the deterministic Assembly preserves group and within-group order. After tools,
+new synthesis uses a fresh final Packet and citation map. An initial direct answer
+can finish in one request. Citation validity remains separate from semantic support.
+
+The evidence-value stopping policy supplies a decision checkpoint initially and
+with each new tool result. It reports recent checked gaps and new receipt/fragment/
+source-item identities; these counts are not relevance, independent corroboration
+or semantic acceptance. Optional research_plan fields resolved/unresolved/deferred
+are explicitly model-authored working notes, not source facts. No extra plan or
+assessment request is required. Continue only for a consequential, unresolved,
+verifiable gap and explain the expected answer change; optional branches may remain
+deferred. Finish sufficient when the core can be answered, limited when important
+details remain unverifiable, or no_gain when there is no worthwhile new path.
+Existing hard guards are unchanged and remain distinct from model decisions.
+The result records termination actor/method and the allowance at the model's stop;
+a program-forced partial cannot become model-judged sufficiency. Simple direct
+answers remain valid and are recorded separately from native finish.
+
+Snapshots retain subquestions, hypotheses, counterevidence, unresolved matters and
+stop reasons as derived model state. Recent same-chat snapshots may be projected
+with original references; corrections mark prior model premises for re-review.
+No snapshot becomes source evidence or cross-chat memory. Full local history stays
+available. Model control arguments are not displayed as source facts.
+
+`rag/clean_research_live.py` owns separate expiring finite permits and the CLI.
+New preparations use the formal `config/clean-generation-v1.json`: official
+`https://api.deepseek.com/chat/completions`, `deepseek-flash`, runtime-only
+`DEEPSEEK_API_KEY`. The retained legacy Chat constants/request default support
+frozen G3 probes; application preparation/entry points explicitly choose the
+official route. Transport and identity checks bind the actual manifest's
+endpoint/model; a route change cannot reinterpret an archived request.
+Metro is explicit compatibility, never automatic fallback. Legacy Metro
+permits keep their own settings, identities, limits and closed accounting.
+Admission binds native schemas, exact previews, source/code/upstream/assets and
+separately scoped official disabled/thinking capability evidence.
+
+The role policy uses 4096 completion tokens for simple final answers, 8192 for
+ordinary research control, 16384 for thinking analysis, and 32768 for complex
+synthesis. Reasoning is already part of completion and is reserved/counted once.
+`research_plan` lets the model organize subquestions and request analysis when
+needed. A closed nonthinking tool unit may start an independent analysis task:
+its exact previous feedback is explicitly input data, not native reasoning or
+facts. That boundary is persisted; no fake/empty reasoning is added to old
+assistant messages. Once thinking starts, subsequent native tools retain exact
+reasoning/arguments/receipts and cannot silently downgrade inside the loop.
+Current E-number/handle catalogs use exact receipt/fragment bindings and source
+identity; list position never assigns a citation. At the independent analysis
+boundary, bodies already delivered in the current Packet are not duplicated in
+the previous tool-feedback projection. Other bodies are explicitly marked deferred
+and remain available by discovered handle; original full feedback stays archived.
+This projection is not permission to truncate source content or claim omitted
+material has been read by the new model task. Native thinking history is untouched.
+Final synthesis is a fresh Packet task with its own recorded role and limits.
+Direct simple answers remain possible; no mandatory action checklist is imposed.
+Initial and per-tool feedback reports the smaller actual remaining turn/campaign
+allowance, explicitly reserving the final synthesis request. Cached reads identify
+already_read/new_read=false; when evidence is sufficient, selection may be followed
+by finish in the same batch. These hints do not replace hard caller admission.
+Every profile remains subject to finite campaign/turn/context/time bounds and
+matching authorization. Official model capability does not qualify Metro or
+establish G5 semantic quality. UI launch and API credentials grant no paid quota.
+All chats share its request budget; old G4/G3 permissions remain closed. Its
+LocalPipeline wrapper reuses the CPU reader within a turn and measures worker
+startup, requests and confirmed shutdown; Dense/BGE Job/GPU policy is unchanged.
+An explicit later operator retry may use `clean_research_retry.py` and the shared
+caller's origin-bound recovery seam. It preserves the original plan/fingerprint,
+ledger reservation, campaign/turn/Batch and UNKNOWN allowance. A separately saved,
+expiring grant permits exactly one added attempt, with explicit duplicate-charge
+risk authorization; it does not reopen the closed campaign. Recovery-aware G5
+readback accounts only for exact ledger-registered recovery roots and preserves
+the old turn/message rather than rewriting its historical partial outcome.
+The shared caller/session cores and their frozen identities remain unchanged.
+The implementation report owns finite observations; G6/G7 and broad serving
+adoption remain separately gated. Channel adoption alone is not research acceptance.
+
+New feedback may reference an exact original fragment/body digest already visible
+in the current model task. It must retain handle, source identity and an explicit
+body-reference status. The complete output remains in the immutable tool unit.
+Only newly generated feedback is projected; no previously sealed native message,
+reasoning or tool result is edited. Same wording with a different fragment/lineage
+is delivered separately. A new task starts with its own visible-body set.
+
+A finite code-only permit revision may be appended after all existing turns and
+calls are terminal/sealed, with no in-flight/UNKNOWN request. The base permit and
+old call bodies/seals remain immutable. The sealed revision binds the base hash,
+all prior call seals and revised code; every other permit field, including settings,
+route, quota and expiry, must remain byte-value equivalent. It cannot reopen a
+closed campaign, migrate an interrupted checkpoint, or replenish any allowance.
+Future turns use the revision; terminal old turns replay read-only. A separate, explicitly documented
+one-time local repair may append a new checkpoint after proving that a rejected
+tool-only step has no effects and its model operation is fully sealed. Keep the
+old checkpoint/code, dry-run the exact update, bind the old state/call seals and
+new code, and require explicit continue. This is not automatic migration or
+permission to resend in-flight/UNKNOWN/source-corrupt/ledger-inconsistent work.
+
+### Bounded tool argument correction
+
+New profiles may opt in to at most two correction rounds per turn. The raw-first
+Chat decoder still requires complete HTTP/SSE terminal, identity, usage and a
+known, structurally valid native tool envelope. Argument JSON/schema rejection
+is a separate `tool_argument_errors` outcome, not executable content. No field
+is stripped/coerced. The entire mixed batch executes nothing. Immutable linked
+tool receipts report the exact validation issue, field path, missing/extra keys
+or expected type and `executed=false`; valid peers get `batch_not_executed`.
+Discovered-handle/query/fragment membership is also checked before source IO.
+A model putting a delivered fragment ID in the handle field receives a specific
+argument rejection and its exact known catalog mapping as a hint; the program
+never substitutes the ID or reads an undiscovered source. These model argument
+errors differ from a failed source hash/lineage or ledger inconsistency, which
+still stop immediately. Legacy reference failures remain strict-stop.
+The next model response is a new normal operation under the same turn/campaign
+and all existing limits. It is revalidated from scratch before any execution.
+The request validator permits a rejected historical assistant only with its exact
+linked rejection receipt; thinking/reasoning/arguments remain verbatim. Legacy
+profiles do not opt in and retain strict rejection. More than two error rounds
+stop without an extra summary request. UNKNOWN, source/identity/usage/ledger or
+transport failures never become argument feedback or automatic retries. Live
+integrity exceptions close the campaign and preserve the interrupted checkpoint.
+
 ## G4 finite remote fixed chain
 
 `rag/clean_live.py` owns finite campaign preparation/admission and a lazy wrapper
@@ -296,6 +449,11 @@ Local ranking outputs seal before reuse; partial local worker outputs block auto
 recomputation into the same root. Sealed calls replay without credentials/network
 after expiry. Incompatible checkpoints remain read-only; no historical hashes change.
 
+Citation rendering may verify a single source snapshot per turn per render and
+reuse it within that frame. It must recheck files on the next refresh; no global
+or cross-refresh trusted-source cache is introduced. Turn/Packet identity and
+selected receipt/Parent checks remain mandatory.
+
 `GC_CLEAN_CHAT_MODE=LIVE` explicitly selects the opt-in UI; a prepared finite permit
 is required. The default is still Mock. Mode-mismatched chats display read-only.
 The existing executor launches the real chain in a Job-owned child, and reopening
@@ -312,6 +470,7 @@ It does not create standing authorization. G5–G7 and default adoption remain s
 | G2 | V1-equivalent original query/ranking fixtures; source/Packet tests; saved handoff replay AND finite new-question local S0/BGE run; unchanged protected hashes. |
 | G3 | Offline fragmentation/tool/error/recovery fixtures; separately approved finite live probe, sealed raw/usage/tool evidence and scoped capability report. |
 | G4 | Full Mock multi-turn/reopen/isolation, context/corrections, idempotent submission, real progress, turn-scoped citations/Parent, cancel/shutdown/recovery and UI fixtures. Real remote dialogue additionally needs matching G3 capability evidence and current batch authorization. |
+| G5 | Original/rewritten/subquestion/Step-Back/counterevidence query lineage; bounded native tool loop; query-local ordered Packet; no-gain/budget/partial stops; tool/call/checkpoint replay, cancel, source isolation and same-chat research/corrections. Real observations require a new finite G5 permit. |
 
 Tests use small checked-in fixtures. Real local asset checks are explicit opt-in
 and use new output roots. Engineering PASS is never final question-answer quality

@@ -28,7 +28,10 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
     body = protocol.encoded(manifest["wire"])
     with (root / "request.body.bin").open("xb") as f:
         f.write(body); f.flush(); os.fsync(f.fileno())
-    write(root / "request-metadata.json", {"endpoint": protocol.ENDPOINT, "method": "POST",
+    endpoint = manifest["profile"]["endpoint"]
+    require(any(r["endpoint"] == endpoint and r["model"] == manifest["wire"]["model"]
+                for r in protocol.ROUTES.values()), "UNSUPPORTED_CHAT_ROUTE")
+    write(root / "request-metadata.json", {"endpoint": endpoint, "method": "POST",
         "transport_retries": 0, "redirects": False, "trust_env": False, "profile": manifest["profile"]})
     result = {"state": "UNKNOWN", "kind": "invalid", "calls": 0, "request_count": 0,
               "usage": "UNKNOWN", "provider_reported_usage": "UNKNOWN", "actual_fee": "UNKNOWN",
@@ -39,7 +42,7 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
     response = None; complete = False; started = time.monotonic()
     try:
         if cancelled(): raise calls.Deferred("CANCELLED_BEFORE_SEND")
-        req = Request(protocol.ENDPOINT, data=body, method="POST", headers={"Authorization": "Bearer " + key,
+        req = Request(endpoint, data=body, method="POST", headers={"Authorization": "Bearer " + key,
                       "Content-Type": "application/json", "Accept-Encoding": "identity"})
         result.update(calls=1, request_count="UNKNOWN")
         try: response = opener.open(req, timeout=manifest["limits"]["timeout_seconds"])
@@ -75,7 +78,7 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
         result.update(parsed)
         result["provider_reported_usage"] = decoder.usage
         result["protocol_validation"] = {"status": "PASS"}
-        if parsed["kind"] in {"final_text", "tool_calls", "refusal"}:
+        if parsed["kind"] in {"final_text", "tool_calls", "tool_argument_errors", "refusal"}:
             result.update(state="CONTENT_VERIFIED", content_validation={"status": "PASS", "scope": "protocol_only"})
         else:
             result.update(state="PROTOCOL_OR_CONTENT_INVALID", content_validation={"status": "FAIL"})
@@ -123,7 +126,7 @@ class ChatSessions(SessionCalls):
         body = {"manifest": manifest, "adapter_code": code_identity(), "mode": "MOCK" if mock else "LIVE",
                 "permit": self.permit if not mock else None}
         return self.prepare(tid, key, body, allowance=request.input_bytes + request.output_tokens,
-                            channel="MOCK" if mock else protocol.ENDPOINT, schema=protocol.VERSION)
+                            channel="MOCK" if mock else manifest["profile"]["endpoint"], schema=protocol.VERSION)
 
     def _admit_live(self, plan):
         p = self.permit
@@ -144,15 +147,17 @@ class ChatSessions(SessionCalls):
 
     def execute_chat(self, opid, *, opener=None, api_key=None):
         plan = self.operation(opid); body = plan["body"]
-        require(body["adapter_code"] == code_identity(), "INCOMPATIBLE_CHAT_ADAPTER")
         mock = body["mode"] == "MOCK"
+        endpoint = body["manifest"]["profile"]["endpoint"]
         require((mock and plan["channel"] == "MOCK" and opener is not None)
-                or (not mock and plan["channel"] == protocol.ENDPOINT and opener is None), "MOCK_LIVE_TRANSPORT_SEPARATION")
+                or (not mock and plan["channel"] == endpoint and opener is None), "MOCK_LIVE_TRANSPORT_SEPARATION")
         state = self.reconcile(opid)
+        if state["status"] not in {"sealed", "pending_finalize", "UNKNOWN"}:
+            require(body["adapter_code"] == code_identity(), "INCOMPATIBLE_CHAT_ADAPTER")
         # Sealed results can reconcile/replay even after approval expires. No new send.
         if not mock and state["status"] not in {"sealed", "pending_finalize", "UNKNOWN"}:
             self._admit_live(plan)
-            require(isinstance(api_key, str) and bool(api_key.strip()), "TOKENMETRO_API_KEY_REQUIRED")
+            require(isinstance(api_key, str) and bool(api_key.strip()), "MODEL_API_KEY_REQUIRED")
         manifest = body["manifest"]
         sequence = 0
 
@@ -169,7 +174,7 @@ class ChatSessions(SessionCalls):
             require(not headers, "IDEMPOTENCY_NOT_VERIFIED")
             if not mock:
                 self._admit_live(plan)
-                require(isinstance(api_key, str) and bool(api_key.strip()), "TOKENMETRO_API_KEY_REQUIRED")
+                require(isinstance(api_key, str) and bool(api_key.strip()), "MODEL_API_KEY_REQUIRED")
             return attempt(folder, manifest, key="fixture-secret" if mock else api_key,
                            opener=opener if mock else build_opener(ProxyHandler({}), _RejectRedirectHandler()),
                            cancelled=cancelled, emit=emit)

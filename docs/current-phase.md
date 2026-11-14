@@ -4,7 +4,325 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G4 real-QA integrated; finite campaign closed (2026-11-14)
+## 0. Current work — G5 engineering closed; local Git closure authorized (2026-11-15)
+
+G5's bounded engineering phase is complete for the selected S0/BGE + DeepSeek
+official / `deepseek-flash` local research chain. The operator's latest criterion
+focuses on reasonable autonomous stopping; real tool-error correction is explicitly
+nonblocking. This is scoped engineering/source/question review, not G7 product or
+all-question semantic acceptance, a default UI/engine switch, or authority to enter
+G6/G7. The operator subsequently requested a local Git commit; push remains unauthorized.
+
+The new `gc-g5-official-4` / `evidence-value-1` controller assesses core answerability
+after feedback, distinguishes resolved/necessary unknown/deferred model notes and
+requires a consequential verifiable gap for continued research. New identity counts
+are observations, not semantic evidence value or independent corroboration.
+Termination metadata distinguishes model finish/direct answers from guard-forced
+stops. No mandatory assessment request, fixed action checklist, model switch or
+additional dependency was added; all original exploration and resource limits remain.
+
+One same-chat real run produced three reviewed answers: sufficient evidence and
+follow-up each ended with model finish(sufficient), with4 turn requests still left;
+the concrete-method question made one targeted extra S0 query, then model
+finish(limited) rather than inventing steps. Its model decision occurred in the last
+campaign research slot, so this is not evidence of budget-independent optimality.
+There were no context_budget/budget_exhausted stops or repeated-query loops.
+The limited partial is intentional, not falsely labelled fully solved.
+
+The10-request authorization is consumed/closed:10 attempts, zero retry/UNKNOWN/
+quota expansion,200,326 reported Token (194,376 input +5,950 output). Weekend
+list-price estimate USD0.021512064; actual account charge UNKNOWN. All requests
+used thinking disabled for these local text judgments; complex roles remain
+available.59 distinct relevant offline checks pass (G5 42, retry5, UI5, interfaces7).
+153 protected upstream/shared/config hashes and4,402 prior closed runtime files
+remain unchanged. The offered conditional extra6 requests were not activated.
+No further paid dispatch is authorized by the closed10-request scope.
+
+Two format errors occurred naturally and were corrected under the same budget.
+A new feedback formatter's missing None guard paused the follow-up; it was fixed,
+regressed, then explicitly repaired at the original sealed/effect-free tool step.
+A database-copy dry run, retained original checkpoint, same operation/ledger and
+code-only permit revision prove zero resend or allowance reset. All raw/failure
+records remain; no generic automatic migration or UNKNOWN recovery was introduced.
+
+The [stopping and closure report](research/clean-generation-g5-stopping-acceptance-20261115.md)
+owns exact behavior, source/answer review, timing, fees, repair and limitations.
+Run root `data/generation/g5-stop-live-20261115-d/` holds sealed calls, receipts,
+code/repair snapshots, audit and unedited answers. The original semantic_acceptance
+fields remain NOT_REVIEWED; this scoped Codex judgment does not rewrite them.
+Actual UI readback renders6 messages with0 new submissions/calls/connections.
+
+**Immediate next action:** complete the explicitly requested local Git commit of
+reviewed source, small tests/configuration and documentation. Exclude credentials,
+full chats and generated data; do not push without explicit authorization.
+Cold starts, occasional format/selection overhead, some overbroad wording and wider
+question-quality evaluation are nonblocking follow-up items. Keep the existing
+opt-in/default entry, all closed scopes, and G6/G7 boundaries unchanged.
+
+### Historical final-acceptance checkpoint — G5 fixes delivered; final real acceptance remains OPEN (2026-11-15)
+
+The operator authorized G5 implementation/offline checks and at most TEN NEW
+DeepSeek official / `deepseek-flash` requests. All ten are now consumed/closed:
+root `g5-final-live-20261115-b` used2 known requests before a fragment/handle
+argument error; `-c` used the remaining8 for real research plus same-chat follow-up.
+Zero retry, UNKNOWN, quota expansion, G6/G7, upstream rebuild, deletion, default
+entry change, Git commit or push. Prior Metro/official accounting remains intact.
+No further paid request is authorized by this work unit.
+
+`config/clean-generation-v1.json` now selects profile `gc-g5-official-3`: same
+adopted official channel/runtime-only key and simple4K/research8K/analysis16K/
+synthesis32K role limits. New G5 argument errors get exact, immutable rejection
+feedback, with the whole affected batch unexecuted and at most two correction
+opportunities per turn. Each corrective response is a new budgeted operation,
+revalidated from scratch. Discovered-reference field mistakes are rejected before
+IO; the program never substitutes a guessed handle. Source/hash/identity/usage/
+ledger faults and UNKNOWN still stop. Legacy profiles retain strict-stop behavior.
+
+The actual main case completed4 S0 groups, subquestions, source readback,
+counterevidence and enabled native-history continuation, then cited synthesis:
+370.66 seconds,107,410 Token,15 Packet fragments/11 cited IDs. Repeated feedback
+hit the input-byte guard, so its retained status is partial/context_budget.
+The same-chat follow-up produced a supported, narrower speaker/time conclusion:
+165.25 seconds,70,400 Token,partial/budget_exhausted. Current E/handle mapping and
+reasoning/tool-result continuity pass source-bound audit. Neither case used finish
+to establish model-judged sufficiency; program limits are not sufficiency acceptance.
+
+The controlled extra-field test was normalized by the model BEFORE dispatch.
+No rejected native argument reached that model in the new run, so real feedback-
+driven self-correction remains UNPROVEN. It must not be reported as a live PASS.
+The finite scope totals213,823 Token (203,514 input +10,309 output), including
+5,799 reported reasoning tokens already within output. Weekend list-price estimate
+USD0.02880978; actual account charge UNKNOWN. All10 requests are HTTP200/single
+attempt with no token overrun, but one research turn failed before source IO.
+
+New feedback now references exact original fragment/body digests already visible
+in the current task, retaining full local output and all old native messages.
+Real follow-up reuse is observed; archived main projection fits129,136 wire bytes
+within the unchanged180,224 input-byte cap. The original main is not rewritten or
+regraded. A sealed code-only revision for the next fresh turn retained the same
+campaign/limits/expiry and prior sealed calls. Closed roots cannot be reopened.
+
+After quota closure, actual remaining turn/campaign allowance and a reserved final
+request were added to all controller feedback, with explicit already_read status
+and finish guidance. These last behavior repairs have offline evidence only.
+UI citation rendering now verifies one source snapshot per turn per refresh;
+subsequent refreshes recheck files. Actual closed history renders4 messages in
+7.81 seconds initially /6.45 seconds on refresh, zero new calls. All82 distinct
+relevant checks pass;153 protected upstream/shared/config hashes and2,088 prior
+official history files remain unchanged.
+
+**At that historical checkpoint G5 was NOT formally finished; final Git closure
+was not justified on those observations alone.** The [final G5 report](research/clean-generation-g5-final-acceptance-20261115.md)
+owns exact results, semantic/source review, costs, stop/performance limitations and
+blocking versus optional work. A sealed actual-error/feedback input preview is
+ready under `-c/next-validation/`, dispatch unauthorized and no new permit.
+**At that checkpoint, next action was:** review the delivered evidence. Any real validation of
+feedback-driven correction and autonomous finish/remaining-budget behavior needs
+fresh finite authorization. Do not auto-run the preview, reuse spent scopes or enter
+G6/G7. Default channel/UI entry and all uncommitted work remain in place.
+
+### Prior official G5 checkpoint — official default adopted; real G5 loop delivered with open acceptance gaps (2026-11-15)
+
+The operator explicitly authorized formal adoption of DeepSeek official API /
+`deepseek-flash` as the generation default, necessary implementation and offline
+checks, and at most EIGHT NEW official paid requests for a real G5 research loop.
+This supersedes Plan D16's Metro-only route decision; all other phase boundaries
+and the exact-evidence/recovery rules remain. Retain Metro explicit adapters and
+immutable historical roots/accounting, with no automatic fallback or UNKNOWN
+resend. No G6/G7, upstream rebuild, deletion, Git commit or push.
+
+Official G5 preparation uses `config/clean-generation-v1.json`, runtime-only
+`DEEPSEEK_API_KEY`, one attempt and zero retries. Role output caps are simple4K,
+ordinary research8K, analysis16K and complex synthesis32K; thinking is included
+in completion usage/reserve. Models may request an analysis task through a
+recorded research plan. Nonthinking tool units are completed/sealed before a
+fresh analysis task; thinking-native continuation keeps exact reasoning/history.
+The new finite campaign is capped at8 requests /1,572,864 conservative tokens,
+196,608 context per request, 300-second requests, six requests/turn, at most six
+S0 searches/16 tools/48 reads, and one-hour research per turn. List-price risk is
+bounded to USD2 using the currently documented peak output rate against the
+whole conservative allowance; this is not a guaranteed currency invoice.
+UNKNOWN, protocol/source/citation faults close the campaign. Earlier batches
+remain closed.
+
+The formal provider/configuration, new G4/G5 preparation and LIVE entry now use
+official DeepSeek. Metro remains explicit compatibility; no historical accounting
+was changed. The new campaign is **closed at7 requests /7 attempts /195,095
+reported tokens, zero retry/UNKNOWN/overrun**; the last unsent request is closed.
+Actual currency fee remains UNKNOWN; cache-aware weekend list-price estimate is
+USD0.022510062. Both real turns retain qualified partial status:
+
+- Memory of Dust:3 requests,425.75 seconds,4 S0 queries (including subquestions,
+  multi-hop and counterevidence),19 read actions and a six-fragment final Packet.
+  The model requested thinking analysis and produced a cited answer after real
+  tool feedback/continued research. Accumulated context triggered early synthesis
+  with `context_budget`; this is a working bounded loop, not sufficiency acceptance.
+- Same-chat source-review follow-up:4 requests,137.95 seconds,three explicit
+  natural-Parent read tools executed. A later `select` added forbidden singular
+  `fragment_id` alongside valid `fragment_ids`; strict validation rejected it
+  before execution and closed the campaign. No final answer for this turn.
+
+Thinking was observed in real analysis and synthesis (1,375+5,064 reasoning
+tokens, already included in output), with8K/16K/32K role caps. This round did not
+complete an enabled native-history continuation after the thinking tools: the
+context guard switched to fresh synthesis. Prior official G3 synthetic evidence
+remains scoped separately. Step-Back was available but not selected by the model.
+Manual review supports the core lock/speaker/limited-identity evidence; the first
+answer's word “假的” is too strong and requires narrowing. Real G5 semantic and
+continuous-research acceptance is therefore **OPEN**, not a full PASS.
+
+After closure, source catalogs were repaired to bind current E-numbers directly
+to handles/receipts/source identity; analysis projection now references Packet
+bodies once and marks other bodies explicitly deferred. The select instruction
+also clarifies the plural field; strict schema and the failed original remain.
+These repairs have offline evidence only, no new paid validation. Exact pre-repair
+runtime code remains sealed in `live/code-snapshot/`; old calls/history replay
+without credentials/network. All frozen upstream/shared-core hashes are unchanged.
+The [official G5 report](research/clean-generation-official-g5-20261115.md) owns
+exact usage, tools, source review, G4 comparison, performance and limitations.
+
+**At that checkpoint, next action was:** review the delivered bounded-loop evidence and offline
+repairs. A fresh finite authorization is required to validate corrected catalog/
+context handling and finish source-review synthesis; do not reuse the closed last
+request, retry the schema failure, reopen old roots or enter G6/G7 automatically.
+
+### Prior official thinking checkpoint — three-request campaign closed
+
+The operator explicitly authorized at most THREE NEW paid official DeepSeek API /
+`deepseek-flash` requests to resolve the G3/G5 thinking capability gap. This is a
+scoped D16 diagnostic exception, not route adoption. The finite probe reuses
+shared `model_calls` Policy/Batch/ledger, existing raw-first transport/Decoder,
+G3 arithmetic/tool fixtures and immutable tool receipts. The three steps are
+nonstream thinking text, SSE thinking native dual tools, and SSE continuation
+with the exact sealed assistant/reasoning and two linked tool results.
+Each step has one attempt, zero retries, 32,768 input UTF-8 bytes, 16,384 output
+tokens (reasoning included), 65,536 context, and 240 seconds; the batch has three
+requests / 147,456 conservative tokens and 20-minute admission. `thinking` is
+explicitly enabled; effort is omitted to match the earlier base switch test.
+UNKNOWN, protocol/identity/usage failure, truncation, missing visible thinking,
+unexpected fixture/tool result or expiry stops dispatch; no allowance increase.
+The credential remains runtime-only. Existing Metro and official closed roots
+and accounting stay immutable; no default switch, unrelated implementation or
+Git commit/push.
+
+The batch is **complete and closed: 3 requests / 3 attempts / zero retries,
+UNKNOWN or overrun**. All responses contain nonempty `reasoning_content` and
+`completion_tokens_details.reasoning_tokens` (46 / 34 / 9). Nonstream text gives
+the correct 2197; thinking SSE produces two native fixture tools; the exact
+sealed assistant/reasoning and linked receipts produce correct continuation 64.
+Reported usage is 1,008 input + 167 output = 1,175 total, with 89 reasoning
+tokens ALREADY inside output; HTTP times total 6.611 seconds. Actual fee remains
+UNKNOWN; cache-aware weekend list-price estimate is USD 0.000194952.
+28 existing checks, three scoped offline scenarios, seven interface checks and
+the credential-free/no-network real-call audit pass. No more requests remain.
+The [official thinking report](research/clean-generation-official-thinking-20261114.md)
+owns exact fields, seals, limits, channel comparisons and strategy recommendations.
+Official thinking is OBSERVED_LIMITED_PASS for these synthetic profiles only;
+Metro thinking remains unqualified, real G5 quality and cross-turn mode switching
+remain unvalidated. No production/default route or G5 permit changes.
+
+**At the thinking checkpoint, next action was:** review the finite capability evidence and recommendations.
+Any official-route G5 research integration/quality comparison needs its own finite
+scope. Keep the default thinking-disabled route and all earlier closed accounting.
+
+### Prior official diagnostic checkpoint — closed; route unchanged
+
+After the Metro failures below, the operator supplied an official DeepSeek API
+credential and explicitly requested an official-vs-Metro diagnostic. This is a
+scoped exception to D16 for ONE diagnostic request, not a route adoption or
+fallback. Reuse the exact original messages, Packet, native tools, thinking
+disabled, SSE and 2,048 output cap; change only the endpoint and documented
+official model ID `deepseek-flash` (currently V4.1-Flash-1017). Use shared
+`model_calls`, one attempt, zero retries, a separate diagnostic receipt with a
+67,072-token conservative ceiling; retain both Metro calls and their accounting.
+No tool execution or follow-up request, default switch, commit or push. The key
+is runtime-only and must not enter artifacts.
+
+The single official request completed in **9.96 seconds / HTTP200**, with
+8,033 input + 818 output = 8,851 reported tokens. Complete SSE, model identity,
+thinking-disabled observation, output cap and two native search argument schemas
+passed the unchanged parser; tools were not executed or admitted to the G5
+controller. Credential-free, network-blocked 17-byte replay passed, with no
+credential pattern in diagnostic artifacts. Actual fee is UNKNOWN; documented
+weekend/cache-miss list-price estimate is USD 0.00169575, not a billing receipt.
+The diagnostic root is closed at one request. Metro remains two requests with
+its original UNKNOWN; all three G5-related requests have 19,215 known tokens
+plus that UNKNOWN. This favors a Metro route/service issue over a model-wide
+inability, but one non-simultaneous stochastic sample cannot locate the fault
+or independently attest Metro's backend model. The [G5 report](research/clean-generation-g5-20261114.md)
+owns the comparison and receipt paths.
+
+**At the diagnostic checkpoint, next action was:** review the official-vs-Metro evidence. Further paid
+research or official-route integration needs a separately bounded scope; the
+production/default route and G5 live acceptance remain unchanged.
+
+### Prior G5 retry checkpoint — tools rejected for output overrun
+
+After reporting a Metro outage, the operator explicitly instructed “重试一下”.
+This authorizes ONE origin-bound retry of operation
+`64e444c69655d2e2424fce2f6b5c159920206cb71af88fd581047b27b4a019a7`,
+with the identical wire body and source Packet, within the ORIGINAL campaign,
+turn and 10-request/670,720-token budget. The old UNKNOWN and its 67,072 allowance
+remain unchanged. Shared `model_calls.run(legacy_origin=...)` owns the retry;
+the new grant allows one additional attempt, no format retry or third request,
+expires after 10 minutes, and keeps the original campaign closed. No automatic
+research/tool-continuation request is authorized by this single-retry grant.
+`clean_research_retry.py` owns the explicit grant and immutable recovery report;
+the G5 adapter recognizes registered recovery attempts during read-only accounting.
+Shared caller/session cores, old seals, fingerprints and budget roots are unchanged.
+
+The authorized retry is finished: **1 added request / 17.06 seconds / HTTP200**,
+8,058 input + 2,306 output = 10,364 provider-reported tokens. Reported output
+exceeded the unchanged 2,048 cap, so the adapter rejected it as
+`PROVIDER_TOKEN_LIMIT_EXCEEDED`. It returned a source-read proposal and a
+counterevidence-search proposal, but neither tool executed after rejection.
+Total G5 requests are now 2; the original UNKNOWN/allowance remains, combined
+tokens and fees remain UNKNOWN. There is no third request or automatic research
+continuation. The original campaign stays closed and the single retry is sealed.
+
+**At the retry checkpoint, next action was:** review the reported output-cap violation and decide
+any further separately bounded validation. Keep both attempts and original
+UNKNOWN accounting; G5 live semantic/continuous-research acceptance is still open.
+
+### Historical G5 implementation and original stopped campaign
+
+The operator authorized G5 implementation on main, offline checks and at most
+10 NEW paid requests under the confirmed Plan D01–D24 and Generation contract.
+Reuse G2/G3/G4, S0/BGE and native tools; fixed TokenMetro /
+`deepseek-v4.1-flash-1017`, thinking disabled while dynamic thinking remains
+unqualified. Codex may choose finite token/action/time limits and stop conditions.
+No automatic allowance increase, retry or UNKNOWN resend; no G6/G7, default
+switch, deletion, Git commit or push. The earlier G4 permit remains closed.
+
+G5 now provides the opt-in bounded LangGraph/native-tool controller, query
+enhancement/subquestions/Step-Back/counterevidence, source read/selection and
+final query-local Packet synthesis on G2/G3/G4. 134 distinct scoped offline
+checks pass, including the final 19 G5 and 5 UI checks. No real research quality
+acceptance is claimed. The [G5 report](research/clean-generation-g5-20261114.md)
+owns implementation, finite limits, source and performance receipts.
+
+The first local preparation stopped at the unchanged RAM guard with zero
+operations/reservations/API and was closed. After the operator freed RAM and
+instructed continuation, the new linked finite root completed S0/BGE/source
+assembly, then sent exactly **1 request / 1 attempt**. HTTP200 SSE supplied only
+64 bytes of PING comments; after 121.49 seconds no answer/tools/usage terminal
+was available. The shared caller records UNKNOWN, retaining the full 67,072
+conservative allowance. Actual tokens and currency fee are UNKNOWN, not zero.
+The campaign automatically closed; nine unsent requests are closed, not standing
+permission. There is no retry, UNKNOWN resend or second live question.
+Complete turn time was 256.09 seconds; local query pipeline 128.25 seconds
+included 41.13 seconds of reader initialization. Same-turn reader reuse is
+implemented, but real supplement latency was not measured because no tool ran.
+Zero-network/credential-free terminal replay preserved all accounting, and actual
+partial-history UI readback/refresh created no new request or submission.
+
+**At the stopped checkpoint, next action was:** operator/provider reconciliation of the UNKNOWN
+request and channel/billing status, then a separately scoped finite live
+validation proposal if desired. Do not reopen either closed root or resend the
+uncertain operation. G5 rewrite/decomposition/active supplementation/continuous
+research remain live-UNVALIDATED; G6/G7 and default adoption remain unauthorized.
+
+### Historical G4 live checkpoint — closed campaign
 
 G2+G3+G4 real fixed-chain QA is integrated opt-in. The finite live campaign is
 **complete and closed at 4 requests / 4 attempts, 64,129 input + 2,395 output =
@@ -38,7 +356,7 @@ defaults or a verified provider tokenizer/price. New chats share the campaign.
 UNKNOWN, protocol/identity/accounting failure, overrun or source-integrity failure
 blocks further dispatch. Actual fees require billing evidence.
 
-**Immediate next action:** operator review of the saved real answers and opt-in
+**At that checkpoint, next action was:** operator review of the saved real answers and opt-in
 experience, especially the several-minute local latency, bounded literal context
 projection and whole-chunk admission limits. Any further paid campaign, G5–G7 or
 default adoption needs its own explicit scope; do not reopen the closed permit.
@@ -76,8 +394,8 @@ The original G3 adapter and offline engineering are committed as `0337963`
 (94 relevant tests at that checkpoint). Its separately authorized finite live
 probe stopped after2 requests /212 provider-reported tokens, no retry or UNKNOWN.
 Both returned the exact model and correct synthetic answers; the enabled-thinking
-response lacked reasoning_content and reasoning usage detail. Dynamic thinking
-remains NOT_QUALIFIED, not proof that the server performed no internal reasoning.
+response lacked reasoning_content and reasoning usage detail. At that original checkpoint, dynamic thinking
+remained NOT_QUALIFIED, not proof that the server performed no internal reasoning.
 Native tools and streaming were never sent. That paid allowance is closed.
 The [G3 report](research/clean-generation-g3-20261114.md) and
 [free parameter review](research/clean-generation-g3-parameter-check-20261114.md)
@@ -418,7 +736,8 @@ The V1 goal remains a stable local question -> official evidence -> answer
 The existing backend and Streamlit presentation are the initial delivery path.
 No complex UI or public cloud deployment is required.
 
-The operator has now selected **DeepSeek as the V1 Generation default**; unset
+The operator selected **DeepSeek as the V1 Generation backend**; its current
+official route supersedes the historical Metro default below. Unset
 `GENSHIN_GENERATION_BACKEND` selects DeepSeek, and `bailian` is explicit rollback.
 This is an operator choice, not a regrading of the closed three-case live gate:
 Q014/Q003 accepted, Q020 rejected for reported output above the request cap.
@@ -469,7 +788,7 @@ Source scope remains `mihoyo_obc` / `zh-cn`; locale remains configurable.
 | Dense / Hybrid | Default local Qwen3 535,802 x 1024 FP32/L2, read-only mmap. Historical `qwen3.7-text-embedding` 535,802 x 2048 remains explicit rollback with its matched query seam. Deterministic RRF Hybrid is retained. |
 | Reranking | Default local `BAAI/bge-reranker-v2-m3` over Hybrid Top500; rank-only fusion `0.35 Hybrid / 0.65 rerank`, denominator 60, final Top20. Online Qwen and off are explicit selectors, with no automatic fallback. |
 | Assembly / citation | Adopted retained-evidence combined (proved aliases + conservative HTML display + existing refill); explicit formal rollback. Context budget 12,000 characters / 3,000 per block. Provider-neutral Evidence Packets retain original-source lineage. Citation validation is structural; semantic faithfulness remains `not_evaluated`. |
-| Generation | V1 default `deepseek`: TokenMetro Chat `deepseek-v4.1-flash-1017`, neutral messages, 1024 requested cap, disabled thinking, temperature 0, one shared attempt and finite authorized budget. Closed live gate 2 accepted / 1 output-cap rejection; cap issue unresolved. Explicit `bailian` retains `qwen3.7-plus-2026-05-26` control. No new paid call permission. |
+| Generation | Historical V1 default `deepseek`: TokenMetro Chat `deepseek-v4.1-flash-1017`, neutral messages, 1024 requested cap, disabled thinking, temperature 0, one shared attempt and finite authorized budget. Closed live gate 2 accepted / 1 output-cap rejection; cap issue unresolved for that route. Official DeepSeek supersedes this route in section0; old evidence/accounting stays unchanged. Explicit `bailian` retains `qwen3.7-plus-2026-05-26` control. No standing paid call permission. |
 | Local Embedding | Pinned `Qwen/Qwen3-Embedding-0.6B` / 1024d full original-RU index is **complete and artifact-validated** (535,802 rows; 524 shards). Default `local_qwen3_1024` uses `data/retrieval/p04-local-qwen3-1024-20261102-v1/metadata/manifest.json` and the paired isolated query encoder. Semantic acceptance is separate. |
 | Local question flow | `rag/backend.py` provides reusable prepared state, candidate retrieval, reranking, Packet/Generation output, citation validation and persisted traces. `python -m genshin_corpus.rag` and Streamlit share the runtime selectors. |
 | Block B / Phase 05 | Experimental adaptive/semantic gates and inactive Navi derivatives remain separate. Block B production adoption stays blocked; neither it nor Phase 05 is required for V1. |
@@ -526,8 +845,9 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-Follow the Generation scope and next gate in section 0 and the
-[G4 real-QA report](research/clean-generation-g4-live-20261114.md). The
+Follow the Generation engineering closure and next action in section 0 and the
+[G5 closure report](research/clean-generation-g5-stopping-acceptance-20261115.md). The
+[G4 real-QA report](research/clean-generation-g4-live-20261114.md) and
 [G3/G4 Git integration](research/clean-generation-g34-git-close-20261114.md) is
 a preserved historical checkpoint. The
 [Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
@@ -624,6 +944,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
+| G5 evidence-value stopping, scoped engineering closure, real questions and limits | [`G5 closure report`](research/clean-generation-g5-stopping-acceptance-20261115.md) |
 | G3 tools-first approved Live run, scoped native tools/SSE capability, audit and remaining gaps | [`G3 tools/SSE Live`](research/clean-generation-g3-tools-live-20261114.md) |
 | G3 offline protocol, finite Live stop and capability limits | [`Generation G3`](research/clean-generation-g3-20261114.md) |
 | G4 local Mock dialogue, context, UI, recovery and merge conditions | [`Generation G4`](research/clean-generation-g4-20261114.md) |

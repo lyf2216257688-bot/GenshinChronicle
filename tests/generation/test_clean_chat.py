@@ -1,5 +1,6 @@
 """Offline Chat protocol/transport fixtures; no API key, model or corpus."""
 from copy import deepcopy
+from dataclasses import replace
 from io import BytesIO
 import json
 from pathlib import Path
@@ -88,6 +89,24 @@ class Opener:
 
 
 class ChatTests(unittest.TestCase):
+    def test_rejected_arguments_require_exact_error_receipt_and_preserve_thinking(self):
+        req=replace(request(thinking="enabled"),argument_error_feedback=True)
+        assistant={"role":"assistant","content":"","reasoning_content":"exact private reasoning",
+                   "tool_calls":[call(arguments='{"handle":17,"extra":true}')]}
+        parsed=Decoder(req.manifest()).finish(json.dumps(response(assistant,"tool_calls")).encode())
+        self.assertEqual(parsed["kind"],"tool_argument_errors")
+        error=parsed["tool_calls"][0]["validation_error"]
+        self.assertEqual(error["issues"][0]["extra"],["extra"])
+        self.assertEqual(error["issues"][1]["path"],"$.handle")
+        reply={"role":"tool","tool_call_id":"c1","content":json.dumps({
+            "status":"invalid_tool_arguments","executed":False,"validation_error":error})}
+        history=req.messages+[parsed["assistant_message"],reply]
+        self.assertEqual(replace(req,messages=history).manifest()["wire"]["messages"],history)
+        for content in ('{}',json.dumps({"status":"invalid_tool_arguments","executed":True,"validation_error":error})):
+            with self.assertRaisesRegex(ValueError,"INVALID_ARGUMENT_ERROR_RECEIPT"):
+                replace(req,messages=history[:-1]+[{**reply,"content":content}]).manifest()
+        with self.assertRaises(ValueError):replace(req,messages=history,argument_error_feedback=False).manifest()
+
     def setUp(self):
         scratch = Path(__file__).resolve().parents[2] / "tmp-g3"
         scratch.mkdir(exist_ok=True)
@@ -126,6 +145,15 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(self.bridge.batch.accounting()["known_tokens"], 30)
         for p in self.root.rglob("*"):
             if p.is_file() and p.suffix != ".sqlite": self.assertNotIn(b"fixture-secret", p.read_bytes())
+
+    def test_sealed_historical_adapter_replays_after_route_code_change_without_send(self):
+        with patch("genshin_corpus.generation.clean_chat_transport.code_identity", return_value={"historical": "a"*64}):
+            op, prior = self.execute()
+        sender=Opener(error=AssertionError("No historical resend"))
+        replay=self.bridge.execute_chat(op,opener=sender)
+        self.assertEqual(replay,prior)
+        self.assertEqual(sender.calls,[])
+        self.assertEqual(self.bridge.batch.accounting()["request_reservations"],1)
 
     def test_sse_every_byte_split_multitool_and_unicode(self):
         for tools in (False, True):

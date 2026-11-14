@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 
 from ..evidence_io import digest, read, require, seal, sha, verify
-from ..generation.clean_chat import ENDPOINT, MODEL
+from ..generation.clean_chat import ENDPOINT, MODEL, ROUTES, DEFAULT_ROUTE
 from ..generation.clean_chat_transport import ChatSessions, code_identity as adapter_code
 from ..model_calls import Deferred
 from ..retrieval.clean_based.query_v2 import ResearchQuery
@@ -62,20 +62,20 @@ def prepare(store, repo, authorization, *, requests=10, seconds=7200):
                    "turn_requests": 1, "turn_tokens": 67072},
         "context_tokens": 67072, "output_tokens": 1536, "timeout_seconds": 120,
         "history_bytes": 16000, "recent_turns": 2, "excerpt_chars": 160,
-        "worker_timeout_seconds": 1800, "query_bytes": 2400, "thinking": "disabled"}
+        "worker_timeout_seconds": 1800, "query_bytes": 2400, "thinking": "disabled", "route": DEFAULT_ROUTE}
     validate_settings(settings)
     # Prior ordinary SSE observation is a protocol prerequisite, not QA adoption.
-    evidence = repo / "data/generation/g3-ts-audit-20261114-a"
+    route = ROUTES[settings["route"]]
+    evidence = repo / "data/generation/g5-official-diagnostic-20261114/call"
     verify(evidence)
-    capabilities = read(evidence / "capabilities.json")["capabilities"]
-    require(any(c["observed_status"] == "OBSERVED_LIMITED_PASS"
-                and c["profile"]["endpoint"] == ENDPOINT and c["profile"]["model"] == MODEL
-                and c["profile"]["thinking"] == "disabled" and c["profile"]["stream"] is True
-                and c["profile"]["protocol"] == "text" for c in capabilities), "ORDINARY_SSE_EVIDENCE_REQUIRED")
+    profile = read(evidence / "plan.json")["manifest"]["profile"]
+    require(read(evidence / "result.json")["state"] == "CONTENT_VERIFIED"
+        and profile["endpoint"] == route["endpoint"] and profile["model"] == route["model"]
+        and profile["thinking"] == "disabled" and profile["stream"] is True, "ORDINARY_SSE_EVIDENCE_REQUIRED")
     permit = {"version": VERSION, "live_enabled": True, "data_root": str(store.root),
         "repo": str(repo), "campaign": settings["campaign"], "settings": settings,
         "authorization": authorization, "expires_at": time.time() + seconds,
-        "endpoint": ENDPOINT, "model": MODEL, "code": code_identity(),
+        "endpoint": route["endpoint"], "model": route["model"], "code": code_identity(),
         "assets": {n: sha(repo / n) for n in ("config/clean-retrieval-v1.json", "config/index-selected-v1.json",
                     "config/reranking-selected-v1.json")},
         "protocol_evidence": {"path": str(evidence), "complete_sha256": sha(evidence / "complete.json")},
@@ -101,10 +101,11 @@ class LiveSessions(ChatSessions):
     """Only admission specializes G3; sender, reservation/recovery stay unchanged."""
     def _admit_live(self, plan):
         p = self.permit
+        route = ROUTES[p["settings"].get("route", "tokenmetro")]
         require(p == read(self.store.root / "live/permit.json") and p["code"] == code_identity()
                 and p["data_root"] == str(self.store.root) and p["campaign"] == self.campaign
-                and p["settings"]["limits"] == self.limits and p["endpoint"] == ENDPOINT
-                and p["model"] == MODEL and p["live_enabled"] is True
+                and p["settings"]["limits"] == self.limits and p["endpoint"] == route["endpoint"]
+                and p["model"] == route["model"] and p["live_enabled"] is True
                 and time.time() < p["expires_at"], "LIVE_PERMIT_MISSING_OR_EXPIRED")
         require(not (self.store.root / "live/closed.json").exists(), "LIVE_CAMPAIGN_CLOSED")
         for name, expected in p["assets"].items():

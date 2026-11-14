@@ -125,6 +125,9 @@ class ChatAppTests(unittest.TestCase):
 
     def test_ui_cancel_retains_nonfinal_draft(self):
         app = self.app(); sid = self.new(app)
+        # Deliberately slow the fixture stream so UI refresh/click happens
+        # before its terminal frame, including on a busy local machine.
+        self.workers[0].delay = .5
         app.text_area[0].set_value("取消这个Mock回答").run()
         self.button(app, "发送").click().run()
         tid = self.store.jobs(sid)[0]["turn_id"]

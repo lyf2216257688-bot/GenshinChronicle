@@ -5,7 +5,8 @@ from pathlib import Path
 import streamlit as st
 
 from genshin_corpus.rag.clean_conversation import ConversationStore, TERMINAL
-from genshin_corpus.rag.clean_conversation_graph import fixture_settings, citation_view
+from genshin_corpus.rag.clean_conversation_graph import fixture_settings, citation_view, citation_views
+from genshin_corpus.evidence_io import require
 from genshin_corpus.rag.clean_executor import LocalExecutor
 
 REPO = Path(__file__).resolve().parents[3]
@@ -25,9 +26,11 @@ def executor(root, repo):
     return LocalExecutor(root, repo)
 
 
-def render_citation(store, citation):
+def render_citation(store, citation, *, views=None):
     try:
-        view = citation_view(store, citation["turn_id"], citation["citation_id"], packet_id=citation["packet_id"])
+        view = views[citation["citation_id"]] if views is not None else citation_view(
+            store, citation["turn_id"], citation["citation_id"], packet_id=citation["packet_id"])
+        require(view["turn_id"] == citation["turn_id"] and view["packet_id"] == citation["packet_id"], "Citation view scope differs")
         fragment = view["fragment"]
         st.write(fragment["source_item"])
         for text in fragment["texts"]:
@@ -59,8 +62,22 @@ def transcript(store, worker, sid):
             st.markdown(message["content"])
             if message["role"] == "assistant":
                 st.caption(message.get("mode", "MOCK") + " · " + message["status"] + " · 语义尚未验收")
+                result = store.load(message["result_ref"])
+                views = None
+                if result.get("sources_ref"):
+                    packet = store.load(result["sources_ref"])["packet"]
+                    try: views = citation_views(store, message["turn_id"], list(packet["citations"]), packet_id=packet["packet_id"])
+                    except (ValueError, OSError, KeyError):
+                        st.error("来源文件缺失或校验失败；本轮引用已阻断。")
+                        continue
+                if result.get("research_ref"):
+                    with st.expander("本轮研究记录", expanded=False):
+                        research = store.load(result["research_ref"])
+                        st.write({"停止原因": result["stop_reason"], "检索次数": research["search_count"],
+                                  "原文读取次数": research["read_count"], "研究要点": research["research"]})
+                        st.caption("研究要点是待核验的模型分析；事实依据请展开原文引用。")
                 for citation in message.get("citations", []):
-                    with st.expander("原文引用 " + citation["citation_id"]): render_citation(store, citation)
+                    with st.expander("原文引用 " + citation["citation_id"]): render_citation(store, citation, views=views)
                 if message["status"] != "completed":
                     drafts = [e["text"] for e in store.events(message["turn_id"]) if e["kind"] == "answer_draft"]
                     if drafts:
@@ -70,7 +87,7 @@ def transcript(store, worker, sid):
                         packet = store.load(result["sources_ref"])["packet"]
                         with st.expander("本轮已保存的原文材料"):
                             for cid in packet["citations"]:
-                                render_citation(store, {"turn_id": message["turn_id"], "packet_id": packet["packet_id"], "citation_id": cid})
+                                render_citation(store, {"turn_id": message["turn_id"], "packet_id": packet["packet_id"], "citation_id": cid}, views=views)
     for job in store.jobs(sid):
         tid = job["turn_id"]
         if job["status"] in TERMINAL: continue
@@ -110,7 +127,8 @@ def main():
     st.set_page_config(page_title="GC 本地研究对话", layout="wide")
     st.title("GC 本地研究对话")
     if MODE == "LIVE":
-        st.warning("G4 有限真实问答：使用本地知识库与远程模型。所有对话共享已授权批次额度；新建对话不会增加额度。")
+        st.warning("有限真实研究问答：使用本地知识库与远程模型。所有对话共享已授权批次额度；新建对话不会增加额度。")
+        st.caption("新批次默认使用 DeepSeek 官方 API；研究按需开启思考，原文与引用保存在本机。")
     else:
         st.warning("G4 离线 Mock：仅使用小型合成资料和模拟回答。真实模式须显式启用并配置有限批次授权。")
     store = ConversationStore(ROOT)
@@ -123,9 +141,12 @@ def main():
         if st.button("新建对话", disabled=worker is None):
             if MODE == "LIVE":
                 from genshin_corpus.evidence_io import read
-                from genshin_corpus.rag.clean_live import permit_for
                 try:
                     settings = read(store.root / "live/permit.json")["settings"]
+                    if settings.get("engine") == "gc-clean-research-1":
+                        from genshin_corpus.rag.clean_research_live import permit_for
+                    else:
+                        from genshin_corpus.rag.clean_live import permit_for
                     permit_for(store, settings)
                 except (OSError, KeyError, ValueError):
                     st.error("缺少可用的有限真实批次配置。")
@@ -148,9 +169,12 @@ def main():
         st.info("此会话与入口运行模式不同，当前只读。")
         return
     if store.chat(sid)["settings"]["mode"] == "LIVE":
-        from genshin_corpus.rag.clean_live import LiveSessions, permit_for
         try:
             settings = store.chat(sid)["settings"]
+            if settings.get("engine") == "gc-clean-research-1":
+                from genshin_corpus.rag.clean_research_live import ResearchSessions as LiveSessions, permit_for
+            else:
+                from genshin_corpus.rag.clean_live import LiveSessions, permit_for
             permit = permit_for(store, settings)
             bridge = LiveSessions(store, permit["campaign"], settings["limits"], permit=permit)
             usage = bridge.batch.accounting()

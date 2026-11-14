@@ -32,6 +32,37 @@ Separate G3 audit children contain zero-network readback reports and observed
 `capabilities.json` records with source-root/call-seal bindings and explicit limits.
 They do not alter frozen request manifests or grant future dispatch authority.
 
+G5 roots additionally keep per-query sealed `local_queries/<turn>/<query>/`
+with worker timing receipts, `research_tools/<turn>/` with immutable native tool
+receipts, and hashed research/step/preview/source artifacts in `chat_artifacts/`.
+These reference complete ranked groups, exact read receipts, selections and
+explicit stop state. The new G5 permit shares the existing `live/` layout but is
+a separately authorized campaign; G4 permits cannot authorize it. Model research
+snapshots remain derived same-chat state, not corpus facts or a global index.
+An explicitly authorized single retry keeps `campaigns/<id>/explicit_retry/<op>/`
+grant/report/code snapshots and `recovered_calls/<op>/` sealed raw call facts.
+The original ledger claim registers `recoveries/0001`; original request facts and
+UNKNOWN reservations remain immutable in the same Batch, with no allowance reset.
+New official G5 campaigns bind `config/clean-generation-v1.json` and scoped
+official capability receipts in `live/permit.json`. Role/analysis-boundary previews
+and closed native histories use existing hashed chat artifacts, while raw
+reasoning remains inside sealed call archives. No credentials enter these files.
+`live/code-snapshot/`, `case-reports/` and independent `audit/` preserve exact
+execution code, measured real research and no-network readback; `live/closed.json`
+closes unused requests as well as consumed quota. A sealed `live/code-revision/`
+may bind a code-only update for a fresh next turn without changing scope,
+expiry, settings or budgets; the base permit and prior calls stay immutable.
+Tool units retain full_output beside any exact-body reference projection. New evidence-value profiles also keep
+non-authoritative resolved/unresolved/deferred notes, per-action identity gain
+and termination actor/method/allowance in these existing artifacts. A separately
+documented `local-repair/` may retain an offline database-copy trial and explicit
+append-only, no-effects checkpoint repair proof; it is not an automatic migration
+or permission to resend a sealed/UNKNOWN call.
+`authorization-balance.json` may bind a closed predecessor and ONLY the remaining
+requests from the same finite authorization. `next-validation/` can hold an
+unapproved request preview; it is not a permit or renewed allowance. Official adoption never renames
+or rewrites old Metro roots, scopes, UNKNOWN allowances or recovered calls.
+
 G4 adds local `chats`, `chat_jobs`, `chat_messages`, `chat_notes` and
 `chat_drafts` tables in `sessions.sqlite`. `chat_artifacts/<turn>/` owns immutable
 messages, typed note revisions, context indexes, ranked inputs, source/Parent

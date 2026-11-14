@@ -10,6 +10,14 @@ from ..evidence_io import digest, require, strict_json
 VERSION = "gc-clean-chat-1"
 ENDPOINT = "https://tokenmetro.com/v1/chat/completions"
 MODEL = "deepseek-v4.1-flash-1017"
+# Historical constants/default request preserve the frozen G3 probe surface.
+# Application entry points select DEFAULT_ROUTE explicitly; no fallback occurs.
+DEFAULT_ROUTE = "deepseek_official"
+ROUTES = {
+    DEFAULT_ROUTE: {"endpoint": "https://api.deepseek.com/chat/completions", "model": "deepseek-flash",
+                    "key_env": "DEEPSEEK_API_KEY"},
+    "tokenmetro": {"endpoint": ENDPOINT, "model": MODEL, "key_env": "TOKENMETRO_API_KEY"},
+}
 
 
 def encoded(value):
@@ -88,7 +96,37 @@ def tool_registry(tools):
     return registry
 
 
-def validate_calls(tool_calls, registry):
+def argument_issues(schema, value, path="$"):
+    """Bounded diagnostics only; schema_check remains the acceptance authority."""
+    if schema["type"] == "object" and isinstance(value, dict):
+        issues = []
+        missing = sorted(set(schema["required"]) - set(value))
+        extra = sorted(set(value) - set(schema["properties"]))
+        if missing or extra:
+            issues.append({"path": path, "code": "TOOL_ARGUMENT_KEYS", "expected_type": "object",
+                           "missing": missing, "extra": extra})
+        return issues + [i for k in value if k in schema["properties"]
+                         for i in argument_issues(schema["properties"][k], value[k], path + "." + k)]
+    if schema["type"] == "array" and isinstance(value, list):
+        issues = []
+        if not schema.get("minItems", 0) <= len(value) <= schema["maxItems"]:
+            issues.append({"path": path, "code": "TOOL_ARGUMENT_LENGTH", "expected_type": "array",
+                           "minItems": schema.get("minItems", 0), "maxItems": schema["maxItems"]})
+        return issues + [i for n, v in enumerate(value) for i in argument_issues(schema["items"], v, path + f"[{n}]")]
+    try:
+        schema_check(schema, value)
+        return []
+    except ValueError as exc:
+        code = str(exc)
+    issue = {"path": path, "code": code, "expected_type": schema["type"]}
+    if code == "TOOL_ARGUMENT_ENUM": issue["allowed"] = schema["enum"]
+    if code == "TOOL_ARGUMENT_TYPE": return [issue]
+    for k in ("minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum"):
+        if k in schema: issue[k] = schema[k]
+    return [issue]
+
+
+def validate_calls(tool_calls, registry, *, argument_errors=False):
     require(isinstance(tool_calls, list) and 0 < len(tool_calls) <= 16, "INVALID_TOOL_CALLS")
     seen, parsed = set(), []
     for call in tool_calls:
@@ -99,15 +137,27 @@ def validate_calls(tool_calls, registry):
         f = call["function"]
         require(isinstance(f, dict) and set(f) == {"name", "arguments"}
                 and f["name"] in registry and isinstance(f["arguments"], str), "UNKNOWN_TOOL_OR_ARGUMENTS")
-        args = strict_json(f["arguments"])
-        schema_check(registry[f["name"]], args)
-        parsed.append({"id": call["id"], "name": f["name"], "arguments": args})
+        try:
+            args = strict_json(f["arguments"])
+        except ValueError:
+            if not argument_errors: raise
+            args = None
+            issues = [{"path": "$", "code": "INVALID_ARGUMENT_JSON", "expected_type": "object"}]
+        else:
+            issues = []
+            try: schema_check(registry[f["name"]], args)
+            except ValueError as exc:
+                if not argument_errors: raise
+                issues = argument_issues(registry[f["name"]], args) or [{"path": "$", "code": str(exc)}]
+        item = {"id": call["id"], "name": f["name"], "arguments": args}
+        if issues: item["validation_error"] = {"code": "INVALID_TOOL_ARGUMENTS", "issues": issues}
+        parsed.append(item)
     return parsed
 
 
-def validate_messages(messages, registry):
+def validate_messages(messages, registry, *, argument_errors=False):
     require(isinstance(messages, list) and bool(messages), "MESSAGES_REQUIRED")
-    pending, seen = set(), set()
+    pending, seen, rejected = set(), set(), {}
     for message in messages:
         require(isinstance(message, dict), "INVALID_MESSAGE")
         role = message.get("role")
@@ -121,11 +171,17 @@ def validate_messages(messages, registry):
         if role == "tool":
             cid = message.get("tool_call_id")
             require(cid in pending, "ORPHAN_OR_DUPLICATE_TOOL_RESULT")
+            if cid in rejected:
+                receipt = strict_json(message["content"])
+                require(isinstance(receipt, dict) and receipt.get("status") == "invalid_tool_arguments"
+                        and receipt.get("executed") is False and receipt.get("validation_error") == rejected[cid],
+                        "INVALID_ARGUMENT_ERROR_RECEIPT")
             pending.remove(cid)
         else:
             require(not pending, "INCOMPLETE_TOOL_PROTOCOL_UNIT")
             if message.get("tool_calls"):
-                validate_calls(message["tool_calls"], registry)
+                calls = validate_calls(message["tool_calls"], registry, argument_errors=argument_errors)
+                rejected.update({c["id"]: c["validation_error"] for c in calls if "validation_error" in c})
                 ids = {c["id"] for c in message["tool_calls"]}
                 require(not seen & ids, "REUSED_TOOL_CALL_ID")
                 seen |= ids; pending = ids
@@ -143,6 +199,8 @@ class ChatRequest:
     context_tokens: int
     timeout_seconds: int
     prompt_version: str
+    route: str = "tokenmetro"
+    argument_error_feedback: bool = False
 
     def manifest(self):
         require(self.thinking in {"enabled", "disabled"} and type(self.stream) is bool, "INVALID_PROFILE")
@@ -150,22 +208,27 @@ class ChatRequest:
             require(type(n) is int and n > 0, "FINITE_REQUEST_LIMIT_REQUIRED")
         require(isinstance(self.prompt_version, str) and bool(self.prompt_version), "PROMPT_VERSION_REQUIRED")
         registry = tool_registry(self.tools)
-        validate_messages(self.messages, registry)
-        wire = {"model": MODEL, "messages": deepcopy(self.messages), "stream": self.stream,
+        require(type(self.argument_error_feedback) is bool, "INVALID_ARGUMENT_ERROR_POLICY")
+        validate_messages(self.messages, registry, argument_errors=self.argument_error_feedback)
+        require(self.route in ROUTES, "UNKNOWN_CHAT_ROUTE")
+        route = ROUTES[self.route]
+        wire = {"model": route["model"], "messages": deepcopy(self.messages), "stream": self.stream,
                 "thinking": {"type": self.thinking}, "max_tokens": self.output_tokens}
         if self.tools: wire.update(tools=deepcopy(self.tools), tool_choice="auto")
         if self.stream: wire["stream_options"] = {"include_usage": True}
         size = len(encoded(wire))
         require(size <= self.input_bytes and size + self.output_tokens <= self.context_tokens, "WHOLE_MESSAGE_BUDGET_EXCEEDED")
-        profile = {"version": VERSION, "endpoint": ENDPOINT, "model": MODEL, "surface": "chat_completions",
+        profile = {"version": VERSION, "endpoint": route["endpoint"], "model": route["model"], "surface": "chat_completions",
                    "thinking": self.thinking, "stream": self.stream, "tool_schema_sha256": digest(self.tools),
                    "prompt_version": self.prompt_version, "protocol": "native_tools" if self.tools else "text",
                    "reasoning_history": "preserve_verbatim", "status": "NOT_LIVE_VALIDATED", "evidence": []}
-        return {"version": VERSION, "profile": profile, "wire": wire,
+        result = {"version": VERSION, "profile": profile, "wire": wire,
                 "limits": {"input_bytes": self.input_bytes, "output_tokens": self.output_tokens,
                            "context_tokens": self.context_tokens, "timeout_seconds": self.timeout_seconds},
                 "estimated_input_tokens": size, "estimator": "conservative_utf8_bytes_not_vendor_tokenizer",
                 "semantic_acceptance": "NOT_REVIEWED"}
+        if self.argument_error_feedback: result["tool_argument_errors"] = "feedback"
+        return result
 
 
 def normalize_usage(usage):
@@ -190,7 +253,8 @@ class Decoder:
 
     def identity_check(self, obj, expected):
         require(isinstance(obj, dict) and not obj.get("error") and obj.get("object") == expected
-                and obj.get("model") == MODEL and isinstance(obj.get("id"), str) and bool(obj["id"]), "RESPONSE_IDENTITY_INVALID")
+                and obj.get("model") == self.manifest["wire"]["model"]
+                and isinstance(obj.get("id"), str) and bool(obj["id"]), "RESPONSE_IDENTITY_INVALID")
         if self.identity is not None: require(self.identity == obj["id"], "RESPONSE_ID_CHANGED")
         self.identity = obj["id"]
 
@@ -288,8 +352,9 @@ class Decoder:
         parsed = []
         if reason == "tool_calls":
             require(not m.get("refusal"), "MIXED_REFUSAL_TOOLS")
-            parsed = validate_calls(tools, self.registry)
-            kind = "tool_calls"
+            parsed = validate_calls(tools, self.registry,
+                                    argument_errors=self.manifest.get("tool_argument_errors") == "feedback")
+            kind = "tool_argument_errors" if any("validation_error" in c for c in parsed) else "tool_calls"
         elif reason in {"length", "content_filter"}: kind = "incomplete" if reason == "length" else "refusal"
         else:
             require(not tools, "TOOLS_WITHOUT_TOOL_FINISH")

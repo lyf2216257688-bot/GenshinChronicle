@@ -1,0 +1,22 @@
+{
+  "version": "gc-g5-official-4",
+  "engine": "gc-clean-research-1",
+  "route": "deepseek_official",
+  "provider": "DeepSeek",
+  "endpoint": "https://api.deepseek.com/chat/completions",
+  "model": "deepseek-flash",
+  "api_key_env": "DEEPSEEK_API_KEY",
+  "live_enabled_without_finite_permit": false,
+  "thinking": "dynamic",
+  "roles": {
+    "simple": {"thinking": "disabled", "output_tokens": 4096},
+    "research": {"thinking": "disabled", "output_tokens": 8192},
+    "analysis": {"thinking": "enabled", "output_tokens": 16384},
+    "synthesis": {"thinking": "enabled", "output_tokens": 32768}
+  },
+  "context_tokens": 196608,
+  "timeout_seconds": 300,
+  "tool_error_corrections": 2,
+  "stop_policy": "evidence-value-1",
+  "retry": {"max_attempts": 1, "unknown_retries": 0, "format_retries": 0}
+}

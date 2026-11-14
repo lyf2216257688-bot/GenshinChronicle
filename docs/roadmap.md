@@ -33,7 +33,11 @@ capability probe keep exact-route evidence and paid approval explicit.
 G4 adds same-chat persistence, extractive context organization, corrections and an
 independent fixed-chain chat/Streamlit interface, defaulting to Mock. The separate
 finite live chain connects real S0/BGE and G3 under expiring shared campaign limits.
-Autonomous research and adoption retain their separate stage gates.
+G5 now adds the bounded single-controller active research loop and evidence-value
+stopping: sufficient core evidence can finish, unverifiable details remain limited,
+and optional branches need not be exhausted. Its finite engineering closure is
+recorded in the [G5 report](research/clean-generation-g5-stopping-acceptance-20261115.md);
+G6/G7, broad product acceptance and default adoption remain separate gates.
 Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

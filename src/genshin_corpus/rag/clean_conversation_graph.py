@@ -7,7 +7,7 @@ from typing import TypedDict
 
 from ..evidence_io import digest, require, sha
 from ..model_calls import Deferred
-from ..generation.clean_chat import ChatRequest, encoded
+from ..generation.clean_chat import ChatRequest, encoded, ROUTES
 from ..generation.clean_chat_transport import ChatSessions
 from ..generation.clean_evidence import EvidenceReader, assemble, message_projection, validate_citations
 from ..retrieval.clean_based.query_v2 import ResearchQuery
@@ -53,7 +53,8 @@ def request_for(context, packet, settings):
     return ChatRequest(messages(context, packet["evidence"]), [], "disabled", True,
         settings["output_tokens"], settings["context_tokens"] - settings["output_tokens"],
         settings["context_tokens"], settings["timeout_seconds"],
-        "g4-live-grounded-answer-1" if settings["mode"] == "LIVE" else "g4-mock-fixed-chain-1")
+        "g4-live-grounded-answer-1" if settings["mode"] == "LIVE" else "g4-mock-fixed-chain-1",
+        route=settings.get("route", "tokenmetro"))
 
 
 def saved_result(store, tid):
@@ -65,11 +66,15 @@ def verify_sources(store, ref):
     sources = store.load(ref)
     packet = sources["packet"]
     validate_citations(packet, list(packet["citations"]))
-    ranked = store.load(sources["ranked_ref"])
-    require(packet["input_group_digests"] == [digest(ranked)], "Packet ranked input differs")
+    groups = [store.load(r) for r in sources["ranked_refs"]] if "ranked_refs" in sources else [store.load(sources["ranked_ref"])]
+    require(packet["input_group_digests"] == [digest(g) for g in groups], "Packet ranked input differs")
     ctx = store.load(sources["context_ref"])
     turn = store.turn(ctx["turn_id"])
-    require(digest(assembly_context(turn, ctx)) == packet["context_digest"], "Packet conversation context differs")
+    if "ranked_refs" in sources:
+        require(sources["assembly_context"]["question"] == turn["question"], "Research question differs")
+        require(digest(sources["assembly_context"]) == packet["context_digest"], "Research assembly context differs")
+    else:
+        require(digest(assembly_context(turn, ctx)) == packet["context_digest"], "Packet conversation context differs")
     for rid, read_ref in sources["reads"].items():
         receipt = store.load(read_ref)
         require(receipt["receipt_id"] == rid, "Source receipt identity differs")
@@ -79,24 +84,34 @@ def verify_sources(store, ref):
 
 def citation_view(store, tid, citation_id, *, packet_id=None):
     """Turn + Packet + citation ID is the address, never a global E01 slot."""
+    return citation_views(store, tid, [citation_id], packet_id=packet_id)[citation_id]
+
+
+def citation_views(store, tid, citation_ids, *, packet_id=None):
+    """One verified snapshot per render; no cache survives the caller's refresh."""
     result = saved_result(store, tid)
     require(result is not None and result.get("sources_ref"), "No source Packet for this turn")
     sources = verify_sources(store, result["sources_ref"])
     packet = sources["packet"]
     require(packet_id is None or packet_id == packet["packet_id"], "Citation Packet belongs to another turn")
-    validate_citations(packet, [citation_id])
-    mapping = packet["citations"][citation_id]
-    receipt = store.load(sources["reads"][mapping["receipt_id"]])
-    require(receipt["receipt_id"] == mapping["receipt_id"] and receipt["source_validation"] == "PASS", "Unverified citation receipt")
-    fragment = next(f for f in receipt["fragments"] if f["fragment_id"] == mapping["fragment_id"])
-    parent_ref = sources["parents"].get(receipt["handle"])
-    parent = store.load(parent_ref) if parent_ref else None
-    if parent:
-        require(parent["handle"] == receipt["handle"] and parent["source_snapshot"] == receipt["source_snapshot"], "Parent source differs")
-    return {"turn_id": tid, "packet_id": packet["packet_id"], "citation_id": citation_id,
-            "fragment": fragment, "receipt": receipt, "parent": parent,
-            "parent_status": "available" if parent else "not_read_or_failed",
-            "semantic_support": "NOT_EVALUATED"}
+    validate_citations(packet, citation_ids)
+    views, receipts, parents = {}, {}, {}
+    for citation_id in dict.fromkeys(citation_ids):
+        mapping = packet["citations"][citation_id]; rid = mapping["receipt_id"]
+        if rid not in receipts: receipts[rid] = store.load(sources["reads"][rid])
+        receipt = receipts[rid]
+        require(receipt["receipt_id"] == rid and receipt["source_validation"] == "PASS", "Unverified citation receipt")
+        fragment = next(f for f in receipt["fragments"] if f["fragment_id"] == mapping["fragment_id"])
+        handle = receipt["handle"]; parent_ref = sources["parents"].get(handle)
+        if handle not in parents: parents[handle] = store.load(parent_ref) if parent_ref else None
+        parent = parents[handle]
+        if parent:
+            require(parent["handle"] == handle and parent["source_snapshot"] == receipt["source_snapshot"], "Parent source differs")
+        views[citation_id] = {"turn_id": tid, "packet_id": packet["packet_id"], "citation_id": citation_id,
+                "fragment": fragment, "receipt": receipt, "parent": parent,
+                "parent_status": "available" if parent else "not_read_or_failed",
+                "semantic_support": "NOT_EVALUATED"}
+    return views
 
 
 def commit_result(store, tid, result):
@@ -231,7 +246,7 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
             return {"dispatch_stop": "unknown_requires_reconciliation"}
         try:
             bridge.execute_chat(state["operation_id"], opener=opener,
-                                api_key=os.environ.get("TOKENMETRO_API_KEY") if mode == "LIVE" else None)
+                                api_key=os.environ.get(ROUTES[settings.get("route", "tokenmetro")]["key_env"]) if mode == "LIVE" else None)
         except Deferred:
             return {"dispatch_stop": "user_cancelled" if store.cancelled(tid) else "budget_or_admission_deferred"}
         require(not store.stopping(), "APPLICATION_SHUTDOWN_CONTINUE_REQUIRED")

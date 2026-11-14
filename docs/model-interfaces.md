@@ -16,8 +16,14 @@ standing permission to call them. Phase 05 `e2_active_exploration` and
 `e2_authorized_candidate` labels are preserved catalog classifications; their
 dispatch is paused. Historical canaries and scoped permits do not reopen work.
 
-The V1 default answer provider is now operator-selected DeepSeek, retaining
-explicit Bailian/Qwen rollback and the unresolved limited-live cap issue.
+The V1 default answer provider is operator-selected **DeepSeek official API /
+`deepseek-flash`**, base `https://api.deepseek.com`, credential `DEEPSEEK_API_KEY`,
+optional endpoint selector `DEEPSEEK_BASE_URL`. The formal new G5 configuration
+is `config/clean-generation-v1.json`. `TOKENMETRO_BASE_URL` and an old Metro key
+do not select the new default. Explicit retained Metro uses
+`DEEPSEEK_BASE_URL=https://tokenmetro.com/v1`, `TOKENMETRO_API_KEY` and an explicit
+`GENSHIN_DEEPSEEK_MODEL=deepseek-v4.1-flash-1017`; there is no fallback. Bailian/Qwen
+remains explicit rollback. Earlier Metro cap failures remain historical evidence.
 The original-RU Qwen selectors below describe retained code, not a working local
 fallback: their local model/index assets were retired. Selected Clean BGE-M3
 indexes and the opt-in [Retrieval P0–P2](phases/clean-retrieval-v1.md) path are
@@ -27,24 +33,47 @@ The separate P4 experiment reuses the same local adapters in serial isolated
 query workers; its opt-in S0/S1/S2 comparisons do not change Serving defaults.
 Migration and acceptance follow the
 [Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
-The first QA route/model is configurable with the evidenced TokenMetro Chat
-default; the three-call live allowance is now consumed/closed. Existing Card/Responses
+The earlier three-call Metro QA allowance is consumed/closed. New QA defaults
+use the official route above. Existing Card/Responses
 routes are evidence for protocol reuse, not QA acceptance or permanent
 architecture restrictions. New/materially changed API execution uses the shared
 call layer; adopted legacy consumers remain unchanged until migrated.
+
+The opt-in Clean G5 controller (`rag/clean_research.py`) uses the existing G3
+Chat/SSE transport and shared caller, with native bounded search/read/select/finish
+schemas. `clean_research_live.py` specializes admission under a new finite,
+expiring campaign; new preparation selects official `deepseek-flash`, dynamic
+thinking and role caps (simple4K/research8K/analysis16K/synthesis32K), one attempt
+and zero format/UNKNOWN transport retries. New G5 profiles permit at most two
+explicit tool-argument correction rounds, each a new budgeted operation after
+an immutable rejection receipt; no malformed batch executes and every corrected
+call is revalidated. Source/hash/ledger and UNKNOWN faults stop. Query enhancement,
+research and synthesis all consume the same campaign/turn accounting. This adds
+no automatic model fallback or standing permission. The operator separately
+adopted the official channel on 2026-11-15. Thinking on TokenMetro and actual currency fees remain independently
+unqualified until exact-route/billing evidence exists. The [latest G5 report](research/clean-generation-g5-stopping-acceptance-20261115.md)
+owns finite real stopping observations, engineering closure and limitations; the [Generation contract](phases/clean-generation-v1.md)
+owns recovery, evidence and tool boundaries.
+An operator's separately recorded one-request retry uses the shared caller's
+exact-origin recovery seam through `rag/clean_research_retry.py`; it retains the
+original fingerprint, ledger, turn, Batch and UNKNOWN allowance. It does not
+reopen a closed campaign or automatically continue the native tool loop.
 
 ---
 
 ## Clean Generation protocol workbench (2026-11-14)
 
-The [Generation contract](phases/clean-generation-v1.md) fixes the research route
-TokenMetro / `deepseek-v4.1-flash-1017`, endpoint
-`https://tokenmetro.com/v1/chat/completions`, credential `TOKENMETRO_API_KEY`.
+The [Generation contract](phases/clean-generation-v1.md) now defaults research to
+official `deepseek-flash`, endpoint `https://api.deepseek.com/chat/completions`,
+credential `DEEPSEEK_API_KEY`. The retained low-level G3 request default/constants
+and frozen probe runners still describe explicit historical Metro experiments;
+formal preparation, G4/G5 entry points and V1 provider choose the official route.
 New `generation/clean_chat.py` and `clean_chat_transport.py` implement explicit
 thinking enabled/disabled, native tools and stream/nonstream manifests, raw-first
 urllib decoding and the existing session/turn/campaign budget path. No SDK or
 transport retry, proxy, redirect, model alias normalization or route fallback is
-enabled. Original `generation/deepseek.py` and all legacy defaults remain unchanged.
+enabled. `generation/deepseek.py` also defaults to official; legacy raw archives,
+fingerprints and accounting are not rewritten.
 Tools use locally validated bounded schemas; remote strict enforcement remains
 unattested. Tool history keeps exact sealed reasoning and arguments. Reasoning
 is local audit data, not default progress output or evidence.
@@ -75,6 +104,21 @@ all disabled-thinking synthetic cases. The separate audit capability manifest bi
 each observed profile to seals and limits. Frozen request profiles retain their
 preparation-time NOT_LIVE_VALIDATED labels; observation records do not rewrite them.
 Thinking tools, research quality and further dispatch remain separate gates.
+
+The operator subsequently authorized a separate, now-closed THREE-request official
+DeepSeek diagnostic, endpoint `https://api.deepseek.com/chat/completions`, model
+`deepseek-flash` (documented V4.1-Flash-1017 alias), using the same shared caller,
+raw-first transport/Decoder and G3 fixtures in an isolated process. Runtime-only
+hidden-input credentials are not a new application environment variable or route
+configuration. The [official thinking report](research/clean-generation-official-thinking-20261114.md)
+records limited observation PASS for nonstream thinking text and one SSE thinking
+dual-tool/continuation loop, all `thinking.type=enabled`, output cap16,384,
+one attempt per operation and zero retries. Three nonempty reasoning fields and
+46/34/9 reasoning tokens were observed; exact assistant/reasoning/tool receipts
+were passed back. This evidence does not qualify TokenMetro thinking, change any
+default/permit, establish effort or mixed-mode capability, or accept G5 research.
+Frozen old profiles, request budgets, accounting and missing-field observations
+remain unchanged. This is a scoped diagnostic exception, not automatic fallback.
 
 `model_call_sessions.py` delegates Mock attempts/retries to `model_calls.run`,
 adds immutable session/turn/campaign mapping, turn limits at every reservation,
@@ -277,14 +321,14 @@ Serving path or override current-phase adoption.
 
 | Route | Model default | Provider / protocol | Credential / endpoint | Status |
 |---|---|---|---|---|
-| `deepseek_generation` | `deepseek-v4.1-flash-1017` | TokenMetro / nonstream Chat Completions | `TOKENMETRO_API_KEY`; `https://tokenmetro.com/v1/chat/completions` | **v1_default_limited_live** |
+| `deepseek_generation` | `deepseek-flash` | DeepSeek official / nonstream Chat Completions | `DEEPSEEK_API_KEY`; `https://api.deepseek.com/chat/completions` | **v1_default_limited_live** |
 
 `generation/deepseek.py` implements `GenerationProvider`; the existing UI factory
 selects it when `GENSHIN_GENERATION_BACKEND` is unset or `deepseek`, by operator
 decision in the Embedding-preparation work unit. Explicit `bailian` keeps the
 original exact-snapshot Qwen rollback. There is no automatic provider fallback.
-The known output-cap incompatibility remains open; this selector change is not
-a new live acceptance result and grants no paid calls. Retrieval, reranking and Assembly are
+The earlier Metro output-cap incompatibility remains a historical finding; the
+official channel adoption is not broad QA acceptance and grants no paid calls. Retrieval, reranking and Assembly are
 unchanged; only the original Packet projection enters the shared message
 renderer. Expected answers, Card/Link content, retrieval traces and provider
 reasoning are not answer evidence. Citation checks retain
@@ -293,9 +337,10 @@ reasoning are not answer evidence. Citation checks retain
 | Environment | Meaning |
 |---|---|
 | `GENSHIN_GENERATION_BACKEND` | `deepseek` (default) or explicit `bailian` rollback |
-| `TOKENMETRO_API_KEY` | Existing runtime credential slot, read only for the selected DeepSeek profile |
-| `TOKENMETRO_BASE_URL` | Optional; currently only the evidenced `https://tokenmetro.com/v1` route is supported |
-| `GENSHIN_DEEPSEEK_MODEL` | Optional request ID; default `deepseek-v4.1-flash-1017`; exact returned identity must match |
+| `DEEPSEEK_API_KEY` | Default official credential; runtime process environment only; never stored in repository/artifacts |
+| `DEEPSEEK_BASE_URL` | Optional; default `https://api.deepseek.com`; `https://tokenmetro.com/v1` requires explicit model and retained Metro key |
+| `TOKENMETRO_API_KEY` | Read only for explicitly selected retained Metro; never an official-key fallback |
+| `GENSHIN_DEEPSEEK_MODEL` | Optional request ID; default `deepseek-flash`; exact returned identity must match |
 | `GENSHIN_DEEPSEEK_RUN_ROOT` | Required new campaign root, preferably `data/retrieval/p04-deepseek-<scope>-<date>` |
 | `GENSHIN_DEEPSEEK_MAX_REQUESTS` | Required positive finite campaign attempt limit |
 | `GENSHIN_DEEPSEEK_MAX_TOKENS` | Required conservative input-plus-output campaign budget |
@@ -382,7 +427,7 @@ dimensions, batch budgets and selectors are operating choices.
 **PAUSED.** The following protocol inventory and historical lifecycle strings
 remain available for audit/replay; none grants current dispatch authorization.
 
-All E2 routes are defined in [`src/genshin_corpus/rag/navi_e2_routes.py`](file:///d:/GenshinChronicle/src/genshin_corpus/rag/navi_e2_routes.py) under `E2_ROUTES`.
+All E2 routes are defined in [`src/genshin_corpus/rag/navi_e2_routes.py`](../src/genshin_corpus/rag/navi_e2_routes.py) under `E2_ROUTES`.
 E2 requires the **OpenAI Responses API** streaming SSE surface (`api_surface='responses'`, endpoint path `/responses`).
 
 The historically authorized G1 offline research runner reuses the existing
@@ -457,7 +502,7 @@ alter Phase04 Generation. UNKNOWN requests remain quarantined across QA cohorts.
 
 ### 2.3 Tier 3: Phase 05 Shared Semantic SDK Routes (Retired from Live Dispatch)
 
-Defined in [`src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py`](file:///d:/GenshinChronicle/src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py) and consumed by [`semantic_sdk_runner.py`](file:///d:/GenshinChronicle/src/genshin_corpus/retrieval/semantic_sdk_runner.py).
+Defined in [`src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py`](../src/genshin_corpus/retrieval/semantic_tokenmetro_profile.py) and consumed by [`semantic_sdk_runner.py`](../src/genshin_corpus/retrieval/semantic_sdk_runner.py).
 
 | Route Key (`route`) | Provider | Model ID Mapping (`TOKENMETRO_MODEL_IDS`) | Base URL | API Key Env | Base URL Env | Current Lifecycle Status |
 |---|---|---|---|---|---|---|
@@ -507,7 +552,7 @@ This section details how Codex, Antigravity, and developer shells obtain API cre
 To prevent documentation rot and eliminate manual update oversights, interface documentation consistency is enforced programmatically.
 
 ### 4.1 Programmatic Source of Truth
-The module [`src/genshin_corpus/rag/model_interfaces_catalog.py`](file:///d:/GenshinChronicle/src/genshin_corpus/rag/model_interfaces_catalog.py) directly imports:
+The module [`src/genshin_corpus/rag/model_interfaces_catalog.py`](../src/genshin_corpus/rag/model_interfaces_catalog.py) directly imports:
 - `E2_ROUTES` from `navi_e2_routes.py`
 - `BailianControlConfig` and `BASELINE_QWEN_MODEL_ID` from `generation.py`
 - `DashScopeQwenEmbeddingConfig` from `qwen_embedding.py`
@@ -516,7 +561,7 @@ The module [`src/genshin_corpus/rag/model_interfaces_catalog.py`](file:///d:/Gen
 Whenever a developer adds, modifies, or removes a model, route, endpoint, or environment variable in code, the catalog immediately reflects the change.
 
 ### 4.2 Automated Consistency Test
-The unit test [`tests/retrieval/test_model_interfaces_consistency.py`](file:///d:/GenshinChronicle/tests/retrieval/test_model_interfaces_consistency.py) runs as part of the standard test suite (`python -m unittest`). It verifies:
+The unit test [`tests/retrieval/test_model_interfaces_consistency.py`](../tests/retrieval/test_model_interfaces_consistency.py) runs as part of the standard test suite (`python -m unittest`). It verifies:
 1. Every active model, route key, provider, base URL, and credential environment variable in code exists in `docs/model-interfaces.md`.
 2. Deprecated routes are documented under the deprecated section and excluded from active tables.
 3. The Responses API protocol requirement and credential isolation rules are documented.

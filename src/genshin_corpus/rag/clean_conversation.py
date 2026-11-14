@@ -53,7 +53,10 @@ class ConversationStore(Store):
         require(isinstance(title, str) and title.strip(), "Chat title required")
         require(settings.get("mode") in {"MOCK", "LIVE"}, "G4_MODE_INVALID")
         if settings["mode"] == "LIVE":
-            from .clean_live import permit_for
+            if settings.get("engine") == "gc-clean-research-1":
+                from .clean_research_live import permit_for
+            else:
+                from .clean_live import permit_for
             campaign = permit_for(self, settings)["campaign"]
         else:
             campaign = "g4-mock-" + session

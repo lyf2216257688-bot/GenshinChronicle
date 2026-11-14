@@ -1,4 +1,4 @@
-"""Phase04 V1 default final QA over the evidenced TokenMetro Chat route.
+"""V1 final QA over official DeepSeek by default; explicit Metro retained.
 
 No Card/Link input or dependencies. Shared calls own attempts, reservations and
 replay; this adapter owns raw-first HTTP and neutral Generation validation.
@@ -24,8 +24,9 @@ from .generation import (
 )
 
 VERSION = "phase04-deepseek-qa-1"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-v4.1-flash-1017"
-DEEPSEEK_BASE_URL = "https://tokenmetro.com/v1"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-flash"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+METRO_BASE_URL = "https://tokenmetro.com/v1"
 DEEPSEEK_LEDGER = Path("data/retrieval/p04-deepseek-request-ledger")
 _RESPONSE_LIMIT = 8 * 1024 * 1024
 
@@ -42,8 +43,8 @@ class DeepSeekGenerationConfig:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "run_root", Path(self.run_root).resolve())
-        if self.base_url != DEEPSEEK_BASE_URL:
-            raise GenerationConfigurationError("DeepSeek QA currently supports the evidenced TokenMetro base URL only")
+        if self.base_url not in {DEEPSEEK_BASE_URL, METRO_BASE_URL}:
+            raise GenerationConfigurationError("DeepSeek QA requires the official or explicit retained Metro base URL")
         if not isinstance(self.model_id, str) or not re.fullmatch(r"deepseek-[a-zA-Z0-9.-]+", self.model_id):
             raise GenerationConfigurationError("DeepSeek requires an explicit safe model ID")
         for name in ("max_requests", "max_tokens", "max_output_tokens"):
@@ -56,7 +57,7 @@ class DeepSeekGenerationConfig:
             raise GenerationConfigurationError("timeout_seconds must be positive and finite")
 
     def operating_config(self) -> dict[str, Any]:
-        return {"version": VERSION, "provider": "tokenmetro", "api_surface": "chat_completions",
+        return {"version": VERSION, "provider": "deepseek_official" if self.base_url == DEEPSEEK_BASE_URL else "tokenmetro", "api_surface": "chat_completions",
                 "base_url": self.base_url, "model": self.model_id,
                 "max_tokens": self.max_output_tokens, "temperature": 0.0,
                 "thinking": {"type": "disabled"}, "stream": False,
@@ -76,7 +77,7 @@ class DeepSeekGenerationProvider:
     def __init__(self, config: DeepSeekGenerationConfig, *, api_key: str,
                  authorization: str, opener: Any = None, mock: bool = False) -> None:
         if not isinstance(api_key, str) or not api_key.strip():
-            raise GenerationConfigurationError("DeepSeek requires TOKENMETRO_API_KEY")
+            raise GenerationConfigurationError("DeepSeek requires a runtime API key for the selected route")
         if not isinstance(authorization, str) or not authorization.strip():
             raise GenerationConfigurationError("DeepSeek live calls require this campaign's explicit authorization")
         if opener is not None and not mock:
@@ -100,13 +101,13 @@ class DeepSeekGenerationProvider:
                 max_requests=int(required("GENSHIN_DEEPSEEK_MAX_REQUESTS")),
                 max_tokens=int(required("GENSHIN_DEEPSEEK_MAX_TOKENS")),
                 model_id=environment.get("GENSHIN_DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL),
-                base_url=environment.get("TOKENMETRO_BASE_URL", DEEPSEEK_BASE_URL),
+                base_url=environment.get("DEEPSEEK_BASE_URL", DEEPSEEK_BASE_URL),
                 max_output_tokens=int(environment.get("GENSHIN_DEEPSEEK_MAX_OUTPUT_TOKENS", "1024")),
                 timeout_seconds=float(environment.get("GENSHIN_DEEPSEEK_TIMEOUT_SECONDS", "120")),
             )
         except (TypeError, ValueError) as exc:
             raise GenerationConfigurationError("DeepSeek campaign configuration is missing or invalid") from exc
-        return cls(config, api_key=required("TOKENMETRO_API_KEY"),
+        return cls(config, api_key=required("DEEPSEEK_API_KEY" if config.base_url == DEEPSEEK_BASE_URL else "TOKENMETRO_API_KEY"),
                    authorization=required("GENSHIN_DEEPSEEK_LIVE_AUTHORIZATION"))
 
     def invocation_payload(self, request: GenerationRequest) -> dict[str, Any]:
@@ -246,7 +247,7 @@ class DeepSeekGenerationProvider:
         ledger = self.config.run_root / "mock-ledger" if self.mock else DEEPSEEK_LEDGER
         batch = model_calls.Batch(self.config.run_root / "budget", max_requests=self.config.max_requests, max_tokens=self.config.max_tokens)
         result = model_calls.run(root, plan, ledger, lambda folder, _: self._attempt(folder, plan, request),
-                                 channel=["tokenmetro", "chat_completions", self.config.model_id],
+                                 channel=[config["provider"], "chat_completions", self.config.model_id],
                                  policy=model_calls.Policy(max_attempts=1), batch=batch,
                                  token_allowance=len(canonical_json_bytes(wire)) + self.config.max_output_tokens)
         ok = result["state"] == "CONTENT_VERIFIED"
@@ -256,7 +257,7 @@ class DeepSeekGenerationProvider:
             answer_text=result["final_text"] if ok else None, citation_validation=validation,
             semantic_request_identity=request.semantic_request_identity, execution_config_identity=digest(config),
             request_audit=request.audit_projection(), provider_audit={
-                "provider_id": "tokenmetro_deepseek", "control_config": config,
+                "provider_id": config["provider"] + "_deepseek", "control_config": config,
                 "authorization": self.authorization, "raw_archive": str(root),
                 "replayed": replayed, "new_transport_attempts": self.provider_network_calls - previous_calls,
                 "raw_archive_sha256": sha(root / "complete.json"), "accounting": result["accounting"],

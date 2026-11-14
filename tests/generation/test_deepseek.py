@@ -65,6 +65,21 @@ class DeepSeekTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_official_default_ignores_old_metro_key_and_explicit_metro_remains_available(self):
+        env={"GENSHIN_DEEPSEEK_RUN_ROOT":str(self.root / "live-unused"),
+             "GENSHIN_DEEPSEEK_MAX_REQUESTS":"1", "GENSHIN_DEEPSEEK_MAX_TOKENS":"10000",
+             "GENSHIN_DEEPSEEK_LIVE_AUTHORIZATION":"OFFLINE_CONFIGURATION_ONLY",
+             "TOKENMETRO_API_KEY":"old-route-key"}
+        with self.assertRaisesRegex(GenerationConfigurationError,"DEEPSEEK_API_KEY"):
+            DeepSeekGenerationProvider.from_environment(env)
+        official=DeepSeekGenerationProvider.from_environment({**env,"DEEPSEEK_API_KEY":"official-fixture"})
+        self.assertEqual(official.config.base_url,"https://api.deepseek.com")
+        self.assertEqual(official.config.model_id,"deepseek-flash")
+        self.assertEqual(official._key,"official-fixture")
+        metro=DeepSeekGenerationProvider.from_environment({**env,"DEEPSEEK_BASE_URL":"https://tokenmetro.com/v1",
+            "GENSHIN_DEEPSEEK_MODEL":"deepseek-v4.1-flash-1017"})
+        self.assertEqual(metro.config.operating_config()["provider"],"tokenmetro")
+
     def provider(self, opener=None, config=None):
         return DeepSeekGenerationProvider(config or self.config, api_key="fixture-secret",
             authorization="OFFLINE_MOCK", opener=opener or FakeOpener(), mock=True)

@@ -126,7 +126,7 @@ class LiveTests(unittest.TestCase):
         with patch("time.time", return_value=self.permit["expires_at"] + 1):
             with self.assertRaisesRegex(ValueError, "LIVE_PERMIT"): self.execute(tid)
         with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(ValueError, "TOKENMETRO_API_KEY_REQUIRED"):
+            with self.assertRaisesRegex(ValueError, "MODEL_API_KEY_REQUIRED"):
                 self.execute(tid, continue_turn=True)
         self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 0)
 

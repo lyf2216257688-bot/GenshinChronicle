@@ -21,7 +21,20 @@ subclass changes only admission; the sender/shared core are unchanged. The UI's
 explicit live mode and Job-owned worker reuse this path, without granting new
 campaigns or automatic restart dispatch. `requirements-py314-generation-ui.lock` adds compatible pinned
 UI dependencies over the unchanged framework lock. These modules do not
-implement the G5 autonomous research controller or switch legacy defaults.
+themselves implement the G5 autonomous research controller or adopt G5 as a default engine.
+`rag/clean_research.py` adds the opt-in G5 LangGraph/native-tool controller,
+query-local evidence groups, immutable tool/state receipts and bounded synthesis.
+`rag/clean_research_live.py` owns its separate finite permit/CLI and a CPU-reader
+reusing, timed wrapper over G2. The existing executor/UI dispatches by the chat's
+explicit engine setting; G4 fixed chats retain their engine and historical settings.
+`config/clean-generation-v1.json` owns formal official route and per-role
+thinking/output defaults; preparation binds it into a finite permit. Chat
+transport consumes manifest-bound routes, preserving old Metro readback. Model
+requested analysis boundaries and exact thinking tool history stay in existing
+research artifacts; no extra caller, service or persistence system is introduced.
+`rag/clean_research_retry.py` owns explicitly authorized one-request origin-bound
+recovery through the unchanged shared caller, preserving the original Batch and
+UNKNOWN accounting; it does not reopen a closed campaign or continue research.
 `retrieval/clean_based/query_v2.py`, `runtime_v2.py`, `worker_v2.py`, `rerank_v2.py`
 and `rerank_worker_v2.py` adapt research query identity, selected S0/BGE and
 process-owned GPU rotation without modifying frozen kernels. `generation/clean_evidence.py`
@@ -247,7 +260,8 @@ the immediate next action are owned by `docs/current-phase.md`.
   assigns Evidence Assembly policy to the Generation workstream; this logical
   ownership is implemented by the separate opt-in `clean_evidence.py` workbench;
   retained Phase04 exports and providers below keep their existing contracts.
-  `deepseek.py` is the V1 default TokenMetro adapter; Bailian/Qwen remains explicit rollback. It implements
+  `deepseek.py` is the V1 default official DeepSeek adapter, with explicit retained
+  Metro compatibility; Bailian/Qwen remains explicit rollback. It implements
   final QA using the shared model-call layer, raw-first HTTP archives and the
   neutral renderer/citation checks. The existing runtime factory selects the
   provider explicitly; Retrieval/Assembly do not own provider selection.

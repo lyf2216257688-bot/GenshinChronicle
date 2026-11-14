@@ -69,10 +69,11 @@ Assembly, Evidence Packets, and provider-neutral Generation contracts.
 Phase 05 — NaviRAG/Card/Link/KG is **PAUSED**, with code, research and model
 evidence preserved. Future semantic work depends on measured basic-RAG needs.
 
-V1 uses the operator-selected DeepSeek default through `GenerationProvider`,
-with explicit Bailian/Qwen rollback. Its limited live gate accepted two cases
-and rejected one for an unresolved output-cap mismatch; no broad QA acceptance
-or new paid authorization follows. The old Qwen query/index selectors still
+V1 uses the operator-selected **DeepSeek official API / `deepseek-flash`** default
+through `GenerationProvider`, with explicit Metro compatibility and Bailian/Qwen
+rollback. Earlier Metro tests accepted two cases and rejected one for an output-cap
+mismatch; that historical result is not a finding about the new official route.
+Channel adoption grants no broad QA acceptance or paid request quota. The old Qwen query/index selectors still
 exist in code, but their local assets were retired. They are not working local
 rollback. Backend/Streamlit adoption of the Clean-based pipeline remains separate.
 
@@ -213,9 +214,26 @@ Final-answer selection uses `GENSHIN_GENERATION_BACKEND=deepseek` (also the
 unset default) or explicit `bailian`; `evidence_only` reads neither Generation profile.
 The DeepSeek path uses the same question/Packet renderer and citation checker,
 not Cards or Links. It requires a new explicitly authorized finite campaign;
+the official key is read from `DEEPSEEK_API_KEY`, never a repository file.
 configuration, raw archives, replay and closed live-test limits are
 documented in [model interfaces](docs/model-interfaces.md#phase-04-v1-default-deepseek-final-qa).
 Returning to `bailian` preserves the original control without changing indexes.
+
+The opt-in Clean G5 research entry is
+`python -m genshin_corpus.rag.clean_research_live --root <new-data-root> prepare --authorization <current-operator-scope> --requests <finite-count>`.
+It reads formal defaults from `config/clean-generation-v1.json` and prepares a
+finite official campaign; it does not send a request. `new`, `submit --run`,
+`continue` and `close` reuse the existing chat/executor contracts. The independent
+`ui/clean_chat_app.py` keeps Mock as its safe launch mode; explicit
+`GC_CLEAN_CHAT_MODE=LIVE` and `GC_CLEAN_CHAT_ROOT` select a prepared campaign.
+Native research is optional per question; complex analysis/synthesis may use
+thinking and role output caps up to32K, with reasoning included in the budget.
+No automatic Metro fallback or UNKNOWN retry is enabled. Exact current scope
+and real research observations are owned by `docs/current-phase.md`.
+The controller now judges core answerability and remaining evidence value after
+feedback, with sufficient/limited/no-gain exits and separate hard guards.
+[Finite G5 engineering closure and limitations](docs/research/clean-generation-g5-stopping-acceptance-20261115.md)
+do not grant standing API allowance or adopt a new default entry.
 
 ## Data and secrets
 

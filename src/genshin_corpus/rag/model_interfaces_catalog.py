@@ -72,13 +72,13 @@ def build_model_interfaces_catalog() -> list[ModelInterfaceEntry]:
 
     catalog.append(ModelInterfaceEntry(
         category="phase04_default_qa", logical_model="deepseek", route_name="deepseek_generation",
-        provider="TokenMetro", model_id=DEFAULT_DEEPSEEK_MODEL,
+        provider="DeepSeek official", model_id=DEFAULT_DEEPSEEK_MODEL,
         base_url_pattern=DEEPSEEK_BASE_URL, confirmed_base_url=DEEPSEEK_BASE_URL,
-        api_surface="chat_completions", endpoint_path="/v1/chat/completions",
-        api_key_env="TOKENMETRO_API_KEY", base_url_env="TOKENMETRO_BASE_URL", surface_env=None,
+        api_surface="chat_completions", endpoint_path="/chat/completions",
+        api_key_env="DEEPSEEK_API_KEY", base_url_env="DEEPSEEK_BASE_URL", surface_env=None,
         status="v1_default_limited_live",
         applicable_modules=("genshin_corpus.generation.deepseek", "genshin_corpus.ui.runtime"),
-        notes="Operator-selected V1 default; output-cap incompatibility remains; finite live authorization still required; no new calls authorized by selector.",
+        notes="Operator-selected official default; finite live authorization still required; Metro explicit compatibility only; no allowance granted by selector.",
     ))
 
     # 1. Phase 04 Production QA: Generation

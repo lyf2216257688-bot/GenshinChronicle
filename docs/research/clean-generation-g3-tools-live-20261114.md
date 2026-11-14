@@ -9,6 +9,10 @@ D01–D24及[Generation 合同](../phases/clean-generation-v1.md)。用户在审
 `OBSERVED_LIMITED_PASS`。实际5次请求、5个attempt、0重试、0 UNKNOWN，供应商报告2,103 Token。
 thinking工具循环与完整主动研究能力仍未证实；没有最终问答质量验收或默认采用。**
 
+后续单独授权的[官方 thinking 对照](clean-generation-official-thinking-20261114.md)已在
+官方 `deepseek-flash` 获得小型 thinking 工具循环有限通过；本报告的 TokenMetro 结论、
+账务与许可不变，官方证据不解锁 Metro thinking 或真实研究验收。
+
 ## 本批授权与实际范围
 
 - 固定 TokenMetro `https://tokenmetro.com/v1/chat/completions`，精确模型
