@@ -1,5 +1,22 @@
 # Data Directory
 
+`generation/clean-v1-local/` is the configurable default for local Generation
+state. `sessions.sqlite` owns submissions/turns/cancellation/event references;
+`checkpoints.sqlite` owns LangGraph progress. `events/` contains immutable event
+receipts; `campaigns/<id>/` contains fixed budget scope, stable prepared operations,
+fingerprint mappings, shared call/attempt ledgers and conservative Batch accounting.
+`locks/` contains application/session/GPU OS locks. Full chat data is local and
+Git-ignored; no cross-chat memory/index or cloud store is created.
+Explicit G1 Mock runs and G2 finite checks use separate new children of
+`generation/`; read receipts, Packet/audit, message previews and sealed reports
+never overwrite source or historical experiment roots. The workbench additionally
+uses one repository-local GPU lock across those roots. Generated files and
+runtime environments are excluded from Git. The
+[Generation contract](../docs/phases/clean-generation-v1.md) owns formats and
+the [implementation report](../docs/research/clean-generation-g0g2-20261114.md)
+owns finite receipts and limitations. Source/Raw evidence remains upstream;
+these outputs do not establish answer quality.
+
 `retrieval/rerank-v1-input-20261113/` owns a create-only, model-free snapshot of
 validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate
 `rerank-v1-smoke-20261113/` own operator-run scores, length audits, immutable

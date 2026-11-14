@@ -35,6 +35,26 @@ call layer; adopted legacy consumers remain unchanged until migrated.
 
 ---
 
+## Clean Generation G0–G2 workbench (2026-11-14)
+
+The [Generation contract](phases/clean-generation-v1.md) retains the sole future
+research route TokenMetro / `deepseek-v4.1-flash-1017`, Chat native tools pending
+exact-route validation. `config/clean-generation-v1.example.json` keeps live
+disabled, all live limits/capability evidence unset. It is not a new working
+remote adapter or a standing permit. No G3-Live call has been authorized here.
+
+`model_call_sessions.py` delegates Mock attempts/retries to `model_calls.run`,
+adds immutable session/turn/campaign mapping, turn limits at every reservation,
+cancel/admission sequencing and zero-network derived-receipt reconciliation.
+G1's entry point enforces `offline_only`; it cannot send to the future route.
+The local V2 S0/BGE workers use existing selected models and migrated runtimes,
+with source/score/query bindings and GPU process rotation. They perform local
+inference, not paid requests. The new orchestration lock pins LangGraph and
+SQLite-checkpoint dependencies independently of ML environments. Transitive
+LangSmith components are not a cloud service dependency: tracing is disabled
+and Mock tests prohibit socket connections. Legacy catalog entries and provider
+defaults remain unchanged.
+
 ## Shared model-call execution (2026-10-30)
 
 New API work defaults to `genshin_corpus.model_calls`. It schedules retry-free

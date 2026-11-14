@@ -32,6 +32,7 @@ Thumbs.db
 /data/canonical/
 /data/clean/
 /data/retrieval/
+/data/generation/
 
 # Logs / temporary outputs
 *.log

@@ -25,8 +25,11 @@ S0/S1/S2 adoption belongs to the operator. The subsequent
 [Reranking and Python migration work](phases/clean-reranking-v1.md) provides
 saved-S0 BGE/GTE comparison, structural/MMR review and the selected complete
 candidate handoff. Runtime admission to immutable indexes is explicit; model and
-ordering adoption remain operator decisions. Generation's later Evidence
-Assembly consumes ordered candidates without taking over discovery or ordering.
+ordering adoption remain operator decisions. The opt-in
+[Generation workbench](phases/clean-generation-v1.md) adds a durable Mock skeleton,
+versioned new-question S0/BGE wiring and Clean Packet assembly without taking over
+discovery or ordering. Remote capability validation, chat/research functionality
+and adoption retain their separate stage gates.
 Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

@@ -1,0 +1,20 @@
+{
+  "version": "gc-clean-generation-1",
+  "data_root": "data/generation/clean-v1-local",
+  "python": ".local/runtime-py314/generation/Scripts/python.exe",
+  "live_enabled": false,
+  "route": {"provider": "tokenmetro", "model": "deepseek-v4.1-flash-1017", "surface": "chat_completions", "capability_profile": null},
+  "retrieval": "config/clean-retrieval-v1.json",
+  "reranking": "config/reranking-selected-v1.json",
+  "pair_budget": 2048,
+  "limits": {
+    "campaign_requests": null, "campaign_tokens": null,
+    "turn_requests": null, "turn_tokens": null,
+    "searches": null, "reads": null, "research_rounds": null,
+    "deadline_seconds": null, "context_tokens": null,
+    "output_tokens": null, "thinking_tokens": null
+  },
+  "retry": {"max_attempts": 1, "unknown_retries": 0, "format_retries": 0},
+  "thinking": null,
+  "fee_control": null
+}

@@ -49,7 +49,11 @@ BGE/GTE comparison and structural/MMR review. The selected ordering is BGE +
 conservative structural processing, MMR off. Its complete candidate handoff and
 explicit relevance-only fallback are described in the
 [P4 handoff report](docs/research/clean-reranking-p4-handoff-20261113.md).
-This is not online RAG adoption or Generation integration.
+The P4 handoff itself does not perform Generation or adopt online RAG.
+The separate opt-in [Generation workbench](docs/phases/clean-generation-v1.md)
+adds a durable Mock graph and local new-question S0/BGE-to-Packet path.
+Its engineering/source checks do not establish answer quality; remote capability
+validation, chat UI, autonomous research and default adoption remain separate.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The retained Phase04 implementation extends the historical adopted Block A over the accepted
@@ -146,9 +150,11 @@ OBC structural projector, and Canonical run pipeline. `retrieval/` contains
 the Phase 04 Retrieval Unit, candidate retrieval, Evidence Assembly,
 materialization, comparison, and Dense challenger/comparison tooling.
 `generation/`
-contains provider-neutral Generation contracts, V1-default DeepSeek and the
-scoped Bailian/Qwen control path. `data/canonical/` and `data/retrieval/` are ignored local
-generated-data roots; the latter is not a serving-system contract.
+contains provider-neutral Generation contracts, retained V1-default DeepSeek and
+the scoped Bailian/Qwen control path, plus opt-in `clean_evidence.py` source reads
+and Packet assembly. `data/canonical/`, `data/retrieval/` and `data/generation/`
+are ignored local generated-data roots; their presence does not establish a
+serving-system contract.
 
 ## Opt-in Clean candidate retrieval
 

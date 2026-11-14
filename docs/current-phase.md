@@ -4,7 +4,39 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — Clean Reranking P4 complete; stage closed (2026-11-13)
+## 0. Current work — Clean Generation G0–G2 engineering complete (2026-11-14)
+
+The operator explicitly authorized implementation of **G0–G2** under the confirmed
+[Generation Plan](research/clean-generation-implementation-plan-20261114.md),
+retaining all D01–D24 decisions. The [Generation contract](phases/clean-generation-v1.md)
+owns persistent interfaces and boundaries. This covers code, fixtures/Mock,
+read-only saved handoff replay and finite local S0/BGE wiring checks, in dependency
+order. G3 may receive free preparation/protocol checks only. **No paid API call,
+G4–G7 implementation, default/Serving switch, deletion or push is authorized.**
+The operator subsequently authorized a local Git commit of this G0–G2 work unit,
+including its Plan, source/configuration, tests and documentation; no push is included.
+All live limits remain unset and live dispatch disabled. Initial uncommitted
+Plan/current-phase edits were preserved and incorporated; implementation baseline is `4757232`.
+
+G0 baseline inspection matches the Plan. Protected existing implementation/config,
+selected source/index manifests, P4 handoff and migration seals are recorded in
+`.local/generation-g0-20261114/protected.json`; initial worktree files/diff are
+preserved beside it. **G0–G2 finite engineering acceptance is complete:** an isolated
+3.14.5 LangGraph/SQLite Mock persistence/dispatch skeleton, fixed campaign/turn
+budgets, cancellation/events/locks and V2 S0/BGE-to-Clean-Packet workbench are
+implemented opt-in. 37 new fixtures and79 relevant regressions/process checks
+pass. Three saved handoff examples cover300 source readbacks; one new local
+question covers100 fully scored/read candidates, with Dense/BM25F reference
+checks, source/Packet/replay checks and worker exit confirmation passing.
+All430 protected hashes and migration code remain unchanged. Exact receipts,
+dependencies, counts and limitations belong to the
+[G0–G2 report](research/clean-generation-g0g2-20261114.md).
+Immediate next action: operator review of this work unit; G3 free adapter work
+may be separately continued, but no paid probe is authorized. G4–G7 remain
+deferred. No final answer was generated; engineering/source checks do not
+establish answer quality or a working adopted chat product.
+
+### Completed Reranking baseline (2026-11-13)
 
 **Latest operator decision:** pause Sparse use and fusion tuning; use S0
 (BM25F + BGE-M3 Dense) to proceed to Clean-based Reranking. Preserve Sparse,
@@ -75,7 +107,7 @@ The [migration report](research/python314-migration-20261113.md) owns exact vers
 finite evidence and cleanup; that migration evidence itself establishes no
 Reranker quality or model selection.
 
-**Execution boundary and immediate next action:** the operator now authorizes
+**Historical Reranking execution boundary (2026-11-13):** the operator authorized
 Codex to start and inspect finite local checks expected within three to five
 minutes. The operator started and completed full70Q in an independent PowerShell
 window; Codex only read the completed outputs and did not rerun scoring. **The
@@ -100,6 +132,19 @@ The operator subsequently explicitly requested a Git commit and push of this
 completed Reranking work unit. That authorization covers reviewed source,
 configuration, tests and documentation; it does not add model/data archives,
 Generation execution or a Serving switch.
+
+### Historical Generation planning handoff (before implementation authorization)
+
+The operator completed the Generation architecture discussion and requested only
+an implementation Plan and its audit. The
+[Generation implementation Plan](research/clean-generation-implementation-plan-20261114.md)
+preserves the confirmed local single-user scope, LangGraph/GC hybrid architecture,
+TokenMetro `deepseek-v4.1-flash-1017` route, evidence assembly, adaptive research,
+same-chat persistence and recovery. Cross-chat/global research memory is deferred.
+This is a planning/documentation handoff, not Generation implementation, model/API
+validation, a Serving switch or commit/push authorization. A new implementation
+scope was subsequently granted above; separate live-call budgets remain required. The completed Reranking
+baseline and executable defaults above are unchanged.
 
 ### Historical P4 completion checkpoint (before the S0 decision)
 
@@ -129,7 +174,9 @@ removed; the surrounding research reports and source data remain. The exact dele
 load the removed Qwen3 index/encoder; it is intentionally no longer a working
 local fallback. Selecting BGE-M3 does not mean a new Clean-based online RAG
 runtime was deployed. An opt-in candidate Retrieval runtime is now implemented;
-integration with Reranking and Generation remains future work. The four-arm benchmark complete.json remains historical and its
+integration was future work at that selection checkpoint. The subsequent G0–G2
+local workbench above connects S0/BGE to Packets without adopting Serving.
+The four-arm benchmark complete.json remains historical and its
 old Run/Resume/Validate are not suitable after candidate removal.
 
 **Completed prior authorization (2026-11-11): P0–P2 Clean-based Retrieval.**
@@ -387,15 +434,18 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-Follow the current validation gate in section 0 and the
-[Reranking/migration runbook](research/clean-reranking-preparation-20261113.md).
+Follow the Generation scope and next gate in section 0 and the
+[G0–G2 handoff](research/clean-generation-g0g2-20261114.md). The
+[Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
+is a preserved completed-stage reference.
 The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
 does not require another retrieval run; the subsequent S0 decision is recorded
 in section 0. Earlier P4 Preflight/Smoke/70Q instructions remain recovery/history
 references, not unfinished P4 work. Do not run the historical four-arm launcher
 against removed Qwen/Jina assets. The selected indexes are reused read-only. Generation owns
-Clean-based candidate-to-Packet assembly after Retrieval and Reranking; this work
-does not implement that downstream policy or establish retrieval/answer quality.
+Clean-based candidate-to-Packet assembly after Retrieval and Reranking; the new
+opt-in workbench implements that policy under its Generation contract. This
+does not establish retrieval/answer quality or adopt a new Serving default.
 The following dated material records retained legacy serving evidence and gaps.
 
 **Latest work (2026-11-02; paid gate CLOSED):** user authorization was exactly
@@ -478,6 +528,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Topic / responsibility | Primary owner |
 | --- | --- |
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
+| Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
+| G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
 | Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |

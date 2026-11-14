@@ -114,6 +114,21 @@ only by an explicit sealed compatibility record against immutable index identity
 it does not rewrite representation metadata. The
 [Reranking contract](phases/clean-reranking-v1.md) owns these interfaces.
 
+### Clean-based Generation workbench
+
+The opt-in [Generation contract](phases/clean-generation-v1.md) connects new
+versioned research queries to the selected local retrieval/ranking primitives.
+Isolated Job-owned workers exit between Dense and BGE GPU use. Generation's
+verified source handles and immutable read receipts retain Clean/Raw lineage;
+deterministic whole-structure admission emits provider-neutral Packets with
+explicit duplicate, unread, failed-source and budget dispositions.
+`rag/` owns a local SQLite/ LangGraph Mock persistence skeleton and finite
+workbench; the session bridge delegates attempts and retries to the unchanged
+shared caller. Checkpoint progress and immutable dispatch/accounting evidence
+have separate authority and are reconciled on resume. No cross-chat Store,
+cloud tracing, adopted chat frontend or automatic live dispatch is introduced.
+This independent workbench does not migrate the retained Phase04 backend/UI.
+
 ### 2. Preserved Parsed baseline
 
 Answers: **What deterministic structure can a source-specific adapter recover from Raw?**
