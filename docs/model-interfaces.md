@@ -52,7 +52,7 @@ is local audit data, not default progress output or evidence.
 `config/clean-generation-v1.example.json` still keeps live disabled and all live
 limits/capability evidence unset. `generation/clean_probe.py` requires sealed
 request previews plus separate code-bound, expiring exact-root approval. The
-operator authorized one bounded G3 paid capability test; its current state and
+operator authorized the initial bounded G3 paid capability test; its current state and
 evidence are routed through current-phase. This is not a standing permit or a
 chat/research acceptance claim. Capability records bind exact profiles and call
 seals; observed synthetic correctness is separate from final question quality.
@@ -61,6 +61,20 @@ confirmed the recorded top-level thinking wire shape but found no exact-route
 public passthrough/response-field contract. Generic model-page parameter tables,
 directory tags and gateway configuration controls do not qualify the1017 route;
 the thinking gap remains open. No request-format change followed that review.
+
+The separate `generation/clean_tools_probe.py` prepares a tools-first disabled-thinking
+batch under a new exact-root approval. It reuses the same Chat adapter and shared
+ledger/UNKNOWN/budget path; it cannot reuse the original closed permit. Native
+tool loops and SSE have independent scoped verdicts, while thinking tools and
+active research remain separately unqualified. The
+[five-request proposal](research/clean-generation-g3-tools-live-plan-20261114.md)
+owns its fixed preparation. That subsequently approved batch is now closed;
+its [Live report](research/clean-generation-g3-tools-live-20261114.md) records
+limited observation PASS for nonstream native tools, SSE text and SSE native tools,
+all disabled-thinking synthetic cases. The separate audit capability manifest binds
+each observed profile to seals and limits. Frozen request profiles retain their
+preparation-time NOT_LIVE_VALIDATED labels; observation records do not rewrite them.
+Thinking tools, research quality and further dispatch remain separate gates.
 
 `model_call_sessions.py` delegates Mock attempts/retries to `model_calls.run`,
 adds immutable session/turn/campaign mapping, turn limits at every reservation,

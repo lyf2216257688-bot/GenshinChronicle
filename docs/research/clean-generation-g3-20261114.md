@@ -4,6 +4,10 @@
 全部 D01–D24；技术合同见[Generation V1](../phases/clean-generation-v1.md)，
 当前授权与下一步由[current-phase](../current-phase.md)维护。
 
+本报告保留原批次停止检查点。此后用户要求将独立能力拆开验证，见新的
+[工具优先 Live 提案](clean-generation-g3-tools-live-plan-20261114.md)及随后完成的
+[工具/SSE Live报告](clean-generation-g3-tools-live-20261114.md)；旧结果与已关闭授权不变。
+
 用户先要求推进 G3，随后明确：“我授权付费测试，你可以适当自主决定。”
 据此完成新适配器与离线检查，再执行有限付费探针。
 **G3 离线工程已交付；Live 能力验证在 thinking 门禁停止，G3 尚未完整通过。**

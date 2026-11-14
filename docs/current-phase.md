@@ -4,7 +4,7 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G3 offline delivered; Live thinking gate stopped (2026-11-14)
+## 0. Current work — G3 ordinary native tools/SSE observed; thinking open (2026-11-14)
 
 The operator authorized G0–G2 under the confirmed
 [Generation Plan](research/clean-generation-implementation-plan-20261114.md),
@@ -13,41 +13,62 @@ as `8be6872`; the [G0–G2 report](research/clean-generation-g0g2-20261114.md) o
 receipts and limits. This is not final answer or continuous-research acceptance.
 The [Generation contract](phases/clean-generation-v1.md) owns durable interfaces.
 
-The operator subsequently requested G3 and explicitly authorized paid testing
-with appropriate implementation discretion. This work unit implements the new
-Chat adapter and a finite TokenMetro / `deepseek-v4.1-flash-1017` capability probe.
-The bounded test uses synthetic arithmetic and two local fixture handles only:
-text thinking off/on, nonstream native tool loops off/on, then a thinking-enabled
-streamed tool loop. At most8 requests,1 attempt per operation, no UNKNOWN/format
-retry; campaign163,840 conservative tokens, turn2 requests/40,960 tokens,
-request input≤16,384 UTF-8 bytes, output≤1,024 off/4,096 on, context32,768,
-timeout120 seconds and admission deadline20 minutes. Actual provider usage and
-unknown fees remain separate from reservations. Stop on failure/mismatch/overrun;
-no automatic extension, alternate model/channel or JSON fallback.
-Exact sealed preparation and separate expiring approval bind the new test root.
-Repository sample live settings remain disabled/unset; this is no standing permit.
+The original G3 adapter and offline engineering are committed as `0337963`
+(94 relevant tests at that checkpoint). Its separately authorized finite live
+probe stopped after2 requests /212 provider-reported tokens, no retry or UNKNOWN.
+Both returned the exact model and correct synthetic answers; the enabled-thinking
+response lacked reasoning_content and reasoning usage detail. Dynamic thinking
+remains NOT_QUALIFIED, not proof that the server performed no internal reasoning.
+Native tools and streaming were never sent. That paid allowance is closed.
+The [G3 report](research/clean-generation-g3-20261114.md) and
+[free parameter review](research/clean-generation-g3-parameter-check-20261114.md)
+own those receipts and limits. The original G0–G3 commits were subsequently
+authorized and pushed; this historical permission does not authorize new Git work.
 
-G3 offline protocol/runner engineering is delivered;94 relevant tests pass.
-The finite live probe stopped after2 requests /212 provider-reported tokens,
-with no retry or UNKNOWN. Both returned the exact model and correct synthetic
-answers, but the thinking-enabled response had no reasoning_content or reasoning
-usage detail. Dynamic thinking remains NOT_QUALIFIED; this does not prove the
-server performed no internal reasoning. Native tools and streaming were not sent.
-The [G3 report](research/clean-generation-g3-20261114.md) owns exact receipts,
-capability scope and limitations. The operator then selected a free public
-documentation/parameter review. That [review](research/clean-generation-g3-parameter-check-20261114.md)
-is complete with zero new model calls: the archived request shape matches the
-official Chat format, but public TokenMetro metadata/templates do not establish
-exact-route thinking passthrough or reasoning-return behavior. Raw responses
-already lack reasoning; no evidence justifies a client parameter change.
-Immediate next action: exact-route channel clarification and operator decision
-before further paid diagnostics or dependent live work.
-No remaining probe allowance is automatically consumed. G4–G7 remain deferred.
-The operator subsequently authorized Git commit and push of this G3 code,
-tests and documentation, including the free parameter review. This excludes
-generated data, runtime environments and credentials. No chat/Serving default
-switch or existing-data deletion is included. Frozen prior code, data and evidence remain
-protected; no previously UNKNOWN historical call is resent.
+The operator now requests G3 Live continuation with native tools first and SSE
+next, explicitly separating the unresolved thinking capability. G4 is being
+advanced in another independent worktree according to the operator; this work
+does not inspect, modify or merge its implementation. G5–G7 are not implemented
+by this work unit. D01–D24, exact TokenMetro / `deepseek-v4.1-flash-1017` Chat route,
+upstream ownership and legacy defaults remain fixed. No JSON fallback is enabled.
+
+The [new tools-first proposal](research/clean-generation-g3-tools-live-plan-20261114.md)
+was explicitly approved by the operator ("我批准执行"): at most5 new requests, all thinking disabled;
+nonstream two-tool loop2 → SSE text1 → SSE two-tool loop2. Fixed limits are
+campaign5 /46,080 conservative tokens, turn2 /18,432, request input≤8,192 UTF-8
+bytes, output≤1,024, context32,768, socket/cooperative timeout120 seconds,
+admission window20 minutes after new approval; one attempt, zero retries.
+UNKNOWN, protocol/identity/accounting failure, overrun, expiry or cancellation
+stops the batch. A complete identity/usage-valid unexpected result closes only
+its case; predefined independent cases may continue. No failed case is retried.
+Actual fees remain UNKNOWN until billing evidence is available. Stream failure
+checks use local copies/fixtures, not additional intentional paid interruptions.
+
+The approved probe at `data/generation/g3-ts-20261114-b/` is complete and closed:
+5 requests /5 attempts, no retries or UNKNOWN,1,887 input +216 output =2,103
+provider-reported tokens. Actual currency fee remains UNKNOWN. Nonstream native
+two-tool loop, SSE text and SSE native two-tool loop each have
+`OBSERVED_LIMITED_PASS` for one synthetic case; both tool continuations returned64.
+The [Live report](research/clean-generation-g3-tools-live-20261114.md) owns raw
+receipts, per-request usage, limitations and next integration conditions.
+
+The separate runner reuses the unchanged adapter, session bridge and shared
+caller.82 relevant offline tests passed before dispatch (8 new). Independent
+audit at `data/generation/g3-ts-audit-20261114-a/` passed: all raw/seals/receipts,
+usage and budgets,3 bytewise SSE replays and5 sealed replays after simulated
+expiry with zero network/credentials. The runner additionally rejected9 local-copy
+failure checks. The audit's capability
+records are observed evidence, not dispatch permission. No actual provider
+interruption occurred; local fault checks do not establish service reliability.
+Free public recheck adds no model request or exact-route thinking explanation.
+
+**Immediate next action: operator decision on a separately bounded real-QA
+integration using the qualified disabled-thinking profiles, after G4 wiring and
+actual tool/schema/Packet checks.** Thinking diagnostics remain separate and need
+route-specific evidence and any new paid authorization. Thinking tools and active
+research are not qualified by these ordinary tool loops; semantic/continuous-QA
+acceptance remains open. This exhausted5-request permit grants no further real
+QA/research run, default switch, commit, push, deletion, upstream rebuild or worktree merge.
 
 ### Completed Reranking baseline (2026-11-13)
 
@@ -543,6 +564,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
+| G3 tools-first approved Live run, scoped native tools/SSE capability, audit and remaining gaps | [`G3 tools/SSE Live`](research/clean-generation-g3-tools-live-20261114.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
 | Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |

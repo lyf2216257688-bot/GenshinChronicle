@@ -1,6 +1,9 @@
 # G3 thinking：TokenMetro 免费参数核查
 
 2026-11-14（Asia/Tokyo）。用户选择先免费核查 TokenMetro 文档与参数透传说明。
+本文保留该次核查与当时下一条件；此后用户已调整独立能力验证顺序，见
+[工具优先 Live 提案](clean-generation-g3-tools-live-plan-20261114.md)、随后完成的
+[工具/SSE Live报告](clean-generation-g3-tools-live-20261114.md)及现行 current-phase。
 本次只读公开 HTTP GET、静态页面组件、官方文档及已有 G3 原始回执；
 **新增付费/模型请求0，没有读取或发送凭据，没有登录后台或修改渠道配置。**
 没有执行下载的脚本、安装任何页面建议的软件或联系第三方。

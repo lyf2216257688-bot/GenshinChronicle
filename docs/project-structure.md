@@ -16,6 +16,9 @@ versioned Chat manifests, bounded tool schemas and JSON/SSE protocol decoding;
 `clean_chat_transport.py` owns raw-first attempts through a subclass of the
 unchanged session bridge. `clean_probe.py` owns sealed finite synthetic capability
 preparation, approval and tests; it does not implement chat/research control.
+`clean_tools_probe.py` separately prepares and, only after new exact approval,
+executes the tools-first disabled-thinking matrix through the same adapter.
+Its local SSE replay/cut checks never send requests or alter original response bytes.
 Existing `generation/__init__.py`
 exports continue to describe retained Phase04 contracts. The new isolated
 orchestration environment uses `requirements-py314-generation.lock`; it does not

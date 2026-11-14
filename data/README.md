@@ -24,6 +24,13 @@ shared attempts/raw responses under the campaign, immutable `tool-receipts/`,
 Failed/UNKNOWN attempts remain retained; continuation never creates a new budget
 root or automatically resends them. Synthetic protocol material is not corpus
 evidence. The tracked sample configuration remains live-disabled.
+The separate tools-first probe uses a new `generation/` child, sealed per-case
+directories and local-copy SSE replay/cut checks in its report. Preparation alone
+creates no `authorization.json`, call ledger or live reservation. Existing probe
+roots and their closed permissions are not extended or reused.
+Separate G3 audit children contain zero-network readback reports and observed
+`capabilities.json` records with source-root/call-seal bindings and explicit limits.
+They do not alter frozen request manifests or grant future dispatch authority.
 
 `retrieval/rerank-v1-input-20261113/` owns a create-only, model-free snapshot of
 validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate

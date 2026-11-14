@@ -38,8 +38,8 @@ All 24 decisions are retained, without a new architecture/model selection:
 | D24 | Bounded incremental capability; no global/cross-chat research memory. |
 
 Plan sections 3–7 and 9 supply the detailed confirmed interface, recovery,
-capability, budget and semantic constraints. G4–G7 remain deferred; documenting
-their constraints does not implement or authorize them.
+capability, budget and semantic constraints. Documenting later-stage constraints
+does not implement or authorize those stages; current scope belongs to current-phase.
 
 ## Ownership, identities and storage
 
@@ -142,6 +142,18 @@ evidence. It is not a G4 chat or G5 research controller. Its live tests consume
 only their approved root/budget, stop on failure and do not create standing API
 permission. Real endpoint/model mismatches or unsupported capabilities require
 an operator decision; do not silently normalize identities or change routes.
+
+`clean_tools_probe.py` is a separate tools-first preparation/approval/run entry;
+it preserves the original probe and its closed authorization. Capability profiles
+are assessed independently: missing thinking evidence does not block separately
+approved disabled-thinking tools or SSE tests. A complete identity/usage-valid
+unexpected result can close one case without preventing the remaining predefined
+independent cases. UNKNOWN, HTTP/protocol/identity failure, overrun, cancellation,
+expiry or local evidence failure stops the batch. No failed case is retried.
+Stream interruption checks on local copies are engineering evidence only, never
+proof of an actual provider interruption's behavior, fee or service reliability.
+Ordinary native tools, thinking tools and active research retain separate verdicts;
+success of one profile never qualifies another or grants live integration permission.
 
 ## G2 query, ranking, source and Packet contract
 
