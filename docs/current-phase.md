@@ -4,7 +4,40 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G3 offline delivered; Live thinking gate stopped (2026-11-14)
+## 0. Current work — G4 offline audit; ordinary G3 profiles observed (2026-11-14)
+
+Latest cross-worktree audit: main still points to `0337963`, with uncommitted G3
+tools-first work. Its sealed report and independent audit confirm 5 requests /
+2,103 provider-reported tokens: disabled-thinking nonstream native tools, SSE text
+and SSE tools each have OBSERVED_LIMITED_PASS for one synthetic case. Dynamic
+thinking remains NOT_QUALIFIED. The 5-request permit is exhausted; no real QA
+permission follows. Main's `docs/research/clean-generation-g3-tools-live-20261114.md`
+owns these new receipts and must be retained during integration. The initial G3
+paragraphs below are historical pre-tools checkpoints, not the latest capability
+verdict. Ordinary disabled-thinking integration need not wait for thinking, but
+still requires actual GC schema/Packet checks and new bounded authorization.
+The [final G4 audit](research/clean-generation-g4-final-audit-20261114.md) owns
+repairs, current checks and the proposed Git sequence. No Git mutation is authorized.
+
+The operator authorized G4's model-free engineering in an independent worktree,
+based on local main `0337963` (latest G3) with a clean initial tree. Scope: same-chat
+local persistence, context organization/corrections, fixed-chain Mock dialogue,
+opt-in Streamlit UI, actual progress events, citation/Parent viewing, cancellation
+and recovery tests. No paid request, G3 adapter/shared-core modification, G5–G7,
+default switch, merge, commit or push is authorized by this work unit.
+The [G4 report](research/clean-generation-g4-20261114.md) owns implementation,
+verification and limitations. Independent offline work can proceed while the
+real-QA authorization remains closed; Mock success never promotes a capability.
+The initial G4 delivery checkpoint passed 31 new backend/UI checks and 94 prior
+regressions pass (125 total), with multi-turn Mock CLI/reopen evidence and 447
+protected baseline files unchanged. The final audit repaired three boundary
+defects; 34 G4 checks and 8 main-runner overlay checks now pass (42 this audit).
+The UI uses a Job-owned local child to keep
+G3's process-wide offline socket guard separate from Streamlit. The optional
+UI dependency lock preserves all original framework pins. Current immediate next
+action: review this uncommitted G4 worktree and its offline merge conditions.
+Enabling real dialogue separately requires matching capability evidence and fresh finite
+batch authorization; default adoption and Git operations remain operator decisions.
 
 The operator authorized G0–G2 under the confirmed
 [Generation Plan](research/clean-generation-implementation-plan-20261114.md),
@@ -40,9 +73,11 @@ is complete with zero new model calls: the archived request shape matches the
 official Chat format, but public TokenMetro metadata/templates do not establish
 exact-route thinking passthrough or reasoning-return behavior. Raw responses
 already lack reasoning; no evidence justifies a client parameter change.
-Immediate next action: exact-route channel clarification and operator decision
-before further paid diagnostics or dependent live work.
-No remaining probe allowance is automatically consumed. G4–G7 remain deferred.
+At that initial G3 checkpoint, the next condition was exact-route channel
+clarification and an operator decision. The later tools-first continuation above
+superseded that order for ordinary disabled-thinking profiles. No past allowance
+is automatically consumed. G4 offline is separately authorized above; real-QA
+authorization and G5–G7 remain separate.
 The operator subsequently authorized Git commit and push of this G3 code,
 tests and documentation, including the free parameter review. This excludes
 generated data, runtime environments and credentials. No chat/Serving default
@@ -448,7 +483,7 @@ valuable comparison/rollback artifacts.
 ## 3. Immediate next action and remaining V1 gaps
 
 Follow the Generation scope and next gate in section 0 and the
-[G0–G2 handoff](research/clean-generation-g0g2-20261114.md). The
+[G4 handoff](research/clean-generation-g4-20261114.md). The
 [Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
 is a preserved completed-stage reference.
 The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
@@ -543,6 +578,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
+| G3 offline protocol, finite Live stop and capability limits | [`Generation G3`](research/clean-generation-g3-20261114.md) |
+| G4 local Mock dialogue, context, UI, recovery and merge conditions | [`Generation G4`](research/clean-generation-g4-20261114.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
 | Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |

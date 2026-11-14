@@ -25,6 +25,22 @@ Failed/UNKNOWN attempts remain retained; continuation never creates a new budget
 root or automatically resends them. Synthetic protocol material is not corpus
 evidence. The tracked sample configuration remains live-disabled.
 
+G4 adds local `chats`, `chat_jobs`, `chat_messages`, `chat_notes` and
+`chat_drafts` tables in `sessions.sqlite`. `chat_artifacts/<turn>/` owns immutable
+messages, typed note revisions, context indexes, ranked inputs, source/Parent
+receipts, Packets and turn results, referenced by hash. The new tables extend
+G1 without rewriting earlier operations. Saved submit tokens survive reconnects;
+same-chat histories stay isolated. Restart only displays earlier work until an
+explicit continue. `mock_corpus/` is a sealed tiny synthetic corpus derived from
+checked-in fixtures with zero model inference; it is not a production corpus.
+G4 progress/draft/result events reuse `events/`; streams, calls and budgets remain
+in the original per-chat campaign. `locks/executor.lock` owns the local background
+executor; `executor_runs/` holds child PID/log/shutdown receipts and
+`chat_submissions/` holds create-only submission intents before turn publication.
+The actual graph runs in a Job-owned local child so its offline socket guard is
+isolated from Streamlit. There is no remote queue service. Failed fixture-development roots are
+retained separately; no existing data root is cleared or migrated automatically.
+
 `retrieval/rerank-v1-input-20261113/` owns a create-only, model-free snapshot of
 validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate
 `rerank-v1-smoke-20261113/` own operator-run scores, length audits, immutable

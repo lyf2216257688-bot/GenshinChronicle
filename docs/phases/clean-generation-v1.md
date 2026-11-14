@@ -4,7 +4,8 @@
 Current authorization and completion belong exclusively to [current-phase](../current-phase.md).
 The Plan's original planning-only authorization describes its historical creation;
 the operator subsequently authorized G0–G2, then G3 implementation and a bounded
-paid capability test. Current scope and results remain owned by current-phase.
+paid capability test, then G4 offline engineering in an independent worktree.
+Current scope and results remain owned by current-phase.
 
 ## Decisions and boundaries
 
@@ -32,14 +33,14 @@ All 24 decisions are retained, without a new architecture/model selection:
 | D18 | Native Chat tools first; JSON protocol needs an explicit separate decision. |
 | D19 | Preserve qualified partial evidence; source failures isolated, drafts never final. |
 | D20 | SQLite same-chat persistence, independent new chats, explicit continue after restart. |
-| D21 | Full history retained; future summaries preserve corrections, qualifiers and locators. |
+| D21 | Full history retained; deterministic context indexes preserve corrections, qualifiers and locators. |
 | D22 | Persist ordered progress events; reasoning/control protocol hidden by default. |
 | D23 | Engineering/source, semantic and continuous-research acceptance are separate. |
 | D24 | Bounded incremental capability; no global/cross-chat research memory. |
 
 Plan sections 3–7 and 9 supply the detailed confirmed interface, recovery,
-capability, budget and semantic constraints. G4–G7 remain deferred; documenting
-their constraints does not implement or authorize them.
+capability, budget and semantic constraints. G4 remote operation and G5–G7
+retain separate gates; documenting them does not authorize implementation or calls.
 
 ## Ownership, identities and storage
 
@@ -178,6 +179,80 @@ budget includes system, question, conversation, tools/history, evidence and rese
 output/thinking. Unverified tokenizer uses explicitly conservative UTF-8 estimation,
 never an exact vendor-token or price claim.
 
+## G4 same-chat fixed-chain and local UI contract
+
+`rag/clean_conversation.py` adds versioned local chat/job/message/note/draft
+tables to the existing `sessions.sqlite`, using the unchanged G1 Store. Full
+messages, typed research notes, context snapshots, ranked inputs, exact reads,
+Parents, Packets and results are immutable files under `chat_artifacts/<turn>/`,
+referenced by path/hash. `gc-clean-conversation-1` records session/turn/message
+identity and provenance. Corrupt/missing referenced files block affected display
+or recovery; DB text must not recreate them. On Windows the new store uses a
+consistent extended absolute path spelling, including for long worktrees.
+
+Draft text and submit tokens persist in SQLite. An unchanged submitted draft
+reuses its turn on refresh/double click. Editing its text creates the next token;
+explicitly repeating identical text creates a legitimate new turn. Metadata is
+also immutable for a submitted token. Chat settings and campaign remain fixed.
+
+`clean_context.py` builds a per-turn extractive index when the configured byte
+allowance is exceeded. Complete local history is preserved. Earlier excerpts
+retain message/citation pointers and omission counts; oldest index entries may
+be omitted as whole records with the original message IDs retained in the audit.
+Recent exchanges, active typed requirements/corrections, research notes and whole
+validated tool protocol units are protected. If these cannot fit, fail explicitly.
+This is deterministic organization with zero model calls, not semantic LLM
+summarization. There is no automatic semantic extraction of research claims.
+User assertions/hypotheses never become supported facts through history reuse.
+
+Explicit intent/scope corrections take effect as requirements; plot assertions
+and plot corrections remain unverified user material. Corrections invalidate
+targeted premises and their dependency closure. An untargeted correction
+conservatively invalidates earlier premises of that class. Derived context is
+rebuilt from revisions; invalidated premises are not restated as current facts.
+No automatic source adjudication or claim verification is inferred from Mock.
+
+`clean_conversation_graph.py` uses sync LangGraph boundaries for context →
+fixed original-query retrieval/ranking → read/Assembly → prepared Chat operation
+→ Mock SSE answer → citation/source check → immutable result/message publication.
+It reuses G2 V2 fusion/ordering and EvidenceReader/Assembly, and G3 ChatSessions
+through the unchanged shared caller. Actual escaped Chat-message bytes plus
+output reserve are checked; evidence admission accounts for envelope overhead.
+Each final citation is addressed by turn + Packet + E-number, and Parent viewing
+uses a saved source-bound receipt. Citation integrity is not semantic support.
+Protocol drafts remain nonfinal; partial/fault/cancel outcomes preserve qualified
+source material and do not turn streamed fragments into final answers.
+
+`clean_executor.py` is one local background supervisor per application data root,
+with an OS ownership lock and the existing application/session locks. It runs
+one `clean_turn_worker.py` child at a time, reusing the Windows Job process-tree
+owner; G3's process-wide offline socket guard cannot affect Streamlit's loopback
+communication. The supervisor thread itself does not run model transport. UI writes
+submissions, observes real saved events and requests cancel/continue. Jobs are
+FIFO across chats; boot/refresh does not enqueue earlier work. Explicit continue
+reuses the same operation/checkpoint/campaign. Shutdown blocks new admission,
+retains in-flight facts and leaves unfinished work for explicit continuation.
+User cancellation persists, prevents later dispatch and closes that turn;
+subsequent research uses a new turn. A sealed known response survives cancellation.
+UNKNOWN reservations are retained and never bypassed through a new operation.
+
+The independent `ui/clean_chat_app.py` and `rag/clean_conversation_cli.py` expose
+only Mock mode. Tiny source fixtures and deterministic hits/scores/answers are
+marked synthetic; real parsing, readback, Packet, protocol, persistence and
+accounting paths are exercised. There is no credential read, live dispatch,
+automatic query rewrite, research tool loop, global memory Store or cloud service.
+Each remote profile needs matching exact-route evidence and fresh batch
+authorization. Limited disabled-thinking tools/SSE observations do not qualify
+thinking; missing thinking evidence does not block separately authorized ordinary
+integration. Synthetic tool success does not validate actual GC tools or QA.
+Create-only intents under `chat_submissions/` precede G1 turn publication, allowing
+the turn/job/message gap to reconcile without losing correction metadata or
+starting execution. `executor_runs/` retains worker PID/log/shutdown receipts.
+
+The optional `requirements-py314-generation-ui.lock` extends the immutable G1
+framework lock in the isolated regular-GIL 3.14.5 Generation environment. It must
+resolve with the original pins; no ML runtime or existing lock is changed.
+
 ## Stage checks
 
 | Stage | Required evidence / next gate |
@@ -186,6 +261,7 @@ never an exact vendor-token or price claim.
 | G1 | Actual pinned framework fixture; crash/replay/cancel/budget/lock tests; zero network. |
 | G2 | V1-equivalent original query/ranking fixtures; source/Packet tests; saved handoff replay AND finite new-question local S0/BGE run; unchanged protected hashes. |
 | G3 | Offline fragmentation/tool/error/recovery fixtures; separately approved finite live probe, sealed raw/usage/tool evidence and scoped capability report. |
+| G4 | Full Mock multi-turn/reopen/isolation, context/corrections, idempotent submission, real progress, turn-scoped citations/Parent, cancel/shutdown/recovery and UI fixtures. Real remote dialogue additionally needs matching G3 capability evidence and current batch authorization. |
 
 Tests use small checked-in fixtures. Real local asset checks are explicit opt-in
 and use new output roots. Engineering PASS is never final question-answer quality
