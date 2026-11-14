@@ -35,13 +35,32 @@ call layer; adopted legacy consumers remain unchanged until migrated.
 
 ---
 
-## Clean Generation G0–G2 workbench (2026-11-14)
+## Clean Generation protocol workbench (2026-11-14)
 
-The [Generation contract](phases/clean-generation-v1.md) retains the sole future
-research route TokenMetro / `deepseek-v4.1-flash-1017`, Chat native tools pending
-exact-route validation. `config/clean-generation-v1.example.json` keeps live
-disabled, all live limits/capability evidence unset. It is not a new working
-remote adapter or a standing permit. No G3-Live call has been authorized here.
+The [Generation contract](phases/clean-generation-v1.md) fixes the research route
+TokenMetro / `deepseek-v4.1-flash-1017`, endpoint
+`https://tokenmetro.com/v1/chat/completions`, credential `TOKENMETRO_API_KEY`.
+New `generation/clean_chat.py` and `clean_chat_transport.py` implement explicit
+thinking enabled/disabled, native tools and stream/nonstream manifests, raw-first
+urllib decoding and the existing session/turn/campaign budget path. No SDK or
+transport retry, proxy, redirect, model alias normalization or route fallback is
+enabled. Original `generation/deepseek.py` and all legacy defaults remain unchanged.
+Tools use locally validated bounded schemas; remote strict enforcement remains
+unattested. Tool history keeps exact sealed reasoning and arguments. Reasoning
+is local audit data, not default progress output or evidence.
+
+`config/clean-generation-v1.example.json` still keeps live disabled and all live
+limits/capability evidence unset. `generation/clean_probe.py` requires sealed
+request previews plus separate code-bound, expiring exact-root approval. The
+operator authorized one bounded G3 paid capability test; its current state and
+evidence are routed through current-phase. This is not a standing permit or a
+chat/research acceptance claim. Capability records bind exact profiles and call
+seals; observed synthetic correctness is separate from final question quality.
+The subsequent [free parameter review](research/clean-generation-g3-parameter-check-20261114.md)
+confirmed the recorded top-level thinking wire shape but found no exact-route
+public passthrough/response-field contract. Generic model-page parameter tables,
+directory tags and gateway configuration controls do not qualify the1017 route;
+the thinking gap remains open. No request-format change followed that review.
 
 `model_call_sessions.py` delegates Mock attempts/retries to `model_calls.run`,
 adds immutable session/turn/campaign mapping, turn limits at every reservation,
@@ -76,7 +95,7 @@ explicit `unknown_retries`, `cost_risk_authorization`, attempt and batch limits.
 No generic assumption says 429/5xx proves no generation. Metro server-side
 idempotency is **NOT_VERIFIED**; identical bodies/fingerprints do not prove
 server deduplication. The generic seam can carry a stable `Idempotency-Key`
-with a route-bound verified provider contract; neither current Metro adapter
+with a route-bound verified provider contract; none of the current Metro adapters
 enables it. Otherwise another attempt may incur another charge and consumes
 risk allowance. Completed non-JSON can retry only with finite authorized
 `format_retries`. Source/Schema failures and truncation are isolated by the shared transport layer, never

@@ -3,7 +3,8 @@
 2026-11-14. Implementation follows the confirmed [Plan](../research/clean-generation-implementation-plan-20261114.md).
 Current authorization and completion belong exclusively to [current-phase](../current-phase.md).
 The Plan's original planning-only authorization describes its historical creation;
-the operator subsequently authorized G0–G2 and optional free G3 preparation.
+the operator subsequently authorized G0–G2, then G3 implementation and a bounded
+paid capability test. Current scope and results remain owned by current-phase.
 
 ## Decisions and boundaries
 
@@ -92,6 +93,56 @@ No server exactly-once claim is made.
 G1 dispatch is Mock-only. Live is disabled and missing finite limits reject live
 requests. G3-Live requires a new explicit authorization and exact capability profile.
 
+## G3 Chat protocol and capability contract
+
+`generation/clean_chat.py` owns `gc-clean-chat-1` manifests and raw JSON/SSE
+decoding. `clean_chat_transport.py` subclasses the unchanged G1 session bridge;
+every attempt still passes through `model_calls.run`, `TurnBatch` and its fixed
+campaign/turn budget. The urllib sender has no SDK retries, proxies or redirect
+following. Default examples stay live-disabled. A separate exact-preparation,
+code-bound, expiring permit is required before live admission. Missing credentials
+fail before reservation. UNKNOWN and format retries are zero for initial probes.
+
+Profiles bind exact endpoint/model, Chat surface, thinking toggle, stream,
+tool-schema digest, prompt/protocol version and reasoning-history policy; the
+request manifest also fixes whole-message/context/output/timeout limits. Profile
+requests start `NOT_LIVE_VALIDATED`; observed capability records reference sealed
+calls and declare their finite scope. Mock results never upgrade live capability.
+No server schema enforcement, service idempotency, exact tokenizer or price is
+inferred from a protocol PASS. There is no alternate JSON action protocol.
+
+HTTP bytes are flushed/fsynced before parsing or draft events. Decode JSON and
+SSE with exact response identity, one choice, explicit finish/usage and arithmetic
+validation. SSE may split UTF-8 and tool arguments anywhere; accumulate by index
+and call ID, reject identity changes, duplicate IDs, missing terminals and usage.
+The full completed batch of calls must pass strict JSON and all local schema
+constraints before any tool executes. Supported schemas form an explicit bounded
+dialect; unknown keywords fail, never silently weaken validation. This dialect
+supports closed nested objects, typed/enum leaves and bounded arrays.
+
+Results distinguish `final_text`, `tool_calls`, `refusal`, `incomplete`, `invalid`
+and `cancelled`. The historical shared state `CONTENT_VERIFIED` means only the
+adapter's scoped protocol validation, never semantic acceptance. Only
+`kind=final_text` supplies answer_text; draft events have `final=false`. Reasoning,
+original assistant/tool arguments and draft content remain separate local files;
+reasoning and control arguments are not progress events or source evidence.
+Tool continuation preserves the sealed assistant message and reasoning verbatim,
+plus exactly linked tool receipts. Reject orphan, repeated or incomplete tool
+protocol units; receipt replay does not repeat the previous model request.
+
+Cancellation blocks later admission and is checked again before sending/reading
+and between serial tools. A transport interruption retains raw fragments and
+UNKNOWN accounting. A sealed known result survives later cancellation/expiry and
+can replay without network or credentials. Socket timeout and cooperative elapsed
+checks bound reads/admission; they do not cancel already admitted remote effects.
+
+`clean_probe.py` is an explicit finite synthetic capability workbench, with sealed
+preparation, request previews, separate approval, partial results and per-profile
+evidence. It is not a G4 chat or G5 research controller. Its live tests consume
+only their approved root/budget, stop on failure and do not create standing API
+permission. Real endpoint/model mismatches or unsupported capabilities require
+an operator decision; do not silently normalize identities or change routes.
+
 ## G2 query, ranking, source and Packet contract
 
 ResearchQuery V2 binds session/turn/query, original question, current subquestion,
@@ -134,7 +185,7 @@ never an exact vendor-token or price claim.
 | G0 | Baseline hash manifest, selected manifests, D01–D24 map, explicit offline boundary. |
 | G1 | Actual pinned framework fixture; crash/replay/cancel/budget/lock tests; zero network. |
 | G2 | V1-equivalent original query/ranking fixtures; source/Packet tests; saved handoff replay AND finite new-question local S0/BGE run; unchanged protected hashes. |
-| G3 | Optional offline protocol preparation only; paid capability probe separately approved. |
+| G3 | Offline fragmentation/tool/error/recovery fixtures; separately approved finite live probe, sealed raw/usage/tool evidence and scoped capability report. |
 
 Tests use small checked-in fixtures. Real local asset checks are explicit opt-in
 and use new output roots. Engineering PASS is never final question-answer quality

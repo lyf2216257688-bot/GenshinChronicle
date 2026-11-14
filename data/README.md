@@ -17,6 +17,14 @@ the [implementation report](../docs/research/clean-generation-g0g2-20261114.md)
 owns finite receipts and limitations. Source/Raw evidence remains upstream;
 these outputs do not establish answer quality.
 
+Explicit G3 roots additionally contain `preparation/` with a seal and exact
+initial request previews, `authorization.json` with expiring finite scope,
+shared attempts/raw responses under the campaign, immutable `tool-receipts/`,
+`case-results/` and a sealed `report/` with usage and capability evidence.
+Failed/UNKNOWN attempts remain retained; continuation never creates a new budget
+root or automatically resends them. Synthetic protocol material is not corpus
+evidence. The tracked sample configuration remains live-disabled.
+
 `retrieval/rerank-v1-input-20261113/` owns a create-only, model-free snapshot of
 validated saved S0 candidates. `rerank-v1-70q-20261113/` and the separate
 `rerank-v1-smoke-20261113/` own operator-run scores, length audits, immutable

@@ -4,37 +4,50 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — Clean Generation G0–G2 engineering complete (2026-11-14)
+## 0. Current work — G3 offline delivered; Live thinking gate stopped (2026-11-14)
 
-The operator explicitly authorized implementation of **G0–G2** under the confirmed
+The operator authorized G0–G2 under the confirmed
 [Generation Plan](research/clean-generation-implementation-plan-20261114.md),
-retaining all D01–D24 decisions. The [Generation contract](phases/clean-generation-v1.md)
-owns persistent interfaces and boundaries. This covers code, fixtures/Mock,
-read-only saved handoff replay and finite local S0/BGE wiring checks, in dependency
-order. G3 may receive free preparation/protocol checks only. **No paid API call,
-G4–G7 implementation, default/Serving switch, deletion or push is authorized.**
-The operator subsequently authorized a local Git commit of this G0–G2 work unit,
-including its Plan, source/configuration, tests and documentation; no push is included.
-All live limits remain unset and live dispatch disabled. Initial uncommitted
-Plan/current-phase edits were preserved and incorporated; implementation baseline is `4757232`.
+retaining D01–D24. Those finite engineering checks are complete and committed
+as `8be6872`; the [G0–G2 report](research/clean-generation-g0g2-20261114.md) owns
+receipts and limits. This is not final answer or continuous-research acceptance.
+The [Generation contract](phases/clean-generation-v1.md) owns durable interfaces.
 
-G0 baseline inspection matches the Plan. Protected existing implementation/config,
-selected source/index manifests, P4 handoff and migration seals are recorded in
-`.local/generation-g0-20261114/protected.json`; initial worktree files/diff are
-preserved beside it. **G0–G2 finite engineering acceptance is complete:** an isolated
-3.14.5 LangGraph/SQLite Mock persistence/dispatch skeleton, fixed campaign/turn
-budgets, cancellation/events/locks and V2 S0/BGE-to-Clean-Packet workbench are
-implemented opt-in. 37 new fixtures and79 relevant regressions/process checks
-pass. Three saved handoff examples cover300 source readbacks; one new local
-question covers100 fully scored/read candidates, with Dense/BM25F reference
-checks, source/Packet/replay checks and worker exit confirmation passing.
-All430 protected hashes and migration code remain unchanged. Exact receipts,
-dependencies, counts and limitations belong to the
-[G0–G2 report](research/clean-generation-g0g2-20261114.md).
-Immediate next action: operator review of this work unit; G3 free adapter work
-may be separately continued, but no paid probe is authorized. G4–G7 remain
-deferred. No final answer was generated; engineering/source checks do not
-establish answer quality or a working adopted chat product.
+The operator subsequently requested G3 and explicitly authorized paid testing
+with appropriate implementation discretion. This work unit implements the new
+Chat adapter and a finite TokenMetro / `deepseek-v4.1-flash-1017` capability probe.
+The bounded test uses synthetic arithmetic and two local fixture handles only:
+text thinking off/on, nonstream native tool loops off/on, then a thinking-enabled
+streamed tool loop. At most8 requests,1 attempt per operation, no UNKNOWN/format
+retry; campaign163,840 conservative tokens, turn2 requests/40,960 tokens,
+request input≤16,384 UTF-8 bytes, output≤1,024 off/4,096 on, context32,768,
+timeout120 seconds and admission deadline20 minutes. Actual provider usage and
+unknown fees remain separate from reservations. Stop on failure/mismatch/overrun;
+no automatic extension, alternate model/channel or JSON fallback.
+Exact sealed preparation and separate expiring approval bind the new test root.
+Repository sample live settings remain disabled/unset; this is no standing permit.
+
+G3 offline protocol/runner engineering is delivered;94 relevant tests pass.
+The finite live probe stopped after2 requests /212 provider-reported tokens,
+with no retry or UNKNOWN. Both returned the exact model and correct synthetic
+answers, but the thinking-enabled response had no reasoning_content or reasoning
+usage detail. Dynamic thinking remains NOT_QUALIFIED; this does not prove the
+server performed no internal reasoning. Native tools and streaming were not sent.
+The [G3 report](research/clean-generation-g3-20261114.md) owns exact receipts,
+capability scope and limitations. The operator then selected a free public
+documentation/parameter review. That [review](research/clean-generation-g3-parameter-check-20261114.md)
+is complete with zero new model calls: the archived request shape matches the
+official Chat format, but public TokenMetro metadata/templates do not establish
+exact-route thinking passthrough or reasoning-return behavior. Raw responses
+already lack reasoning; no evidence justifies a client parameter change.
+Immediate next action: exact-route channel clarification and operator decision
+before further paid diagnostics or dependent live work.
+No remaining probe allowance is automatically consumed. G4–G7 remain deferred.
+The operator subsequently authorized Git commit and push of this G3 code,
+tests and documentation, including the free parameter review. This excludes
+generated data, runtime environments and credentials. No chat/Serving default
+switch or existing-data deletion is included. Frozen prior code, data and evidence remain
+protected; no previously UNKNOWN historical call is resent.
 
 ### Completed Reranking baseline (2026-11-13)
 

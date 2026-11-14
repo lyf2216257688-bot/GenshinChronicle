@@ -11,7 +11,12 @@ CLI/UI defaults or implements a chat/research controller.
 and `rerank_worker_v2.py` adapt research query identity, selected S0/BGE and
 process-owned GPU rotation without modifying frozen kernels. `generation/clean_evidence.py`
 owns hash-verified source handles/read receipts, whole-structure fragment IDs and
-provider-neutral Packet admission/dispositions. Existing `generation/__init__.py`
+provider-neutral Packet admission/dispositions. `generation/clean_chat.py` owns
+versioned Chat manifests, bounded tool schemas and JSON/SSE protocol decoding;
+`clean_chat_transport.py` owns raw-first attempts through a subclass of the
+unchanged session bridge. `clean_probe.py` owns sealed finite synthetic capability
+preparation, approval and tests; it does not implement chat/research control.
+Existing `generation/__init__.py`
 exports continue to describe retained Phase04 contracts. The new isolated
 orchestration environment uses `requirements-py314-generation.lock`; it does not
 add frameworks to any ML environment. Current completion/authorization remains
