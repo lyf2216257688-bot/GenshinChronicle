@@ -90,6 +90,14 @@ class ChatAppTests(unittest.TestCase):
         self.assertEqual(len(reopened.chat_message), 2)
         self.assertEqual(len(self.store.jobs(sid)), 1)
 
+    def test_live_ui_requires_finite_prepared_campaign(self):
+        with patch.dict(os.environ, {"GC_CLEAN_CHAT_MODE": "LIVE"}):
+            app = self.app()
+            self.button(app, "新建对话").click().run()
+            self.assertFalse(app.exception)
+            self.assertTrue(app.error)
+            self.assertEqual(self.store.chats(), [])
+
     def test_typed_correction_and_new_chat_isolation(self):
         app = self.app(); sid = self.new(app)
         next(s for s in app.selectbox if s.label == "这条消息的类型").select("用户剧情断言（待核验）").run()

@@ -39,8 +39,9 @@ All 24 decisions are retained, without a new architecture/model selection:
 | D24 | Bounded incremental capability; no global/cross-chat research memory. |
 
 Plan sections 3–7 and 9 supply the detailed confirmed interface, recovery,
-capability, budget and semantic constraints. G4 remote operation and G5–G7
-retain separate gates; documenting them does not authorize implementation or calls.
+capability, budget and semantic constraints. G4 remote operation requires a finite
+campaign authorization; G5–G7 retain separate gates. Documenting an interface
+does not authorize calls.
 
 ## Ownership, identities and storage
 
@@ -226,7 +227,7 @@ No automatic source adjudication or claim verification is inferred from Mock.
 
 `clean_conversation_graph.py` uses sync LangGraph boundaries for context →
 fixed original-query retrieval/ranking → read/Assembly → prepared Chat operation
-→ Mock SSE answer → citation/source check → immutable result/message publication.
+→ Chat SSE answer → citation/source check → immutable result/message publication.
 It reuses G2 V2 fusion/ordering and EvidenceReader/Assembly, and G3 ChatSessions
 through the unchanged shared caller. Actual escaped Chat-message bytes plus
 output reserve are checked; evidence admission accounts for envelope overhead.
@@ -248,11 +249,11 @@ User cancellation persists, prevents later dispatch and closes that turn;
 subsequent research uses a new turn. A sealed known response survives cancellation.
 UNKNOWN reservations are retained and never bypassed through a new operation.
 
-The independent `ui/clean_chat_app.py` and `rag/clean_conversation_cli.py` expose
-only Mock mode. Tiny source fixtures and deterministic hits/scores/answers are
+The independent `ui/clean_chat_app.py` defaults to Mock, and
+`rag/clean_conversation_cli.py` remains Mock-only. Tiny source fixtures and deterministic hits/scores/answers are
 marked synthetic; real parsing, readback, Packet, protocol, persistence and
-accounting paths are exercised. There is no credential read, live dispatch,
-automatic query rewrite, research tool loop, global memory Store or cloud service.
+accounting paths are exercised. Mock execution has no credential read or live
+dispatch. There is no research tool loop, global memory Store or cloud service.
 Each remote profile needs matching exact-route evidence and fresh batch
 authorization. Limited disabled-thinking tools/SSE observations do not qualify
 thinking; missing thinking evidence does not block separately authorized ordinary
@@ -264,6 +265,43 @@ starting execution. `executor_runs/` retains worker PID/log/shutdown receipts.
 The optional `requirements-py314-generation-ui.lock` extends the immutable G1
 framework lock in the isolated regular-GIL 3.14.5 Generation environment. It must
 resolve with the original pins; no ML runtime or existing lock is changed.
+
+## G4 finite remote fixed chain
+
+`rag/clean_live.py` owns finite campaign preparation/admission and a lazy wrapper
+around unchanged G2 LocalPipeline. It specializes only G3 admission, not its
+sender, retries or UNKNOWN recovery. The immutable permit binds data root, shared
+campaign, limits, expiry, integration/adapter/upstream code, selected configuration
+hashes and prior ordinary SSE evidence. Each new request is checked against the
+exact verified context/Packet and a saved wire preview before reservation and send.
+All chats share that campaign; creating another chat cannot replenish its budget.
+The live profile uses disabled thinking, SSE text and no model tools. It is a new
+QA prompt with finite validation permission, not automatic promotion of synthetic
+G3 semantic capability. UNKNOWN, invalid protocol/identity/usage, source corruption
+or expired authority prevents further dispatch. Actual fees remain separately unknown.
+
+G4 does one selected S0/BGE retrieval and one answer request per turn. Follow-ups
+may use literal same-chat user messages as explicit search/rerank context in a
+`follow_up` V2 query, with a current-turn original-query parent, recorded gap,
+source message IDs and preserved original question. No model rewrite, decomposition,
+extra retrieval or autonomous research is introduced. Invalidated user premises are
+excluded from this projection; claims still require the current source Packet.
+Long literal queries fail explicitly, without truncation or a larger BGE budget.
+
+The live system instruction replaces the Mock-only instruction. Whole-message
+admission counts the actual serialized envelope and output reserve. Every candidate
+is accounted for; full natural Parents are read for admitted evidence after Assembly
+for citation viewing. Parent readback does not silently enter the model Packet.
+Local ranking outputs seal before reuse; partial local worker outputs block automatic
+recomputation into the same root. Sealed calls replay without credentials/network
+after expiry. Incompatible checkpoints remain read-only; no historical hashes change.
+
+`GC_CLEAN_CHAT_MODE=LIVE` explicitly selects the opt-in UI; a prepared finite permit
+is required. The default is still Mock. Mode-mismatched chats display read-only.
+The existing executor launches the real chain in a Job-owned child, and reopening
+never schedules paid work. `clean_live` CLI supports prepare/new/submit/continue/show/close;
+prepare records explicit operator authority and fixed budget, but sends nothing.
+It does not create standing authorization. G5–G7 and default adoption remain separate.
 
 ## Stage checks
 

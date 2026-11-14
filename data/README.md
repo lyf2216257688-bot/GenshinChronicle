@@ -41,7 +41,21 @@ same-chat histories stay isolated. Restart only displays earlier work until an
 explicit continue. `mock_corpus/` is a sealed tiny synthetic corpus derived from
 checked-in fixtures with zero model inference; it is not a production corpus.
 G4 progress/draft/result events reuse `events/`; streams, calls and budgets remain
-in the original per-chat campaign. `locks/executor.lock` owns the local background
+in the original campaign. Mock uses per-chat campaigns; finite real QA shares one
+campaign across all chats in its root. `live/permit.json` binds finite operator
+authority, limits, expiry, code/configuration and prior protocol evidence;
+`live/previews/` holds exact verified Packet wire previews and `live/closed.json`
+irreversibly closes admission for that campaign. Finite real-QA roots can additionally
+retain sealed `audit/` reports with exact usage/source exports and `closed-replay.json`
+for zero-network readback receipts. A separate sealed `live-observation/` records
+the exact QA profile and finite call-bound observations without changing manifests
+or granting future dispatch. `live/code-snapshot/` preserves exact code bytes
+verified against the immutable permit when subsequent metadata-only cleanup occurs;
+it does not change old hashes or allow an incompatible checkpoint to dispatch.
+`local_queries/<turn>/` holds
+sealed real S0/BGE candidates/scores/ranking and worker receipts. Partial local
+outputs are preserved and block implicit overwrite/recompute. These files never
+change source/index assets or replenish a campaign. `locks/executor.lock` owns the local background
 executor; `executor_runs/` holds child PID/log/shutdown receipts and
 `chat_submissions/` holds create-only submission intents before turn publication.
 The actual graph runs in a Job-owned local child so its offline socket guard is

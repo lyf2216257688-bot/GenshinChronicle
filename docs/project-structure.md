@@ -9,13 +9,17 @@ budgets to the unchanged shared caller. `rag/clean_cli.py` is the Mock entry;
 CLI/UI defaults or implements a chat/research controller.
 G4 adds `rag/clean_conversation.py` for chat/message/note/draft records,
 `clean_context.py` for per-chat extractive context organization and correction
-invalidation, `clean_conversation_graph.py` for the recoverable fixed Mock chain,
+invalidation, `clean_conversation_graph.py` for the recoverable fixed chain,
 `clean_executor.py` for the application-owned supervisor and Job-owned
 `clean_turn_worker.py` child, and
 `clean_mock.py` for tiny synthetic corpus/hits/scores/SSE material. The explicit
 CLI is `rag/clean_conversation_cli.py`; `ui/clean_chat_app.py` is its independent
-opt-in Streamlit presentation. Both expose Mock only, without changing G3 or
-the shared core. `requirements-py314-generation-ui.lock` adds compatible pinned
+opt-in Streamlit presentation. Mock is the UI default and that CLI remains Mock-only.
+`rag/clean_live.py` adds finite campaign preparation/admission, literal-user-context
+follow-up queries, a lazy G2 LocalPipeline wrapper and a separate live CLI. Its G3
+subclass changes only admission; the sender/shared core are unchanged. The UI's
+explicit live mode and Job-owned worker reuse this path, without granting new
+campaigns or automatic restart dispatch. `requirements-py314-generation-ui.lock` adds compatible pinned
 UI dependencies over the unchanged framework lock. These modules do not
 implement the G5 autonomous research controller or switch legacy defaults.
 `retrieval/clean_based/query_v2.py`, `runtime_v2.py`, `worker_v2.py`, `rerank_v2.py`

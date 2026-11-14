@@ -1,4 +1,4 @@
-"""Private single-turn Mock child, owned by the local executor's Windows Job."""
+"""Private single-turn child, owned by the local executor's Windows Job."""
 import argparse
 import os
 from pathlib import Path
@@ -18,8 +18,15 @@ def main(argv=None):
     args = p.parse_args(argv)
     store = ConversationStore(args.root)
     folder = inside(store.root / "executor_runs", args.run_root)
-    write(folder / "worker.json", {"pid": os.getpid(), "mode": "MOCK", "turn_id": args.turn})
+    mode = store.chat(store.turn(args.turn)["session"])["settings"]["mode"]
+    write(folder / "worker.json", {"pid": os.getpid(), "mode": mode, "turn_id": args.turn})
     store.shutdown_file = folder / "shutdown.json"
+    if mode == "LIVE":
+        from .clean_live import LivePipeline
+        pipeline = LivePipeline(store, args.turn, args.repo)
+        try: run_turn(store, args.turn, pipeline, continue_turn=args.continue_turn)
+        finally: pipeline.close()
+        return 0
     manifest = fixture_inputs(Path(args.repo), store.root / "mock_corpus")
     with InputReader(manifest) as reader:
         run_turn(store, args.turn, FixturePipeline(reader, args.repo), continue_turn=args.continue_turn,

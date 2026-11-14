@@ -4,7 +4,46 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G3/G4 integrated on main (2026-11-14)
+## 0. Current work — G4 real-QA integrated; finite campaign closed (2026-11-14)
+
+G2+G3+G4 real fixed-chain QA is integrated opt-in. The finite live campaign is
+**complete and closed at 4 requests / 4 attempts, 64,129 input + 2,395 output =
+66,524 provider-reported tokens**, zero retries/UNKNOWN/overrun. Actual monetary
+fee remains UNKNOWN without billing evidence. Remaining six requests are closed,
+not standing permission. Three continuous Guhua turns and one independent Memory
+of Dust plot question have limited source-based Codex review PASS; this is not
+G7 adoption, blind review or general continuous-research acceptance.
+The real sealed-response/checkpoint-gap recovery and all four closed-call replays
+passed with credentials removed/network blocked and zero extra requests.
+115 distinct offline checks pass; final affected G4/Live/UI regression is 43 PASS.
+Real-history Streamlit AppTest readback/refresh adds no submission or external call.
+The [G4 real-QA report](research/clean-generation-g4-live-20261114.md) owns exact
+usage, raw/audit receipts, the RAM failure and explicit local resume, semantic
+findings, metadata-only final cleanup and limitations. All 645 protected hashes
+are unchanged. No default switch, upstream rebuild or deletion. The operator
+subsequently authorized a local Git commit of this work unit; push remains unauthorized.
+
+The operator explicitly authorized necessary G2+G3+G4 integration, offline tests
+and at most **10 new paid requests** in this work unit. Fixed route is TokenMetro /
+`deepseek-v4.1-flash-1017`, thinking disabled. This is a new finite campaign,
+separate from the closed synthetic G3 allowances. No default switch, deletion,
+automatic commit/push, G5–G7, upstream rebuild or additional allowance is authorized.
+The opt-in fixed chain uses real S0/BGE, verified Assembly and G4 same-chat
+context/UI, with one answer request per turn, one attempt and zero retries.
+Campaign/turn bounds are 10/1 requests and 670,720/67,072 conservative tokens;
+each request permits at most 65,536 input UTF-8 bytes, 1,536 output tokens,
+120 seconds, context 67,072; admission expires after two hours. These are finite
+validation limits selected under the operator's explicit delegation, not product
+defaults or a verified provider tokenizer/price. New chats share the campaign.
+UNKNOWN, protocol/identity/accounting failure, overrun or source-integrity failure
+blocks further dispatch. Actual fees require billing evidence.
+
+**Immediate next action:** operator review of the saved real answers and opt-in
+experience, especially the several-minute local latency, bounded literal context
+projection and whole-chunk admission limits. Any further paid campaign, G5–G7 or
+default adoption needs its own explicit scope; do not reopen the closed permit.
+
+### Historical G3/G4 Git integration checkpoint
 
 The operator explicitly authorized separate G3/G4 commits, their merge into main,
 and push to origin/main. G3 continuation is committed as `e090cd0`; G4 offline
@@ -22,8 +61,9 @@ checks and 8 G3 overlay checks passed before integration. The
 historical checkpoints. The [Git integration report](research/clean-generation-g34-git-close-20261114.md)
 owns merge/verification receipts. Optional UI dependencies preserve the original
 framework pins; 116 integrated main checks plus 20 shared-core regressions pass,
-with pip check and 439 exact baseline file hashes unchanged. No legacy selector changed. This remains Mock engineering,
-not semantic acceptance or permission to run real continuous QA.
+with pip check and 439 exact baseline file hashes unchanged. No legacy selector changed.
+That checkpoint established Mock engineering only; this work unit's separate
+real-QA authorization is recorded above, without granting semantic adoption.
 
 The operator authorized G0–G2 under the confirmed
 [Generation Plan](research/clean-generation-implementation-plan-20261114.md),
@@ -80,12 +120,12 @@ records are observed evidence, not dispatch permission. No actual provider
 interruption occurred; local fault checks do not establish service reliability.
 Free public recheck adds no model request or exact-route thinking explanation.
 
-**Immediate next action: operator decision on a separately bounded real-QA
-integration using the qualified disabled-thinking profiles, after G4 wiring and
-actual tool/schema/Packet checks.** Thinking diagnostics remain separate and need
+The historical next gate was a separately bounded real-QA integration using the
+observed disabled-thinking profiles, after G4 wiring and actual schema/Packet
+checks; the new work unit above addresses that gate. Thinking diagnostics remain separate and need
 route-specific evidence and any new paid authorization. Thinking tools and active
 research are not qualified by these ordinary tool loops; semantic/continuous-QA
-acceptance remains open. This exhausted5-request permit grants no further real
+acceptance remains open. The exhausted5-request permit itself grants no further real
 QA/research run, default switch, commit, push, deletion, upstream rebuild or worktree merge.
 
 ### Completed Reranking baseline (2026-11-13)
@@ -487,7 +527,9 @@ valuable comparison/rollback artifacts.
 ## 3. Immediate next action and remaining V1 gaps
 
 Follow the Generation scope and next gate in section 0 and the
-[G3/G4 integration](research/clean-generation-g34-git-close-20261114.md). The
+[G4 real-QA report](research/clean-generation-g4-live-20261114.md). The
+[G3/G4 Git integration](research/clean-generation-g34-git-close-20261114.md) is
+a preserved historical checkpoint. The
 [Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
 is a preserved completed-stage reference.
 The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
@@ -585,6 +627,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | G3 tools-first approved Live run, scoped native tools/SSE capability, audit and remaining gaps | [`G3 tools/SSE Live`](research/clean-generation-g3-tools-live-20261114.md) |
 | G3 offline protocol, finite Live stop and capability limits | [`Generation G3`](research/clean-generation-g3-20261114.md) |
 | G4 local Mock dialogue, context, UI, recovery and merge conditions | [`Generation G4`](research/clean-generation-g4-20261114.md) |
+| G4 real fixed QA, finite live usage/source review, RAM/checkpoint recovery and opt-in UI | [`G4 real QA`](research/clean-generation-g4-live-20261114.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
 | Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |

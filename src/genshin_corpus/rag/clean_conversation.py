@@ -51,8 +51,12 @@ class ConversationStore(Store):
     def create_chat(self, title, settings, *, session=None):
         session = session or uuid4().hex
         require(isinstance(title, str) and title.strip(), "Chat title required")
-        require(settings.get("mode") == "MOCK", "G4_LIVE_DISABLED")
-        campaign = "g4-mock-" + session
+        require(settings.get("mode") in {"MOCK", "LIVE"}, "G4_MODE_INVALID")
+        if settings["mode"] == "LIVE":
+            from .clean_live import permit_for
+            campaign = permit_for(self, settings)["campaign"]
+        else:
+            campaign = "g4-mock-" + session
         wire = json.dumps(settings, sort_keys=True)
         with self.connect() as db:
             db.execute("INSERT OR IGNORE INTO chats VALUES (?,?,?,?,?)", (session, title, campaign, wire, VERSION))
@@ -167,7 +171,7 @@ class ConversationStore(Store):
         mid = self.message(tid, "user", turn["question"], input_kind=metadata["note_kind"] or "question")
         if metadata["note_kind"]:
             self.add_note(tid, metadata["note_kind"], turn["question"], message_ids=[mid], dependencies=metadata["targets"])
-        self.event(tid, "g4-submitted", {"kind": "submitted", "mode": "MOCK"})
+        self.event(tid, "g4-submitted", {"kind": "submitted", "mode": self.chat(turn["session"])["settings"]["mode"]})
 
     def jobs(self, session=None):
         with self.connect() as db:

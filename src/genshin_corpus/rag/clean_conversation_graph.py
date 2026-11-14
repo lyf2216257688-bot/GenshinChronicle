@@ -1,4 +1,4 @@
-"""G4 fixed-chain Mock dialogue on G1 persistence, G2 evidence and G3 transport."""
+"""Opt-in G4 fixed dialogue on G1 persistence, G2 evidence and G3 transport."""
 from contextlib import closing, contextmanager
 import os
 import re
@@ -28,7 +28,8 @@ def fixture_settings():
 
 def code_identity():
     return {"graph": sha(__file__), "conversation": sha(clean_conversation.__file__),
-            "context": sha(clean_context.__file__), "mock": sha(clean_mock.__file__)}
+            "context": sha(clean_context.__file__), "mock": sha(clean_mock.__file__),
+            "live": sha(os.path.join(os.path.dirname(__file__), "clean_live.py"))}
 
 
 class State(TypedDict, total=False):
@@ -51,7 +52,8 @@ def messages(context, evidence):
 def request_for(context, packet, settings):
     return ChatRequest(messages(context, packet["evidence"]), [], "disabled", True,
         settings["output_tokens"], settings["context_tokens"] - settings["output_tokens"],
-        settings["context_tokens"], settings["timeout_seconds"], "g4-mock-fixed-chain-1")
+        settings["context_tokens"], settings["timeout_seconds"],
+        "g4-live-grounded-answer-1" if settings["mode"] == "LIVE" else "g4-mock-fixed-chain-1")
 
 
 def saved_result(store, tid):
@@ -102,10 +104,10 @@ def commit_result(store, tid, result):
     ref = store.artifact(tid, "result", result)
     store.event(tid, "g4-result-ready", {"kind": "g4_result_ready", "ref": ref})
     store.message(tid, "assistant", result["answer_text"] or result["delivery_note"],
-                  status=result["status"], mode="MOCK", citations=result["citations"], result_ref=ref,
+                  status=result["status"], mode=result["mode"], citations=result["citations"], result_ref=ref,
                   semantic_acceptance="NOT_REVIEWED")
     store.status(tid, result["status"])
-    store.event(tid, "turn_complete", {"kind": "g4_complete", "mode": "MOCK", "result_ref": ref})
+    store.event(tid, "turn_complete", {"kind": "g4_complete", "mode": result["mode"], "result_ref": ref})
     return ref
 
 
@@ -117,16 +119,21 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
     from langgraph.checkpoint.sqlite import SqliteSaver
     turn = store.turn(tid)
     settings = store.chat(turn["session"])["settings"]
-    require(settings["mode"] == "MOCK", "G4_LIVE_DISABLED")
+    mode = settings["mode"]
+    require(mode in {"MOCK", "LIVE"}, "G4_MODE_INVALID")
 
     def progress(stage):
         require(not store.stopping(), "APPLICATION_SHUTDOWN_CONTINUE_REQUIRED")
-        store.event(tid, "g4-" + stage, {"kind": "progress", "stage": stage, "mode": "MOCK", "final": False})
+        store.event(tid, "g4-" + stage, {"kind": "progress", "stage": stage, "mode": mode, "final": False})
 
     def context_node(state):
         require(state["turn_id"] == tid and state["version"] == VERSION, "Foreign graph state")
         progress("context_started")
         ctx = organize(store, tid, **{k: settings[k] for k in ("history_bytes", "recent_turns", "excerpt_chars")})
+        if mode == "LIVE":
+            from .clean_live import SYSTEM as live_system
+            ctx["system"] = live_system
+            ctx["context_id"] = digest({k: v for k, v in ctx.items() if k != "context_id"})
         ref = store.artifact(tid, "context", ctx)
         progress("context_organized")
         fault("context_saved_before_checkpoint")
@@ -143,7 +150,13 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
         ctx = store.load(state["context_ref"])
         context = assembly_context(turn, ctx)
         query = ResearchQuery(turn["session"], tid, "original", *([turn["question"]] * 4))
-        ranked = pipeline.run(query)
+        query_audit = None
+        if mode == "LIVE":
+            from .clean_live import query_for
+            query, parents, query_audit = query_for(store, turn, ctx)
+            ranked = pipeline.run(query, parents=parents)
+        else:
+            ranked = pipeline.run(query)
         ranked_ref = store.artifact(tid, "ranked", ranked)
         progress("ranking_complete")
         er = EvidenceReader(pipeline.reader)
@@ -158,11 +171,6 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
             except (ValueError, KeyError, FileNotFoundError) as exc:
                 failures.append({"chunk_id": cid, "type": type(exc).__name__, "scope": "chunk"})
                 continue
-            try:
-                parent = er.read(handle, "natural_parent")
-                parents[handle] = store.artifact(tid, "parent-" + parent["receipt_id"], parent)
-            except (ValueError, KeyError, FileNotFoundError) as exc:
-                failures.append({"chunk_id": cid, "type": type(exc).__name__, "scope": "parent"})
         budget = {"context_tokens": settings["context_tokens"], "output_tokens": settings["output_tokens"], "thinking_tokens": 0}
         # G2 counts the full neutral projection. Also account for G3's actual
         # escaped Chat envelope, reducing only evidence admission when needed.
@@ -181,7 +189,18 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
             budget["context_tokens"] -= excess
             envelope_reserve += excess
         else: raise ValueError("WHOLE_MESSAGE_BUDGET_EXCEEDED")
-        value = {"mode": "MOCK", "query": query.value(), "ranked_ref": ranked_ref,
+        # Parent display is read only for admitted evidence, after deterministic
+        # admission; unread candidates still retain their explicit disposition.
+        admitted = {e["receipt_id"] for e in packet["evidence"]}
+        for receipt in receipts:
+            if receipt["receipt_id"] not in admitted: continue
+            handle = receipt["handle"]
+            try:
+                parent = er.read(handle, "natural_parent")
+                parents[handle] = store.artifact(tid, "parent-" + parent["receipt_id"], parent)
+            except (ValueError, KeyError, FileNotFoundError) as exc:
+                failures.append({"chunk_id": receipt["chunk_id"], "type": type(exc).__name__, "scope": "parent"})
+        value = {"mode": mode, "query": query.value(), "query_context": query_audit, "ranked_ref": ranked_ref,
                  "packet": packet, "reads": refs, "parents": parents, "source_failures": failures,
                  "context_ref": state["context_ref"], "chat_envelope_reserve": envelope_reserve}
         ref = store.artifact(tid, "sources", value)
@@ -193,7 +212,7 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
         sources = store.load(state["sources_ref"])
         context = assembly_context(turn, store.load(state["context_ref"]))
         req = request_for(context, sources["packet"], settings)
-        opid = bridge.prepare_chat(tid, "g4-fixed-answer", req, mock=True)
+        opid = bridge.prepare_chat(tid, "g4-fixed-answer", req, mock=mode == "MOCK")
         progress("request_prepared")
         fault("chat_prepared_before_checkpoint")
         return {"operation_id": opid}
@@ -202,8 +221,8 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
         progress("generation_started")
         sources = store.load(state["sources_ref"])
         scenario = store.job(tid)["metadata"]["scenario"]
-        opener = opener_factory(sources["packet"], scenario) if opener_factory else MockOpener(
-            mock_answer(sources["packet"], scenario), disconnect=scenario == "disconnect")
+        opener = (opener_factory(sources["packet"], scenario) if opener_factory else MockOpener(
+            mock_answer(sources["packet"], scenario), disconnect=scenario == "disconnect")) if mode == "MOCK" else None
         if store.cancelled(tid):
             return {"dispatch_stop": "user_cancelled"}
         # Reconcile uncertain reservations without invoking a sender. No new
@@ -211,7 +230,8 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
         if bridge.reconcile(state["operation_id"])["status"] == "UNKNOWN":
             return {"dispatch_stop": "unknown_requires_reconciliation"}
         try:
-            bridge.execute_chat(state["operation_id"], opener=opener)
+            bridge.execute_chat(state["operation_id"], opener=opener,
+                                api_key=os.environ.get("TOKENMETRO_API_KEY") if mode == "LIVE" else None)
         except Deferred:
             return {"dispatch_stop": "user_cancelled" if store.cancelled(tid) else "budget_or_admission_deferred"}
         require(not store.stopping(), "APPLICATION_SHUTDOWN_CONTINUE_REQUIRED")
@@ -248,20 +268,22 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
         cancelled = store.cancelled(tid)
         outcome = "cancelled" if cancelled and not answer else "completed" if answer and citations and not sources["source_failures"] else "partial"
         scenario = store.job(tid)["metadata"]["scenario"]
-        if scenario == "limited" and outcome == "completed": outcome = "partial"
+        if mode == "MOCK" and scenario == "limited" and outcome == "completed": outcome = "partial"
         accounting = bridge.batch.accounting()
         # This field is invocation-relative (Batch.window_start), not a durable
         # campaign fact, and changes when a process reopens the same campaign.
         accounting.pop("new_request_reservations", None)
-        value = {"version": VERSION, "turn_id": tid, "session_id": turn["session"], "mode": "MOCK",
+        value = {"version": VERSION, "turn_id": tid, "session_id": turn["session"], "mode": mode,
                  "status": outcome, "answer_text": answer, "citations": citations, "citation_validation": check,
                  "sources_ref": state["sources_ref"], "context_ref": state["context_ref"],
                  "operation_id": state["operation_id"], "call_state": result.get("state", status["status"]),
                  "stop_reason": "user_cancelled" if cancelled else "citation_validation_failed" if check["status"] == "FAIL"
-                    else state.get("dispatch_stop", "fixture_limited" if outcome == "partial" else "fixture_complete"),
-                 "delivery_note": "Mock部分交付：已保存可核验材料；本轮未形成通过完整检查的最终答案，草稿仅供查看。",
+                    else state.get("dispatch_stop", ("limited_evidence" if outcome == "partial" else "fixed_chain_complete") if mode == "LIVE"
+                                   else "fixture_limited" if outcome == "partial" else "fixture_complete"),
+                 "delivery_note": "" if outcome == "completed" else
+                    ("真实问答" if mode == "LIVE" else "Mock") + "部分交付：已保存可核验材料；本轮未形成通过完整检查的最终答案，草稿仅供查看。",
                  "semantic_acceptance": "NOT_REVIEWED", "live_capability": "NOT_VALIDATED",
-                 "remote_calls": 0, "budget": accounting}
+                 "remote_calls": result.get("calls", 0) if mode == "LIVE" else 0, "budget": accounting}
         ref = store.artifact(tid, "result", value)
         fault("result_saved_before_checkpoint")
         return {"result_ref": ref}
@@ -269,7 +291,14 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
     def finish_node(state):
         result = store.load(state["result_ref"])
         commit_result(store, tid, result)
+        if mode == "LIVE" and (result.get("call_state") != "CONTENT_VERIFIED"
+                               or result["citation_validation"]["status"] == "FAIL" or sources_failed(result)):
+            from .clean_store import put
+            put(store.root / "live/closed.json", {"reason": "live_anomaly", "turn_id": tid})
         return {}
+
+    def sources_failed(result):
+        return bool(store.load(result["sources_ref"])["source_failures"])
 
     builder = StateGraph(State)
     nodes = [("context", context_node), ("sources", source_node), ("prepare", prepare_node),
@@ -287,7 +316,12 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
 
 def run_turn(store, tid, pipeline, *, continue_turn=False, opener_factory=None, fault=lambda p: None):
     chat = store.chat(store.turn(tid)["session"])
-    bridge = ChatSessions(store, chat["campaign"], chat["settings"]["limits"])
+    mode = chat["settings"]["mode"]
+    if mode == "LIVE":
+        from .clean_live import LiveSessions, permit_for
+        bridge = LiveSessions(store, chat["campaign"], chat["settings"]["limits"], permit=permit_for(store, chat["settings"]))
+    else:
+        bridge = ChatSessions(store, chat["campaign"], chat["settings"]["limits"])
     with store.execute(tid):
         store.ensure_submission(tid)
         existing = saved_result(store, tid)
@@ -297,9 +331,9 @@ def run_turn(store, tid, pipeline, *, continue_turn=False, opener_factory=None, 
             commit_result(store, tid, existing)
             return existing
         if store.cancelled(tid):
-            result = {"version": VERSION, "turn_id": tid, "session_id": chat["id"], "mode": "MOCK",
+            result = {"version": VERSION, "turn_id": tid, "session_id": chat["id"], "mode": mode,
                       "status": "cancelled", "answer_text": None, "citations": [], "sources_ref": None,
-                      "delivery_note": "Mock轮次已取消；没有启动新的派发。", "stop_reason": "user_cancelled",
+                      "delivery_note": "轮次已取消；没有启动新的派发。", "stop_reason": "user_cancelled",
                       "remote_calls": 0, "semantic_acceptance": "NOT_REVIEWED"}
             # An interrupted in-flight graph must first reconcile its original
             # operation, retaining its sources and known/UNKNOWN accounting.

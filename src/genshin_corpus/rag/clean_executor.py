@@ -104,6 +104,8 @@ class LocalExecutor:
             startup.wShowWindow = 0
             extra["startupinfo"] = startup
         started, stopping = time.monotonic(), None
+        settings = self.store.chat(self.store.turn(tid)["session"])["settings"]
+        timeout = settings.get("worker_timeout_seconds", 90)
         with (folder / "worker.log").open("xb") as log:
             with child_process(command, cwd=self.repo, env=env, stdin=subprocess.DEVNULL,
                                stdout=log, stderr=log, **extra) as process:
@@ -114,9 +116,9 @@ class LocalExecutor:
                             put(stop_file, {"kind": "application_shutdown", "turn_id": tid})
                             stopping = stopping or time.monotonic()
                             require(time.monotonic() - stopping < 3, "WORKER_SHUTDOWN_TIMEOUT")
-                        require(time.monotonic() - started < 90, "MOCK_WORKER_TIMEOUT")
+                        require(time.monotonic() - started < timeout, "LOCAL_WORKER_TIMEOUT")
                         time.sleep(.03)
-                    require(process.returncode == 0, "MOCK_WORKER_INTERRUPTED_SEE_LOCAL_LOG")
+                    require(process.returncode == 0, "LOCAL_WORKER_INTERRUPTED_SEE_LOCAL_LOG")
                 finally:
                     self.process = None
         if (folder / "worker.json").exists(): wait_pid(read(folder / "worker.json")["pid"])

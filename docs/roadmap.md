@@ -31,8 +31,9 @@ versioned new-question S0/BGE wiring and Clean Packet assembly without taking ov
 discovery or ordering. A separate native Chat adapter and finite synthetic
 capability probe keep exact-route evidence and paid approval explicit.
 G4 adds same-chat persistence, extractive context organization, corrections and an
-independent fixed-chain Mock chat/Streamlit interface. Remote dialogue, autonomous
-research and adoption retain their separate stage gates.
+independent fixed-chain chat/Streamlit interface, defaulting to Mock. The separate
+finite live chain connects real S0/BGE and G3 under expiring shared campaign limits.
+Autonomous research and adoption retain their separate stage gates.
 Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

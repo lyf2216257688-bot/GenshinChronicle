@@ -1,4 +1,4 @@
-"""Explicit opt-in G4 Streamlit chat. Only synthetic Mock execution is exposed."""
+"""Explicit opt-in G4 Streamlit chat; live needs a prepared finite campaign."""
 import os
 from pathlib import Path
 
@@ -10,10 +10,11 @@ from genshin_corpus.rag.clean_executor import LocalExecutor
 
 REPO = Path(__file__).resolve().parents[3]
 ROOT = os.environ.get("GC_CLEAN_CHAT_ROOT", str(REPO / "data/generation/clean-v1-local"))
+MODE = os.environ.get("GC_CLEAN_CHAT_MODE", "MOCK")
 LABELS = {"context_started": "读取本对话历史", "context_organized": "上下文整理完成",
-          "retrieval_started": "正在执行Mock召回", "ranking_complete": "Mock排序完成",
-          "packet_ready": "原文Packet已保存", "request_prepared": "Mock请求已准备",
-          "generation_started": "正在接收Mock草稿", "checking": "正在检查引用与来源"}
+          "retrieval_started": "正在召回资料", "ranking_complete": "排序完成",
+          "packet_ready": "原文Packet已保存", "request_prepared": "请求已准备",
+          "generation_started": "正在接收草稿", "checking": "正在检查引用与来源"}
 KINDS = {"普通追问": None, "要求与范围": "requirement", "用户剧情断言（待核验）": "user_assertion",
          "假说": "hypothesis", "未解问题": "unresolved", "纠正意图或范围": "correction_intent",
          "纠正剧情前提（待核验）": "correction_fact"}
@@ -57,7 +58,7 @@ def transcript(store, worker, sid):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if message["role"] == "assistant":
-                st.caption("Mock · " + message["status"] + " · 语义尚未验收")
+                st.caption(message.get("mode", "MOCK") + " · " + message["status"] + " · 语义尚未验收")
                 for citation in message.get("citations", []):
                     with st.expander("原文引用 " + citation["citation_id"]): render_citation(store, citation)
                 if message["status"] != "completed":
@@ -106,9 +107,12 @@ def transcript(store, worker, sid):
 
 
 def main():
-    st.set_page_config(page_title="GC 本地研究对话 · Mock", layout="wide")
+    st.set_page_config(page_title="GC 本地研究对话", layout="wide")
     st.title("GC 本地研究对话")
-    st.warning("G4 离线 Mock：仅使用小型合成资料和模拟回答。当前入口未接入真实连续问答；渠道能力与运行授权见 current-phase。")
+    if MODE == "LIVE":
+        st.warning("G4 有限真实问答：使用本地知识库与远程模型。所有对话共享已授权批次额度；新建对话不会增加额度。")
+    else:
+        st.warning("G4 离线 Mock：仅使用小型合成资料和模拟回答。真实模式须显式启用并配置有限批次授权。")
     store = ConversationStore(ROOT)
     try: worker = executor(str(store.root), str(REPO))
     except (OSError, ValueError):
@@ -117,7 +121,17 @@ def main():
     with st.sidebar:
         st.caption("所有会话仅保存在本机")
         if st.button("新建对话", disabled=worker is None):
-            sid = store.create_chat("Mock研究对话", fixture_settings())
+            if MODE == "LIVE":
+                from genshin_corpus.evidence_io import read
+                from genshin_corpus.rag.clean_live import permit_for
+                try:
+                    settings = read(store.root / "live/permit.json")["settings"]
+                    permit_for(store, settings)
+                except (OSError, KeyError, ValueError):
+                    st.error("缺少可用的有限真实批次配置。")
+                    return
+            else: settings = fixture_settings()
+            sid = store.create_chat("原神真实问答" if MODE == "LIVE" else "Mock研究对话", settings)
             st.query_params["chat"] = sid; st.rerun()
         chats = store.chats()
         if not chats:
@@ -130,6 +144,25 @@ def main():
                            format_func=lambda value: labels[value])
         st.query_params["chat"] = sid
     transcript(store, worker, sid)
+    if store.chat(sid)["settings"]["mode"] != MODE:
+        st.info("此会话与入口运行模式不同，当前只读。")
+        return
+    if store.chat(sid)["settings"]["mode"] == "LIVE":
+        from genshin_corpus.rag.clean_live import LiveSessions, permit_for
+        try:
+            settings = store.chat(sid)["settings"]
+            permit = permit_for(store, settings)
+            bridge = LiveSessions(store, permit["campaign"], settings["limits"], permit=permit)
+            usage = bridge.batch.accounting()
+            st.caption(f"本批已预约 {usage['request_reservations']}/{settings['limits']['campaign_requests']} 请求 · "
+                       f"已知用量 {usage['known_tokens']} Token · 实际费用未知")
+            import time
+            if (store.root / "live/closed.json").exists() or time.time() >= permit["expires_at"] or usage["request_reservations"] >= settings["limits"]["campaign_requests"]:
+                st.info("本批已关闭、过期或额度已用尽，历史可继续查看。")
+                return
+        except (OSError, KeyError, ValueError):
+            st.error("真实批次配置或账本校验失败，当前只读。")
+            return
     draft = store.draft(sid)
     key = "composer-" + sid
     def edit(): store.edit_draft(sid, st.session_state[key])

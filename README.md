@@ -57,7 +57,9 @@ shared budgets and explicit paid approval. Engineering/source and synthetic
 protocol checks do not establish answer quality. The independent
 [G4 Mock chat](docs/research/clean-generation-g4-20261114.md) adds same-chat local
 history, context/corrections, citation/Parent viewing and a Streamlit interface.
-Remote dialogue, autonomous research and default adoption retain separate gates.
+The opt-in [finite real-QA chain](docs/research/clean-generation-g4-live-20261114.md)
+connects real S0/BGE and the G3 adapter under a separate expiring campaign permit.
+Mock remains the chat default; autonomous research and default adoption retain separate gates.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The retained Phase04 implementation extends the historical adopted Block A over the accepted

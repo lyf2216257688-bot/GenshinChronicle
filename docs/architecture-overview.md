@@ -129,12 +129,15 @@ have separate authority and are reconciled on resume. New Generation Chat
 modules decode native tools and JSON/SSE under exact-route capability manifests;
 a separately approved finite synthetic probe archives raw bytes, usage and tool
 receipts. Only complete locally validated tool batches can execute. G4 adds an
-independent Mock-only Streamlit frontend and background local executor over a
+independent Streamlit frontend and background local executor over a
 fixed chain, with same-chat durable history, typed corrections and extractive
 context indexes. Citation addresses include turn and Packet identity; source-bound
 Parent receipts remain viewable. Restart displays saved work and requires explicit
 continuation. No cross-chat Store, cloud tracing, adopted default frontend or
-automatic live dispatch is introduced.
+automatic live dispatch is introduced. Mock is the entry default. Explicit finite
+G4 live mode reuses S0/BGE, source Assembly and G3's unchanged sender/shared caller;
+all chats share its expiring campaign budget. Literal user context can accompany
+follow-up queries; this fixed chain adds no autonomous research controller.
 This independent workbench does not migrate the retained Phase04 backend/UI.
 
 ### 2. Preserved Parsed baseline

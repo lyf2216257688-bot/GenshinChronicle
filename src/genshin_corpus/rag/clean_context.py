@@ -75,7 +75,7 @@ def organize(store, tid, *, history_bytes, recent_turns, excerpt_chars, protocol
 
 
 def assembly_context(turn, context):
-    return {"system": SYSTEM, "question": turn["question"],
+    return {"system": context.get("system", SYSTEM), "question": turn["question"],
             "conversation": {"recent": context["recent"], "summary": context["summary"],
                              "research_state": context["research_state"]},
             "tools": context["tools"], "protocol_history": context["protocol_history"]}
