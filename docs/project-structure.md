@@ -7,6 +7,17 @@ G1 Mock checkpoint graph; `model_call_sessions.py` bridges fixed campaign/turn
 budgets to the unchanged shared caller. `rag/clean_cli.py` is the Mock entry;
 `rag/clean_local.py` is the finite local query/Packet entry. Neither changes legacy
 CLI/UI defaults or implements a chat/research controller.
+G4 adds `rag/clean_conversation.py` for chat/message/note/draft records,
+`clean_context.py` for per-chat extractive context organization and correction
+invalidation, `clean_conversation_graph.py` for the recoverable fixed Mock chain,
+`clean_executor.py` for the application-owned supervisor and Job-owned
+`clean_turn_worker.py` child, and
+`clean_mock.py` for tiny synthetic corpus/hits/scores/SSE material. The explicit
+CLI is `rag/clean_conversation_cli.py`; `ui/clean_chat_app.py` is its independent
+opt-in Streamlit presentation. Both expose Mock only, without changing G3 or
+the shared core. `requirements-py314-generation-ui.lock` adds compatible pinned
+UI dependencies over the unchanged framework lock. These modules do not
+implement the G5 autonomous research controller or switch legacy defaults.
 `retrieval/clean_based/query_v2.py`, `runtime_v2.py`, `worker_v2.py`, `rerank_v2.py`
 and `rerank_worker_v2.py` adapt research query identity, selected S0/BGE and
 process-owned GPU rotation without modifying frozen kernels. `generation/clean_evidence.py`

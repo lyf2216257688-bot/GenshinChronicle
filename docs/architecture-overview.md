@@ -128,8 +128,13 @@ shared caller. Checkpoint progress and immutable dispatch/accounting evidence
 have separate authority and are reconciled on resume. New Generation Chat
 modules decode native tools and JSON/SSE under exact-route capability manifests;
 a separately approved finite synthetic probe archives raw bytes, usage and tool
-receipts. Only complete locally validated tool batches can execute. No cross-chat Store,
-cloud tracing, adopted chat frontend or automatic live dispatch is introduced.
+receipts. Only complete locally validated tool batches can execute. G4 adds an
+independent Mock-only Streamlit frontend and background local executor over a
+fixed chain, with same-chat durable history, typed corrections and extractive
+context indexes. Citation addresses include turn and Packet identity; source-bound
+Parent receipts remain viewable. Restart displays saved work and requires explicit
+continuation. No cross-chat Store, cloud tracing, adopted default frontend or
+automatic live dispatch is introduced.
 This independent workbench does not migrate the retained Phase04 backend/UI.
 
 ### 2. Preserved Parsed baseline

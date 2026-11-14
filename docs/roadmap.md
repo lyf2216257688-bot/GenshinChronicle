@@ -30,7 +30,9 @@ ordering adoption remain operator decisions. The opt-in
 versioned new-question S0/BGE wiring and Clean Packet assembly without taking over
 discovery or ordering. A separate native Chat adapter and finite synthetic
 capability probe keep exact-route evidence and paid approval explicit.
-Chat/research functionality and adoption retain their separate stage gates.
+G4 adds same-chat persistence, extractive context organization, corrections and an
+independent fixed-chain Mock chat/Streamlit interface. Remote dialogue, autonomous
+research and adoption retain their separate stage gates.
 Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

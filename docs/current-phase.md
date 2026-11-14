@@ -4,7 +4,26 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G3 ordinary native tools/SSE observed; thinking open (2026-11-14)
+## 0. Current work — G3/G4 integrated on main (2026-11-14)
+
+The operator explicitly authorized separate G3/G4 commits, their merge into main,
+and push to origin/main. G3 continuation is committed as `e090cd0`; G4 offline
+engineering and final audit repairs are committed as `7953d78` on
+`codex/g4-offline`. Their formal deliverables are integrated on main; future
+work uses the primary checkout, without depending on the G4 worktree or runtime.
+This Git authorization adds no paid call, G5–G7, default switch or data rebuild.
+
+G4 provides persistent same-chat Mock conversation, extractive context/corrections,
+source/Parent citations, a Job-owned local executor and opt-in Streamlit UI.
+The final audit repaired three cancel/checkpoint/submit-token defects; its 34 G4
+checks and 8 G3 overlay checks passed before integration. The
+[G4 implementation](research/clean-generation-g4-20261114.md) and
+[final audit](research/clean-generation-g4-final-audit-20261114.md) retain those
+historical checkpoints. The [Git integration report](research/clean-generation-g34-git-close-20261114.md)
+owns merge/verification receipts. Optional UI dependencies preserve the original
+framework pins; 116 integrated main checks plus 20 shared-core regressions pass,
+with pip check and 439 exact baseline file hashes unchanged. No legacy selector changed. This remains Mock engineering,
+not semantic acceptance or permission to run real continuous QA.
 
 The operator authorized G0–G2 under the confirmed
 [Generation Plan](research/clean-generation-implementation-plan-20261114.md),
@@ -25,10 +44,9 @@ The [G3 report](research/clean-generation-g3-20261114.md) and
 own those receipts and limits. The original G0–G3 commits were subsequently
 authorized and pushed; this historical permission does not authorize new Git work.
 
-The operator now requests G3 Live continuation with native tools first and SSE
-next, explicitly separating the unresolved thinking capability. G4 is being
-advanced in another independent worktree according to the operator; this work
-does not inspect, modify or merge its implementation. G5–G7 are not implemented
+The subsequent G3 Live unit tested native tools first and SSE next, separately
+from the unresolved thinking capability. Its work was independent of G4; the
+subsequently authorized Git integration combines both formal deliverables. G5–G7 are not implemented
 by this work unit. D01–D24, exact TokenMetro / `deepseek-v4.1-flash-1017` Chat route,
 upstream ownership and legacy defaults remain fixed. No JSON fallback is enabled.
 
@@ -469,7 +487,7 @@ valuable comparison/rollback artifacts.
 ## 3. Immediate next action and remaining V1 gaps
 
 Follow the Generation scope and next gate in section 0 and the
-[G0–G2 handoff](research/clean-generation-g0g2-20261114.md). The
+[G3/G4 integration](research/clean-generation-g34-git-close-20261114.md). The
 [Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
 is a preserved completed-stage reference.
 The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
@@ -565,6 +583,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
 | G3 tools-first approved Live run, scoped native tools/SSE capability, audit and remaining gaps | [`G3 tools/SSE Live`](research/clean-generation-g3-tools-live-20261114.md) |
+| G3 offline protocol, finite Live stop and capability limits | [`Generation G3`](research/clean-generation-g3-20261114.md) |
+| G4 local Mock dialogue, context, UI, recovery and merge conditions | [`Generation G4`](research/clean-generation-g4-20261114.md) |
 | Clean-based Reranking and Python 3.14 migration contract | [`Reranking V1`](phases/clean-reranking-v1.md) |
 | Historical Reranking preparation and initial diagnostic checkpoints | [`Preparation report`](research/clean-reranking-preparation-20261113.md) |
 | Reranking P0–P1 readiness, actual longest-pair CUDA check and P2 operator commands | [`P0–P1 review`](research/clean-reranking-p0p1-readiness-20261113.md) |

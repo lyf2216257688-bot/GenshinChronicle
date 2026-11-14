@@ -54,8 +54,10 @@ The separate opt-in [Generation workbench](docs/phases/clean-generation-v1.md)
 adds a durable Mock graph and local new-question S0/BGE-to-Packet path.
 Its separate versioned Chat adapter and finite capability probe retain raw-first
 shared budgets and explicit paid approval. Engineering/source and synthetic
-protocol checks do not establish answer quality; chat UI, autonomous research
-and default adoption retain separate gates.
+protocol checks do not establish answer quality. The independent
+[G4 Mock chat](docs/research/clean-generation-g4-20261114.md) adds same-chat local
+history, context/corrections, citation/Parent viewing and a Streamlit interface.
+Remote dialogue, autonomous research and default adoption retain separate gates.
 The direct Raw adapter, evidence locators, resumable builder and readers remain
 specified in the [Clean contract](docs/phases/clean-v1.md).
 The retained Phase04 implementation extends the historical adopted Block A over the accepted
