@@ -23,7 +23,7 @@ decision record; this contract and current-phase own the adopted revision.
 | D06 | Target consequential gaps; allow bounded conclusions and unresolved questions. |
 | D07 | Expand reading within proven source handles, including complete natural Parents. |
 | D08 | Retrieval discovers; Reranking orders; Generation validates selections and assembles Packets. |
-| D09 | S0/F1_max; retain Sparse/S1/S2; no automatic routing or fusion tuning. |
+| D09 | S0/F1_max default; explicit frozen S2 opt-in under G6; retain S1 assets; no automatic routing or fusion tuning. |
 | D10 | Preserve original question; optional rewrites/subquestions require recorded gaps and ancestry. |
 | D11 | Necessary main-question research only; record incidental unresolved questions. |
 | D12 | Query-local ranking, intermediate evidence retained, no cross-query logit comparison. |
@@ -50,7 +50,7 @@ does not authorize calls.
 `rag/clean_*` owns the opt-in local orchestration skeleton. `model_call_sessions`
 bridges GC `model_calls.run/Policy/Batch`; it is not a second sender or retry policy.
 `retrieval/clean_based/*_v2` owns versioned queries, local workers and selected
-S0/BGE ordering. `generation/clean_*` owns verified reads, fragment selection,
+S0 or explicit S2/BGE ordering. `generation/clean_*` owns verified reads, fragment selection,
 provider-neutral Packet composition and later new Chat adaptation. No seventh layer.
 
 Default configurable root: `data/generation/clean-v1-local/`. `sessions.sqlite`
@@ -419,6 +419,68 @@ stop without an extra summary request. UNKNOWN, source/identity/usage/ledger or
 transport failures never become argument feedback or automatic retries. Live
 integrity exceptions close the campaign and preserve the interrupted checkpoint.
 
+## G6 optional Sparse/S2 contract
+
+S0 remains the retrieval default. V2 queries may explicitly select S2; original
+and enhanced queries in one chat retain its fixed combination. The model's tool
+schema cannot choose a combination. This adds no dynamic LLM routing or S1 path.
+`config/clean-generation-s2-v1.json` references the unchanged P4 selection and
+validated full Sparse manifest. `sparse_v2.py` binds those hashes, shared input,
+counts and independent P3 validation; the worker reuses `StreamingSparseSession`
+and `SparseEncoder`, admitted through the unchanged Python migration certificate.
+No index or frozen math/selection is modified. S2 fixes Dense .5, BM25F .25,
+Sparse .25, depth50 per route, candidate_limit100, rrf_k60, F1_max and structural
+cleanup. S0 retains BM25F/Dense .5/.5. Changes fail closed; there is no tuning API.
+
+Every channel keeps scores, route/rank, representation, Chunk/source mapping,
+weights and complete fusion dispositions. The complete selected set is scored
+with the selected BGE-v2-m3/2048-token/no-truncation policy before Assembly.
+Dense, BM25F, Sparse and BGE workers run serially with confirmed process exit;
+the read-only Sparse shards are streamed without a new index. No partial scoring
+or Sparse failure falls back to S0 or bypasses source verification.
+
+`clean_local query --combination S2` is the finite offline entry; the research
+CLI uses an explicit `prepare --stage g6` and `new --combination S0|S2`.
+G6 permits share one campaign across both immutable chat settings and admit at
+most20 attempts, zero implicit retries/UNKNOWN resend, 2–6 requests per turn,
+196608 conservative tokens/request and the existing dynamic roles/time/tools.
+Preparation may explicitly reduce the per-turn request limit for matched tests.
+The conservative list-price risk ceiling is USD5; actual billing remains separate.
+This schema ceiling grants no standing authorization. Old G5 ceilings and closed
+permits stay unchanged; code changes cannot reopen historical campaigns.
+
+Offline comparison may reuse a historical BGE score only for the exact query,
+Chunk/source text, selected score binding and pair budget, retaining source seals
+and per-pair reuse provenance. New/missing pairs are scored separately; the merged
+complete audit is explicitly identified as replay plus new inference. Replaying
+historical recall is not a fresh retrieval run; verify live local wiring separately.
+Candidate-ID novelty is not semantic gain. Compare unique Sparse evidence,
+BM25F reweighting, candidate-limit/fusion changes, BGE order, Packet disposition
+and unedited final answers independently. Added and lost useful evidence may
+coexist. S2 adoption requires the operator's decision; G6 does not imply G7.
+
+### G6 bounded S0-preserving offline study
+
+The separately authorized two-case follow-up uses an isolated research helper,
+`rag/clean_sparse_study.py`, and `scripts/retrieval/study_s0_sparse.py`.
+It preserves every S0 candidate and fusion value, admits the exact-cached subset
+of Sparse identities absent from BOTH fixed Dense/BM25F raw windows, and reuses
+the selected joint BGE/structural ordering without a new top100 cut. Cache
+availability is explicitly accounted for, not interpreted as evidence relevance.
+This study pool is not a new V2 combination or production configuration.
+
+Fixed first6, first48 diagnostic, and S0-first6 plus Sparse-only read policies
+separate read availability from budget/ordering. A residual-admission diagnostic
+protects the exact same-context/budget S0 Packet's fragment content, then tests
+Sparse supplements in joint BGE order; emitted Packets retain that order.
+Protection does not freeze citation numbering, rescue evidence excluded by S0,
+guarantee room for supplements, or predict new model selections/answers.
+Fixed-budget Assembly is evaluated separately from the existing G5 full-request
+guard and its 2048-step admission reduction; every effective cap is recorded.
+After that guard, protection must still retain the original baseline content.
+All input/failed admissions remain auditable. No new inference, paid request,
+default adoption, frozen fusion change or G7 is part of this study.
+
 ## G4 finite remote fixed chain
 
 `rag/clean_live.py` owns finite campaign preparation/admission and a lazy wrapper
@@ -471,6 +533,7 @@ It does not create standing authorization. G5–G7 and default adoption remain s
 | G3 | Offline fragmentation/tool/error/recovery fixtures; separately approved finite live probe, sealed raw/usage/tool evidence and scoped capability report. |
 | G4 | Full Mock multi-turn/reopen/isolation, context/corrections, idempotent submission, real progress, turn-scoped citations/Parent, cancel/shutdown/recovery and UI fixtures. Real remote dialogue additionally needs matching G3 capability evidence and current batch authorization. |
 | G5 | Original/rewritten/subquestion/Step-Back/counterevidence query lineage; bounded native tool loop; query-local ordered Packet; no-gain/budget/partial stops; tool/call/checkpoint replay, cancel, source isolation and same-chat research/corrections. Real observations require a new finite G5 permit. |
+| G6 | Frozen opt-in S2 streaming/V2/BGE/Assembly; independent S0; bounded old70Q reuse, real source/Packet/answer gains and losses; new finite shared authorization; operator decides adoption. |
 
 Tests use small checked-in fixtures. Real local asset checks are explicit opt-in
 and use new output roots. Engineering PASS is never final question-answer quality

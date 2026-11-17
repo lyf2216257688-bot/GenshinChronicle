@@ -1,4 +1,4 @@
-"""Finite new-query S0/BGE wiring, independent of saved 70Q score directories."""
+"""Finite S0 or explicit frozen S2/BGE wiring, independent of saved 70Q scores."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 import ctypes
@@ -11,9 +11,9 @@ import time
 from ...evidence_io import digest, read, require, seal, sha, strict_json, write
 from ...indexing.benchmark_io import child_process, disk_guard, resources
 from ...model_calls import locked
-from .core import validate_profile
 from .indexes import selected
-from .query_v2 import fuse_v2, validate_ancestry
+from .query_v2 import fuse_v2, validate_ancestry, validate_profile_v2
+from .sparse_v2 import selected_sparse
 from .rerank_handoff import validate_selection
 from .rerank_v2 import rank_v2, scoring_input
 from .runtime import validate_output
@@ -24,7 +24,7 @@ def code_identity():
     folder = Path(__file__).parent
     return {p.name: sha(p) for p in [folder / n for n in
         ("runtime_v2.py", "worker_v2.py", "query_v2.py", "rerank_v2.py", "rerank_worker_v2.py",
-         "core.py", "rerank_core.py", "rerank_model.py", "indexes.py", "source.py")]}
+         "sparse_v2.py", "core.py", "rerank_core.py", "rerank_model.py", "indexes.py", "source.py")]}
 
 
 def wait_pid(pid):
@@ -102,17 +102,19 @@ class LocalPipeline:
         self.repo, self.output = Path(repo).resolve(), Path(output).resolve()
         self.config_path, self.selection_path = Path(config_path).resolve(), Path(selection_path).resolve()
         self.config = read(self.config_path); self.selection = validate_selection(read(self.selection_path))
-        validate_profile(self.config)
-        require(self.config["combination"] == "S0" and self.config["fusion"] == "f1_max"
-                and self.config["structural_cleanup"], "Selected S0 profile required")
+        validate_profile_v2(self.config)
         validate_output(self.repo, self.config, self.output)
-        self.output.mkdir(parents=True, exist_ok=False)
-        disk_guard(self.output, self.config)
         self.worker_factory, self.binding = worker_factory, FileBinding()
         self.binding.bind(self.config_path); self.binding.bind(self.selection_path)
         self.code = code_identity()
         self.resources = []
         _, self.manifests = selected(self.repo, self.config)
+        if self.config["combination"] == "S2":
+            self.manifests["sparse"] = selected_sparse(self.repo, self.config, self.manifests["dense"][1], self.binding)
+            root = self.manifests["sparse"][0].parent.resolve()
+            require(self.output != root and not self.output.is_relative_to(root), "Output inside Sparse index")
+        self.output.mkdir(parents=True, exist_ok=False)
+        disk_guard(self.output, self.config)
         self.reader = InputReader(self.manifests["dense"][1]["input_manifest"])
         try:
             require(self.reader.bundle_id == self.selection["input_bundle_id"], "Foreign Reader/selection")
@@ -121,11 +123,13 @@ class LocalPipeline:
 
     def run(self, query, *, parents=(), evidence_refs=(), verify_reference=False):
         validate_ancestry(query, parents, evidence_refs)
+        validate_profile_v2(self.config, query.combination)
         self.binding.check(); started = time.perf_counter(); hits = []
         # Repo-wide GPU lock also protects independent workbench roots.
         with locked(self.repo / ".local/clean-generation-gpu.lock"):
-            for channel in ("dense", "bm25f"):
-                python = self.config["dense_python" if channel == "dense" else "lexical_python"]
+            channels = ("dense", "bm25f", "sparse") if query.combination == "S2" else ("dense", "bm25f")
+            for channel in channels:
+                python = self.config["lexical_python" if channel == "bm25f" else "dense_python"]
                 args = ["--repo", str(self.repo), "--config", str(self.config_path), "--channel", channel,
                         "--scratch", str(self.output / (channel + "-scratch"))]
                 with self.worker_factory(self.repo, python, "genshin_corpus.retrieval.clean_based.worker_v2", args,

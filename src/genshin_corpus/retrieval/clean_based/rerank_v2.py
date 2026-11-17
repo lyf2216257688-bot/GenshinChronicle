@@ -5,7 +5,7 @@ from pathlib import Path
 import platform
 
 from ...evidence_io import digest, require, sha
-from .query_v2 import ResearchQuery
+from .query_v2 import ResearchQuery, validate_profile_v2
 from .rerank_core import ranked_candidates
 from .rerank_handoff import PROFILES, validate_selection
 
@@ -18,8 +18,7 @@ def validate_candidates(value, selection):
     require(value["query_digest"] == digest(query.value()), "Query digest changed")
     require(value["input_bundle_id"] == selection["input_bundle_id"], "Foreign input bundle")
     profile = value["profile"]
-    require(profile["combination"] == "S0" and profile["fusion"] == "f1_max" and profile["structural_cleanup"] is True,
-            "Selected recall profile changed")
+    validate_profile_v2(profile, query.combination)
     ids = [c["chunk_id"] for c in value["candidates"]]
     require(len(set(ids)) == len(ids) and bool(ids) == (value["status"] == "complete"), "Invalid candidate status/identity")
     for c in value["candidates"]:

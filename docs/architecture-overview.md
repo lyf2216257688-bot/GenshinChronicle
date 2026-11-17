@@ -144,7 +144,10 @@ selection, counterevidence and stopping state; Generation deterministically
 assembles query-local ordered groups into a final Packet. All remote steps reuse
 G3/shared accounting and bounded same-chat persistence. The separate expiring G5
 permit cannot reopen G4 allowances. CPU readers can be reused within a turn while
-GPU workers retain serial leases and confirmed exit. G6/G7 are separate gates.
+GPU workers retain serial leases and confirmed exit. G6 adds explicit frozen
+S2 selection over existing streaming Sparse shards, V2 ordering and the same
+Assembly/controller/caller. Each chat fixes S0 or S2; no model routing or fusion
+tuning is introduced. The operator separately decides adoption; G7 remains gated.
 The official-channel adoption selects manifest-bound DeepSeek endpoints and
 per-role thinking/output policy from `config/clean-generation-v1.json`, without
 moving layer ownership. Explicit model-requested analysis starts after a sealed

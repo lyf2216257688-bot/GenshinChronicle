@@ -124,13 +124,16 @@ remain unchanged. This is a scoped diagnostic exception, not automatic fallback.
 adds immutable session/turn/campaign mapping, turn limits at every reservation,
 cancel/admission sequencing and zero-network derived-receipt reconciliation.
 G1's entry point enforces `offline_only`; it cannot send to the future route.
-The local V2 S0/BGE workers use existing selected models and migrated runtimes,
+The local V2 S0 or explicit G6 S2/BGE workers use existing selected models and migrated runtimes,
 with source/score/query bindings and GPU process rotation. They perform local
 inference, not paid requests. The new orchestration lock pins LangGraph and
 SQLite-checkpoint dependencies independently of ML environments. Transitive
 LangSmith components are not a cloud service dependency: tracing is disabled
 and Mock tests prohibit socket connections. Legacy catalog entries and provider
-defaults remain unchanged.
+defaults remain unchanged. G6 reuses the validated streaming Sparse index and
+frozen P4 weights; its explicit permit shares at most20 attempts across S0/S2
+chats under the same caller, dynamic roles and strict UNKNOWN policy. This
+separate schema ceiling cannot expand a G5 permit or authorize a future campaign.
 
 ## Shared model-call execution (2026-10-30)
 

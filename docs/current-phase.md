@@ -4,7 +4,139 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G5 engineering closed; local Git closure authorized (2026-11-15)
+## 0. Current work — G6 S0-preserving offline study complete; S0 retained (2026-11-17)
+
+The operator's bounded follow-up is complete. The
+[offline study report](research/clean-generation-g6-s0-sparse-offline-study-20261117.md)
+owns results and limitations. An isolated helper retains all100 S0 candidates
+and fusion values, adds12/11 exact-cached raw Sparse-only candidates for
+Q046/Q050, and jointly reuses BGE ordering. Q050 has26 further unscored unique
+identities outside this comparison; they remain recorded, not deemed useless.
+
+The protected residual-admission diagnostic retains every S0 first6 baseline
+Packet fragment (initial4/3 and final6/6), and delivers Q050's explicit
+`大调律师优恩尼娅` text in a request-envelope-valid final Packet. It rejects
+the longer Cassiodor dialogue; Q046's new gift still does not fit its protected
+Packet. Direct candidate merging reproduces the Q046/S2 first6 losses.
+An exact historical Q046 replay shows that removing ONLY restrictive model
+selection restores both shared identity and Sparse gift evidence at the same
+final budget/context. The main bottlenecks are Assembly/read visibility and
+selection, not a demonstrated need for further fusion tuning.
+
+72 distinct related checks and121 fresh source-receipt readbacks pass.
+Fixed-budget Assembly and existing-G5 envelope/admission-shrink replay are
+separate sealed comparisons; all32 latter request envelopes pass. No new
+answer, BGE inference or API request was made. Prior G6 Live trees, original
+UNKNOWNs, closed permits, indexes, frozen math/config and defaults remain intact.
+This is not G7, semantic answer acceptance or production adoption.
+
+**Next:** operator review. Retain S0; prefer a separately scoped investigation
+of selection coverage and structure-preserving budget admission over further
+fusion tuning or DeepSeek Sparse routing. This completed offline unit grants
+no new paid dispatch, index rebuild, G7, Git commit/push or default switch.
+
+The operator subsequently authorized a local Git commit of the completed G6
+implementation, offline study, tests and documentation. Ignored credentials and
+generated runtime evidence remain excluded; push is not authorized.
+
+### Historical G6 engineering/Live closure; S0 retained (2026-11-17)
+
+G6 offline engineering and bounded review are complete. The recommendation is
+**retain S0; keep Sparse/S2 as a research capability, pending the operator's
+adoption decision**. Explicit frozen S2 reaches V2/BGE/Assembly;163 distinct
+related checks, the fresh local S2 chain and657 protected preexisting tracked
+file hashes pass. No frozen math/index/default or dynamic retrieval routing changed.
+The [G6 report](research/clean-generation-g6-implementation-live-20261117.md)
+owns evidence, raw answers, per-stage losses and finite limitations.
+
+Final total is14/20 attempts:12 complete known responses,2 immutable original
+UNKNOWNs, and2 explicitly authorized origin retries included in that total.
+Known usage273,806 tokens (269,825 input /3,981 output); known-part list-price
+estimate USD0.046416132, using each raw SSE timestamp's actual peak/off-peak
+period. Total usage/fee and actual account charge remain UNKNOWN. All three
+ordinary permits remain closed; the6 unused attempts are closed with them.
+Both explicit recoveries are sealed and can only replay. No further dispatch,
+retry, permit reopening, replacement operation or allowance reset is authorized.
+
+Q046's ordinary pair is a real regression: S0 names `卡莉露`; S2 only says
+spring fairy. Both initially excluded the long identity text; S0's final full
+budget restores it, while S2's model selection excludes both that shared identity
+and the valid Sparse-only gift text. Novel candidates did not reach the answer.
+Q007's recovery-linked synthesis gives the same birthday answer, with its old
+partial/UNKNOWN history retained. Q050's ordinary S0 enhancement hit a local RAM
+guard. Its matched fixed-Packet comparison is complete after S2's one authorized
+origin recovery: S2 uses new direct dialogue and adds `卡西奥多` as a clue, but
+overstates "served the king together" as confirmed membership among the four.
+The explicit weapon story naming `优恩尼娅` remains outside its Packet.
+Neither answer completes the list; S2 also uses parenthetical E-markers instead
+of required bracketed citations, so its renderer citation list is empty. The raw
+protocol/case statuses and empty-set validator result are retained, not upgraded
+to full G5 citation acceptance. This is not G7, broad adoption or a new UI.
+
+Independent offline audit verifies all14 attempts, both origin recoveries,
+27 fresh source receipts, exact request/raw/SSE/usage, closed predecessor/global
+budgets and zero-call terminal replay. A sealed citation-format supplement marks
+the Q050 limitation explicitly; the earlier13-attempt audit remains historical.
+
+**Next:** operator review of the report and adoption decision. Prefer a separate
+bounded S0-preserving Sparse-only supplementation study before considering model
+routing. Preserve source/answer/UNKNOWN records; no further paid work, tuning,
+upstream rebuild, G7, commit or push is authorized by this closed work unit.
+
+### Historical explicit resume and first origin recovery (2026-11-17)
+
+The operator resumed G6 and explicitly accepted at most ONE potentially
+duplicate-charged retry of the original UNKNOWN, plus remaining bounded G6
+comparisons, with the original **20 cumulative attempts** ceiling unchanged.
+The existing origin-bound helper completed that one retry: CONTENT_VERIFIED /
+native finish(sufficient),11,313 reported tokens. The original UNKNOWN and old
+partial history remain immutable, and the old campaign remains closed.
+Old-root accounting is now5 attempts /57,187 known tokens plus1 UNKNOWN usage.
+Only15 attempts remain globally. Any separately prepared continuation must bind
+that closed predecessor and its5 consumed attempts, never replenish the quota.
+Next: finish the source-bound post-recovery synthesis and Q046/Q050 matched
+S0/S2 comparisons, then independent UNKNOWN-aware audit, costs and final report.
+No new default, fusion tuning, upstream rebuild, G7, commit or push is authorized.
+
+### Historical operator pause and four-attempt checkpoint (2026-11-16)
+
+At that checkpoint the operator explicitly requested a pause until tomorrow;
+automatic resumption was prohibited. G6 offline integration was implemented;9 new G6 tests,
+131 executed Generation regressions (including those9),27 shared/interface
+checks and5 UI checks passed. Two broad-suite loader errors were resolved by
+using the existing SDK-capable interpreter and the correct interface test module;
+no dependency was added. The existing70Q inventory and8 paired offline cases
+are saved under `data/generation/g6-offline-20261116/`;146 missing BGE pairs were
+newly scored, with1454 exact historical pairs reused. A fresh S2 local query,
+all three reference searches,100 BGE pairs and Assembly passed under
+`data/generation/g6-local-s2-20261116/`, with complete ordering equal to replay.
+
+Live root `data/generation/g6-live-20261116/` is closed after **4 counted attempts**:
+Q007/S0 completed in3 known requests /45,874 reported tokens; Q007/S2's first
+request failed with URLError and remains **UNKNOWN**, with no response/usage and
+no retry. It is not a quality loss verdict for S2. Preserve its sealed original
+operation `88af89dfe0e164f4505cfbb9e2cf43d8b55552ee908b9634bfdf71753790d29c`.
+The20-attempt authorization therefore has16 unspent attempts, not a new quota;
+UNKNOWN transmission/token/fee uncertainty is retained. There is no paid S0/S2
+quality conclusion yet. Final G6 audit/report/adoption remain unfinished.
+On explicit resume, read the [pause handoff](research/clean-generation-g6-pause-20261116.md),
+inspect the original UNKNOWN and existing recovery contract before any dispatch.
+Do not reopen the closed permit, replace the failed operation, reset its budget,
+or assume permission for duplicate billing merely from a configured retry policy.
+
+The operator explicitly authorized Astra Plan G6: opt-in frozen Sparse/S2 V2
+wiring, bounded existing-70Q evidence/Packet comparisons and at most **20 new
+DeepSeek official / deepseek-flash requests**, counting failures, retries and
+redispatch. Offline integration/evidence review precedes representative Live QA.
+Use the shared model_calls ledger, dynamic roles, finite token/time limits and
+strict UNKNOWN recovery. No automatic routing, fusion tuning, upstream rebuild,
+default adoption, G7, deletion, Git commit or push is authorized. S0 stays selected;
+final S2 adoption belongs to the operator. G5 is committed as `ea12935`; its closed
+budgets and immutable evidence remain closed. The originally authorized work
+was integration, evidence/Packet tracing, comparable finite QA and a scoped
+report; the operator pause above now controls the immediate next action.
+
+### Historical G5 engineering closure and local Git authorization (2026-11-15)
 
 G5's bounded engineering phase is complete for the selected S0/BGE + DeepSeek
 official / `deepseek-flash` local research chain. The operator's latest criterion
@@ -448,10 +580,13 @@ QA/research run, default switch, commit, push, deletion, upstream rebuild or wor
 
 ### Completed Reranking baseline (2026-11-13)
 
-**Latest operator decision:** pause Sparse use and fusion tuning; use S0
+**At that 2026-11-13 Reranking checkpoint:** pause Sparse use and fusion tuning; use S0
 (BM25F + BGE-M3 Dense) to proceed to Clean-based Reranking. Preserve Sparse,
 S1/S2 and Retrieval P3/P4 evidence. This supersedes the adoption-pending checkpoint below;
 it does not adopt an online Serving path or establish end-to-end quality.
+The original G6 authorization reopened frozen opt-in S2 comparison; its later
+offline follow-up above adds only the isolated S0-preserving supplementation
+study. S0 selection and the prohibition on fusion tuning remain unchanged.
 
 **Authorized implementation:** the operator approved the revised
 [Reranking/Python migration contract](phases/clean-reranking-v1.md): preserve
@@ -945,6 +1080,8 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
 | G5 evidence-value stopping, scoped engineering closure, real questions and limits | [`G5 closure report`](research/clean-generation-g5-stopping-acceptance-20261115.md) |
+| G6 frozen Sparse/S2 wiring, candidate/Packet/answer gains and losses, finite accounting and limitations | [`G6 report`](research/clean-generation-g6-implementation-live-20261117.md) |
+| G6 S0-preserving Sparse-only supplement, fixed Assembly/full-envelope comparisons and selection-loss diagnosis | [`G6 offline follow-up`](research/clean-generation-g6-s0-sparse-offline-study-20261117.md) |
 | G3 tools-first approved Live run, scoped native tools/SSE capability, audit and remaining gaps | [`G3 tools/SSE Live`](research/clean-generation-g3-tools-live-20261114.md) |
 | G3 offline protocol, finite Live stop and capability limits | [`Generation G3`](research/clean-generation-g3-20261114.md) |
 | G4 local Mock dialogue, context, UI, recovery and merge conditions | [`Generation G4`](research/clean-generation-g4-20261114.md) |

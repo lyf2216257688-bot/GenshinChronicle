@@ -235,6 +235,14 @@ feedback, with sufficient/limited/no-gain exits and separate hard guards.
 [Finite G5 engineering closure and limitations](docs/research/clean-generation-g5-stopping-acceptance-20261115.md)
 do not grant standing API allowance or adopt a new default entry.
 
+G6 adds explicit frozen S2 retrieval using the existing Sparse index:
+`python -m genshin_corpus.rag.clean_local query --combination S2` for finite local checks, or
+the `genshin_corpus.rag.clean_research_live` module's `prepare --stage g6`
+followed by `new --combination S2`
+under a newly authorized finite campaign. S0 stays selected; the model cannot
+route and no fusion tuning is exposed. Both combinations reuse BGE and the same
+source/Packet/caller contracts. See the [Generation contract](docs/phases/clean-generation-v1.md#g6-optional-sparses2-contract).
+
 ## Data and secrets
 
 The full Raw corpus is local generated data and is ignored by Git. Small sanitized fixtures required for tests may be committed under `tests/fixtures/`.

@@ -89,6 +89,7 @@ def main(argv=None):
     parser.add_argument("--output-tokens", type=int, required=True)
     parser.add_argument("--thinking-tokens", type=int, required=True)
     parser.add_argument("--verify-reference", action="store_true")
+    parser.add_argument("--combination", choices=("S0", "S2"), default="S0")
     args = parser.parse_args(argv); repo = Path(args.repo).resolve(); output = Path(args.output).resolve()
     require(output.parent == (repo / "data/generation").resolve() and not output.exists(),
             "Output must be a new direct data/generation child")
@@ -96,12 +97,15 @@ def main(argv=None):
     # One workbench process per application root; GPU lock additionally spans roots.
     with locked(repo / "data/generation/clean-v1-local/locks/application.lock"):
         if args.action == "handoff":
+            require(args.combination == "S0", "Saved handoff is S0 only")
             result = handoff_packets(repo, output, args.question_id, budget)
         else:
             require(args.question and not args.question_id, "Provide one new engineering question")
             output.mkdir(parents=True, exist_ok=False)
-            query = ResearchQuery("g2-local-workbench", output.name, "original", args.question, args.question, args.question, args.question)
-            with LocalPipeline(repo, repo / "config/clean-retrieval-v1.json", repo / "config/reranking-selected-v1.json", output / "upstream") as pipeline:
+            query = ResearchQuery("g2-local-workbench", output.name, "original", args.question, args.question, args.question, args.question,
+                                  combination=args.combination)
+            config = "config/clean-generation-s2-v1.json" if args.combination == "S2" else "config/clean-retrieval-v1.json"
+            with LocalPipeline(repo, repo / config, repo / "config/reranking-selected-v1.json", output / "upstream") as pipeline:
                 ranked = pipeline.run(query, verify_reference=args.verify_reference)
                 result = packet_for(ranked, pipeline.reader, output / "assembly", budget)
             write(output / "report.json", result); seal(output)

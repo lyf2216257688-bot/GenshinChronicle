@@ -52,6 +52,7 @@ Thumbs.db
 !/scripts/retrieval/run-clean-reranking.ps1
 !/scripts/retrieval/run-python314-migration.ps1
 !/scripts/retrieval/run-rerank-handoff.ps1
+!/scripts/retrieval/study_s0_sparse.py
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

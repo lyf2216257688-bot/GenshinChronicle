@@ -37,7 +37,10 @@ G5 now adds the bounded single-controller active research loop and evidence-valu
 stopping: sufficient core evidence can finish, unverifiable details remain limited,
 and optional branches need not be exhausted. Its finite engineering closure is
 recorded in the [G5 report](research/clean-generation-g5-stopping-acceptance-20261115.md);
-G6/G7, broad product acceptance and default adoption remain separate gates.
+G6 adds explicit frozen Sparse/S2 through the same V2/BGE/Assembly chain, with
+separate bounded evidence/answer comparison and operator adoption. Dynamic
+routing and fusion tuning remain outside it. G7, broad product acceptance and
+default adoption retain separate gates.
 Retained Phase04 selectors reference
 retired local Qwen assets and are not an operational fallback. Current work-unit
 status is owned by [current-phase](current-phase.md).

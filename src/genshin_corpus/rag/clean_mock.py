@@ -71,19 +71,20 @@ class FixturePipeline:
         self.reader, self.repo = reader, Path(repo)
 
     def run(self, query):
+        from ..retrieval.clean_based.query_v2 import WEIGHTS
         docs = {d["chunk"]["chunk_id"]: d for d in
                 (self.reader.document(i) for i in range(len(self.reader.offsets)))}
         hits = []
         for granularity in ("micro", "macro"):
             members = [d for d in docs.values() if granularity in d["row"]["granularities"]]
             for n, doc in enumerate(members, 1):
-                for channel in ("bm25f", "dense"):
+                for channel in WEIGHTS[query.combination]:
                     hits.append({"question_id": query.turn_id, "query_id": query.query_id, "round": query.round,
                         "kind": query.kind, "channel": channel, "granularity": granularity, "rank": n,
                         "raw_score": 1 / n, "representation_id": "MOCK-" + channel + granularity,
                         "input_row": doc["input_row"], "chunk_id": doc["chunk"]["chunk_id"]})
-        profile = {"combination": "S0", "fusion": "f1_max", "depth": 50, "candidate_limit": 100,
-                   "rrf_k": 60, "channel_weights": {"bm25f": .5, "dense": .5}, "structural_cleanup": True}
+        profile = {"combination": query.combination, "fusion": "f1_max", "depth": 50, "candidate_limit": 100,
+                   "rrf_k": 60, "channel_weights": WEIGHTS[query.combination], "structural_cleanup": True}
         candidates = fuse_v2(query, hits, docs, profile, input_bundle_id=self.reader.bundle_id, code={"mode": "MOCK"})
         selection = deepcopy(read(self.repo / "config/reranking-selected-v1.json"))
         selection["input_bundle_id"] = self.reader.bundle_id

@@ -63,6 +63,25 @@ requests from the same finite authorization. `next-validation/` can hold an
 unapproved request preview; it is not a permit or renewed allowance. Official adoption never renames
 or rewrites old Metro roots, scopes, UNKNOWN allowances or recovered calls.
 
+G6 comparisons use new `generation/` children for a read-only old70Q inventory,
+explicit S0/S2 candidates, exact cached/fresh BGE pair provenance, read receipts,
+Packet dispositions and per-case differences. Finite G6 live roots reuse the
+G5 layout with one shared ledger/permit across S0/S2 chats; no new index is built.
+Historical-recall replay and fresh local retrieval checks are labelled separately.
+Full local source/answers remain ignored data; the research report owns judgments.
+
+`generation/g6-s0-sparse-study-20261117-r3/` owns the completed two-case offline follow-up:
+the unchanged S0 candidate prefix, explicit supplemental pool/joint BGE order,
+fresh source readbacks, common contexts, fixed-read/budget Packets, protected
+residual admission decisions and real-selection replay. Its sealed protocol
+separates cache omissions, unread evidence, budget loss and model selections.
+It contains no new inference, API reservation, production selector or index.
+The first two attempt directories preserve local harness interruptions.
+`generation/g6-s0-sparse-envelope-20261117/` separately owns the existing-G5
+request-envelope guard/admission-reduction replay over those sealed receipts.
+`generation/g6-s0-sparse-review-20261117/` owns the independent summary,
+unscored Q050 source appendix, protection checks and closeout hashes.
+
 G4 adds local `chats`, `chat_jobs`, `chat_messages`, `chat_notes` and
 `chat_drafts` tables in `sessions.sqlite`. `chat_artifacts/<turn>/` owns immutable
 messages, typed note revisions, context indexes, ranked inputs, source/Parent

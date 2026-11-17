@@ -37,7 +37,17 @@ recovery through the unchanged shared caller, preserving the original Batch and
 UNKNOWN accounting; it does not reopen a closed campaign or continue research.
 `retrieval/clean_based/query_v2.py`, `runtime_v2.py`, `worker_v2.py`, `rerank_v2.py`
 and `rerank_worker_v2.py` adapt research query identity, selected S0/BGE and
-process-owned GPU rotation without modifying frozen kernels. `generation/clean_evidence.py`
+process-owned GPU rotation without modifying frozen kernels.
+The G6 `retrieval/clean_based/sparse_v2.py` binds the frozen P4 selection/full
+Sparse index and its independent validation. V2 and research/local CLIs expose
+explicit S0/S2 selection using `config/clean-generation-s2-v1.json`; per-chat
+combination stays fixed and the model cannot route. Both combinations share
+the G6 campaign in the existing research permit/ledger; there is no new sender.
+`rag/clean_sparse_study.py` is an isolated offline diagnostic for unchanged S0
+plus exact-cached raw Sparse-only candidates and protected residual admission.
+`scripts/retrieval/study_s0_sparse.py` replays the two bounded source/Packet cases
+with sockets blocked; neither is connected to production selectors or Live calls.
+`generation/clean_evidence.py`
 owns hash-verified source handles/read receipts, whole-structure fragment IDs and
 provider-neutral Packet admission/dispositions. `generation/clean_chat.py` owns
 versioned Chat manifests, bounded tool schemas and JSON/SSE protocol decoding;

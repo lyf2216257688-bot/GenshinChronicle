@@ -12,14 +12,16 @@ from .clean_research import VERSION, TOOLS, code_identity, fixture_settings, ver
 
 
 def validate_settings(s):
-    if s.get("generation_profile") in {"gc-g5-official-2", "gc-g5-official-3", "gc-g5-official-4"}:
-        revised = s["generation_profile"] in {"gc-g5-official-3", "gc-g5-official-4"}
+    g6 = s.get("generation_profile") == "gc-g6-official-1"
+    require(s.get("retrieval_combination", "S0") in ({"S0", "S2"} if g6 else {"S0"}), "EXPLICIT_G6_REQUIRED_FOR_S2")
+    if s.get("generation_profile") in {"gc-g5-official-2", "gc-g5-official-3", "gc-g5-official-4", "gc-g6-official-1"}:
+        revised = s["generation_profile"] in {"gc-g5-official-3", "gc-g5-official-4", "gc-g6-official-1"}
         require(s.get("engine") == VERSION and s.get("mode") == "LIVE"
             and s.get("route") == DEFAULT_ROUTE and s.get("thinking") == "dynamic", "G5_OFFICIAL_SCOPE_REQUIRED")
         l = s["limits"]
         require(set(l) == {"campaign_requests", "campaign_tokens", "turn_requests", "turn_tokens"}
             and all(type(v) is int and v > 0 for v in l.values())
-            and l["campaign_requests"] <= (10 if revised else 8) and 2 <= l["turn_requests"] <= 6
+            and l["campaign_requests"] <= (20 if g6 else 10 if revised else 8) and 2 <= l["turn_requests"] <= 6
             and s["context_tokens"] <= 196608
             and l["campaign_tokens"] == l["campaign_requests"] * s["context_tokens"]
             and l["turn_tokens"] == l["turn_requests"] * s["context_tokens"], "FINITE_OFFICIAL_LIMITS_REQUIRED")
@@ -32,12 +34,12 @@ def validate_settings(s):
             "research_seconds": 3600, "feedback_bytes": 40000, "history_bytes": 24000,
             "recent_turns": 2, "excerpt_chars": 160}
         require(all(type(s.get(k)) is int and 0 < s[k] <= v for k,v in bounds.items()), "OFFICIAL_HARD_LIMIT_REQUIRED")
-        ceiling = 2.5 if revised else 2
+        ceiling = 5 if g6 else 2.5 if revised else 2
         require(s.get("fee_risk_usd") == ceiling and l["campaign_tokens"] * 1.2 / 1000000 <= ceiling,
                 "OFFICIAL_LIST_PRICE_RISK_CEILING")
         if revised: require(type(s.get("tool_error_corrections")) is int and 0 <= s["tool_error_corrections"] <= 2,
                             "FINITE_TOOL_CORRECTIONS_REQUIRED")
-        if s["generation_profile"] == "gc-g5-official-4":
+        if s["generation_profile"] in {"gc-g5-official-4", "gc-g6-official-1"}:
             require(s.get("stop_policy") == "evidence-value-1", "G5_STOP_POLICY_CHANGED")
         return
     require(s.get("engine") == VERSION and s.get("mode") == "LIVE" and s.get("thinking") == "disabled",
@@ -55,8 +57,10 @@ def validate_settings(s):
     require(all(type(s.get(k)) is int and 0 < s[k] <= v for k, v in bounds.items()), "G5_LIMIT_INCREASE_REJECTED")
 
 
-def prepare(store, repo, authorization, *, requests=8, seconds=7200):
-    require(type(requests) is int and 0 < requests <= 10 and type(seconds) is int and 0 < seconds <= 7200
+def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5", turn_requests=None):
+    require(stage in {"g5", "g6"}, "Unknown preparation stage")
+    require(type(requests) is int and 0 < requests <= (20 if stage == "g6" else 10)
+            and type(seconds) is int and 0 < seconds <= 7200
             and isinstance(authorization, str) and authorization.strip(), "FINITE_AUTHORIZATION_REQUIRED")
     repo = Path(repo).resolve()
     config = read(repo / "config/clean-generation-v1.json")
@@ -70,8 +74,14 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200):
         "max_searches": 6, "max_tools": 16, "max_rounds": 5, "max_reads": 48, "research_seconds": 3600,
         "feedback_bytes": 40000, "fee_risk_usd": 2.5, "tool_error_corrections": config["tool_error_corrections"],
         "stop_policy": config["stop_policy"]}
+    if stage == "g6":
+        settings.update(generation_profile="gc-g6-official-1", retrieval_combination="S0",
+                        campaign="g6-official-" + digest(str(store.root))[:20], fee_risk_usd=5)
+    per_turn = min(6, requests) if turn_requests is None else turn_requests
+    require(type(per_turn) is int and 2 <= per_turn <= min(6, requests)
+            and (turn_requests is None or stage == "g6"), "FINITE_G6_TURN_LIMIT_REQUIRED")
     settings["limits"] = {"campaign_requests": requests, "campaign_tokens": requests * settings["context_tokens"],
-        "turn_requests": min(6, requests), "turn_tokens": min(6, requests) * settings["context_tokens"]}
+        "turn_requests": per_turn, "turn_tokens": per_turn * settings["context_tokens"]}
     validate_settings(settings)
     evidence = repo / "data/generation/g5-official-diagnostic-20261114/call"
     verify(evidence)
@@ -99,6 +109,11 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200):
         "max_attempts": 1, "unknown_retries": 0, "format_retries": 0,
         "fee_control": "requests_and_conservative_tokens_actual_fee_unknown",
         "profile_status": "G5_NEW_SCHEMA_PROMPT_FINITE_VALIDATION_AUTHORIZED"}
+    if stage == "g6":
+        permit["retrieval_combinations"] = ["S0", "S2"]
+        permit["profile_status"] = "G6_PAIRED_S0_S2_FINITE_VALIDATION_AUTHORIZED"
+        for name in ("config/clean-generation-s2-v1.json", "config/recall-experiment-v1.json"):
+            permit["assets"][name] = sha(repo / name)
     put(store.root / "live/permit.json", permit)
     ResearchSessions(store, settings["campaign"], settings["limits"], permit=permit)
     return settings
@@ -108,7 +123,11 @@ def permit_for(store, settings):
     validate_settings(settings)
     require((store.root / "live/permit.json").is_file(), "G5_FINITE_PERMIT_REQUIRED")
     p = read(store.root / "live/permit.json")
-    require(p["version"] == VERSION and p["settings"] == settings and p["data_root"] == str(store.root)
+    expected = settings
+    if settings.get("generation_profile") == "gc-g6-official-1":
+        require(p.get("retrieval_combinations") == ["S0", "S2"], "G6_COMBINATIONS_CHANGED")
+        expected = {**settings, "retrieval_combination": "S0"}
+    require(p["version"] == VERSION and p["settings"] == expected and p["data_root"] == str(store.root)
             and p["campaign"] == settings["campaign"] and p["live_enabled"] is True, "G5_PERMIT_SCOPE_CHANGED")
     revision = store.root / "live/code-revision"
     if revision.exists():
@@ -206,6 +225,9 @@ class ResearchPipeline:
         return self._reader.reader
 
     def run(self, query, *, parents=(), evidence_refs=()):
+        settings = self.store.chat(self.store.turn(self.tid)["session"])["settings"]
+        require(query.combination == settings.get("retrieval_combination", "S0"), "RESEARCH_COMBINATION_CHANGED")
+        config = "config/clean-generation-s2-v1.json" if query.combination == "S2" else "config/clean-retrieval-v1.json"
         output = self.store.root / "local_queries" / self.tid / query.query_id
         if output.exists():
             verify(output); result = read(output / "ranked.json")
@@ -214,7 +236,7 @@ class ResearchPipeline:
         start = time.perf_counter()
         self.worker_timings.clear()
         if self.pipeline is None:
-            self.pipeline = LocalPipeline(self.repo, self.repo / "config/clean-retrieval-v1.json",
+            self.pipeline = LocalPipeline(self.repo, self.repo / config,
                 self.repo / "config/reranking-selected-v1.json", output,
                 worker_factory=lambda *a, **kw: TimedWorker(self.worker_timings, *a, **kw))
         else:
@@ -263,7 +285,10 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="action", required=True)
     prep = sub.add_parser("prepare"); prep.add_argument("--authorization", required=True)
     prep.add_argument("--requests", type=int, default=8)
+    prep.add_argument("--stage", choices=("g5", "g6"), default="g5")
+    prep.add_argument("--turn-requests", type=int)
     new = sub.add_parser("new"); new.add_argument("--title", default="原神主动研究")
+    new.add_argument("--combination", choices=("S0", "S2"), default="S0")
     submit = sub.add_parser("submit"); submit.add_argument("--session", required=True)
     submit.add_argument("--token", required=True); submit.add_argument("--question", required=True)
     submit.add_argument("--note-kind"); submit.add_argument("--run", action="store_true")
@@ -272,8 +297,15 @@ def main(argv=None):
     a = parser.parse_args(argv)
     from .clean_conversation import ConversationStore
     store = ConversationStore(a.root)
-    if a.action == "prepare": value = prepare(store, a.repo, a.authorization, requests=a.requests)
-    elif a.action == "new": value = store.create_chat(a.title, read(store.root / "live/permit.json")["settings"])
+    if a.action == "prepare": value = prepare(store, a.repo, a.authorization, requests=a.requests, stage=a.stage,
+                                             turn_requests=a.turn_requests)
+    elif a.action == "new":
+        settings = read(store.root / "live/permit.json")["settings"]
+        if settings.get("generation_profile") == "gc-g6-official-1":
+            settings = {**settings, "retrieval_combination": a.combination}
+        else: require(a.combination == "S0", "EXPLICIT_G6_REQUIRED_FOR_S2")
+        permit_for(store, settings)
+        value = store.create_chat(a.title, settings)
     elif a.action == "close": put(store.root / "live/closed.json", {"reason": "campaign_completed"}); value = "closed"
     else:
         tid = store.enqueue(a.session, a.token, a.question, note_kind=a.note_kind) if a.action == "submit" else a.turn

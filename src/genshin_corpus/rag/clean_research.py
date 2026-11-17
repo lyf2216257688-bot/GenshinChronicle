@@ -17,7 +17,7 @@ from .clean_context import organize, assembly_context
 from .clean_conversation_graph import commit_result, saved_result, messages
 
 VERSION = "gc-clean-research-1"
-SYSTEM = ("你是原神资料研究助手。先利用S0反馈回答，必要时调用工具解决影响原问题的具体缺口。"
+SYSTEM = ("你是原神资料研究助手。先利用当前检索反馈回答，必要时调用工具解决影响原问题的具体缺口。"
     "研究目标是回答用户的核心问题，不是收齐所有相关资料。每次查证反馈后，先判断核心结论是否已有依据。"
     "核心已足：优先finish(sufficient)，可选身份/背景/联想仍未知不妨碍结束；简单事实也可直接引用作答。"
     "关键细节仍未知但没有具体可核验的新路径：finish(limited)；补检没有有效收益且无更好路径：finish(no_gain)。"
@@ -388,7 +388,8 @@ def research_graph(store, tid, pipeline, bridge, *, opener_factory=None, fault=l
                     "started_at": time.time(), "research": {}, "stop": "researching", "no_gain": 0,
                     "analysis": False}
             progress("retrieval_started", "initial-search")
-            query = ResearchQuery(turn["session"], tid, "original", *([turn["question"]] * 4))
+            query = ResearchQuery(turn["session"], tid, "original", *([turn["question"]] * 4),
+                                  combination=settings.get("retrieval_combination", "S0"))
             search(data, query)
             existing = store.artifact(tid, "g5-data-initial", data)
         context, packet = packet_for(store, turn, ctx_ref, data, settings)
@@ -537,7 +538,8 @@ def research_graph(store, tid, pipeline, bridge, *, opener_factory=None, fault=l
                         q = ResearchQuery(turn["session"], tid, "query-" + str(data["search_count"]), turn["question"],
                             args["subquestion"], args["search_text"], args["rerank_text"], kind=args["kind"],
                             round=data["search_count"], parent_query_ids=(args["parent_query"],),
-                            parent_evidence_refs=tuple(args["evidence_handles"]), trigger_gap=args["gap"])
+                            parent_evidence_refs=tuple(args["evidence_handles"]), trigger_gap=args["gap"],
+                            combination=settings.get("retrieval_combination", "S0"))
                         progress("retrieval_started", "search-" + q.query_id)
                         output = search(data, q)
                 elif name == "read_source":
