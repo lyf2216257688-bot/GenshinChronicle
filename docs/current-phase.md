@@ -4,7 +4,38 @@
 authorization, executable defaults, adoption and the immediate next action.
 Phase specifications own contracts; research notes own dated experiment facts.
 
-## 0. Current work — G6 S0-preserving offline study complete; S0 retained (2026-11-17)
+## 0. Current work — G7 part 2: 70Q quality audit complete (2026-11-17)
+
+The operator explicitly authorized a read-only semantic audit of the completed
+G7 part-1 baseline at `data/generation/g7-70q-baseline-20261117/`, superseding
+earlier work units' no-G7 gates for this audit only. The
+[audit record](research/clean-generation-g7-70q-quality-audit-20261117.md)
+routes the full report, 70 question judgments and source/stage evidence.
+
+Runtime totals are41 completed /14 answer-bearing partial /1 failed /14 UNKNOWN.
+Of55 final answers, the non-blind single-reviewer audit judges43 correct,
+8 partially correct,1 unsupported erroneous identity assertion and3 insufficient
+evidence;15 questions have no final answer and remain unevaluable. Twelve of
+the43 correct core answers still rely on compilation/commentary rather than an
+independently closed primary-text chain. These are limited corpus judgments,
+not a gold benchmark, all-official-text acceptance or G7 product adoption.
+
+Known usage remains2,962,012 tokens across172 known responses plus14 immutable
+URLError UNKNOWN attempts; total usage/fees and actual billing remain unknown.
+No new API request, inference, generation, retry, index/config/default change,
+Git commit or push occurred in this audit. Original runtime status/semantic fields
+are retained; the new judgments are separate audit derivatives.
+
+**Next:** operator review only. Prefer separately scoped evidence-selection,
+question-coverage and current-Packet citation-binding work before broader retrieval
+tuning; retain S0/BGE and existing entry defaults. No optimization, paid recovery,
+UNKNOWN resend, default adoption, commit or push is authorized by this audit.
+
+The operator subsequently authorized a local Git commit of the G7 audit report
+and documentation on2026-11-18. Generated runtime data remain excluded; push
+and further optimization are not authorized.
+
+### Historical G6 S0-preserving offline study complete; S0 retained (2026-11-17)
 
 The operator's bounded follow-up is complete. The
 [offline study report](research/clean-generation-g6-s0-sparse-offline-study-20261117.md)
@@ -980,11 +1011,12 @@ valuable comparison/rollback artifacts.
 
 ## 3. Immediate next action and remaining V1 gaps
 
-Follow the Generation engineering closure and next action in section 0 and the
-[G5 closure report](research/clean-generation-g5-stopping-acceptance-20261115.md). The
+Follow the G7 audit completion and operator-review-only next action in section0
+and the [G7 audit record](research/clean-generation-g7-70q-quality-audit-20261117.md).
+The [G5 closure report](research/clean-generation-g5-stopping-acceptance-20261115.md),
 [G4 real-QA report](research/clean-generation-g4-live-20261114.md) and
-[G3/G4 Git integration](research/clean-generation-g34-git-close-20261114.md) is
-a preserved historical checkpoint. The
+[G3/G4 Git integration](research/clean-generation-g34-git-close-20261114.md) are
+preserved historical checkpoints. The
 [Reranking/migration runbook](research/clean-reranking-preparation-20261113.md)
 is a preserved completed-stage reference.
 The completed P4 [70Q quality review](research/recall-p4-70q-quality-review-20261113.md)
@@ -1077,6 +1109,7 @@ No branch consolidation or remote-state claim follows from this inspection.
 | Topic / responsibility | Primary owner |
 | --- | --- |
 | Working rules and evidence/layer invariants | [`AGENTS.md`](../AGENTS.md) |
+| G7 70Q runtime reconciliation, semantic judgments, representative source/stage losses and limits | [`G7 quality audit`](research/clean-generation-g7-70q-quality-audit-20261117.md) |
 | Clean Generation persistence, budgets/recovery, V2 wiring and Packet contract | [`Generation V1`](phases/clean-generation-v1.md) |
 | G0–G2 finite implementation/tests, local query/readback receipts and limitations | [`Generation G0–G2`](research/clean-generation-g0g2-20261114.md) |
 | G5 evidence-value stopping, scoped engineering closure, real questions and limits | [`G5 closure report`](research/clean-generation-g5-stopping-acceptance-20261115.md) |
