@@ -1,13 +1,14 @@
 # Phase 04 — Retrieval / Evidence Assembly
 
-Status: **Phase 04 basic RAG V1 is the retained serving delivery contract.
-The previously adopted Block A remains the executable baseline while V1 changes
-are implemented and validated. Current work-unit status, authorization and
-adoption are owned by [`docs/current-phase.md`](../current-phase.md).**
+Status: **Preserved Phase04 V1 delivery and acceptance contract.** Block A
+was the adopted baseline for the historical V1 work. Its local Qwen serving
+assets were retired in November 2026. See [Current Phase](../current-phase.md)
+for adoption and authorization and the [Clean workbench](../rag-workbench.md)
+for the independent local entry points.
 
 The separately approved [Clean V1 reconstruction](clean-v1.md) owns direct
 Raw extraction and its replacement-foundation readers. This document continues
-to own the deployed Canonical/RU serving path and its acceptance requirements.
+to own the preserved Canonical/RU serving interface and its acceptance requirements.
 
 The Assembly implementation and placement described here belong to the retained
 legacy Phase 04 path. The agreed Clean-based target architecture assigns

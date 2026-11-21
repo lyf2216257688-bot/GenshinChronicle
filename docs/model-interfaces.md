@@ -1,29 +1,25 @@
 # AI Model Interfaces and Provider Configuration
 
-This document is the **single source of truth** for all external AI model providers,
-models, endpoints, wire protocols, environment variables, credential loading rules,
-and lifecycle states across the GenshinChronicle repository.
+This catalog records external AI model providers, endpoints, wire protocols,
+credential slots and implemented interface lifecycle labels. Code defines
+executable behavior. The catalog is checked against
+the [model interfaces consistency tests](../tests/retrieval/test_model_interfaces_consistency.py)
+and the [source catalog](../src/genshin_corpus/rag/model_interfaces_catalog.py).
 
-Code-level definitions in `src/genshin_corpus/` are authoritative. This document is
-automatically checked against the codebase by `tests/retrieval/test_model_interfaces_consistency.py`
-and `src/genshin_corpus/rag/model_interfaces_catalog.py`.
+[Current Phase](current-phase.md) records current adoption and authorization.
+The [Clean workbench](rag-workbench.md) is the local entry point. The Phase04
+and Phase05 tables retain code-level lifecycle labels and historical evidence.
+Prior canaries, closed campaigns and labels such as Phase05
+e2_active_exploration do not grant dispatch authority.
 
-**2026-11-02 priority / catalog interpretation:** current authorization and
-adoption are owned by [`current-phase.md`](current-phase.md). Phase 04 basic
-RAG V1 is active; Phase 05 NaviRAG/Card/Link/KG work is paused. The tables below
-describe implemented interfaces and retained code-level lifecycle labels, not
-standing permission to call them. Phase 05 `e2_active_exploration` and
-`e2_authorized_candidate` labels are preserved catalog classifications; their
-dispatch is paused. Historical canaries and scoped permits do not reopen work.
-
-The V1 default answer provider is operator-selected **DeepSeek official API /
+The Legacy Phase04 V1 answer selector uses the operator-selected **DeepSeek official API /
 `deepseek-flash`**, base `https://api.deepseek.com`, credential `DEEPSEEK_API_KEY`,
-optional endpoint selector `DEEPSEEK_BASE_URL`. The formal new G5 configuration
-is `config/clean-generation-v1.json`. `TOKENMETRO_BASE_URL` and an old Metro key
-do not select the new default. Explicit retained Metro uses
+optional endpoint selector `DEEPSEEK_BASE_URL`. The opt-in Clean G5 workbench
+independently uses [its pinned configuration](../config/clean-generation-v1.json)
+and a finite permit. Explicit Legacy Metro compatibility uses
 `DEEPSEEK_BASE_URL=https://tokenmetro.com/v1`, `TOKENMETRO_API_KEY` and an explicit
-`GENSHIN_DEEPSEEK_MODEL=deepseek-v4.1-flash-1017`; there is no fallback. Bailian/Qwen
-remains explicit rollback. Earlier Metro cap failures remain historical evidence.
+`GENSHIN_DEEPSEEK_MODEL=deepseek-v4.1-flash-1017`. The retained Legacy Phase04
+adapter also supports an explicit Bailian/Qwen provider selection. Earlier Metro cap failures remain historical evidence.
 The original-RU Qwen selectors below describe retained code, not a working local
 fallback: their local model/index assets were retired. Selected Clean BGE-M3
 indexes and the opt-in [Retrieval P0–P2](phases/clean-retrieval-v1.md) path are

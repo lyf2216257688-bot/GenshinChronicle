@@ -1,5 +1,7 @@
 # Clean双粒度分片的三类定向优化
 
+> 2026-11-21 资料定位更新：本机缺少本文部分历史附件，原链接保留用于追溯。见[历史数据登记](README.md#历史数据登记)。
+
 2026-11-07。用户已确定双粒度并行检索和balanced默认配置，compact保留历史资料。
 本轮复用既有适配器、通用核心和检查，只修改成就折叠准入、文章边界及明确机制字段。
 [设计](../phases/chunking-pilot-v1.md)、[完整实际前后对照](../../data/retrieval/clean-chunking-refinement-20261107-review/cases.md)

@@ -1,5 +1,7 @@
 # Phase05 G1: lightweight offline navigation generation
 
+> 2026-11-21 资料定位更新：本机缺少本文部分历史附件，原链接保留用于追溯。见[历史数据登记](../README.md#历史数据登记)。
+
 Status: **bounded offline loop COMPLETE with recorded failures; full production NOT READY**.
 Current authorization is owned by `docs/current-phase.md`.
 

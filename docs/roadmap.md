@@ -1,160 +1,17 @@
 # Roadmap
 
-This roadmap describes direction, not a commitment to pre-design later phases.
+This roadmap describes project direction. The [current stage](current-phase.md) owns the immediate action, adopted choices and authorization.
 
-## Clean V1 reconstruction
+## Build on the evidence foundation
 
-The approved reconstruction target uses Raw -> Clean -> Chunking -> Indexing ->
-Retrieval -> Reranking -> Generation. The Clean work unit owns direct extraction,
-structure and tag preservation, source resolution, file builds and a bounded
-representative pilot. Its contract is [Clean V1](phases/clean-v1.md).
-The [V2 chunking contract](phases/chunking-v2.md) owns scoped admission,
-structure-aware packing, micro/macro candidates and natural-parent readback.
-The [indexing input contract](phases/indexing-input-v1.md) adds a shared input
-foundation for BM25F and Dense over completed V2.1 artifacts. The
-[standalone launcher](phases/index-benchmark-v1.md) implements physical index
-construction and independent search, with bounded development validation.
-The selected BGE-M3/BM25F assets feed the opt-in
-[Clean Retrieval P0–P2](phases/clean-retrieval-v1.md) work: candidate discovery and
-fusion, then bounded Sparse validation before any full build. The
-[P3 Sparse path](phases/sparse-build-v1.md) prepares a standalone operator-run
-streaming full build and validation; Codex performs only finite development tests.
-The separate [P4 experiment](phases/recall-experiment-v1.md) supports operator-run
-70Q comparison with automatic diagnostics and original-text review; final
-S0/S1/S2 adoption belongs to the operator. The subsequent
-[Reranking and Python migration work](phases/clean-reranking-v1.md) provides
-saved-S0 BGE/GTE comparison, structural/MMR review and the selected complete
-candidate handoff. Runtime admission to immutable indexes is explicit; model and
-ordering adoption remain operator decisions. The opt-in
-[Generation workbench](phases/clean-generation-v1.md) adds a durable Mock skeleton,
-versioned new-question S0/BGE wiring and Clean Packet assembly without taking over
-discovery or ordering. A separate native Chat adapter and finite synthetic
-capability probe keep exact-route evidence and paid approval explicit.
-G4 adds same-chat persistence, extractive context organization, corrections and an
-independent fixed-chain chat/Streamlit interface, defaulting to Mock. The separate
-finite live chain connects real S0/BGE and G3 under expiring shared campaign limits.
-G5 now adds the bounded single-controller active research loop and evidence-value
-stopping: sufficient core evidence can finish, unverifiable details remain limited,
-and optional branches need not be exhausted. Its finite engineering closure is
-recorded in the [G5 report](research/clean-generation-g5-stopping-acceptance-20261115.md);
-G6 adds explicit frozen Sparse/S2 through the same V2/BGE/Assembly chain, with
-separate bounded evidence/answer comparison and operator adoption. Dynamic
-routing and fusion tuning remain outside it. G7, broad product acceptance and
-default adoption retain separate gates.
-Retained Phase04 selectors reference
-retired local Qwen assets and are not an operational fallback. Current work-unit
-status is owned by [current-phase](current-phase.md).
+The original sequence established [Raw Collection](phases/phase-01-raw-collection.md), [Parsed](phases/phase-02-parsed-schema.md) and [Canonical](phases/phase-03-canonical-schema.md) over official OBC text. The [Legacy Phase04](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract) baseline established source-backed Retrieval Units, isolated lexical and Dense search, deterministic Assembly, provider-neutral Generation and local presentation. Historical milestones and operating points are in the [Phase04 register](research/phase-04/p04-rag-historical-checkpoint-register.md).
 
-## Phase 00 — Repository initialization
+The Clean-based path uses direct Raw-to-Clean reconstruction, structural chunking, a common index input, bounded retrieval, separate reranking and evidence-grounded Generation. Development follows the [architecture](architecture-overview.md) and [stage contracts](current-phase.md#阶段合同). The [workbench](rag-workbench.md) routes the delivered components and operator entry points.
 
-Status: **complete**
+## Establish end-to-end quality from observed use
 
-Deliverables:
-- repository instructions;
-- architecture overview;
-- active-phase specification;
-- data/Git safety boundaries;
-- empty implementation/test skeleton for the collector.
+Evaluate the assembled evidence, traceable citations and answer support on real questions. Distinguish the responsible layer before scoping any optimization. Preserve the existing reproducible baselines and record limits of coverage, restart behavior and resource use before any Serving or broader adoption decision. The existing [retrieval, ordering and Generation reports](research/README.md) provide starting evidence for those decisions.
 
-## Phase 01 — Raw Collection
+## Keep semantic expansion conditional
 
-Status: **complete / CLOSED**
-
-Goal: obtain the complete, auditable `mihoyo_obc` `zh-cn` Raw corpus.
-
-High-level sequence:
-
-```text
-API discovery
--> channel inventory
--> detail-endpoint verification
--> collector v0.1
--> staged crawl validation
--> full Raw crawl
--> manifest / coverage report
--> Raw corpus profiling and stratified sampling
-```
-
-## Phase 02 — Parsing
-
-Status: **complete / CLOSED**
-
-The source-specific Parsed foundation closed with auditable OBC Raw-to-Parsed
-acceptance. Parsed outputs remain source-specific, provisional, and
-evolutionary; closure does not freeze their draft schema or unknown handlers.
-
-## Phase 03 — Canonical Corpus
-
-Status: **complete / CLOSED**
-
-The approved `CanonicalRecord -> CanonicalSection -> CanonicalUnit` contract,
-structural OBC projector, dialogue/structured-observation preservation,
-immutable run storage, representative acceptance, and the separate 16,437
-record production gate are complete. This establishes an auditable OBC `zh-cn`
-structural Canonical corpus, not semantic completeness or cross-snapshot
-semantic identity.
-
-## Phase 04 — Retrieval / RAG
-
-Status: **retained implementation; local Qwen Serving assets retired**
-
-The historical first end-to-end baseline includes rebuildable Retrieval Units,
-BM25/local Dense/RRF Hybrid candidate retrieval, deterministic Evidence
-Assembly, Evidence Packets, and provider-neutral Generation contracts.
-Production/default configuration, challenger status, and authorization remain
-intentionally outside this phase-level roadmap and are owned by
-`docs/current-phase.md`. The first implementation does not freeze a permanent
-retrieval winner, Dense model, reranker, vector database, or Generation
-provider.
-
-The following ordered milestones record the 2026-11-02 historical checkpoint;
-their Qwen defaults/rollback do not override current selection or assert asset
-availability. The priority change reused Phases 01-03 and the existing RU/index,
-Assembly, Generation and local presentation modules. Serving-baseline milestones are
-staged so that real failures can be attributed; an unresolved Generation issue
-does not block independently authorized offline Embedding preparation:
-
-1. **DeepSeek QA:** reuse the implemented provider/shared accounting and the
-   operator-selected V1 default; retain explicit Qwen rollback. The closed
-   fixed-Packet live evidence and open cap issue stay separate from adoption
-   and future paid authorization; current facts belong to current-phase.
-2. **Local original-RU embeddings:** use the completed Qwen3-Embedding-0.6B /
-   1024d index and matching query encoder by default. Keep the historical 2048d
-   pair available as explicit rollback. Use the repeatable 70Q Packet
-   comparison to identify retrieval and Assembly weaknesses after adoption.
-3. **Local V1 acceptance:** reuse the backend/Streamlit entry point for repeated
-   real questions, traceable citations, restart/resource/error checks and
-   measured latency/usage. Use existing 70Q/story materials plus actual questions;
-   use the existing 70Q comparison and record residual quality limits before
-   release.
-
-Detailed acceptance and migration requirements belong to the
-[Phase 04 delivery contract](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract).
-Current progress and the immediate next action remain in `docs/current-phase.md`.
-These model/dimension choices are stage operating choices, not permanent
-architecture restrictions. Basic V1 does not depend on Phase 05 completion.
-
-## Phase 05 — Source-Bound Semantic Navigation
-
-Status: **PAUSED — resume only from demonstrated basic-RAG needs**
-
-Phase 05 provides a versioned source-bound semantic build lineage, distinct
-hierarchy and event/relation graph views, and bounded provider-neutral
-navigation over official RU candidates. It preserves Phase 04 Block A,
-Evidence Packet authority, and the Generation-visible contract. P05-W1 proves
-only mechanical contracts and does not establish semantic extraction quality,
-corpus-scale view quality, answer improvement, or production/default adoption.
-
-NaviRAG, Card generation/repair, Link improvements and KG construction are not
-the current next steps. Preserve all implementations, historical results,
-failed attempts and inactive artifacts. The pause is a priority decision,
-not a declaration that these capabilities failed or are permanently rejected.
-After V1 use exposes a concrete navigation/semantic bottleneck, select the
-smallest useful capability, bounded cost and source-based acceptance scope
-before separately authorizing resumption.
-
-## Later semantic layers
-
-Global entity resolution, Claims, timelines, multilingual alignment, and other
-AI-semantic structures beyond the bounded P05 contract remain conditional. Add
-only the smallest structure justified by later semantic/live evidence.
+The [Phase05 navigation contract](phases/phase-05-source-bound-semantic-navigation.md) preserves source-bound hierarchy, Card/Link and event/relation experiments. Further work needs a demonstrated RAG bottleneck and a separate, bounded source-based acceptance scope. Global entity identity, claims, timelines and cross-language alignment need their own evidence and authorization before implementation.
