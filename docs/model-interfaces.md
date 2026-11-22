@@ -64,6 +64,9 @@ official `deepseek-flash`, endpoint `https://api.deepseek.com/chat/completions`,
 credential `DEEPSEEK_API_KEY`. The retained low-level G3 request default/constants
 and frozen probe runners still describe explicit historical Metro experiments;
 formal preparation, G4/G5 entry points and V1 provider choose the official route.
+The Windows chat product supplies the G5 credential from its Windows-user-encrypted
+local settings, with the launch environment as a fallback. The verified endpoint
+and finite permission continue to come from the G5 contract. [Product credential rules](phases/local-chat-v1.md)
 New `generation/clean_chat.py` and `clean_chat_transport.py` implement explicit
 thinking enabled/disabled, native tools and stream/nonstream manifests, raw-first
 urllib decoding and the existing session/turn/campaign budget path. No SDK or

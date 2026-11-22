@@ -1,6 +1,5 @@
 """One immutable execution directory per finite grant, one durable conversation catalog."""
 import json
-import os
 from pathlib import Path
 import time
 from types import SimpleNamespace
@@ -12,12 +11,13 @@ from ..generation.clean_chat_transport import ChatSessions
 from ..rag import clean_research_live
 from ..rag.clean_conversation_graph import fixture_settings
 from ..rag.clean_store import put
+from .credentials import read_credential
 from .store import Problem
 
 
 def adapter_identity():
     folder = Path(__file__).parent
-    return {name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py")}
+    return {name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py", "credentials.py")}
 
 
 class ExecutionView:
@@ -66,11 +66,14 @@ def latest(store, mode):
     return store.binding(row[0]) if row else None
 
 
-def same_execution_profile(b, root):
+def same_execution_profile(b, root, product_root):
     if b["adapter"] != adapter_identity():
         return False
     if b["mode"] == "MOCK":
         return True
+    credential = read_credential(product_root)
+    if not credential.key or credential.revision != b.get("credential_revision"):
+        return False
     from ..retrieval.clean_based.runtime_v2 import code_identity as upstream
     permit = clean_research_live.permit_for(SimpleNamespace(root=root), b["settings"])
     try:
@@ -94,7 +97,7 @@ def status(store, b):
         state = "expired"
     elif totals["request_reservations"] >= limits["campaign_requests"] or totals["known_tokens"] >= limits["campaign_tokens"]:
         state = "exhausted"
-    elif not same_execution_profile(b, root):
+    elif not same_execution_profile(b, root, store.root):
         state = "read_only"
     return {"id": b["id"], "mode": b["mode"], "state": state, "expires": b["expires"],
             "requests": totals["request_reservations"], "max_requests": limits["campaign_requests"],
@@ -113,6 +116,7 @@ def open_batch(store, repo, data):
     previous = latest(store, data.mode)
     if previous and status(store, previous)["state"] == "open":
         raise Problem("batch_open", "已有可用批次。")
+    credential_revision = None
     if data.mode == "LIVE":
         if data.confirm_live is not True:
             raise Problem("consent_required", "请明确确认本批次对官方模型的有限调用。", 422)
@@ -120,8 +124,10 @@ def open_batch(store, repo, data):
         missing = inspect_assets(repo)
         if missing:
             raise Problem("assets_missing", "本地资产未就绪：" + "、".join(missing))
-        if not os.environ.get("DEEPSEEK_API_KEY", "").strip():
-            raise Problem("key_missing", "请在启动环境中设置 DEEPSEEK_API_KEY，再重新启动软件。")
+        credential = read_credential(store.root)
+        if not credential.key:
+            raise Problem("key_missing", "请在批次设置的真实问答配置中保存可用的 API Key。")
+        credential_revision = credential.revision
     bid = uuid4().hex
     root = store.root / "batches" / bid
     root.mkdir(parents=True, exist_ok=False)
@@ -143,6 +149,8 @@ def open_batch(store, repo, data):
         ChatSessions(scope, campaign, limits)
     binding = {"id": bid, "mode": data.mode, "settings": settings, "expires": expires, "campaign": campaign,
                "adapter": adapter_identity(), "model": model, "permit_sha256": permit_hash}
+    if data.mode == "LIVE":
+        binding["credential_revision"] = credential_revision
     path = root / "binding.json"
     put(path, binding)
     with store.connect() as db:

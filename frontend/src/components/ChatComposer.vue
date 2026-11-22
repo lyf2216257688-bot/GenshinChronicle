@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import type { Draft } from '../api/client.ts'
+import ChatIcon from './ChatIcon.vue'
 const p = defineProps<{ draft: Draft; enabled: boolean; sending: boolean }>()
 const emit = defineEmits<{
   edit: [Partial<Pick<Draft, 'text' | 'kind' | 'target'>>]
@@ -70,13 +71,16 @@ function key(e: KeyboardEvent) {
           />补充条件</label
         >
         <span class="muted key-hint">Shift + Enter 换行</span>
-        <button v-if="!enabled" class="secondary" @click="emit('grants')">开启问答批次</button>
+        <button v-if="!enabled" class="secondary" @click="emit('grants')">
+          <ChatIcon name="settings" />开启问答批次
+        </button>
         <button
           v-else
           class="primary"
           :disabled="sending || !draft.text.trim()"
           @click="emit('send')"
         >
+          <ChatIcon name="send" />
           {{ sending ? '正在保存…' : '发送' }}
         </button>
       </div>

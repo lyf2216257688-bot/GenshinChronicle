@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useChat } from './chat/state.ts'
 import type { Chat, Feedback, Mode } from './api/client.ts'
 import ChatSidebar from './components/ChatSidebar.vue'
@@ -8,11 +8,15 @@ import ChatComposer from './components/ChatComposer.vue'
 import EvidencePanel from './components/EvidencePanel.vue'
 import FeedbackForm from './components/FeedbackForm.vue'
 import BatchPanel from './components/BatchPanel.vue'
+import ChatIcon from './components/ChatIcon.vue'
 
 const s = reactive(useChat()),
   nav = ref(false),
   title = ref(''),
   panelBusy = ref(false)
+const navToggle = ref<HTMLButtonElement | null>(null)
+const panelClose = ref<HTMLButtonElement | null>(null)
+let panelTrigger: HTMLElement | null = null
 const titles = {
   batch: '批次设置',
   source: '引用原文',
@@ -21,6 +25,14 @@ const titles = {
   reports: '反馈记录',
   rename: '重命名会话',
 }
+const panelIcons = {
+  batch: 'settings',
+  source: 'book',
+  trace: 'trace',
+  report: 'flag',
+  reports: 'record',
+  rename: 'edit',
+} as const
 const categories = {
   answer: '回答错误',
   missing_evidence: '证据遗漏',
@@ -37,6 +49,20 @@ onMounted(() => {
   }, 1000)
 })
 onBeforeUnmount(() => clearInterval(clock))
+watch(() => s.panel, async (panel, previous) => {
+  if (panel && !previous) {
+    panelTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }
+  await nextTick()
+  if (s.panel !== panel) return
+  if (panel) {
+    panelClose.value?.focus({ preventScroll: true })
+  } else {
+    const target = panelTrigger?.getClientRects().length ? panelTrigger : navToggle.value
+    if (target?.getClientRects().length) target.focus({ preventScroll: true })
+    panelTrigger = null
+  }
+})
 function create(mode: Mode) {
   nav.value = false
   void s.safe(() => s.create(mode))
@@ -61,11 +87,21 @@ function showBatches() {
   s.closePanel()
   s.panel = 'batch'
   nav.value = false
-  void s.safe(s.refreshBatches)
+  void s.safe(s.refreshBatchPanel)
 }
 function closeDetails() {
-  s.closePanel()
+  if (s.panel) s.closePanel()
+  if (nav.value) hideNav()
+}
+function hideNav() {
   nav.value = false
+  navToggle.value?.focus()
+}
+async function openNav() {
+  if (s.panel) s.closePanel()
+  nav.value = true
+  await nextTick()
+  document.querySelector<HTMLButtonElement>('#chat-navigation .nav-close')?.focus()
 }
 function selectChat(chat: Chat) {
   nav.value = false
@@ -92,22 +128,37 @@ function editTitle() {
       @open="selectChat"
       @grants="showBatches"
       @reports="showReports"
-      @hide="nav = false"
+      @hide="hideNav"
     />
     <main>
       <header class="topbar">
-        <button class="mobile-toggle" aria-label="打开会话导航" @click="nav = true">☰</button>
+        <button
+          ref="navToggle"
+          class="icon-button mobile-toggle"
+          aria-label="打开会话导航"
+          :aria-expanded="nav"
+          aria-controls="chat-navigation"
+          @click="openNav"
+        >
+          <ChatIcon name="menu" :size="18" />
+        </button>
         <div class="header-title">
-          <span class="eyebrow">世界观问答</span>
-          <h1>{{ s.current?.title ?? 'GenshinChronicle' }}</h1>
+          <span v-if="s.current" class="eyebrow">世界观问答</span>
+          <h1>{{ s.current?.title ?? '首页' }}</h1>
         </div>
-        <button v-if="s.current" class="subtle rename" @click="editTitle">
-          重命名
-        </button>
-        <button v-if="s.current" class="mode-label" @click="showBatches">
-          {{ s.current.mode === 'MOCK' ? '离线演示' : '真实问答' }} ·
-          {{ liveBatch ? '批次可用' : '待开启' }}
-        </button>
+        <div v-if="s.current" class="header-actions">
+          <button class="icon-button rename" aria-label="重命名" title="重命名" @click="editTitle">
+            <ChatIcon name="edit" />
+          </button>
+          <button class="mode-label" :class="{ idle: !liveBatch }" @click="showBatches">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+              {{ s.current.mode === 'MOCK' ? '离线演示' : '真实问答' }} ·
+              {{ liveBatch ? '批次可用' : '待开启' }}
+            </span>
+            <ChatIcon name="down" :size="12" />
+          </button>
+        </div>
       </header>
       <div v-if="s.error" class="banner error" role="alert">
         <span>{{ s.error }}</span
@@ -125,6 +176,9 @@ function editTitle() {
           :turns="s.rows"
           :before="s.before"
           :loading="s.loading"
+          :demo="s.current.mode === 'MOCK'"
+          :source-turn="s.panel === 'source' ? s.selected?.id : undefined"
+          :source-citation="s.panel === 'source' ? s.selectedCitation?.citation_id : undefined"
           @older="s.safe(s.older)"
           @source="(t, c) => s.safe(() => s.inspect('source', t, c))"
           @trace="(t) => s.safe(() => s.inspect('trace', t))"
@@ -143,19 +197,38 @@ function editTitle() {
         />
       </template>
       <div v-else class="welcome">
-        <span class="large-mark" aria-hidden="true">GC</span>
-        <h2>原神世界观问答</h2>
-        <p>围绕剧情持续追问，随时回到引用原文。</p>
-        <div>
-          <button class="primary" :disabled="s.busy" @click="create('LIVE')">开始真实对话</button>
-          <button class="secondary" :disabled="s.busy" @click="create('MOCK')">体验离线演示</button>
-        </div>
+        <section class="welcome-card" aria-labelledby="welcome-title">
+          <div class="welcome-content">
+            <span class="large-mark"><ChatIcon name="mark" :size="42" /></span>
+            <h2 id="welcome-title">原神世界观问答</h2>
+            <p>围绕剧情持续追问，随时回到引用原文。</p>
+            <div class="welcome-actions">
+              <button class="primary" :disabled="s.busy" @click="create('LIVE')">
+                <ChatIcon name="plus" />开始真实对话
+              </button>
+              <button class="secondary" :disabled="s.busy" @click="create('MOCK')">
+                <ChatIcon name="flask" />体验离线演示
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
-    <aside v-if="s.panel" class="panel" :aria-label="titles[s.panel]">
+    <button
+      v-if="nav || s.panel"
+      class="scrim"
+      :class="{ 'panel-scrim': s.panel }"
+      aria-label="关闭浮层"
+      tabindex="-1"
+      @click="closeDetails"
+    ></button>
+    <aside v-if="s.panel" id="chat-details" class="panel" :aria-label="titles[s.panel]">
       <header>
+        <ChatIcon :name="panelIcons[s.panel]" :size="19" />
         <h2>{{ titles[s.panel] }}</h2>
-        <button aria-label="关闭详情" class="subtle" @click="s.closePanel">×</button>
+        <button ref="panelClose" aria-label="关闭详情" class="icon-button" @click="s.closePanel">
+          <ChatIcon name="close" />
+        </button>
       </header>
       <div class="panel-body">
         <p v-if="s.panelLoading" class="muted">正在读取已保存的材料…</p>
@@ -165,18 +238,21 @@ function editTitle() {
           :mode="s.current?.mode ?? 'LIVE'"
           :info="s.info"
           :busy="panelBusy"
+          @save-settings="(v) => panelAction(() => s.saveLiveSettings(v))"
+          @clear-settings="panelAction(s.clearLiveSettings)"
           @grant="(v) => panelAction(() => s.grant(v))"
           @close="(v) => panelAction(() => s.endBatch(v))"
         />
         <EvidencePanel
           v-if="s.panel === 'source' && s.source"
           :source="s.source"
+          :demo="s.current?.mode === 'MOCK'"
           @report="s.selected && s.report(s.selected, s.selectedCitation)"
         />
         <template v-if="s.panel === 'source' && !s.source && !s.panelLoading && s.selected">
-          <p>这处引用暂时无法读取。</p>
+          <p class="explanation">这处引用暂时无法读取。</p>
           <button class="secondary" @click="s.report(s.selected, s.selectedCitation)">
-            反馈此引用
+            <ChatIcon name="flag" />反馈此引用
           </button></template
         >
         <template v-if="s.panel === 'trace' && s.trace"

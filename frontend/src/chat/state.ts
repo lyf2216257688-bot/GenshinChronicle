@@ -8,6 +8,7 @@ import type {
   Draft,
   Feedback,
   Grant,
+  LiveSettings,
   Mode,
   ReportInput,
   Runtime,
@@ -109,6 +110,20 @@ export function useChat(api: Client = defaultApi) {
   }
   async function refreshBatches() {
     batches.value = (await api.batches()).items
+  }
+  async function refreshBatchPanel() {
+    const [runtime] = await Promise.all([api.runtime(), refreshBatches()])
+    info.value = runtime
+  }
+  async function saveLiveSettings(data: LiveSettings) {
+    info.value = await api.saveLiveSettings(data)
+    notice.value = 'API 配置已保存在本机。'
+    await refreshBatches()
+  }
+  async function clearLiveSettings() {
+    info.value = await api.clearLiveSettings()
+    notice.value = '已移除本机保存的 API Key。'
+    await refreshBatches()
   }
   function backupKey(sid: string) {
     return 'gc:unsaved:' + sid
@@ -350,5 +365,8 @@ export function useChat(api: Client = defaultApi) {
     reload,
     closePanel,
     refreshBatches,
+    refreshBatchPanel,
+    saveLiveSettings,
+    clearLiveSettings,
   }
 }

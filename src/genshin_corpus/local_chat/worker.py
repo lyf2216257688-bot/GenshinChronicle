@@ -13,6 +13,7 @@ from ..rag.clean_conversation import TERMINAL
 from ..rag.clean_executor import LocalExecutor
 from ..rag.clean_store import put
 from .batches import ExecutionView
+from .credentials import worker_credential
 from .store import ProductStore
 
 
@@ -88,11 +89,12 @@ def main():
     if binding["mode"] == "LIVE":
         from ..rag.clean_research import run_turn
         from ..rag.clean_research_live import ResearchPipeline
-        pipeline = ResearchPipeline(view, args.turn, args.repo)
-        try:
-            run_turn(view, args.turn, pipeline, continue_turn=args.resume)
-        finally:
-            pipeline.close()
+        with worker_credential(store.root, binding["credential_revision"]):
+            pipeline = ResearchPipeline(view, args.turn, args.repo)
+            try:
+                run_turn(view, args.turn, pipeline, continue_turn=args.resume)
+            finally:
+                pipeline.close()
     else:
         from ..rag.clean_conversation_graph import run_turn
         from ..rag.clean_mock import fixture_inputs, FixturePipeline, MockOpener, mock_answer

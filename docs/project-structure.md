@@ -30,7 +30,7 @@
 | `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff；V2 运行时由工作台接入。 |
 | `generation/` | Evidence Packet 组装、provider-neutral 生成合同、协议检查、结果及引用绑定。 |
 | `rag/`、`ui/` | 工作台与保留的 Legacy 编排、持久化和本地 Streamlit 页面。UI 通过后端进入工作流程。 |
-| `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |
+| `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、本机凭据、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |
 | `model_calls.py`、`model_call_sessions.py`、`evidence_io.py` | 共享请求计数与恢复、会话侧操作桥接、create-only JSON/哈希/封存。 |
 | `build_runtime.py`、`runtime_compatibility.py`、`runtime_migration.py` | 并行构建运行时和解释器迁移/索引兼容性校验。 |
 | `parser/`、`canonical/`、`retrieval/` 下的原 RU 实现 | 保留 Legacy Parsed/Canonical/RU、词法与旧 Assembly 接口，参阅 [Phase04 合同](phases/phase-04-retrieval-evidence-assembly.md)。 |

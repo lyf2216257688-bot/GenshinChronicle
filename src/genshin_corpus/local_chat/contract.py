@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pydantic.json_schema import models_json_schema
 
 Mode = Literal["MOCK", "LIVE"]
@@ -26,8 +26,17 @@ class Runtime(Model):
     instance: str
     issues: list[str]
     key_configured: bool
+    key_source: Literal["local", "environment", "missing", "unavailable"]
+    credential_storage_supported: bool
+    endpoint: str
+    data_root: str
     live_model: str
     tokens_per_request: int
+
+
+class LiveSettings(Model):
+    endpoint: Annotated[str, Field(min_length=1, max_length=512)]
+    api_key: Annotated[SecretStr, Field(min_length=1, max_length=512)]
 
 
 class NewChat(Model):
@@ -173,6 +182,8 @@ class Reports(Model):
 # operation id, method, resource, request model, response model
 ROUTES = (
     ("runtime", "GET", "/runtime", None, Runtime),
+    ("save_live_settings", "PUT", "/live-settings", LiveSettings, Runtime),
+    ("clear_live_settings", "DELETE", "/live-settings", None, Runtime),
     ("chats", "GET", "/chats", None, Chats),
     ("new_chat", "POST", "/chats", NewChat, Chat),
     ("rename", "PATCH", "/chats/{sid}", Rename, Chat),

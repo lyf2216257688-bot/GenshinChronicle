@@ -14,6 +14,7 @@ export type Source = Schema['Source']
 export type Trace = Schema['Trace']
 export type TurnEvent = Schema['TurnEvent']
 export type Runtime = Schema['Runtime']
+export type LiveSettings = Schema['LiveSettings']
 
 export class ApiError extends Error {
   code: string
@@ -37,6 +38,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const id = encodeURIComponent
 export const client = {
   runtime: () => request<Runtime>('GET', '/runtime'),
+  saveLiveSettings: (data: LiveSettings) => request<Runtime>('PUT', '/live-settings', data),
+  clearLiveSettings: () => request<Runtime>('DELETE', '/live-settings'),
   chats: () => request<Schema['Chats']>('GET', '/chats'),
   create: (mode: Mode) => request<Chat>('POST', '/chats', { mode }),
   rename: (sid: string, title: string) => request<Chat>('PATCH', '/chats/' + id(sid), { title }),

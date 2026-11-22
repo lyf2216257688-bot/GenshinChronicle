@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from starlette.testclient import TestClient
 from genshin_corpus.evidence_io import digest, read
-from genshin_corpus.local_chat import contract, presentation
+from genshin_corpus.local_chat import contract, credentials, presentation
 from genshin_corpus.local_chat.api import REPO, create_app
 from genshin_corpus.local_chat.batches import ExecutionView
 
@@ -234,6 +234,35 @@ class ChatProductTests(unittest.TestCase):
         draft = self.api("GET", f"/chats/{first}/draft")
         self.api("POST", f"/chats/{first}/turns", {**draft, "text": "额度用尽后的追问"}, 409)
 
+    @unittest.skipUnless(os.name == "nt", "Windows DPAPI")
+    def test_live_settings_store_only_protected_key_inside_data_root(self):
+        endpoint = credentials.OFFICIAL_ENDPOINT
+        key = "test-key-for-local-storage-only"
+        folder = self.svc.store.root
+        file = folder / credentials.FILE_NAME
+        with patch.dict(os.environ, {credentials.KEY_ENV: ""}):
+            info = self.api("GET", "/runtime")
+            self.assertEqual(info["data_root"], str(folder))
+            self.assertEqual(info["key_source"], "missing")
+            for invalid in ("http://api.deepseek.com", "https://api.deepseek.com@other.invalid",
+                            endpoint + "?key=extra"):
+                self.api("PUT", "/live-settings", {"endpoint": invalid, "api_key": key}, 422)
+            self.api("PUT", "/live-settings", {"endpoint": endpoint, "api_key": "test\r\ninjected"}, 422)
+            self.assertFalse(file.exists())
+            self.assertEqual(self.api("PUT", "/live-settings",
+                {"endpoint": credentials.OFFICIAL_BASE, "api_key": key})["key_source"], "local")
+            self.assertEqual(credentials.read_credential(folder).key, key)
+            self.assertNotIn(key.encode(), file.read_bytes())
+            self.assertNotIn(key, self.client.get("/api/v1/runtime").text)
+            self.assertFalse(self.api("GET", "/batches")["items"])
+
+            self.client.__exit__(None, None, None)
+            self.open()
+            self.assertTrue(self.api("GET", "/runtime")["key_configured"])
+            self.assertEqual(credentials.read_credential(folder).key, key)
+            self.assertEqual(self.api("DELETE", "/live-settings")["key_source"], "missing")
+            self.assertFalse(file.exists())
+
     @unittest.skipUnless(os.getenv("GC_TEST_LOCAL_PROFILE") == "1", "requires local sealed G3 route evidence")
     def test_official_g5_entry_with_in_memory_transport_and_no_socket(self):
         """Exercise real permit validation, G5, shared budget and worker entry without a provider connection."""
@@ -245,10 +274,15 @@ class ChatProductTests(unittest.TestCase):
         from tests.generation.test_clean_research import Pipeline
         store = self.svc.store
         sid = self.api("POST", "/chats", {"mode": "LIVE"})["id"]
-        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "offline-test-only"}), \
+        key = "offline-test-only"
+        with patch.dict(os.environ, {credentials.KEY_ENV: key if os.name != "nt" else ""}), \
                 patch.object(socket.socket, "connect", side_effect=AssertionError("No provider socket")) as network:
+            if os.name == "nt":
+                self.api("PUT", "/live-settings", {"endpoint": credentials.OFFICIAL_ENDPOINT, "api_key": key})
             grant = contract.Grant(mode="LIVE", requests=2, minutes=5, confirm_live=True)
             b = self.svc.open_batch(grant)
+            if os.name == "nt":
+                self.api("DELETE", "/live-settings", expect=409)
             with patch.object(self.svc.worker, "schedule"):
                 d = contract.Draft(**{**store.get_draft(sid), "text": "测试本地接线"})
                 tid = self.svc.submit(sid, d)["id"]
@@ -262,9 +296,13 @@ class ChatProductTests(unittest.TestCase):
                     "--repo", str(REPO), "--turn", tid, "--run", str(folder)]), \
                     patch("genshin_corpus.rag.clean_research_live.ResearchPipeline", return_value=TinyPipeline(reader, REPO)), \
                     patch("genshin_corpus.generation.clean_chat_transport.build_opener", return_value=sender), \
+                    patch.object(sender, "open", wraps=sender.open) as sent, \
                     patch.object(clean_mock, "MODEL", "deepseek-flash"):
                 worker.main()
             self.assertEqual(sender.calls, 1)
+            request = sent.call_args.args[0]
+            self.assertEqual(request.full_url, credentials.OFFICIAL_ENDPOINT)
+            self.assertTrue(request.get_header("Authorization") == "Bearer " + key)
             self.assertEqual(self.svc.turn(tid)["answer"], "离线协议夹具[E01]")
             citation = self.svc.turn(tid)["citations"][0]
             self.assertTrue(self.svc.citation(tid, citation["packet_id"], citation["citation_id"])["texts"])

@@ -15,6 +15,7 @@ from starlette.staticfiles import StaticFiles
 
 from ..evidence_io import read, strict_json
 from . import batches as grants, contract, presentation as display
+from .credentials import OFFICIAL_ENDPOINT, clear_credential, read_credential, save_credential
 from .diagnostics import inspect_assets
 from .store import PRODUCT, Problem, ProductStore, root_identity
 from .worker import ProductExecutor
@@ -44,9 +45,26 @@ class Service:
         except (OSError, ValueError, TypeError, KeyError):
             model, allowance = "未配置", 0
             issues.append("生成配置")
+        credential = read_credential(self.store.root)
         return {"product": PRODUCT, "instance": root_identity(self.store.root), "issues": issues,
-                "live_model": model, "tokens_per_request": allowance,
-                "key_configured": bool(os.environ.get("DEEPSEEK_API_KEY", "").strip())}
+                "live_model": model, "tokens_per_request": allowance, "endpoint": OFFICIAL_ENDPOINT,
+                "data_root": str(self.store.root), "key_configured": bool(credential.key),
+                "key_source": credential.source, "credential_storage_supported": os.name == "nt"}
+
+    def require_live_settings_editable(self):
+        batch = grants.latest(self.store, "LIVE")
+        if batch and grants.status(self.store, batch)["state"] == "open":
+            raise Problem("batch_open", "请先关闭当前真实问答批次，再修改 API 配置。")
+
+    def save_live_settings(self, data):
+        self.require_live_settings_editable()
+        save_credential(self.store.root, data.endpoint, data.api_key.get_secret_value())
+        return self.runtime()
+
+    def clear_live_settings(self):
+        self.require_live_settings_editable()
+        clear_credential(self.store.root)
+        return self.runtime()
 
     def chats(self):
         return {"items": self.store.list_chats()}

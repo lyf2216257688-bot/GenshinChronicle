@@ -14,7 +14,7 @@
 | `retrieval/bge-m3-sparse-v1-20261112-ready/`、`retrieval/python314-compatibility-20261113-r3/` | 分别为显式 S2 配套索引和用于校验运行时与既有索引兼容性的证明。 |
 | `retrieval/rerank-v1-handoff-20261113/` | P4 完整有序候选交接。排序选择器同时绑定冻结的 70Q 输入、分析和评审，定位见[选择器](../config/reranking-selected-v1.json)与 [P4 报告](../docs/research/clean-reranking-p4-handoff-20261113.md)。 |
 | `generation/clean-v1-local/` | 可配置的本地会话默认根。显式查询、Mock 测试以及有限研究使用各自的新根。 |
-| `generation/personal-chat-v1/` | 独立个人聊天软件的默认数据根。中央 `sessions.sqlite` 保存长期会话、草稿及不可变结果与反馈的引用。每个 `batches/<id>/` 独立保存许可、批次关闭记录、预算、请求账本与执行检查点。 |
+| `generation/personal-chat-v1/` | 独立个人聊天软件的默认数据根。中央 `sessions.sqlite` 保存长期会话、草稿及不可变结果与反馈的引用。`live-settings.json` 保存官方地址与 Windows 当前账号加密的凭据。`batches/<id>/` 独立保存许可、批次关闭记录、预算、请求账本与执行检查点。 |
 | `generation/g7-70q-baseline-20261117/` | 完整 G7 基线及审计。保留 `questions/` 原始轨迹、`records/` 逐题结果、`audit/` 独立判断、账目和 UNKNOWN 尝试。 |
 
 在用 Dense/BM25F 的 manifest 共同指向同一输入包，输入包再绑定 Chunk 与 Clean 的绝对路径。移动这些路径会使工作台的验证或源文回读失败。模型、解释器、wheel 和迁移凭据在 `.local/`，入口见[工作台运行前提](../docs/rag-workbench.md#运行前提)。

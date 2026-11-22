@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import type { Citation, Turn } from '../api/client.ts'
+import ChatIcon from './ChatIcon.vue'
 import MessageItem from './MessageItem.vue'
-const props = defineProps<{ turns: Turn[]; before: number | null; loading: boolean }>()
+const props = defineProps<{
+  turns: Turn[]
+  before: number | null
+  loading: boolean
+  demo: boolean
+  sourceTurn?: string
+  sourceCitation?: string
+}>()
 defineEmits<{
   older: []
   source: [Turn, Citation]
@@ -33,7 +41,7 @@ watch(
       <button v-if="before" class="older" @click="$emit('older')">加载更早的消息</button>
       <p v-if="loading" class="muted">正在读取会话…</p>
       <div v-else-if="!turns.length" class="empty">
-        <span class="large-mark" aria-hidden="true">GC</span>
+        <span class="large-mark"><ChatIcon name="mark" :size="39" /></span>
         <h2>开始一段世界观讨论</h2>
         <p>提出一个剧情问题，再沿着回答里的引用追问。</p>
       </div>
@@ -41,6 +49,8 @@ watch(
         v-for="t in turns"
         :key="t.id"
         :turn="t"
+        :demo="demo"
+        :source-citation="t.id === sourceTurn ? sourceCitation : undefined"
         @source="(c) => $emit('source', t, c)"
         @trace="$emit('trace', t)"
         @report="$emit('report', t)"

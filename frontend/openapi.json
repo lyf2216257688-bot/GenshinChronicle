@@ -33,6 +33,90 @@
         }
       }
     },
+    "/api/v1/live-settings": {
+      "put": {
+        "operationId": "save_live_settings",
+        "parameters": [
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Runtime"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveSettings"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "clear_live_settings",
+        "parameters": [
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Runtime"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/chats": {
       "get": {
         "operationId": "chats",
@@ -1182,6 +1266,31 @@
         "title": "Grant",
         "type": "object"
       },
+      "LiveSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "api_key": {
+            "format": "password",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Api Key",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "endpoint",
+          "api_key"
+        ],
+        "title": "LiveSettings",
+        "type": "object"
+      },
       "NewChat": {
         "additionalProperties": false,
         "properties": {
@@ -1330,6 +1439,28 @@
             "title": "Key Configured",
             "type": "boolean"
           },
+          "key_source": {
+            "enum": [
+              "local",
+              "environment",
+              "missing",
+              "unavailable"
+            ],
+            "title": "Key Source",
+            "type": "string"
+          },
+          "credential_storage_supported": {
+            "title": "Credential Storage Supported",
+            "type": "boolean"
+          },
+          "endpoint": {
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "data_root": {
+            "title": "Data Root",
+            "type": "string"
+          },
           "live_model": {
             "title": "Live Model",
             "type": "string"
@@ -1344,6 +1475,10 @@
           "instance",
           "issues",
           "key_configured",
+          "key_source",
+          "credential_storage_supported",
+          "endpoint",
+          "data_root",
           "live_model",
           "tokens_per_request"
         ],

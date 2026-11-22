@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Turn } from '../api/client.ts'
+import ChatIcon from './ChatIcon.vue'
 defineProps<{ turn: Turn }>()
 defineEmits<{ stop: []; resume: [] }>()
 const labels: Record<Turn['state'], string> = {
@@ -15,10 +16,19 @@ const labels: Record<Turn['state'], string> = {
 }
 </script>
 <template>
-  <div class="progress" role="status">
+  <div
+    class="progress"
+    :class="{ 'progress-card': turn.watching || turn.can_stop || turn.can_resume || !turn.has_answer }"
+    :data-state="turn.state"
+    role="status"
+  >
     <span class="status-dot" aria-hidden="true"></span> <strong>{{ labels[turn.state] }}</strong
     ><span v-if="turn.stage && (turn.watching || turn.can_resume)">{{ turn.stage }}</span>
-    <button v-if="turn.can_stop" class="text-action" @click="$emit('stop')">停止本轮</button>
-    <button v-if="turn.can_resume" class="text-action" @click="$emit('resume')">继续本轮</button>
+    <button v-if="turn.can_stop" class="secondary stop-action" @click="$emit('stop')">
+      <ChatIcon name="stop" :size="14" />停止本轮
+    </button>
+    <button v-if="turn.can_resume" class="primary resume-action" @click="$emit('resume')">
+      <ChatIcon name="resume" :size="14" />继续本轮
+    </button>
   </div>
 </template>

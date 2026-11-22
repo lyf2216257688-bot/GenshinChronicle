@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/live-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["save_live_settings"];
+        post?: never;
+        delete: operations["clear_live_settings"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chats": {
         parameters: {
             query?: never;
@@ -371,6 +387,16 @@ export interface components {
             /** Confirm Live */
             confirm_live: boolean;
         };
+        /** LiveSettings */
+        LiveSettings: {
+            /** Endpoint */
+            endpoint: string;
+            /**
+             * Api Key
+             * Format: password
+             */
+            api_key: string;
+        };
         /** NewChat */
         NewChat: {
             /**
@@ -426,6 +452,17 @@ export interface components {
             issues: string[];
             /** Key Configured */
             key_configured: boolean;
+            /**
+             * Key Source
+             * @enum {string}
+             */
+            key_source: "local" | "environment" | "missing" | "unavailable";
+            /** Credential Storage Supported */
+            credential_storage_supported: boolean;
+            /** Endpoint */
+            endpoint: string;
+            /** Data Root */
+            data_root: string;
             /** Live Model */
             live_model: string;
             /** Tokens Per Request */
@@ -559,6 +596,72 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Runtime"];
+                };
+            };
+            /** @description Product error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_live_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-GC-Client": "local-chat-v1";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiveSettings"];
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Runtime"];
+                };
+            };
+            /** @description Product error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clear_live_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-GC-Client": "local-chat-v1";
+            };
             path?: never;
             cookie?: never;
         };
