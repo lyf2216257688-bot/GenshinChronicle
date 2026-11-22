@@ -32,7 +32,7 @@ def citation_cases(store, repo, sid):
 if __name__ == "__main__":
     repo = Path(__file__).resolve().parents[2]
     root = Path(sys.argv[1]).resolve()
-    if root.parent != repo / "tmp/browser-chat" or not root.name.startswith("case-"):
+    if root.parent != repo / ".local/tmp/browser-chat" or not root.name.startswith("case-"):
         raise SystemExit("An isolated browser test directory is required.")
     store = ProductStore(root)
     grant = batches.latest(store, "MOCK")

@@ -18,6 +18,7 @@ from genshin_corpus.rag.clean_conversation_graph import fixture_settings, run_tu
 from genshin_corpus.rag.clean_executor import LocalExecutor
 from genshin_corpus.rag.clean_mock import FixturePipeline, fixture_inputs, MockOpener, mock_answer
 from genshin_corpus.retrieval.clean_based.source import InputReader
+from tests.scratch import scratch_root
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -27,8 +28,8 @@ class Crash(BaseException): pass
 
 class ConversationTests(unittest.TestCase):
     def setUp(self):
-        scratch = REPO / "tmp-g4"; scratch.mkdir(exist_ok=True)
-        self.temp = TemporaryDirectory(dir=scratch); self.addCleanup(self.temp.cleanup)
+        self.temp = TemporaryDirectory(dir=scratch_root())
+        self.addCleanup(self.temp.cleanup)
         self.store = ConversationStore(self.temp.name)
         self.addCleanup(lambda: shutil.rmtree(self.store.root) if self.store.root.exists() else None)
         self.settings = fixture_settings()

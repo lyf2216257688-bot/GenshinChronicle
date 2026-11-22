@@ -8,6 +8,7 @@ import os
 import tempfile
 import unittest
 from tests.responses_fixture import single_message_events
+from tests.scratch import scratch_root
 import unittest.mock
 from pathlib import Path
 
@@ -50,7 +51,7 @@ def success(name: str) -> httpx.Response:
 
 class SdkRunnerTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory(dir="D:/GenshinChronicle")
+        self.temp = tempfile.TemporaryDirectory(dir=scratch_root())
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / "run"
 

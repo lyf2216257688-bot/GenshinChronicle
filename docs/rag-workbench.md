@@ -21,10 +21,10 @@
 
 | 用途 | 环境与依赖 |
 | --- | --- |
-| Generation / Mock UI | `.local/runtime-py314/generation/Scripts/python.exe` · [Generation 锁](../requirements-py314-generation.lock) · [UI 锁](../requirements-py314-generation-ui.lock) |
-| Dense / Sparse 编码 | `.local/runtime-py314/dense-sparse/Scripts/python.exe` · [Dense 依赖](../requirements-py314-dense.txt) |
+| Generation / Mock UI | `.local/runtime-py314/generation/Scripts/python.exe` · [Generation 锁](../requirements/requirements-py314-generation.lock) · [UI 锁](../requirements/requirements-py314-generation-ui.lock) |
+| Dense / Sparse 编码 | `.local/runtime-py314/dense-sparse/Scripts/python.exe` · [Dense 依赖](../requirements/requirements-py314-dense.txt) |
 | BM25F 查询 | `.local/rag-index-prep-20261109/bm25f-runtime/Scripts/python.exe` · [运行时迁移说明](research/python314-migration-20261113.md) |
-| BGE 重排 | `.local/runtime-py314/reranker/Scripts/python.exe` · [Reranker 依赖](../requirements-py314-reranker.txt) |
+| BGE 重排 | `.local/runtime-py314/reranker/Scripts/python.exe` · [Reranker 依赖](../requirements/requirements-py314-reranker.txt) |
 
 ## 离线运行
 

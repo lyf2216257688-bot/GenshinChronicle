@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import redirect_stdout
 from io import StringIO
 import json
-from pathlib import Path
 import shutil
 from types import SimpleNamespace
 from unittest import TestCase
@@ -13,11 +12,12 @@ from uuid import uuid4
 from genshin_corpus.rag.__main__ import main as query_main
 from genshin_corpus.rag.embedding_70q import PROFILES, export_review, tally_review, write_jsonl
 from genshin_corpus.ui.runtime import PreparedStateOwner
+from tests.scratch import scratch_root
 
 
 class EmbeddingComparisonTests(TestCase):
     def test_review_export_keeps_references_and_pending_verdicts_separate(self):
-        root = Path("tmp") / f"paired-evidence-{uuid4().hex}"
+        root = scratch_root() / f"paired-evidence-{uuid4().hex}"
         root.mkdir(parents=True)
         self.addCleanup(shutil.rmtree, root)
         question = SimpleNamespace(question_id="Q001", question="问题")
@@ -48,7 +48,7 @@ class EmbeddingComparisonTests(TestCase):
         self.assertEqual(decision["run_identity"], "fixture")
 
     def test_tally_uses_the_blind_key_and_rejects_cross_run_decisions(self):
-        root = Path("tmp") / f"paired-tally-{uuid4().hex}"
+        root = scratch_root() / f"paired-tally-{uuid4().hex}"
         review_root = root / "review"
         review_root.mkdir(parents=True)
         self.addCleanup(shutil.rmtree, root)

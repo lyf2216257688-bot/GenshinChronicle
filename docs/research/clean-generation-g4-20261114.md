@@ -70,7 +70,7 @@ Parent展示来自保存的合法源回读，不猜content_id或任意路径；�
 
 1. G1锁固定`websockets==17.4`，本机Streamlit1.63要求`<17`。保留原锁，
    固定兼容的Streamlit1.67及其24项新增依赖到
-   [可选UI锁](../../requirements-py314-generation-ui.lock)，由其引用原G1锁。
+   [可选UI锁](../../requirements/requirements-py314-generation-ui.lock)，由其引用原G1锁。
    两份锁在本工作树隔离3.14.5环境安装，`pip check`通过；没有改主工作树或ML环境。
 2. G3的`offline_only`临时修改进程全局socket方法；直接在Streamlit进程的后台线程运行
    Mock会与本地socket通信冲突。G4将图执行隔离为本地子进程，复用已有Windows Job owner，
@@ -114,7 +114,7 @@ Parent展示来自保存的合法源回读，不猜content_id或任意路径；�
 ```powershell
 $env:PYTHONPATH = 'src'
 $py = './.local/runtime-py314/generation/Scripts/python.exe'
-& $py -m pip install --require-hashes -r requirements-py314-generation-ui.lock
+& $py -m pip install --require-hashes -r requirements/requirements-py314-generation-ui.lock
 $env:GC_CLEAN_CHAT_ROOT = 'data/generation/g4-my-mock'
 & $py -m streamlit run src/genshin_corpus/ui/clean_chat_app.py `
   --server.address 127.0.0.1 --server.headless true --browser.gatherUsageStats false

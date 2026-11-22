@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 
 from genshin_corpus.retrieval import navi_f2_continue_46 as c
+from tests.scratch import scratch_root
 
 
 def result(state, validation, *, stream='PASS', output=20):
@@ -107,7 +108,7 @@ class ContinuationTests(unittest.TestCase):
             put(folder / 'result.json', recorded)
             put(root / 'validation' / (row['request_id'] + '.json'), {'state': 'NOT_SENT', 'usage': 'UNKNOWN'})
             return {'state': 'NOT_SENT', 'usage': 'UNKNOWN'}
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp, \
+        with tempfile.TemporaryDirectory(dir=scratch_root()) as temp, \
              patch.object(c, 'OUT', Path(temp) / 'new-run'), \
              patch('sys.argv', ['runner', '--execute-authorized', '--ack-slots-3-through-48']), \
              patch.object(c, 'verify_prior', return_value=manifest), \
@@ -145,7 +146,7 @@ class ContinuationTests(unittest.TestCase):
         manifest = c.verify_prior()
         row = manifest['records'][2]
         for sent in (False, True):
-            with self.subTest(headers_started=sent), tempfile.TemporaryDirectory(dir=Path.cwd()) as temp:
+            with self.subTest(headers_started=sent), tempfile.TemporaryDirectory(dir=scratch_root()) as temp:
                 root = Path(temp)
                 (root / 'validation').mkdir()
                 def fail(request):

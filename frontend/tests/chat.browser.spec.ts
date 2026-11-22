@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const scratch = path.join(repo, 'tmp', 'browser-chat')
+const scratch = path.join(repo, '.local', 'tmp', 'browser-chat')
 const python = path.join(repo, '.local/runtime-py314/generation/Scripts/python.exe')
 const env = {
   ...process.env,

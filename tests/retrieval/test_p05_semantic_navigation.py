@@ -28,6 +28,7 @@ from genshin_corpus.retrieval.semantic_compilation import (
     traverse_graph,
     write_semantic_build,
 )
+from tests.scratch import scratch_root
 
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "retrieval" / "p05-story-rus.json"
@@ -70,7 +71,7 @@ class _Decision:
 
 class P05SemanticNavigationTests(unittest.TestCase):
     def setUp(self):
-        self.root = Path("tmp") / f"p05-semantic-{uuid4().hex}"
+        self.root = scratch_root() / f"p05-semantic-{uuid4().hex}"
         self.root.mkdir(parents=True)
         self.rows = {row["unit_id"]: row for row in json.loads(FIXTURE.read_text(encoding="utf-8"))}
         bindings = {

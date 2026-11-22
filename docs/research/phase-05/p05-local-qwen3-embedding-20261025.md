@@ -27,7 +27,7 @@ BM25/Hybrid及分时BGE重排已运行成功。此状态不表示全库质量或
 | 新Dense索引 | 验证目录的 `dense/metadata/manifest.json` 和 `dense/artifacts/` |
 | 本地适配器 | `src/genshin_corpus/retrieval/local_qwen3_embedding.py` |
 | 验证/查询入口 | `src/genshin_corpus/retrieval/local_qwen3_validation.py` |
-| 环境版本锁 | `requirements-local-qwen3-embedding.txt` |
+| 环境版本锁 | [`requirements-local-qwen3-embedding.txt`](../../../requirements/requirements-local-qwen3-embedding.txt) |
 
 模型：[`Qwen/Qwen3-Embedding-0.6B`](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B)。
 固定官方revision：`97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`。

@@ -32,7 +32,7 @@ Plan、索引/统一输入/Clean/Chunk清单、迁移seal和P4 handoff seal。
 
 正式新环境：`.local/runtime-py314/generation/`，与Dense、词法和Reranker隔离。
 先在`.local/generation-framework-check/`安装并运行兼容夹具，再将同一wheel集合安装到正式环境。
-[requirements-py314-generation.lock](../../requirements-py314-generation.lock)固定41项依赖及SHA256：
+[requirements-py314-generation.lock](../../requirements/requirements-py314-generation.lock)固定41项依赖及SHA256：
 LangGraph 1.2.22、checkpoint 4.3.2、SQLite checkpoint 3.1.3；`pip check`通过。
 LangSmith为框架传递依赖；没有使用云服务、Store或遥测，tracing显式关闭。
 框架存在一条第三方`asyncio.iscoroutinefunction`弃用警告；未影响本轮运行。

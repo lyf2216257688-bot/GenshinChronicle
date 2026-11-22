@@ -11,6 +11,7 @@ from genshin_corpus.evidence_io import read, seal, sha, write
 from genshin_corpus.model_call_sessions import SessionCalls
 from genshin_corpus.rag.clean_store import Store
 from genshin_corpus.rag.clean_graph import mock_attempt, run_mock
+from tests.scratch import scratch_root
 
 LIMITS = {"campaign_requests": 5, "campaign_tokens": 100, "turn_requests": 2, "turn_tokens": 20}
 
@@ -21,9 +22,8 @@ class Crash(BaseException):
 
 class SessionTests(unittest.TestCase):
     def setUp(self):
-        scratch = Path(__file__).resolve().parents[2] / "tmp-g1"
-        scratch.mkdir(exist_ok=True)
-        self.temp = TemporaryDirectory(dir=scratch); self.addCleanup(self.temp.cleanup)
+        self.temp = TemporaryDirectory(dir=scratch_root())
+        self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.store = Store(self.root)
         self.tid = self.store.submit("s1", "submit", "问题", "fixture")

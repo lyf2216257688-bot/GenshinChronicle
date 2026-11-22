@@ -9,12 +9,12 @@ from genshin_corpus.evidence_io import digest, read
 from genshin_corpus.local_chat import contract, credentials, presentation
 from genshin_corpus.local_chat.api import REPO, create_app
 from genshin_corpus.local_chat.batches import ExecutionView
+from tests.scratch import scratch_root
 
 
 class ChatProductTests(unittest.TestCase):
     def setUp(self):
-        scratch = REPO / "tmp" / "chat-tests"
-        scratch.mkdir(parents=True, exist_ok=True)
+        scratch = scratch_root()
         # Windows' ordinary path spelling cannot remove the nested sealed attempt files.
         self.temp = TemporaryDirectory(dir=("\\\\?\\" + str(scratch)) if os.name == "nt" else scratch)
         self.addCleanup(self.temp.cleanup)

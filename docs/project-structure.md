@@ -10,12 +10,14 @@
 | `src/genshin_corpus/` | Python 包，运行时通过 `PYTHONPATH=src` 导入。 |
 | `Start-GC-Chat.cmd`、`frontend/` | Windows 聊天启动器，Vue 3 / TypeScript 页面、产品契约快照、前端操作与浏览器测试。编译页面随产品包交付。 |
 | `config/` | 版本化运行选择器、显式实验配置和安全样例。实验计划的绑定以其报告和 manifest 为准。 |
-| `requirements-*` | 各隔离运行时的依赖或锁。历史依赖文件照原实验保留。 |
+| [`requirements/`](../requirements/) | Python 各隔离运行时的依赖清单和锁。安装命令使用 `-r requirements/<文件名>`。 |
 | `scripts/retrieval/` | 版本化的构建、迁移、对照及交接 PowerShell 入口，以及有限研究 helper。 |
 | `tests/` | 夹具测试、离线回放和本地 UI 测试。小型净化数据位于 `tests/fixtures/` 和各子套件。 |
 | `data/` | Raw 证据、派生产物、运行历史及封存回执。 |
 | `docs/` | 层架构、阶段合同、技术决策、运营指南和日期研究。依据[文档导航](current-phase.md#文档导航)选择事实主文档。 |
-| `.local/`、`logs/`、`tmp*/` | Git 忽略的本地环境、私有输入、运行日志与测试暂存。历史日志或一次性复核脚本可能是唯一证据。 |
+| `.local/` | Git 忽略的本地环境、模型、私有输入、运行日志与归档。需要在仓库内写入的临时测试使用 `.local/tmp/`。 |
+
+2026-11-22 整理时，根目录原有的 `logs/`、`tmp*/` 和 Phase05 本地工作文档 `PROJECT.md`、`TEST_INFRA.md`、`TEST_READY.md` 原样归档在 `.local/archive/root-cleanup-20261122/`，保留原文件名和下级层次。依赖清单迁入 `requirements/`，文件名、内容和锁内引用保持原样。
 
 ## 源码包
 

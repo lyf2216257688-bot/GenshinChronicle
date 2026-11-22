@@ -14,6 +14,7 @@ import streamlit as st
 from genshin_corpus.rag.clean_conversation import ConversationStore
 from genshin_corpus.rag.clean_conversation_graph import fixture_settings
 from genshin_corpus.rag.clean_executor import LocalExecutor
+from tests.scratch import scratch_root
 
 REPO = Path(__file__).resolve().parents[2]
 APP = REPO / "src/genshin_corpus/ui/clean_chat_app.py"
@@ -21,8 +22,7 @@ APP = REPO / "src/genshin_corpus/ui/clean_chat_app.py"
 
 class ChatAppTests(unittest.TestCase):
     def setUp(self):
-        scratch = REPO / "tmp-g4-ui"; scratch.mkdir(exist_ok=True)
-        self.temp = TemporaryDirectory(dir=scratch)
+        self.temp = TemporaryDirectory(dir=scratch_root())
         self.store = ConversationStore(self.temp.name)
         self.workers = []
         self.env = patch.dict(os.environ, {"GC_CLEAN_CHAT_ROOT": str(self.store.root), "LANGSMITH_TRACING": "false",

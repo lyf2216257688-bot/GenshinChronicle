@@ -264,7 +264,7 @@ Create-only intents under `chat_submissions/` precede G1 turn publication, allow
 the turn/job/message gap to reconcile without losing correction metadata or
 starting execution. `executor_runs/` retains worker PID/log/shutdown receipts.
 
-The optional `requirements-py314-generation-ui.lock` extends the immutable G1
+The optional [UI lock](../../requirements/requirements-py314-generation-ui.lock) extends the immutable G1
 framework lock in the isolated regular-GIL 3.14.5 Generation environment. It must
 resolve with the original pins; no ML runtime or existing lock is changed.
 

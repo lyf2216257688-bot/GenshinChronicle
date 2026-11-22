@@ -17,6 +17,7 @@ from genshin_corpus.rag.clean_mock import fixture_inputs, FixturePipeline, MockO
 from genshin_corpus.rag.clean_store import put
 from genshin_corpus.retrieval.clean_based.source import InputReader
 from genshin_corpus.retrieval.clean_based.query_v2 import validate_ancestry
+from tests.scratch import scratch_root
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -32,8 +33,7 @@ class Pipeline(FixturePipeline):
 
 class LiveTests(unittest.TestCase):
     def setUp(self):
-        scratch = REPO / "tmp-g4-live"; scratch.mkdir(exist_ok=True)
-        self.temp = TemporaryDirectory(dir=scratch)
+        self.temp = TemporaryDirectory(dir=scratch_root())
         self.store = ConversationStore(self.temp.name)
         self.addCleanup(self.temp.cleanup)
         self.addCleanup(lambda: shutil.rmtree(self.store.root) if self.store.root.exists() else None)

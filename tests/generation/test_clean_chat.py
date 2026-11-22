@@ -19,6 +19,7 @@ from genshin_corpus.generation.clean_chat_transport import (
 )
 from genshin_corpus.generation import clean_probe
 from genshin_corpus.rag.clean_store import Store
+from tests.scratch import scratch_root
 
 TOOLS = [{"type": "function", "function": {"name": "read_probe_evidence", "description": "Read fixture evidence.",
     "parameters": {"type": "object", "properties": {"handle": {"type": "string", "enum": ["amber", "tide"]}},
@@ -108,9 +109,8 @@ class ChatTests(unittest.TestCase):
         with self.assertRaises(ValueError):replace(req,messages=history,argument_error_feedback=False).manifest()
 
     def setUp(self):
-        scratch = Path(__file__).resolve().parents[2] / "tmp-g3"
-        scratch.mkdir(exist_ok=True)
-        self.tmp = TemporaryDirectory(dir=scratch); self.addCleanup(self.tmp.cleanup)
+        self.tmp = TemporaryDirectory(dir=scratch_root())
+        self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name); self.store = Store(self.root)
         self.tid = self.store.submit("s1", "submit", "Fixture", "probe")
         self.bridge = ChatSessions(self.store, "probe", LIMITS)

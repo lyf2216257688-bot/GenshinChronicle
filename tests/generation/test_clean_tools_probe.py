@@ -9,6 +9,7 @@ from urllib.error import URLError
 
 from genshin_corpus.evidence_io import read, sha, verify
 from genshin_corpus.generation import clean_tools_probe as probe
+from tests.scratch import scratch_root
 from . import test_clean_chat as f
 
 
@@ -33,9 +34,8 @@ def openers():
 
 class ToolsProbeTests(unittest.TestCase):
     def setUp(self):
-        scratch = Path(__file__).resolve().parents[2] / "tmp-g3"
-        scratch.mkdir(exist_ok=True)
-        self.tmp = TemporaryDirectory(dir=scratch); self.addCleanup(self.tmp.cleanup)
+        self.tmp = TemporaryDirectory(dir=scratch_root())
+        self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name); self.root = self.base / "data/generation/p"
         guard = patch.object(socket.socket, "connect", side_effect=AssertionError("No network"))
         mocked = guard.start(); self.addCleanup(guard.stop); self.addCleanup(mocked.assert_not_called)

@@ -4,7 +4,7 @@ Comprehensive Opaque-Box E2E Test Suite for Phase 05 E2 Research Mode & Broadene
 Methodology: Category-Partition + Boundary Value Analysis + Combinatorial + Real-World Workload Testing.
 Strictly 100% offline testing with zero live network calls, zero credentials, zero paid API charges.
 
-Covers all 4 Tiers from TEST_INFRA.md:
+Covers four offline test tiers:
 - Tier 1: Feature Coverage (F1 through F9, >=5 tests per feature area)
 - Tier 2: Boundary & Corner Cases (>=5 tests)
 - Tier 3: Cross-Feature Combinations (Pairwise, >=5 tests)

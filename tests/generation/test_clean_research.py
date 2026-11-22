@@ -18,6 +18,7 @@ from genshin_corpus.rag import clean_research as r
 from genshin_corpus.rag import clean_research_live as live
 from genshin_corpus.retrieval.clean_based.query_v2 import validate_ancestry
 from genshin_corpus.retrieval.clean_based.source import InputReader
+from tests.scratch import scratch_root
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -61,8 +62,8 @@ def finish(reason="sufficient"):
 
 class ResearchTests(unittest.TestCase):
     def setUp(self):
-        scratch = REPO / "tmp-g5"; scratch.mkdir(exist_ok=True)
-        self.tmp = TemporaryDirectory(dir=scratch); self.addCleanup(self.tmp.cleanup)
+        self.tmp = TemporaryDirectory(dir=scratch_root())
+        self.addCleanup(self.tmp.cleanup)
         self.store = ConversationStore(self.tmp.name)
         manifest = fixture_inputs(REPO, self.store.root / "corpus")
         self.reader = InputReader(manifest); self.addCleanup(self.reader.close)

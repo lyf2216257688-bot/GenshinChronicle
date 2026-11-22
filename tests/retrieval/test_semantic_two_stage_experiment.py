@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from tests.responses_fixture import single_message_events
+from tests.scratch import scratch_root
 from unittest.mock import patch
 
 import httpx
@@ -24,7 +25,7 @@ from genshin_corpus.retrieval.semantic_sdk_runner import run_sdk_route_pair, aud
 
 class TwoStageExperimentTest(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2])
+        self.temp = tempfile.TemporaryDirectory(dir=scratch_root())
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.payload = {"schema_version": "fixture", "segments": [{"segment_id": "s1", "text": "A waits"}]}
