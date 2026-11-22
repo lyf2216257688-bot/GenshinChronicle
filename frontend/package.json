@@ -1,0 +1,21 @@
+{
+  "name": "genshinchronicle-chat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "openapi-typescript openapi.json -o src/api/generated.ts",
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "node --experimental-strip-types --test tests/actions.test.ts",
+    "test:browser": "node node_modules/@playwright/test/cli.js test"
+  },
+  "dependencies": { "vue": "^3.5.0" },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "openapi-typescript": "^7.9.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.0",
+    "vue-tsc": "^3.1.0"
+  }
+}

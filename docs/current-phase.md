@@ -4,9 +4,11 @@
 
 ## 当前工作与下一步
 
-2026-11-21 的工作范围为文档治理与可再生缓存清理。六阶段实现、选择器与数据保持在原路径。G7 第二部分的 70 题语义审计已完成，完整基线及审计保留在原数据根。下一步由操作者审阅治理结果和既有 G7 审计。各已关闭额度及 UNKNOWN 记录继续受原合同约束，优化、恢复派发和 Serving 采用须有独立工作范围。
+2026-11-22 已实现独立的 [Windows 本地聊天 V1](local-chat.md)，包含稳定的产品接口、持久化多轮会话、跨批次续聊、停止与显式恢复、原文回读和反馈。前端与原有 Clean RAG 通过[产品合同](phases/local-chat-v1.md)相接。工程验收使用离线夹具、内存模型传输和本机 Edge。下一项真实语义验收需要单独开启有限批次，本次开发未发起付费请求。六阶段算法、默认选择器及已封存 G7 审计沿用既有基线。
 
-G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNOWN。55 个最终答案的单人非盲审计评为 43 正确、8 部分正确、1 不受证据支持的错误身份断言、3 证据不足；其余 15 题无法评价。43 个正确核心答案中有 12 个仍依赖汇编或考据，主要文本尚未独立闭环。审计判断与原始运行状态独立保存，费用和实际扣款保持原审计的不确定性。此结果属于狭义语料判断，产品验收仍开放。见 [G7 审计](research/clean-generation-g7-70q-quality-audit-20261117.md)。
+V1 工程验收通过 9 项产品接口与业务测试、4 项独立前端操作测试、3 个 Edge 场景和 149 项原有工作台、证据及模型协议回归。Edge 场景涵盖启动器冷启动与复用、服务重启后的跨批次追问、原操作显式恢复，以及对无绑定引用、无效编号和证据不足的反馈回查。[产品测试](../tests/local_chat/test_product.py) · [浏览器场景](../frontend/tests/chat.browser.spec.ts)
+
+G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNOWN。55 个最终答案的单人非盲审计评为 43 正确、8 部分正确、1 不受证据支持的错误身份断言、3 证据不足；其余 15 题无法评价。43 个正确核心答案中有 12 个仍依赖汇编或考据，主要文本尚未独立闭环。审计判断与原始运行状态独立保存，费用和实际扣款保持原审计的不确定性。此结果属于狭义语料判断，真实剧情回答质量的产品验收仍开放。见 [G7 审计](research/clean-generation-g7-70q-quality-audit-20261117.md)。
 
 ## 已选定的本地链
 
@@ -17,7 +19,7 @@ G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNO
 | Indexing | 固定输入包上的 BGE-M3 1024d Dense 和 BM25F 为选定索引。完整的 BGE-M3 Sparse 供显式 S2 使用。 |
 | Retrieval | S0（BM25F + Dense，`f1_max`）是 Clean 本地链默认。S2 是冻结的显式研究选项，S1 和补充式 Sparse 结果保留为实验。 |
 | Reranking | BGE reranker v2 m3 + 保守结构处理（`bge_structural`），MMR 关闭。`bge_relevance` 可显式使用同一评分，自动回退关闭。 |
-| Generation | 独立工作台支持本地证据组装及持久化对话。独立 UI 默认 Mock。需显式有限许可的 G5/G6 研究配置选用 DeepSeek 官方 `deepseek-flash`，工作台保持 opt-in。 |
+| Generation | 独立工作台支持本地证据组装、持久化对话，原 Streamlit 工作台默认 Mock。个人聊天软件另有 Windows 入口，提供离线演示及显式开启有限批次的真实问答。G5/G6 研究配置选用 DeepSeek 官方 `deepseek-flash`。 |
 
 [六阶段实现、配置和入口](rag-workbench.md) · [数据与索引绑定](../data/README.md) · [阶段验收与实验](research/README.md)
 
@@ -44,4 +46,5 @@ G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNO
 - [Raw 采集](phases/phase-01-raw-collection.md) · [Clean V1](phases/clean-v1.md) · [Chunking V2/V2.1](phases/chunking-v2.md)
 - [统一索引输入](phases/indexing-input-v1.md) · [物理索引构建与独立查询](phases/index-benchmark-v1.md) · [Sparse 构建](phases/sparse-build-v1.md)
 - [Clean Retrieval](phases/clean-retrieval-v1.md) · [冻结召回比较](phases/recall-experiment-v1.md) · [Clean Reranking](phases/clean-reranking-v1.md) · [Clean Generation](phases/clean-generation-v1.md)
+- [个人聊天 V1 产品合同](phases/local-chat-v1.md) · [Windows 使用与开发说明](local-chat.md)
 - [Legacy Parsed](phases/phase-02-parsed-schema.md) · [Legacy Canonical](phases/phase-03-canonical-schema.md) · [Legacy Phase04 RAG](phases/phase-04-retrieval-evidence-assembly.md) · [暂停的 Phase05](phases/phase-05-source-bound-semantic-navigation.md)

@@ -1,0 +1,1708 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GenshinChronicle Local Chat",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/runtime": {
+      "get": {
+        "operationId": "runtime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Runtime"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chats": {
+      "get": {
+        "operationId": "chats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chats"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "new_chat",
+        "parameters": [
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewChat"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chats/{sid}": {
+      "patch": {
+        "operationId": "rename",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rename"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chats/{sid}/draft": {
+      "get": {
+        "operationId": "draft",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "save_draft",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Draft"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chats/{sid}/turns": {
+      "get": {
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Exclusive turn sequence",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "submit",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Draft"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}": {
+      "get": {
+        "operationId": "turn",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/stop": {
+      "post": {
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/resume": {
+      "post": {
+        "operationId": "resume",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/events": {
+      "get": {
+        "operationId": "events",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Last received event sequence",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Last received event sequence",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnEvent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/packets/{packet}/citations/{cid}": {
+      "get": {
+        "operationId": "citation",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packet",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/trace": {
+      "get": {
+        "operationId": "trace",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trace"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/turns/{tid}/feedback": {
+      "post": {
+        "operationId": "report",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback": {
+      "get": {
+        "operationId": "feedback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reports"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/batches": {
+      "get": {
+        "operationId": "batches",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batches"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "open_batch",
+        "parameters": [
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Grant"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/batches/{bid}/close": {
+      "post": {
+        "operationId": "close_batch",
+        "parameters": [
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Batch": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "MOCK",
+              "LIVE"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "open",
+              "closed",
+              "expired",
+              "exhausted",
+              "read_only"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "expires": {
+            "title": "Expires",
+            "type": "number"
+          },
+          "requests": {
+            "title": "Requests",
+            "type": "integer"
+          },
+          "max_requests": {
+            "title": "Max Requests",
+            "type": "integer"
+          },
+          "known_tokens": {
+            "title": "Known Tokens",
+            "type": "integer"
+          },
+          "max_tokens": {
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "unknown_usage": {
+            "title": "Unknown Usage",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "mode",
+          "state",
+          "model",
+          "expires",
+          "requests",
+          "max_requests",
+          "known_tokens",
+          "max_tokens",
+          "unknown_usage"
+        ],
+        "title": "Batch",
+        "type": "object"
+      },
+      "Batches": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Batch"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Batches",
+        "type": "object"
+      },
+      "Chat": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "MOCK",
+              "LIVE"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "mode"
+        ],
+        "title": "Chat",
+        "type": "object"
+      },
+      "Chats": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Chat"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Chats",
+        "type": "object"
+      },
+      "Citation": {
+        "additionalProperties": false,
+        "properties": {
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "packet_id": {
+            "title": "Packet Id",
+            "type": "string"
+          },
+          "citation_id": {
+            "title": "Citation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "packet_id",
+          "citation_id"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
+      "Draft": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 12000,
+            "title": "Text",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "question",
+              "requirement",
+              "correction_fact",
+              "correction_intent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "token",
+          "revision",
+          "text",
+          "kind",
+          "target"
+        ],
+        "title": "Draft",
+        "type": "object"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "Feedback": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "answer",
+              "missing_evidence",
+              "citation",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Citation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "chat_id": {
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "result_hash": {
+            "title": "Result Hash",
+            "type": "string"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "created": {
+            "title": "Created",
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "note",
+          "id",
+          "chat_id",
+          "turn_id",
+          "question",
+          "result_hash",
+          "engine",
+          "created"
+        ],
+        "title": "Feedback",
+        "type": "object"
+      },
+      "Grant": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "MOCK",
+              "LIVE"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "requests": {
+            "maximum": 10,
+            "minimum": 2,
+            "title": "Requests",
+            "type": "integer"
+          },
+          "minutes": {
+            "maximum": 120,
+            "minimum": 1,
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "confirm_live": {
+            "title": "Confirm Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "requests",
+          "minutes",
+          "confirm_live"
+        ],
+        "title": "Grant",
+        "type": "object"
+      },
+      "NewChat": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "MOCK",
+              "LIVE"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "title": {
+            "default": "新对话",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "NewChat",
+        "type": "object"
+      },
+      "Page": {
+        "additionalProperties": false,
+        "properties": {
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            },
+            "title": "Turns",
+            "type": "array"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          }
+        },
+        "required": [
+          "turns",
+          "before"
+        ],
+        "title": "Page",
+        "type": "object"
+      },
+      "Rename": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "Rename",
+        "type": "object"
+      },
+      "Report": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "answer",
+              "missing_evidence",
+              "citation",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Citation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "category",
+          "note"
+        ],
+        "title": "Report",
+        "type": "object"
+      },
+      "Reports": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Feedback"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Reports",
+        "type": "object"
+      },
+      "Runtime": {
+        "additionalProperties": false,
+        "properties": {
+          "product": {
+            "const": "gc-personal-chat-1",
+            "title": "Product",
+            "type": "string"
+          },
+          "instance": {
+            "title": "Instance",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "key_configured": {
+            "title": "Key Configured",
+            "type": "boolean"
+          },
+          "live_model": {
+            "title": "Live Model",
+            "type": "string"
+          },
+          "tokens_per_request": {
+            "title": "Tokens Per Request",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product",
+          "instance",
+          "issues",
+          "key_configured",
+          "live_model",
+          "tokens_per_request"
+        ],
+        "title": "Runtime",
+        "type": "object"
+      },
+      "Source": {
+        "additionalProperties": false,
+        "properties": {
+          "citation": {
+            "$ref": "#/components/schemas/Citation"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "support_note": {
+            "title": "Support Note",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SourceLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "texts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Texts",
+            "type": "array"
+          },
+          "parent_texts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parent Texts",
+            "type": "array"
+          },
+          "has_parent": {
+            "title": "Has Parent",
+            "type": "boolean"
+          },
+          "context": {
+            "additionalProperties": true,
+            "title": "Context",
+            "type": "object"
+          },
+          "locators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Locators",
+            "type": "array"
+          }
+        },
+        "required": [
+          "citation",
+          "title",
+          "support_note",
+          "lines",
+          "texts",
+          "parent_texts",
+          "has_parent",
+          "context",
+          "locators"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "SourceLine": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "dialogue": {
+            "title": "Dialogue",
+            "type": "boolean"
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "condition_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Status"
+          }
+        },
+        "required": [
+          "text",
+          "dialogue",
+          "speaker",
+          "conditions",
+          "condition_status"
+        ],
+        "title": "SourceLine",
+        "type": "object"
+      },
+      "Trace": {
+        "additionalProperties": false,
+        "properties": {
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Queries",
+            "type": "array"
+          },
+          "reads": {
+            "title": "Reads",
+            "type": "integer"
+          },
+          "dispositions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Dispositions",
+            "type": "object"
+          },
+          "stop_reason": {
+            "title": "Stop Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "queries",
+          "reads",
+          "dispositions",
+          "stop_reason"
+        ],
+        "title": "Trace",
+        "type": "object"
+      },
+      "Turn": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "chat_id": {
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "user_message": {
+            "title": "User Message",
+            "type": "string"
+          },
+          "assistant_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Message"
+          },
+          "result_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Hash"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "interrupted",
+              "completed",
+              "partial",
+              "cancelled",
+              "unknown",
+              "failed",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "has_answer": {
+            "title": "Has Answer",
+            "type": "boolean"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "can_trace": {
+            "title": "Can Trace",
+            "type": "boolean"
+          },
+          "can_stop": {
+            "title": "Can Stop",
+            "type": "boolean"
+          },
+          "can_resume": {
+            "title": "Can Resume",
+            "type": "boolean"
+          },
+          "watching": {
+            "title": "Watching",
+            "type": "boolean"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "draft": {
+            "title": "Draft",
+            "type": "string"
+          },
+          "cursor": {
+            "title": "Cursor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "chat_id",
+          "sequence",
+          "batch_id",
+          "question",
+          "user_message",
+          "assistant_message",
+          "result_hash",
+          "state",
+          "has_answer",
+          "answer",
+          "detail",
+          "stop_reason",
+          "citations",
+          "can_trace",
+          "can_stop",
+          "can_resume",
+          "watching",
+          "stage",
+          "draft",
+          "cursor"
+        ],
+        "title": "Turn",
+        "type": "object"
+      },
+      "TurnEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "stage",
+              "draft",
+              "refresh",
+              "settled",
+              "error"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "const": "running",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "State"
+          }
+        },
+        "required": [
+          "sequence",
+          "kind",
+          "text"
+        ],
+        "title": "TurnEvent",
+        "type": "object"
+      }
+    }
+  }
+}

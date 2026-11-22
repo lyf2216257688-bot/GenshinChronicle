@@ -8,6 +8,7 @@
 
 | 任务 | 入口 |
 | --- | --- |
+| 开始本机聊天、找回上次的讨论 | 双击 [Start-GC-Chat.cmd](Start-GC-Chat.cmd)，见[聊天使用说明](docs/local-chat.md) |
 | 本地问题到可核读的 Evidence Packet | [S0 本地查询](docs/rag-workbench.md#离线运行) |
 | 检查结果、证据和历史评估 | [已交付成果与实验索引](docs/research/README.md) |
 | 修改或扩展一个阶段 | [工作规则](AGENTS.md)、[架构](docs/architecture-overview.md)、[阶段合同](docs/current-phase.md#阶段合同) |

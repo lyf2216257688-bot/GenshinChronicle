@@ -25,6 +25,8 @@ Official source → Raw → Clean → Chunking → Indexing
 
 **Query ownership.** Generation can explicitly request a new upstream query under its bounded contract. Retrieval continues to own discovery, Reranking continues to own ordering, and Assembly operates on their outputs. The model consumes the assembled Packet; generated claims require support from the cited evidence in that Packet.
 
+The [local chat client](phases/local-chat-v1.md) consumes published turn, source and progress views through a versioned product API. The product adapter owns chat identities, drafts, per-turn grant selection and feedback. The existing Generation engine owns research decisions, model calls, publication and evidence binding.
+
 ## Preserved interfaces
 
 - [Parsed](phases/phase-02-parsed-schema.md) maintains source-specific deterministic structure, Raw references, fingerprints, parser versions and explicit unsupported states. [Canonical](phases/phase-03-canonical-schema.md) keeps stable structural records, exact Parsed lineage, and the difference between actual RawRefs and dependencies introduced in projection.

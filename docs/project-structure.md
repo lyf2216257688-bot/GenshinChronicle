@@ -8,6 +8,7 @@
 | --- | --- |
 | `README.md`、`AGENTS.md` | 项目入口和仓库工程规则。 |
 | `src/genshin_corpus/` | Python 包，运行时通过 `PYTHONPATH=src` 导入。 |
+| `Start-GC-Chat.cmd`、`frontend/` | Windows 聊天启动器，Vue 3 / TypeScript 页面、产品契约快照、前端操作与浏览器测试。编译页面随产品包交付。 |
 | `config/` | 版本化运行选择器、显式实验配置和安全样例。实验计划的绑定以其报告和 manifest 为准。 |
 | `requirements-*` | 各隔离运行时的依赖或锁。历史依赖文件照原实验保留。 |
 | `scripts/retrieval/` | 版本化的构建、迁移、对照及交接 PowerShell 入口，以及有限研究 helper。 |
@@ -29,6 +30,7 @@
 | `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff；V2 运行时由工作台接入。 |
 | `generation/` | Evidence Packet 组装、provider-neutral 生成合同、协议检查、结果及引用绑定。 |
 | `rag/`、`ui/` | 工作台与保留的 Legacy 编排、持久化和本地 Streamlit 页面。UI 通过后端进入工作流程。 |
+| `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |
 | `model_calls.py`、`model_call_sessions.py`、`evidence_io.py` | 共享请求计数与恢复、会话侧操作桥接、create-only JSON/哈希/封存。 |
 | `build_runtime.py`、`runtime_compatibility.py`、`runtime_migration.py` | 并行构建运行时和解释器迁移/索引兼容性校验。 |
 | `parser/`、`canonical/`、`retrieval/` 下的原 RU 实现 | 保留 Legacy Parsed/Canonical/RU、词法与旧 Assembly 接口，参阅 [Phase04 合同](phases/phase-04-retrieval-evidence-assembly.md)。 |
