@@ -56,6 +56,8 @@ class ProductStore(ConversationStore):
                     turn TEXT PRIMARY KEY REFERENCES turns(id), ref TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS product_feedback(
                     id TEXT PRIMARY KEY, session TEXT NOT NULL, turn TEXT NOT NULL, ref TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS product_deleted_chats(
+                    session TEXT PRIMARY KEY REFERENCES chats(id), deleted_at REAL NOT NULL);
                 CREATE INDEX IF NOT EXISTS product_history ON turns(session,sequence);
                 CREATE INDEX IF NOT EXISTS product_turn_events ON events(turn,sequence);
             """)
@@ -75,6 +77,7 @@ class ProductStore(ConversationStore):
     def list_chats(self):
         with self.connect() as db:
             rows = db.execute("""SELECT c.id,c.title,c.settings FROM chats c LEFT JOIN turns t ON t.session=c.id
+                WHERE NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=c.id)
                 GROUP BY c.id ORDER BY COALESCE(MAX(t.sequence),0) DESC,c.rowid DESC""").fetchall()
         return [{"id": sid, "title": title, "mode": json.loads(settings)["mode"]} for sid, title, settings in rows]
 
@@ -86,10 +89,19 @@ class ProductStore(ConversationStore):
 
     def get_draft(self, sid):
         with self.connect() as db:
-            row = db.execute("SELECT token,revision,text,kind,target FROM product_drafts WHERE session=?", (sid,)).fetchone()
+            row = db.execute("""SELECT token,revision,text,kind,target FROM product_drafts p
+                WHERE p.session=? AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=p.session)
+                """, (sid,)).fetchone()
         if not row:
             raise Problem("chat_missing", "会话不存在。", 404)
         return dict(zip(("token", "revision", "text", "kind", "target"), row))
+
+    def delete_chat(self, sid):
+        with self.connect() as db:
+            if not db.execute("SELECT 1 FROM product_drafts WHERE session=?", (sid,)).fetchone():
+                raise Problem("chat_missing", "会话不存在。", 404)
+            db.execute("INSERT INTO product_deleted_chats VALUES (?,?) ON CONFLICT(session) DO NOTHING",
+                       (sid, time.time()))
 
     def check_target(self, sid, kind, target):
         if kind.startswith("correction_") != bool(target):
@@ -115,6 +127,7 @@ class ProductStore(ConversationStore):
         with self.connect() as db:
             row = db.execute("""SELECT t.id FROM turns t JOIN chat_jobs j ON j.turn=t.id
                 WHERE t.cancelled=0 AND j.status IN ('queued','running')
+                AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=t.session)
                 ORDER BY t.sequence LIMIT 1""").fetchone()
         return row[0] if row else None
 

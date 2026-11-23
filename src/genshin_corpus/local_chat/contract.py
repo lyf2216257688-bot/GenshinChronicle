@@ -1,7 +1,7 @@
 """Typed public transport contract. The server and generated Vue client share these models."""
 import json
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pydantic.json_schema import models_json_schema
 
@@ -10,6 +10,8 @@ Kind = Literal["question", "requirement", "correction_fact", "correction_intent"
 Category = Literal["answer", "missing_evidence", "citation", "other"]
 Title = Annotated[str, Field(min_length=1, max_length=100)]
 Message = Annotated[str, Field(max_length=12000)]
+RuntimeRevision = Literal[2]
+API_REVISION, = get_args(RuntimeRevision)
 
 
 class Model(BaseModel):
@@ -24,6 +26,7 @@ class Error(Model):
 class Runtime(Model):
     product: Literal["gc-personal-chat-1"]
     instance: str
+    api_revision: RuntimeRevision
     issues: list[str]
     key_configured: bool
     key_source: Literal["local", "environment", "missing", "unavailable"]
@@ -187,6 +190,7 @@ ROUTES = (
     ("chats", "GET", "/chats", None, Chats),
     ("new_chat", "POST", "/chats", NewChat, Chat),
     ("rename", "PATCH", "/chats/{sid}", Rename, Chat),
+    ("delete_chat", "DELETE", "/chats/{sid}", None, Chats),
     ("draft", "GET", "/chats/{sid}/draft", None, Draft),
     ("save_draft", "PUT", "/chats/{sid}/draft", Draft, Draft),
     ("history", "GET", "/chats/{sid}/turns", None, Page),

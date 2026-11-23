@@ -62,7 +62,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["delete_chat"];
         options?: never;
         head?: never;
         patch: operations["rename"];
@@ -448,6 +448,11 @@ export interface components {
             product: "gc-personal-chat-1";
             /** Instance */
             instance: string;
+            /**
+             * Api Revision
+             * @constant
+             */
+            api_revision: 2;
             /** Issues */
             issues: string[];
             /** Key Configured */
@@ -738,6 +743,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Chat"];
+                };
+            };
+            /** @description Product error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_chat: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-GC-Client": "local-chat-v1";
+            };
+            path: {
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Chats"];
                 };
             };
             /** @description Product error */

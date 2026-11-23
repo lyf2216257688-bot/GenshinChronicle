@@ -244,5 +244,7 @@ def add_feedback(store, tid, data):
 
 def reports(store):
     with store.connect() as db:
-        rows = db.execute("SELECT ref FROM product_feedback ORDER BY rowid DESC").fetchall()
+        rows = db.execute("""SELECT f.ref FROM product_feedback f
+            WHERE NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=f.session)
+            ORDER BY f.rowid DESC""").fetchall()
     return {"items": [store.load(json.loads(ref)) for (ref,) in rows]}

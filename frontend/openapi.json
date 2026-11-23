@@ -245,6 +245,50 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "delete_chat",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GC-Client",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "local-chat-v1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chats"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Product error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/chats/{sid}/draft": {
@@ -1428,6 +1472,11 @@
             "title": "Instance",
             "type": "string"
           },
+          "api_revision": {
+            "const": 2,
+            "title": "Api Revision",
+            "type": "integer"
+          },
           "issues": {
             "items": {
               "type": "string"
@@ -1473,6 +1522,7 @@
         "required": [
           "product",
           "instance",
+          "api_revision",
           "issues",
           "key_configured",
           "key_source",

@@ -18,7 +18,7 @@ import type {
 } from '../api/client.ts'
 import { applyEvent, createActions, DraftEditor } from './actions.ts'
 
-export type Panel = 'batch' | 'source' | 'trace' | 'report' | 'reports' | 'rename' | null
+export type Panel = 'batch' | 'source' | 'trace' | 'report' | 'reports' | 'rename' | 'delete' | null
 export function useChat(api: Client = defaultApi) {
   const actions = createActions(api)
   const chats = ref<Chat[]>([]),
@@ -31,6 +31,7 @@ export function useChat(api: Client = defaultApi) {
     sending = ref(false),
     busy = ref(false),
     error = ref(''),
+    runtimeError = ref(''),
     notice = ref('')
   const before = ref<number | null>(null),
     reconnecting = ref(false),
@@ -54,8 +55,10 @@ export function useChat(api: Client = defaultApi) {
     try {
       error.value = ''
       await fn()
+      return true
     } catch (e) {
       fail(e)
+      return false
     }
   }
   function closeStreams() {
@@ -112,8 +115,17 @@ export function useChat(api: Client = defaultApi) {
     batches.value = (await api.batches()).items
   }
   async function refreshBatchPanel() {
-    const [runtime] = await Promise.all([api.runtime(), refreshBatches()])
-    info.value = runtime
+    await Promise.all([refreshRuntime(), refreshBatches()])
+  }
+  async function refreshRuntime() {
+    try {
+      info.value = await api.runtime()
+      runtimeError.value = ''
+    } catch (e) {
+      info.value = null
+      runtimeError.value = e instanceof Error ? e.message : '无法连接本机聊天服务。'
+      throw e
+    }
   }
   async function saveLiveSettings(data: LiveSettings) {
     info.value = await api.saveLiveSettings(data)
@@ -135,17 +147,32 @@ export function useChat(api: Client = defaultApi) {
     draft.value = local.snapshot()
     sessionStorage.setItem(backupKey(local.sid), JSON.stringify(draft.value))
     clearTimeout(timer)
-    timer = setTimeout(
-      () =>
-        void safe(async () => {
-          await local.flush()
-          if (local === editor) {
-            draft.value = local.snapshot()
-            sessionStorage.removeItem(backupKey(local.sid))
-          }
-        }),
-      220,
-    )
+    timer = setTimeout(() => void saveEditedDraft(local), 220)
+  }
+  async function saveEditedDraft(local: DraftEditor) {
+    try {
+      await local.flush()
+      if (local === editor) {
+        draft.value = local.snapshot()
+        sessionStorage.removeItem(backupKey(local.sid))
+      }
+    } catch (e) {
+      if (local === editor) fail(e)
+    }
+  }
+  function clearChat() {
+    ++generation
+    clearTimeout(timer)
+    closeStreams()
+    closePanel()
+    editor = null
+    current.value = null
+    draft.value = null
+    rows.value = []
+    before.value = null
+    loading.value = false
+    localStorage.removeItem('gc:last-chat')
+    history.replaceState(null, '', location.pathname + location.hash)
   }
   async function open(chat: Chat, discard = false) {
     if (sending.value) return
@@ -179,16 +206,15 @@ export function useChat(api: Client = defaultApi) {
       if (epoch === generation) loading.value = false
     }
   }
-  async function init() {
+  async function init(discard = false) {
     const [list, runtime, grants] = await Promise.allSettled([
       api.chats(),
-      api.runtime(),
+      refreshRuntime(),
       api.batches(),
     ])
     if (list.status === 'rejected') throw list.reason
     chats.value = list.value.items
-    if (runtime.status === 'fulfilled') info.value = runtime.value
-    else fail(runtime.reason)
+    if (runtime.status === 'rejected') fail(runtime.reason)
     if (grants.status === 'fulfilled') batches.value = grants.value.items
     else {
       batches.value = []
@@ -197,7 +223,12 @@ export function useChat(api: Client = defaultApi) {
     const id =
       new URLSearchParams(location.search).get('chat') || localStorage.getItem('gc:last-chat')
     const chat = chats.value.find((c) => c.id === id) ?? chats.value[0]
-    if (chat) await open(chat)
+    if (id && !chats.value.some((c) => c.id === id)) {
+      sessionStorage.removeItem(backupKey(id))
+      clearChat()
+    }
+    if (chat) await open(chat, discard)
+    else if (!id) clearChat()
   }
   async function create(mode: Mode) {
     if (busy.value || sending.value) return
@@ -308,15 +339,26 @@ export function useChat(api: Client = defaultApi) {
     chats.value = (await api.chats()).items
     closePanel()
   }
-  async function reload() {
-    if (!current.value || !info.value) {
-      await init()
-      return
+  async function removeChat(chat: Chat) {
+    if (busy.value || sending.value) return
+    busy.value = true
+    try {
+      chats.value = (await api.deleteChat(chat.id)).items
+      sessionStorage.removeItem(backupKey(chat.id))
+      if (current.value?.id === chat.id) {
+        clearChat()
+        if (chats.value[0]) await open(chats.value[0])
+      } else {
+        closePanel()
+      }
+      notice.value = '会话已删除。'
+    } finally {
+      busy.value = false
     }
-    const c = current.value
-    sessionStorage.removeItem(backupKey(c.id))
-    await open(c, true)
-    await refreshBatches()
+  }
+  async function reload() {
+    if (current.value) sessionStorage.removeItem(backupKey(current.value.id))
+    await init(true)
   }
   onBeforeUnmount(() => {
     ++generation
@@ -335,6 +377,7 @@ export function useChat(api: Client = defaultApi) {
     busy,
     sending,
     error,
+    runtimeError,
     notice,
     before,
     reconnecting,
@@ -362,6 +405,7 @@ export function useChat(api: Client = defaultApi) {
     grant,
     endBatch,
     rename,
+    removeChat,
     reload,
     closePanel,
     refreshBatches,

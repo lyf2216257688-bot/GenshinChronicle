@@ -10,16 +10,19 @@ import webbrowser
 import uvicorn
 
 from .api import DEFAULT_ROOT, STATIC, create_app
+from .contract import API_REVISION
 from .store import PRODUCT, root_identity
 
 
-def running(url, root):
+def instance_status(url, root):
     try:
         with build_opener(ProxyHandler({})).open(url + "api/v1/runtime", timeout=1) as response:
             result = json.load(response)
-            return result.get("product") == PRODUCT and result.get("instance") == root_identity(root)
+            if isinstance(result, dict) and result.get("product") == PRODUCT and result.get("instance") == root_identity(root):
+                return "ready" if result.get("api_revision") == API_REVISION else "outdated"
     except (OSError, ValueError):
-        return False
+        pass
+    return "unavailable"
 
 
 def main():
@@ -45,16 +48,19 @@ def main():
             # instance has finished opening SQLite and serving its identity.
             deadline = time.monotonic() + 4
             while time.monotonic() < deadline:
-                if running(url, args.root):
+                status = instance_status(url, args.root)
+                if status == "ready":
                     if not args.no_browser:
                         webbrowser.open(url)
                     return
+                if status == "outdated":
+                    p.exit(1, "该端口上的聊天后台版本已过期。请停止旧服务，再运行 Start-GC-Chat.cmd。\n")
                 time.sleep(.15)
             p.exit(1, "本机端口已被其他程序占用，请使用 --port 指定其他端口。\n")
         if not args.no_browser:
             def open_when_ready():
                 for _ in range(100):
-                    if running(url, args.root):
+                    if instance_status(url, args.root) == "ready":
                         webbrowser.open(url)
                         return
                     time.sleep(.15)

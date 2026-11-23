@@ -174,7 +174,9 @@ def close_batch(store, bid, worker):
             time.sleep(.01)
     with store.connect() as db:
         rows = db.execute("""SELECT t.id FROM turns t JOIN chat_jobs j ON j.turn=t.id
-            WHERE t.campaign=? AND j.status IN ('queued','running','interrupted')""", (binding["campaign"],)).fetchall()
+            WHERE t.campaign=? AND j.status IN ('queued','running','interrupted')
+            AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=t.session)
+            """, (binding["campaign"],)).fetchall()
     for (tid,) in rows:
         worker.cancel(tid)
     return status(store, binding)

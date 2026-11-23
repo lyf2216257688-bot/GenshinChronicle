@@ -13,6 +13,7 @@ import ChatIcon from './components/ChatIcon.vue'
 const s = reactive(useChat()),
   nav = ref(false),
   title = ref(''),
+  deleteTarget = ref<Chat | null>(null),
   panelBusy = ref(false)
 const navToggle = ref<HTMLButtonElement | null>(null)
 const panelClose = ref<HTMLButtonElement | null>(null)
@@ -24,6 +25,7 @@ const titles = {
   report: '记录问题',
   reports: '反馈记录',
   rename: '重命名会话',
+  delete: '删除会话',
 }
 const panelIcons = {
   batch: 'settings',
@@ -32,6 +34,7 @@ const panelIcons = {
   report: 'flag',
   reports: 'record',
   rename: 'edit',
+  delete: 'trash',
 } as const
 const categories = {
   answer: '回答错误',
@@ -68,10 +71,10 @@ function create(mode: Mode) {
   void s.safe(() => s.create(mode))
 }
 async function panelAction(fn: () => Promise<unknown>) {
-  if (panelBusy.value) return
+  if (panelBusy.value) return false
   panelBusy.value = true
   try {
-    await s.safe(fn)
+    return await s.safe(fn)
   } finally {
     panelBusy.value = false
   }
@@ -116,6 +119,17 @@ function editTitle() {
   title.value = s.current.title
   s.panel = 'rename'
 }
+function askDelete(chat: Chat) {
+  deleteTarget.value = chat
+  s.error = ''
+  s.notice = ''
+  nav.value = false
+  s.panel = 'delete'
+}
+function confirmDelete() {
+  const chat = deleteTarget.value
+  if (chat) void panelAction(() => s.removeChat(chat))
+}
 </script>
 <template>
   <div class="workspace" @keydown.esc="closeDetails">
@@ -124,8 +138,10 @@ function editTitle() {
       :active="s.current?.id"
       :expanded="nav"
       :busy="s.busy || s.sending"
+      :can-delete="!!s.info"
       @create="create"
       @open="selectChat"
+      @remove="askDelete"
       @grants="showBatches"
       @reports="showReports"
       @hide="hideNav"
@@ -232,13 +248,17 @@ function editTitle() {
       </header>
       <div class="panel-body">
         <p v-if="s.panelLoading" class="muted">正在读取已保存的材料…</p>
+        <p v-if="s.error && (s.panel === 'delete' || (s.panel === 'batch' && !s.runtimeError))" class="explanation">
+          {{ s.error }}
+        </p>
         <BatchPanel
           v-if="s.panel === 'batch'"
           :items="s.batches"
           :mode="s.current?.mode ?? 'LIVE'"
           :info="s.info"
+          :connection-error="s.runtimeError"
           :busy="panelBusy"
-          @save-settings="(v) => panelAction(() => s.saveLiveSettings(v))"
+          :save-settings="(v) => panelAction(() => s.saveLiveSettings(v))"
           @clear-settings="panelAction(s.clearLiveSettings)"
           @grant="(v) => panelAction(() => s.grant(v))"
           @close="(v) => panelAction(() => s.endBatch(v))"
@@ -300,6 +320,14 @@ function editTitle() {
           <label>会话名称<input v-model="title" maxlength="100" required /></label
           ><button class="primary" :disabled="!title.trim()">保存名称</button>
         </form>
+        <div v-if="s.panel === 'delete' && deleteTarget" class="form">
+          <p>删除「{{ deleteTarget.title }}」？</p>
+          <p class="muted">会话和关联反馈将从应用中移除。本机执行记录保留供复查。</p>
+          <div class="connection-actions">
+            <button class="danger-button" :disabled="panelBusy || s.sending" @click="confirmDelete">确认删除</button>
+            <button class="secondary" :disabled="panelBusy" @click="s.closePanel">取消</button>
+          </div>
+        </div>
       </div>
     </aside>
   </div>

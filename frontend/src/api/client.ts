@@ -36,13 +36,20 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 const id = encodeURIComponent
+const apiRevision: Runtime['api_revision'] = 2
 export const client = {
-  runtime: () => request<Runtime>('GET', '/runtime'),
+  async runtime() {
+    const runtime = await request<Runtime>('GET', '/runtime')
+    if (runtime.api_revision !== apiRevision)
+      throw new ApiError('service_outdated', '聊天页面和后台版本不一致。请停止旧服务，再从项目目录启动并刷新页面。')
+    return runtime
+  },
   saveLiveSettings: (data: LiveSettings) => request<Runtime>('PUT', '/live-settings', data),
   clearLiveSettings: () => request<Runtime>('DELETE', '/live-settings'),
   chats: () => request<Schema['Chats']>('GET', '/chats'),
   create: (mode: Mode) => request<Chat>('POST', '/chats', { mode }),
   rename: (sid: string, title: string) => request<Chat>('PATCH', '/chats/' + id(sid), { title }),
+  deleteChat: (sid: string) => request<Schema['Chats']>('DELETE', '/chats/' + id(sid)),
   history: (sid: string, before?: number) =>
     request<Schema['Page']>(
       'GET',

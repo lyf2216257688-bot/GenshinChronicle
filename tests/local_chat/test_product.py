@@ -187,6 +187,39 @@ class ChatProductTests(unittest.TestCase):
             self.api("POST", f"/chats/{sid}/turns", {**self.api("GET", f"/chats/{sid}/draft"), "text": "追问"}, 409)
             self.assertEqual(self.api("GET", f"/chats/{sid}/turns")["turns"], [])
 
+    def test_delete_chat_hides_history_and_keeps_the_audit_files(self):
+        self.grant()
+        sid, other = self.chat(), self.chat()
+        _, tid = self.send(sid, "稍后删除的会话")
+        turn = self.finish(tid)
+        citation = turn["citations"][0]
+        report = self.api("POST", "/turns/" + tid + "/feedback",
+                          {"note": "复核用例", "category": "citation", "citation": citation})
+        store = self.svc.store
+        draft = self.api("GET", f"/chats/{sid}/draft")
+        source = f"/turns/{tid}/packets/{citation['packet_id']}/citations/{citation['citation_id']}"
+        with patch.object(self.svc.worker, "active", tid):
+            self.assertEqual(self.api("DELETE", f"/chats/{sid}", expect=409)["code"], "chat_busy")
+        for _ in range(2):
+            items = self.api("DELETE", f"/chats/{sid}")["items"]
+            self.assertEqual([item["id"] for item in items], [other])
+        self.assertEqual(self.api("GET", "/feedback")["items"], [])
+        self.assertEqual(self.api("GET", f"/chats/{sid}/turns", expect=404)["code"], "chat_missing")
+        self.api("GET", f"/chats/{sid}/draft", expect=404)
+        self.api("PUT", f"/chats/{sid}/draft", draft, expect=404)
+        self.api("POST", f"/chats/{sid}/turns", draft, expect=404)
+        self.api("POST", f"/turns/{tid}/resume", expect=404)
+        self.api("GET", f"/turns/{tid}/events", expect=404)
+        self.api("GET", source, expect=404)
+        self.assertEqual(presentation.turn_view(store, self.svc.worker, tid)["result_hash"], report["result_hash"])
+        with store.connect() as db:
+            self.assertIsNotNone(db.execute("SELECT ref FROM product_feedback WHERE id=?", (report["id"],)).fetchone())
+        self.client.__exit__(None, None, None)
+        self.open()
+        self.assertEqual([item["id"] for item in self.api("GET", "/chats")["items"]], [other])
+        self.api("DELETE", f"/chats/{other}")
+        self.assertEqual(self.api("GET", "/chats")["items"], [])
+
     def test_g7_failure_shapes_use_only_published_bindings(self):
         from tests.local_chat.citation_cases import citation_cases
         self.grant()

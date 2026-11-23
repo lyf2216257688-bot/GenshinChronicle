@@ -285,3 +285,56 @@ test('real connection settings are saved locally before a batch can be opened', 
   await panel.getByRole('button', { name: '移除本机 Key' }).click()
   await expect(panel.getByText('待配置', { exact: true })).toBeVisible()
 })
+
+test('an old backend is reported as a version mismatch', async ({ page }) => {
+  await page.route('**/api/v1/runtime', async (route) => {
+    const response = await route.fetch()
+    const current = await response.json()
+    const { product, instance, issues, key_configured, live_model, tokens_per_request } = current
+    await route.fulfill({ response, json: { product, instance, issues, key_configured, live_model, tokens_per_request } })
+  })
+  await page.goto(url)
+  const button = page.getByRole('button', { name: '批次设置', exact: true })
+  await button.click()
+  const panel = page.getByRole('complementary', { name: '批次设置' })
+  await panel.getByRole('combobox').selectOption('LIVE')
+  await expect(panel).toContainText('聊天页面和后台版本不一致')
+  await expect(panel.getByText('应用数据目录', { exact: true })).toHaveCount(0)
+  await expect(panel).not.toContainText('无法使用 Windows 账号加密')
+  await expect(panel.getByRole('button', { name: '开启批次' })).toHaveCount(0)
+})
+
+test('deleting a sidebar chat needs confirmation and survives restart', async ({ page, request }) => {
+  const titles = ['待删除会话 A', '待删除会话 B']
+  const [a, b] = await Promise.all(titles.map(async (title) => {
+    const response = await request.post(url + 'api/v1/chats', {
+      data: { mode: 'LIVE', title },
+      headers: { 'X-GC-Client': 'local-chat-v1' },
+    })
+    expect(response.ok()).toBe(true)
+    return (await response.json()).id as string
+  }))
+  await page.goto(url + '?chat=' + a)
+  const target = page.getByRole('button', { name: '删除会话：' + titles[1] })
+  const confirm = page.getByRole('complementary', { name: '删除会话' })
+  await target.click()
+  await confirm.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(target).toBeFocused()
+  await target.click()
+  await confirm.getByRole('button', { name: '确认删除', exact: true }).click()
+  await expect(target).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: titles[0], level: 1 })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '打开会话导航' }).click()
+  await page.getByRole('button', { name: '删除会话：' + titles[0] }).click()
+  await confirm.getByRole('button', { name: '确认删除', exact: true }).click()
+  await expect(page.getByText('会话已删除。')).toBeVisible()
+  await expect(page).not.toHaveURL(url + '?chat=' + a)
+  await stop()
+  await start()
+  await page.goto(url + '?chat=' + b)
+  await expect(page.getByRole('heading', { name: titles[1], level: 1 })).toHaveCount(0)
+  await page.getByRole('button', { name: '打开会话导航' }).click()
+  for (const title of titles)
+    await expect(page.getByRole('button', { name: '删除会话：' + title })).toHaveCount(0)
+})

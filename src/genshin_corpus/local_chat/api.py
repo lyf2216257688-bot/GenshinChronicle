@@ -25,6 +25,14 @@ STATIC = Path(__file__).parent / "static"
 DEFAULT_ROOT = REPO / "data/generation/personal-chat-v1"
 
 
+class ChatStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if not path.startswith("assets/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+
 class Service:
     def __init__(self, root, repo, delay):
         self.repo = Path(repo)
@@ -46,7 +54,8 @@ class Service:
             model, allowance = "未配置", 0
             issues.append("生成配置")
         credential = read_credential(self.store.root)
-        return {"product": PRODUCT, "instance": root_identity(self.store.root), "issues": issues,
+        return {"product": PRODUCT, "instance": root_identity(self.store.root), "api_revision": contract.API_REVISION,
+                "issues": issues,
                 "live_model": model, "tokens_per_request": allowance, "endpoint": OFFICIAL_ENDPOINT,
                 "data_root": str(self.store.root), "key_configured": bool(credential.key),
                 "key_source": credential.source, "credential_storage_supported": os.name == "nt"}
@@ -76,6 +85,14 @@ class Service:
         if not data.title.strip():
             raise Problem("empty_title", "请输入会话名称。", 422)
         return self.store.rename(sid, data.title.strip())
+
+    def delete_chat(self, sid):
+        with self.worker.condition:
+            scheduled = (*self.worker.pending, self.worker.active)
+            if any(tid and self.store.turn(tid)["session"] == sid for tid in scheduled):
+                raise Problem("chat_busy", "会话有正在处理的轮次，请先停止并等待本轮结束。")
+            self.store.delete_chat(sid)
+        return self.chats()
 
     def draft(self, sid):
         return self.store.get_draft(sid)
@@ -177,12 +194,16 @@ def endpoint(name, body, response):
     async def handle(request: Request):
         service = request.app.state.service
         kwargs = dict(request.path_params)
-        if "sid" in kwargs and name not in {"draft", "save_draft"}:
-            # Resolve product IDs before calling inherited store methods.
-            await asyncio.to_thread(service.store.get_draft, kwargs["sid"])
-        if "tid" in kwargs:
-            await asyncio.to_thread(service.store.input_for, kwargs["tid"])
+
+        def check_access():
+            if "sid" in kwargs and name not in {"draft", "delete_chat"}:
+                service.store.get_draft(kwargs["sid"])
+            if "tid" in kwargs:
+                item = service.store.input_for(kwargs["tid"])
+                service.store.get_draft(item["intent"]["session"])
+
         if name == "events":
+            await asyncio.to_thread(check_access)
             cursor = request.headers.get("last-event-id") or request.query_params.get("after", "0")
             return StreamingResponse(event_stream(service, kwargs["tid"], number(cursor, 0, 2**63-1)),
                                      media_type="text/event-stream", headers={"Cache-Control": "no-store"})
@@ -200,9 +221,11 @@ def endpoint(name, body, response):
         def execute():
             method = getattr(service, name)
             if request.method == "GET":
+                check_access()
                 result = method(**kwargs)
             else:
                 with service.store.commands:
+                    check_access()
                     result = method(**kwargs)
             return response.model_validate(result).model_dump()
         return JSONResponse(await asyncio.to_thread(execute), headers={"Cache-Control": "no-store"})
@@ -257,7 +280,7 @@ def create_app(root=DEFAULT_ROOT, repo=REPO, *, delay=.025):
               name, method, path, body, response in contract.ROUTES]
     routes.append(Route("/api/v1/openapi.json", spec))
     if STATIC.is_dir():
-        routes.append(Mount("/", app=StaticFiles(directory=STATIC, html=True)))
+        routes.append(Mount("/", app=ChatStaticFiles(directory=STATIC, html=True)))
     app = Starlette(routes=routes, lifespan=lifespan,
                     exception_handlers={cls: error for cls in (Problem, ValueError, OSError, KeyError)})
     app.add_middleware(LoopbackOnly)

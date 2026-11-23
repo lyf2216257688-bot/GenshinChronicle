@@ -187,7 +187,7 @@ summary:focus-visible {
 }
 
 .brand > svg,
-.chat-list .active > svg {
+.chat-row.active .chat-link > svg {
   color: var(--gold);
 }
 
@@ -198,7 +198,7 @@ summary:focus-visible {
 }
 
 .new-actions button,
-.chat-list button,
+.chat-link,
 .nav-bottom button {
   display: flex;
   align-items: center;
@@ -231,7 +231,7 @@ summary:focus-visible {
 }
 
 .new-actions button:hover,
-.chat-list button:hover,
+.chat-row button:hover,
 .nav-bottom button:hover,
 .sidebar .nav-close:hover {
   background: #34554e;
@@ -256,21 +256,48 @@ summary:focus-visible {
   overflow: auto;
 }
 
-.chat-list button {
+.chat-row {
+  display: flex;
+  align-items: center;
+  padding-right: 3px;
   margin-bottom: 3px;
+  border-radius: var(--radius);
+}
+
+.chat-link {
+  flex: 1;
+  min-width: 0;
   color: var(--nav-muted);
 }
 
-.chat-list button > span {
+.chat-link > span {
   flex: 1;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.chat-list .active {
+.chat-row.active {
   background: var(--nav-active);
+}
+
+.chat-row.active .chat-link {
   color: var(--nav-text);
+}
+
+.chat-delete {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--nav-muted);
+}
+
+.chat-row .chat-delete:hover,
+.chat-delete:focus-visible {
+  color: #ffe3d8;
 }
 
 .chat-list small {
@@ -990,6 +1017,17 @@ main {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.danger-button {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
+.danger-button:hover {
+  background: #79372f;
 }
 
 .batch-authorization {

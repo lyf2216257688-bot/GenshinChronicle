@@ -2,11 +2,17 @@
 import { computed, ref, watch } from 'vue'
 import type { Batch, Grant, LiveSettings, Mode, Runtime } from '../api/client.ts'
 import ChatIcon from './ChatIcon.vue'
-const p = defineProps<{ items: Batch[]; mode: Mode; info: Runtime | null; busy: boolean }>()
+const p = defineProps<{
+  items: Batch[]
+  mode: Mode
+  info: Runtime | null
+  connectionError: string
+  busy: boolean
+  saveSettings: (data: LiveSettings) => Promise<boolean>
+}>()
 const emit = defineEmits<{
   grant: [Grant]
   close: [Batch]
-  saveSettings: [LiveSettings]
   clearSettings: []
 }>()
 const mode = ref(p.mode),
@@ -25,12 +31,13 @@ const keyStatus = {
   unavailable: '本机 Key 无法读取',
 }
 const settingsLocked = computed(() => p.busy || (mode.value === 'LIVE' && b.value?.state === 'open'))
-function saveSettings() {
+async function saveSettings() {
   const key = apiKey.value.trim()
   if (!key || settingsLocked.value) return
-  apiKey.value = ''
-  consent.value = false
-  emit('saveSettings', { endpoint: endpoint.value.trim(), api_key: key })
+  if (await p.saveSettings({ endpoint: endpoint.value.trim(), api_key: key })) {
+    apiKey.value = ''
+    consent.value = false
+  }
 }
 const states = {
   open: '可用',
@@ -47,6 +54,9 @@ const states = {
       <option value="MOCK">离线演示</option>
     </select></label
   >
+  <p v-if="mode === 'LIVE' && !info" class="explanation">
+    {{ connectionError || '正在读取本机真实问答配置…' }}
+  </p>
   <section v-if="info" class="product-data" aria-label="应用数据目录">
     <h3>应用数据目录</h3>
     <code>{{ info.data_root }}</code>
@@ -113,7 +123,7 @@ const states = {
     </button>
   </div>
   <form
-    v-if="b?.state !== 'open'"
+    v-if="b?.state !== 'open' && (mode === 'MOCK' || info)"
     class="form"
     @submit.prevent="
       $emit('grant', { mode, requests, minutes, confirm_live: mode === 'LIVE' && consent })
