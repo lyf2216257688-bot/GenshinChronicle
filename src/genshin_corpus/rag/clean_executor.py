@@ -17,8 +17,8 @@ from .clean_store import put
 
 
 class LocalExecutor:
-    def __init__(self, root, repo, *, delay=.015):
-        self.store = ConversationStore(root)
+    def __init__(self, root, repo, *, delay=.015, store=None):
+        self.store = ConversationStore(root) if store is None else store
         self.repo, self.delay = repo, delay
         self.condition, self.stop_event = Condition(), Event()
         self.pending, self.active, self.last_error = {}, None, None
@@ -29,8 +29,7 @@ class LocalExecutor:
             # The application lock proves no CLI is running before deriving
             # interrupted status. Boot does not enqueue any prior submission.
             with locked(self.store.root / "locks/application.lock"):
-                for job in self.store.jobs():
-                    if job["status"] == "running": self.store.status(job["turn_id"], "interrupted")
+                self._recover_jobs()
             self.thread = Thread(target=self._loop, name="gc-g4-local-executor", daemon=True)
             self.thread.start()
         except BaseException:
@@ -38,6 +37,11 @@ class LocalExecutor:
             raise
         self.closed = False
         atexit.register(self.close)
+
+    def _recover_jobs(self):
+        for job in self.store.jobs():
+            if job["status"] == "running":
+                self.store.status(job["turn_id"], "interrupted")
 
     def schedule(self, tid, *, continue_turn=False):
         require(not self.stop_event.is_set(), "Application is stopping")

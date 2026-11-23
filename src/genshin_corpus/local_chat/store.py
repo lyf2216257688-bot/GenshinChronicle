@@ -59,6 +59,7 @@ class ProductStore(ConversationStore):
                 CREATE TABLE IF NOT EXISTS product_deleted_chats(
                     session TEXT PRIMARY KEY REFERENCES chats(id), deleted_at REAL NOT NULL);
                 CREATE INDEX IF NOT EXISTS product_history ON turns(session,sequence);
+                CREATE INDEX IF NOT EXISTS product_queue_status ON chat_jobs(status);
                 CREATE INDEX IF NOT EXISTS product_turn_events ON events(turn,sequence);
             """)
 
@@ -106,13 +107,30 @@ class ProductStore(ConversationStore):
     def check_target(self, sid, kind, target):
         if kind.startswith("correction_") != bool(target):
             raise Problem("invalid_target", "纠正消息需要指定同一会话的原消息。", 422)
-        if target:
-            with self.connect() as db:
-                row = db.execute("SELECT ref FROM chat_messages WHERE id=? AND session=?", (target, sid)).fetchone()
-            if not row:
-                raise Problem("invalid_target", "关联消息不在本会话中。", 422)
-            original = self.load(json.loads(row[0]))
-            require(original["message_id"] == target and original["session_id"] == sid, "Message identity changed")
+        if target and not self.correction_source_turn(sid, target):
+            raise Problem("invalid_target", "关联消息不在本会话中。", 422)
+
+    def correction_source_turn(self, sid, target):
+        with self.connect() as db:
+            db.execute("BEGIN")
+            source = db.execute("SELECT turn,ref FROM chat_messages WHERE session=? AND id=?",
+                                (sid, target)).fetchone()
+            if source is None:
+                # The committed submission is visible before the worker
+                # publishes the corresponding message file and reference.
+                unpublished = db.execute("""SELECT t.id FROM turns t JOIN product_inputs i ON i.turn=t.id
+                    WHERE t.session=? AND NOT EXISTS
+                    (SELECT 1 FROM chat_messages m WHERE m.turn=t.id AND m.role='user')""", (sid,)).fetchall()
+        if source:
+            original = self.load(json.loads(source[1]))
+            require((original["message_id"], original["session_id"], original["turn_id"]) == (target, sid, source[0]),
+                    "Correction target changed")
+            return source[0]
+        for (tid,) in unpublished:
+            if digest([CHAT_VERSION, tid, "user"]) == target:
+                self.input_for(tid)
+                return tid
+        return None
 
     def job(self, tid):
         with self.connect() as db:
@@ -122,14 +140,56 @@ class ProductStore(ConversationStore):
         return {"turn_id": tid, "status": row[0], "metadata": json.loads(row[1])}
 
     def next_turn(self):
-        # Parked turns retain their original checkpoint and budget. Only submitted or
-        # explicitly resumed work competes for the single local execution slot.
+        # The child must retain its slot if an earlier parked turn is resumed
+        # after the claim but before the child acquires the application lock.
         with self.connect() as db:
             row = db.execute("""SELECT t.id FROM turns t JOIN chat_jobs j ON j.turn=t.id
                 WHERE t.cancelled=0 AND j.status IN ('queued','running')
                 AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=t.session)
-                ORDER BY t.sequence LIMIT 1""").fetchone()
+                ORDER BY j.status='running' DESC,t.sequence LIMIT 1""").fetchone()
         return row[0] if row else None
+
+    def park_old_jobs(self):
+        with self.connect() as db:
+            db.execute("UPDATE chat_jobs SET status='interrupted' WHERE status IN ('queued','running')")
+
+    def claim(self):
+        with self.connect() as db:
+            # Idle polling must not take SQLite's write lock.
+            if db.execute("SELECT 1 FROM chat_jobs WHERE status='queued' LIMIT 1").fetchone() is None:
+                return None
+            row = db.execute("""UPDATE chat_jobs SET status='running' WHERE turn=(
+                SELECT t.id FROM turns t JOIN chat_jobs j ON j.turn=t.id
+                WHERE j.status='queued'
+                AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=t.session)
+                ORDER BY t.sequence LIMIT 1)
+                RETURNING turn,CASE WHEN json_valid(metadata)
+                THEN json_extract(metadata,'$.continue_requested') ELSE 0 END""").fetchone()
+            return (row[0], bool(row[1])) if row else None
+
+    def request_continue(self, tid):
+        with self.connect() as db:
+            changed = db.execute("""UPDATE chat_jobs
+                SET status='queued',metadata=json_set(metadata,'$.continue_requested',json('true'))
+                WHERE turn=? AND status='interrupted'
+                AND EXISTS (SELECT 1 FROM turns WHERE id=? AND cancelled=0)""", (tid, tid))
+            if not changed.rowcount:
+                raise Problem("cannot_resume", "当前轮次无法按原许可继续。")
+
+    def interrupt(self, tid):
+        with self.connect() as db:
+            db.execute("UPDATE chat_jobs SET status='interrupted' WHERE turn=? AND status='running'", (tid,))
+
+    def has_work(self, *, sid=None):
+        with self.connect() as db:
+            return db.execute("""SELECT 1 FROM chat_jobs j JOIN turns t ON t.id=j.turn
+                WHERE j.status IN ('queued','running') AND (? IS NULL OR t.session=?)
+                AND NOT EXISTS (SELECT 1 FROM product_deleted_chats d WHERE d.session=t.session)
+                LIMIT 1""", (sid, sid)).fetchone() is not None
+
+    def event_cursor(self, tid):
+        with self.connect() as db:
+            return db.execute("SELECT COALESCE(MAX(sequence),0) FROM events WHERE turn=?", (tid,)).fetchone()[0]
 
     def save_draft(self, sid, data):
         self.check_target(sid, data.kind, data.target)
@@ -162,11 +222,20 @@ class ProductStore(ConversationStore):
                 raise Problem("draft_conflict", "草稿版本已变化，请重新载入。")
             self.check_target(sid, data.kind, data.target)
             batch = active_binding(chat["mode"])
+            from .context import check_context_budget
+            notes = self.notes(sid, prospective=(intent, tid))
+            try:
+                check_context_budget(text, notes, current_message_id=digest([CHAT_VERSION, tid, "user"]),
+                                     history_bytes=batch["settings"]["history_bytes"])
+            except ValueError as exc:
+                if str(exc) != "PRODUCT_CONTEXT_BUDGET_EXCEEDED" and not isinstance(exc, UnicodeError):
+                    raise
+                raise Problem("context_budget_exceeded", "本条输入与有效的补充条件超出上下文预算。请缩短问题或修订条件。", 422) from None
             campaign = batch["campaign"]
             submission = {"schema": PRODUCT, "intent": intent, "batch_id": batch["id"],
                           "campaign": campaign, "settings_digest": digest(batch["settings"])}
             file = self.root / "submissions" / (digest(submission) + ".json")
-            put(file, submission)
+            put(file, submission, atomic=True)
             ref = json.dumps({"path": file.relative_to(self.root).as_posix(), "sha256": sha(file)})
             seq = db.execute("SELECT COALESCE(MAX(sequence),0)+1 FROM turns").fetchone()[0]
             db.execute("INSERT OR IGNORE INTO sessions VALUES (?,?)", (sid, TURN_VERSION))
@@ -180,7 +249,6 @@ class ProductStore(ConversationStore):
                        (uuid4().hex, sid))
             if chat["title"] == "新对话":
                 db.execute("UPDATE chats SET title=? WHERE id=?", (" ".join(text.split())[:36], sid))
-        self.ensure_submission(tid)
         return tid, True
 
     def input_for(self, tid):
@@ -200,27 +268,34 @@ class ProductStore(ConversationStore):
         mode = self.chat_info(item["session"])["mode"]
         self.event(tid, "g4-submitted", {"kind": "submitted", "mode": mode})
 
-    def notes(self, session, *, before=None):
+    def artifact(self, tid, key, value, *, atomic=True):
+        return super().artifact(tid, key, value, atomic=atomic)
+
+    def message(self, tid, role, content, *, atomic=True, **extra):
+        return super().message(tid, role, content, atomic=atomic, **extra)
+
+    def event(self, tid, key, payload, *, atomic=True):
+        return super().event(tid, key, payload, atomic=atomic)
+
+    def notes(self, session, *, before=None, prospective=None):
         """A revision is visible from its own turn onward. Never annotate a past turn in place."""
         limit = self.turn(before)["sequence"] if before else 2**63 - 1
         with self.connect() as db:
             rows = db.execute("""SELECT i.ref,t.id FROM product_inputs i JOIN turns t ON t.id=i.turn
                 JOIN chat_jobs j ON j.turn=t.id WHERE t.session=? AND t.sequence<=?
                 AND json_extract(j.metadata,'$.note_kind') IS NOT NULL ORDER BY t.sequence""", (session, limit)).fetchall()
+        items = [(self.load(json.loads(wire))["intent"], tid) for wire, tid in rows]
+        if prospective and prospective[0]["kind"] != "question":
+            items.append(prospective)
         notes = {}
-        for wire, tid in rows:
-            item = self.load(json.loads(wire))["intent"]
+        for item, tid in items:
             kind, target = item["kind"], item["target"]
             mid = digest([CHAT_VERSION, tid, "user"])
             if target:
-                with self.connect() as db:
-                    source = db.execute("SELECT turn,ref FROM chat_messages WHERE session=? AND id=?",
-                                        (session, target)).fetchone()
+                source = self.correction_source_turn(session, target)
                 require(source is not None, "Missing correction target")
-                original = self.load(json.loads(source[1]))
-                require(original["message_id"] == target and original["turn_id"] == source[0], "Correction target changed")
                 if target not in notes:
-                    notes[target] = {"note_id": target, "turn_id": source[0], "session_id": session,
+                    notes[target] = {"note_id": target, "turn_id": source, "session_id": session,
                                      "message_ids": [target], "kind": "corrected_message", "text": "",
                                      "authority": "historical_message", "dependencies": []}
                 notes[target]["status"] = "needs_review"
@@ -251,10 +326,20 @@ class ProductStore(ConversationStore):
         for attempt in range(100):
             try:
                 with locked(self.root / "batches" / batch / "locks/admission.lock"):
-                    if self.job(tid)["status"] in TERMINAL:
-                        return
-                    return super().cancel(tid)
+                    with self.connect() as db:
+                        db.execute("BEGIN IMMEDIATE")
+                        status = db.execute("SELECT status FROM chat_jobs WHERE turn=?", (tid,)).fetchone()[0]
+                        if status in TERMINAL:
+                            return
+                        db.execute("UPDATE turns SET cancelled=1 WHERE id=?", (tid,))
+                        if status == "interrupted":
+                            db.execute("UPDATE chat_jobs SET status='queued' WHERE turn=?", (tid,))
+                break
             except OSError:
                 if attempt == 99:
                     raise
                 time.sleep(.01)
+        self.ensure_cancellation(tid)
+
+    def ensure_cancellation(self, tid):
+        self.event(tid, "cancel", {"kind": "cancel_requested"})

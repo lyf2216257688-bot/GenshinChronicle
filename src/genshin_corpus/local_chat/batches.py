@@ -17,7 +17,7 @@ from .store import Problem
 
 def adapter_identity():
     folder = Path(__file__).parent
-    return {name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py", "credentials.py")}
+    return {name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py", "credentials.py", "context.py")}
 
 
 class ExecutionView:
@@ -46,6 +46,11 @@ class ExecutionView:
         if self.binding["mode"] == "MOCK" and time.time() >= self.binding["expires"]:
             raise model_calls.Deferred("BATCH_EXPIRED")
         return False
+
+    def product_context(self, tid, settings, *, system, include_research=False):
+        from .context import snapshot
+        require(tid == self.tid and settings == self.binding["settings"], "Foreign context binding")
+        return snapshot(self.catalog, tid, settings, system=system, include_research=include_research)
 
     def __getattr__(self, name):
         return getattr(self.catalog, name)
@@ -166,7 +171,7 @@ def close_batch(store, bid, worker):
     for attempt in range(100):
         try:
             with model_calls.locked(root / "locks/admission.lock"):
-                put(root / "operator-closed.json", {"reason": "user_closed", "batch": bid})
+                put(root / "operator-closed.json", {"reason": "user_closed", "batch": bid}, atomic=True)
             break
         except OSError:
             if attempt == 99:

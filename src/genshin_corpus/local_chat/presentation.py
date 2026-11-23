@@ -90,11 +90,10 @@ def public_events(store, tid, after):
     return out
 
 
-def turn_view(store, worker, tid):
+def turn_view(store, tid):
     entry = store.turn(tid)
     job = store.job(tid)["status"]
-    with worker.condition:
-        scheduled = tid in worker.pending or tid == worker.active
+    scheduled = job in {"queued", "running"}
     base = {"id": tid, "chat_id": entry["session"], "sequence": entry["sequence"], "batch_id": "",
             "question": "", "user_message": digest([VERSION, tid, "user"]), "assistant_message": None, "result_hash": None,
             "state": job, "has_answer": False, "answer": None, "detail": "", "stop_reason": None, "citations": [],
@@ -133,21 +132,24 @@ def turn_view(store, worker, tid):
                     base["stage"] = e["text"]
                 if e["kind"] == "draft":
                     base["draft"] += e["text"]
+        else:
+            base["cursor"] = store.event_cursor(tid)
         if unfinished and not base["stage"]:
             base["stage"] = "正在排队" if scheduled else "等待明确继续或停止"
     except (OSError, ValueError, KeyError):
         base.update(state="blocked", detail="本轮记录缺失或校验失败，已阻断受影响内容。", answer=None,
-                    citations=[], has_answer=False, can_trace=False, watching=False, can_resume=False)
+                    citations=[], has_answer=False, can_trace=False, watching=False, can_resume=False,
+                    cursor=store.event_cursor(tid))
     return base
 
 
-def history(store, worker, sid, before, limit):
+def history(store, sid, before, limit):
     store.chat(sid)
     with store.connect() as db:
         rows = db.execute("""SELECT id,sequence FROM turns WHERE session=? AND sequence<?
             ORDER BY sequence DESC LIMIT ?""", (sid, before, limit + 1)).fetchall()
     selected = rows[:limit]
-    return {"turns": [turn_view(store, worker, tid) for tid, _ in reversed(selected)],
+    return {"turns": [turn_view(store, tid) for tid, _ in reversed(selected)],
             "before": selected[-1][1] if len(rows) > limit else None}
 
 

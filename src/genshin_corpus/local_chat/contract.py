@@ -10,7 +10,7 @@ Kind = Literal["question", "requirement", "correction_fact", "correction_intent"
 Category = Literal["answer", "missing_evidence", "citation", "other"]
 Title = Annotated[str, Field(min_length=1, max_length=100)]
 Message = Annotated[str, Field(max_length=12000)]
-RuntimeRevision = Literal[2]
+RuntimeRevision = Literal[3]
 API_REVISION, = get_args(RuntimeRevision)
 
 

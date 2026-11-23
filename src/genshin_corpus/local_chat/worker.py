@@ -1,7 +1,9 @@
 """Single product worker, reusing the G4 Mock and G5 Live graph entrypoints."""
 import argparse
+import logging
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import time
@@ -19,25 +21,83 @@ from .store import ProductStore
 
 class ProductExecutor(LocalExecutor):
     def __init__(self, store, repo, *, delay=.025):
-        super().__init__(store.root, repo, delay=delay)
-        self.store = store
-        # The executor owns the instance lock, and its in-memory queue is still empty.
-        # A previous process may have exited between committing a turn and starting it.
-        with store.connect() as db:
-            db.execute("UPDATE chat_jobs SET status='interrupted' WHERE status='queued'")
-        # A crash after the atomic turn commit may precede publication of its user message/event.
-        with store.connect() as db:
-            ids = db.execute("""SELECT i.turn FROM product_inputs i WHERE NOT EXISTS
-                (SELECT 1 FROM events e WHERE e.turn=i.turn AND e.event_key='g4-submitted')""").fetchall()
-        for (tid,) in ids:
-            store.ensure_submission(tid)
+        super().__init__(store.root, repo, delay=delay, store=store)
+
+    def _recover_jobs(self):
+        self.store.park_old_jobs()
 
     def cancel(self, tid):
-        self.store.cancel(tid)
+        try:
+            self.store.cancel(tid)
+        finally:
+            self.wake()
+
+    def wake(self):
         with self.condition:
-            if tid != self.active and self.store.job(tid)["status"] not in TERMINAL:
-                self.pending[tid] = True
-                self.condition.notify_all()
+            self.condition.notify_all()
+
+    def _loop(self):
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    claim = self.store.claim()
+                    with self.condition:
+                        if claim is None:
+                            self.condition.wait(.25)
+                            continue
+                        tid, resume = claim
+                        self.active = tid
+                except (OSError, sqlite3.Error) as exc:
+                    self._storage_error(exc)
+                    continue
+                try:
+                    self.store.job(tid)  # Do not let malformed job metadata block the queue head.
+                    self.store.ensure_submission(tid)
+                    if self.store.cancelled(tid):
+                        self.store.ensure_cancellation(tid)
+                    if not self.stop_event.is_set():
+                        self._execute_child(tid, resume)
+                    require(self.store.job(tid)["status"] in TERMINAL, "WORKER_UNSETTLED")
+                except Exception as exc:
+                    self._park(tid, exc)
+                finally:
+                    with self.condition:
+                        self.active = None
+                        self.condition.notify_all()
+        finally:
+            self.owner.__exit__(None, None, None)
+
+    def _storage_error(self, exc):
+        self.last_error = type(exc).__name__
+        logging.getLogger(__name__).warning("Chat queue storage failure (%s)", self.last_error)
+        self.stop_event.wait(.25)
+
+    def _park(self, tid, exc):
+        self.last_error = type(exc).__name__
+        while True:
+            try:
+                self.store.interrupt(tid)
+                break
+            except (OSError, sqlite3.Error) as storage_error:
+                self._storage_error(storage_error)
+                if self.stop_event.is_set():
+                    return  # The next owner will park this claim under the application lock.
+        try:
+            if self.store.job(tid)["status"] == "interrupted":
+                self.store.event(tid, "g4-interrupted-" + uuid4().hex,
+                    {"kind": "interrupted", "error_type": type(exc).__name__, "continue_required": True}, atomic=True)
+        except (OSError, sqlite3.Error, ValueError, KeyError) as event_error:
+            logging.getLogger(__name__).warning("Chat interruption event failed (%s)", type(event_error).__name__)
+
+    def wait_idle(self, timeout=10):
+        end = time.monotonic() + timeout
+        with self.condition:
+            while self.active or self.store.has_work():
+                left = end - time.monotonic()
+                if left <= 0:
+                    return False
+                self.condition.wait(min(left, .25))
+        return True
 
     def _execute_child(self, tid, resume):
         binding = self.store.binding(self.store.input_for(tid)["batch_id"])
@@ -90,7 +150,8 @@ def main():
         from ..rag.clean_research import run_turn
         from ..rag.clean_research_live import ResearchPipeline
         with worker_credential(store.root, binding["credential_revision"]):
-            pipeline = ResearchPipeline(view, args.turn, args.repo)
+            pipeline = ResearchPipeline(view, args.turn, args.repo,
+                                        staged_local_queries=True, explicit_resume=args.resume)
             try:
                 run_turn(view, args.turn, pipeline, continue_turn=args.resume)
             finally:

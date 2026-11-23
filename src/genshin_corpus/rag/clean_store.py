@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 from pathlib import Path
 import sqlite3
+from uuid import uuid4
 
 from ..evidence_io import digest, inside, read, require, sha, write
 from ..model_calls import locked
@@ -10,13 +11,22 @@ from ..model_calls import locked
 VERSION = "gc-clean-research-state-1"
 
 
-def put(path, value):
+def put(path, value, *, atomic=False):
     """Idempotent create-only publication, rejecting a conflicting partial file."""
     path = Path(path)
     if path.exists():
         require(read(path) == value, "Immutable receipt differs: " + str(path))
-    else:
+    elif not atomic:
         write(path, value)
+    else:
+        # The caller holds the lock for this publication. A process exit during
+        # the write leaves only the unreferenced temporary file.
+        attempt = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+        try:
+            write(attempt, value)
+            attempt.rename(path)
+        finally:
+            attempt.unlink(missing_ok=True)
     return path
 
 
@@ -92,14 +102,14 @@ class Store:
                 db.execute("UPDATE turns SET cancelled=1 WHERE id=?", (tid,))
             self.event(tid, "cancel", {"kind": "cancel_requested"})
 
-    def event(self, tid, key, payload):
+    def event(self, tid, key, payload, *, atomic=False):
         turn = self.turn(tid)
         require(not {"version", "session_id", "turn_id"}.intersection(payload), "Event cannot replace its identity")
         value = {"version": VERSION, "session_id": turn["session"], "turn_id": tid, **payload}
         path = self.root / "events" / tid / (digest(key) + ".json")
         # Serialize event repair and publication; files precede SQLite references.
         with locked(self.root / "locks/events.lock"):
-            put(path, value)
+            put(path, value, atomic=atomic)
             wire = json.dumps({"path": str(path.relative_to(self.root)), "sha256": sha(path)}, sort_keys=True)
             with self.connect() as db:
                 db.execute("INSERT OR IGNORE INTO events(session,turn,event_key,payload) VALUES (?,?,?,?)",

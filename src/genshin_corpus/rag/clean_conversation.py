@@ -77,10 +77,10 @@ class ConversationStore(Store):
         require(row is not None and row[3] == VERSION, "Unknown/incompatible chat")
         return {"id": session, "title": row[0], "campaign": row[1], "settings": json.loads(row[2]), "version": row[3]}
 
-    def artifact(self, tid, key, value):
+    def artifact(self, tid, key, value, *, atomic=False):
         self.turn(tid)
         path = self.root / "chat_artifacts" / tid / (digest(key) + ".json")
-        put(path, value)
+        put(path, value, atomic=atomic)
         return {"path": path.relative_to(self.root).as_posix(), "sha256": sha(path)}
 
     def load(self, ref):
@@ -96,7 +96,7 @@ class ConversationStore(Store):
         path = self.root / "chat_artifacts" / tid / (digest(key) + ".json")
         return {"path": path.relative_to(self.root).as_posix(), "sha256": sha(path)} if path.exists() else None
 
-    def message(self, tid, role, content, **extra):
+    def message(self, tid, role, content, *, atomic=False, **extra):
         turn = self.turn(tid)
         mid = digest([VERSION, tid, role])
         value = {"version": VERSION, "message_id": mid, "session_id": turn["session"],
@@ -106,7 +106,7 @@ class ConversationStore(Store):
         if old:
             require(self.load(json.loads(old[0])) == value, "Message changed")
             return mid
-        ref = self.artifact(tid, "message-" + role, value)
+        ref = self.artifact(tid, "message-" + role, value, atomic=atomic)
         with self.connect() as db:
             wire = json.dumps(ref, sort_keys=True)
             db.execute("INSERT OR IGNORE INTO chat_messages VALUES (?,?,?,?,?)", (mid, turn["session"], tid, role, wire))

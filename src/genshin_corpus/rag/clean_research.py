@@ -13,7 +13,7 @@ from ..generation.clean_chat_transport import ChatSessions, assistant_from_seal,
 from ..generation.clean_evidence import EvidenceReader, assemble, fragment_content, validate_citations
 from ..model_calls import Deferred
 from ..retrieval.clean_based.query_v2 import ResearchQuery
-from .clean_context import organize, assembly_context
+from .clean_context import PRODUCT_VERSION, organize, assembly_context
 from .clean_conversation_graph import commit_result, saved_result, messages
 
 VERSION = "gc-clean-research-1"
@@ -250,11 +250,17 @@ def request_for(msgs, settings, *, final=False, analysis=False):
 
 
 def packet_for(store, turn, ctx_ref, data, settings, *, final=False):
-    context = assembly_context(turn, store.load(ctx_ref))
+    saved_context = store.load(ctx_ref)
+    context = assembly_context(turn, saved_context)
     context["system"] = SYSTEM + ("最终综合：研究已停止，依据当前Packet作答，明确未解事项。" if final else "")
+    queries = [{k: q[k] for k in ("query_id", "subquestion", "kind", "trigger_gap")} for q in data["queries"]]
+    if saved_context["version"] == PRODUCT_VERSION:
+        for query in queries:
+            if query["kind"] == "original":
+                # The literal original question is already in the outer question.
+                del query["subquestion"]
     context["conversation"] = {"chat": context["conversation"], "research": data.get("research", {}),
-        "plan": data.get("plan"), "queries": [{k: q[k] for k in ("query_id", "subquestion", "kind", "trigger_gap")}
-            for q in data["queries"]], "stop_reason": data.get("stop", "researching")}
+        "plan": data.get("plan"), "queries": queries, "stop_reason": data.get("stop", "researching")}
     groups = [store.load(r) for r in data["groups"]]
     receipts = [store.load(r) for r in data["reads"].values()]
     role = role_for(settings, final=final, analysis=data.get("analysis", False))
@@ -361,25 +367,29 @@ def research_graph(store, tid, pipeline, bridge, *, opener_factory=None, fault=l
     def initialize(state):
         require(state["version"] == VERSION and state["turn_id"] == tid, "FOREIGN_RESEARCH_STATE")
         progress("context_started", "context")
-        ctx = organize(store, tid, **{k: settings[k] for k in ("history_bytes", "recent_turns", "excerpt_chars")})
-        # Same-chat research is explicit derived state. A later correction marks
-        # every inherited model premise for re-review rather than reasserting it.
-        previous = []
-        notes = store.notes(turn["session"], before=tid)
-        correction = store.job(tid)["metadata"].get("note_kind") in {"correction_fact", "correction_intent"}
-        stale = {n["turn_id"] for n in notes if n["status"] == "needs_review"}
-        for m in store.history(turn["session"], before=tid):
-            if m["role"] != "assistant" or not m.get("result_ref"): continue
-            prior = store.load(m["result_ref"])
-            if not prior.get("research_ref"): continue
-            d = verify_data(store, prior["research_ref"])
-            previous.append({"turn_id": m["turn_id"], "research_ref": prior["research_ref"],
-                "status": "needs_review" if correction or m["turn_id"] in stale else "unverified_model_research",
-                "research": {} if correction or m["turn_id"] in stale else d["research"],
-                "stop_reason": prior["stop_reason"]})
-        ctx["research_state"]["prior_research"] = previous[-settings["recent_turns"]:]
-        ctx["system"] = SYSTEM; ctx["context_id"] = digest({k: v for k, v in ctx.items() if k != "context_id"})
-        ctx_ref = store.artifact(tid, "context", ctx)
+        product_context = getattr(store, "product_context", None)
+        if product_context:
+            ctx_ref = product_context(tid, settings, system=SYSTEM, include_research=True)
+        else:
+            ctx = organize(store, tid, **{k: settings[k] for k in ("history_bytes", "recent_turns", "excerpt_chars")})
+            # Standalone research can carry untargeted corrections.
+            previous = []
+            notes = store.notes(turn["session"], before=tid)
+            correction = store.job(tid)["metadata"].get("note_kind") in {"correction_fact", "correction_intent"}
+            stale = {n["turn_id"] for n in notes if n["status"] == "needs_review"}
+            for m in store.history(turn["session"], before=tid):
+                if m["role"] != "assistant" or not m.get("result_ref"): continue
+                prior = store.load(m["result_ref"])
+                if not prior.get("research_ref"): continue
+                d = verify_data(store, prior["research_ref"])
+                previous.append({"turn_id": m["turn_id"], "research_ref": prior["research_ref"],
+                    "status": "needs_review" if correction or m["turn_id"] in stale else "unverified_model_research",
+                    "research": {} if correction or m["turn_id"] in stale else d["research"],
+                    "stop_reason": prior["stop_reason"]})
+            ctx["research_state"]["prior_research"] = previous[-settings["recent_turns"]:]
+            ctx["system"] = SYSTEM
+            ctx["context_id"] = digest({k: v for k, v in ctx.items() if k != "context_id"})
+            ctx_ref = store.artifact(tid, "context", ctx)
         existing = store.published_artifact(tid, "g5-data-initial")
         if existing: data = verify_data(store, existing)
         else:
@@ -684,14 +694,19 @@ def run_turn(store, tid, pipeline, *, continue_turn=False, opener_factory=None, 
         with research_graph(store, tid, pipeline, bridge, opener_factory=opener_factory, fault=fault) as graph:
             config = {"configurable": {"thread_id": tid}, "recursion_limit": 40}
             snap = graph.get_state(config)
-            if not snap.values and store.cancelled(tid):
+            if snap.values:
+                require(snap.values["code"] == code_identity(), "INCOMPATIBLE_G5_CODE_READ_ONLY")
+            # No model operation can be prepared before the initializer checkpoints.
+            # Product stop/close can settle a parked initial query without running it again.
+            initial_incomplete = not snap.values or (
+                getattr(pipeline, "staged_local_queries", False) and snap.next == ("initialize",))
+            if initial_incomplete and store.cancelled(tid):
                 result = {"version": VERSION, "mode": settings["mode"], "turn_id": tid, "session_id": chat["id"],
                     "status": "cancelled", "stop_reason": "user_cancelled", "answer_text": None, "citations": [],
                     "sources_ref": None, "research_ref": None, "operation_id": None, "remote_calls": 0,
                     "semantic_acceptance": "NOT_REVIEWED", "delivery_note": "轮次已取消；没有启动检索或模型派发。"}
                 commit_result(store, tid, result); return result
             if snap.values:
-                require(snap.values["code"] == code_identity(), "INCOMPATIBLE_G5_CODE_READ_ONLY")
                 require(continue_turn or store.cancelled(tid), "Interrupted turn requires explicit continue")
                 initial = None
             else: initial = {"version": VERSION, "turn_id": tid, "code": code_identity()}

@@ -144,12 +144,16 @@ def conversation_graph(store, tid, pipeline, bridge, *, opener_factory=None, fau
     def context_node(state):
         require(state["turn_id"] == tid and state["version"] == VERSION, "Foreign graph state")
         progress("context_started")
-        ctx = organize(store, tid, **{k: settings[k] for k in ("history_bytes", "recent_turns", "excerpt_chars")})
-        if mode == "LIVE":
-            from .clean_live import SYSTEM as live_system
-            ctx["system"] = live_system
-            ctx["context_id"] = digest({k: v for k, v in ctx.items() if k != "context_id"})
-        ref = store.artifact(tid, "context", ctx)
+        product_context = getattr(store, "product_context", None)
+        if product_context:
+            ref = product_context(tid, settings, system=SYSTEM)
+        else:
+            ctx = organize(store, tid, **{k: settings[k] for k in ("history_bytes", "recent_turns", "excerpt_chars")})
+            if mode == "LIVE":
+                from .clean_live import SYSTEM as live_system
+                ctx["system"] = live_system
+                ctx["context_id"] = digest({k: v for k, v in ctx.items() if k != "context_id"})
+            ref = store.artifact(tid, "context", ctx)
         progress("context_organized")
         fault("context_saved_before_checkpoint")
         return {"context_ref": ref}

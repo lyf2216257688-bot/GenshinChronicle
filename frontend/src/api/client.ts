@@ -18,25 +18,40 @@ export type LiveSettings = Schema['LiveSettings']
 
 export class ApiError extends Error {
   code: string
-  constructor(code: string, message: string) {
+  status?: number
+  constructor(code: string, message: string, status?: number) {
     super(message)
     this.code = code
+    this.status = status
   }
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await fetch('/api/v1' + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', 'X-GC-Client': 'local-chat-v1' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const data = await response.json()
-  if (!response.ok) throw new ApiError(data.code ?? 'http', data.message ?? '本机服务请求失败。')
+  let response: Response
+  try {
+    response = await fetch('/api/v1' + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-GC-Client': 'local-chat-v1' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch {
+    throw new ApiError('connection', '无法连接本机服务。请确认服务已启动。')
+  }
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const code = typeof data?.code === 'string' ? data.code : 'http'
+    const message = typeof data?.message === 'string' && data.message
+      ? data.message : `本机服务请求失败（HTTP ${response.status}）。`
+    throw new ApiError(code, message, response.status)
+  }
+  if (data === null || typeof data !== 'object')
+    throw new ApiError('invalid_response', '本机服务返回了无法读取的响应。', response.status)
   return data as T
 }
 
 const id = encodeURIComponent
-const apiRevision: Runtime['api_revision'] = 2
+const apiRevision: Runtime['api_revision'] = 3
+const eventKinds = new Set(['stage', 'draft', 'refresh', 'settled', 'error'])
 export const client = {
   async runtime() {
     const runtime = await request<Runtime>('GET', '/runtime')
@@ -83,7 +98,19 @@ export const client = {
     const stream = new EventSource('/api/v1/turns/' + id(tid) + '/events?after=' + after)
     stream.onopen = () => connection(true)
     stream.onerror = () => connection(false)
-    stream.onmessage = (e) => receive(JSON.parse(e.data) as TurnEvent)
+    stream.onmessage = (e) => {
+      let event: TurnEvent
+      try {
+        event = JSON.parse(e.data) as TurnEvent
+        if (!event || !eventKinds.has(event.kind) || typeof event.text !== 'string' ||
+            !Number.isSafeInteger(event.sequence) || event.sequence < 0 ||
+            (event.state != null && event.state !== 'running')) throw Error('Invalid progress event')
+      } catch {
+        connection(false)
+        return
+      }
+      receive(event)
+    }
     return () => stream.close()
   },
 }

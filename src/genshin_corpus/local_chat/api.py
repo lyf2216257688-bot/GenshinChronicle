@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import sqlite3
 
 from pydantic import ValidationError
 from starlette.applications import Starlette
@@ -88,8 +89,8 @@ class Service:
 
     def delete_chat(self, sid):
         with self.worker.condition:
-            scheduled = (*self.worker.pending, self.worker.active)
-            if any(tid and self.store.turn(tid)["session"] == sid for tid in scheduled):
+            active = self.worker.active
+            if self.store.has_work(sid=sid) or active and self.store.turn(active)["session"] == sid:
                 raise Problem("chat_busy", "会话有正在处理的轮次，请先停止并等待本轮结束。")
             self.store.delete_chat(sid)
         return self.chats()
@@ -101,17 +102,18 @@ class Service:
         return self.store.save_draft(sid, data)
 
     def history(self, sid, before=2**63-1, limit=20):
-        return display.history(self.store, self.worker, sid, before, limit)
+        return display.history(self.store, sid, before, limit)
 
     def submit(self, sid, data):
-        tid, fresh = self.store.submit_draft(sid, data, lambda mode: grants.available(self.store, mode))
-        if fresh:
-            self.worker.schedule(tid)
+        if self.worker.stop_event.is_set():
+            raise Problem("service_stopping", "本地服务正在关闭。", 503)
+        tid, _ = self.store.submit_draft(sid, data, lambda mode: grants.available(self.store, mode))
+        self.worker.wake()
         return self.turn(tid)
 
     def turn(self, tid):
         self.store.input_for(tid)
-        return display.turn_view(self.store, self.worker, tid)
+        return display.turn_view(self.store, tid)
 
     def stop(self, tid):
         view = self.turn(tid)
@@ -122,7 +124,10 @@ class Service:
     def resume(self, tid):
         if not self.turn(tid)["can_resume"]:
             raise Problem("cannot_resume", "当前轮次无法按原许可继续。")
-        self.worker.schedule(tid, continue_turn=True)
+        if self.worker.stop_event.is_set():
+            raise Problem("service_stopping", "本地服务正在关闭。", 503)
+        self.store.request_continue(tid)
+        self.worker.wake()
         return self.turn(tid)
 
     def citation(self, tid, packet, cid):
@@ -162,6 +167,22 @@ def event_frame(e):
     return f"id: {value.sequence}\ndata: {value.model_dump_json()}\n\n"
 
 
+def problem_for(exc, operation):
+    if isinstance(exc, Problem):
+        return exc
+    sqlite_code = getattr(exc, "sqlite_errorcode", 0) & 0xff
+    logging.getLogger(__name__).warning("Chat API %s failed (%s, SQLite=%d)",
+                                       operation, type(exc).__name__, sqlite_code)
+    if isinstance(exc, sqlite3.Error):
+        if sqlite_code in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+            return Problem("storage_busy", "本地记录正在被占用，请稍后重试。", 503)
+        if sqlite_code in {sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB}:
+            return Problem("integrity", "本地数据库校验失败。请保留数据以便复查。")
+    if isinstance(exc, (OSError, ValueError, KeyError)) and not isinstance(exc, ValidationError):
+        return Problem("integrity", "本地记录缺失或校验失败。请保留数据以便复查。")
+    return Problem("internal_error", "本地服务遇到异常，请查看本地服务日志。", 500)
+
+
 async def event_stream(service, tid, after):
     seq, idle = after, 0
     try:
@@ -172,8 +193,8 @@ async def event_stream(service, tid, after):
                 yield event_frame(event)
                 if event["kind"] == "settled":
                     return
-            with service.worker.condition:
-                active = tid in service.worker.pending or tid == service.worker.active
+            job = await asyncio.to_thread(service.store.job, tid)
+            active = job["status"] in {"queued", "running"}
             if not active:
                 # A job may have published its last events between the read and idle check.
                 tail = await asyncio.to_thread(display.public_events, service.store, tid, seq)
@@ -186,8 +207,9 @@ async def event_stream(service, tid, after):
             if idle % 50 == 0:
                 yield ": keepalive\n\n"
             await asyncio.sleep(.25)
-    except (KeyError, ValueError, OSError):
-        yield event_frame({"sequence": seq, "kind": "error", "text": "进度记录校验失败。"})
+    except Exception as exc:
+        problem = problem_for(exc, "events")
+        yield event_frame({"sequence": seq, "kind": "error", "text": str(problem)})
 
 
 def endpoint(name, body, response):
@@ -232,6 +254,19 @@ def endpoint(name, body, response):
     return handle
 
 
+def guarded_endpoint(name, body, response):
+    handle = endpoint(name, body, response)
+
+    async def guarded(request):
+        try:
+            return await handle(request)
+        except Exception as exc:
+            problem = problem_for(exc, name)
+            return JSONResponse({"code": problem.code, "message": str(problem)}, problem.status,
+                                headers={"Cache-Control": "no-store"})
+    return guarded
+
+
 class LoopbackOnly:
     def __init__(self, app):
         self.app = app
@@ -267,21 +302,14 @@ def create_app(root=DEFAULT_ROOT, repo=REPO, *, delay=.025):
         finally:
             await asyncio.to_thread(service.worker.close)
 
-    async def error(request, exc):
-        if isinstance(exc, Problem):
-            return JSONResponse({"code": exc.code, "message": str(exc)}, exc.status)
-        logging.getLogger(__name__).warning("Local data check failed (%s)", type(exc).__name__)
-        return JSONResponse({"code": "integrity", "message": "本地记录缺失、被占用或校验失败。请保留数据以便复查。"}, 409)
-
     async def spec(request):
         return JSONResponse(contract.specification())
 
-    routes = [Route("/api/v1" + path, endpoint(name, body, response), methods=[method]) for
+    routes = [Route("/api/v1" + path, guarded_endpoint(name, body, response), methods=[method]) for
               name, method, path, body, response in contract.ROUTES]
     routes.append(Route("/api/v1/openapi.json", spec))
     if STATIC.is_dir():
         routes.append(Mount("/", app=ChatStaticFiles(directory=STATIC, html=True)))
-    app = Starlette(routes=routes, lifespan=lifespan,
-                    exception_handlers={cls: error for cls in (Problem, ValueError, OSError, KeyError)})
+    app = Starlette(routes=routes, lifespan=lifespan)
     app.add_middleware(LoopbackOnly)
     return app

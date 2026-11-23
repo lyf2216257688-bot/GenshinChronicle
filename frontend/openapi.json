@@ -1473,7 +1473,7 @@
             "type": "string"
           },
           "api_revision": {
-            "const": 2,
+            "const": 3,
             "title": "Api Revision",
             "type": "integer"
           },

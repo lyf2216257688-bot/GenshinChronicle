@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { once } from 'node:events'
@@ -17,10 +17,17 @@ const env = {
   LANGSMITH_TRACING: 'false',
 }
 let root: string, port: number, url: string, server: ChildProcess
-async function start() {
+async function start(batchClockOffset = 0) {
   const windows = process.platform === 'win32'
-  const entry = windows ? ['/d', '/c', 'Start-GC-Chat.cmd'] : ['-B', '-m', 'genshin_corpus.local_chat']
-  server = spawn(windows ? 'cmd.exe' : python, [...entry, '--no-browser', '--root', root, '--port', String(port)],
+  const useLauncher = windows && !batchClockOffset
+  const entry = batchClockOffset ? ['-B', '-c', [
+    'import runpy, time',
+    'from types import SimpleNamespace',
+    'from genshin_corpus.local_chat import batches',
+    'batches.time = SimpleNamespace(time=lambda: time.time() + ' + batchClockOffset + ')',
+    'runpy.run_module("genshin_corpus.local_chat", run_name="__main__", alter_sys=True)',
+  ].join('\n')] : useLauncher ? ['/d', '/c', 'Start-GC-Chat.cmd'] : ['-B', '-m', 'genshin_corpus.local_chat']
+  server = spawn(useLauncher ? 'cmd.exe' : python, [...entry, '--no-browser', '--root', root, '--port', String(port)],
     { cwd: repo, env, windowsHide: true, stdio: 'ignore' })
   await expect
     .poll(
@@ -49,6 +56,15 @@ async function stop() {
     server.kill('SIGTERM')
     await closed
   }
+}
+async function createDemo(page: Page) {
+  const [response] = await Promise.all([
+    page.waitForResponse((r) => r.url() === url + 'api/v1/chats' && r.request().method() === 'POST'),
+    page.getByRole('button', { name: '离线演示', exact: true }).click(),
+  ])
+  expect(response.ok()).toBe(true)
+  const { id } = await response.json()
+  await expect(page).toHaveURL(url + '?chat=' + id)
 }
 test.beforeAll(async () => {
   await mkdir(scratch, { recursive: true })
@@ -208,6 +224,7 @@ test('launcher reuses the right service and an interrupted turn resumes only on 
 test('unbound numbers, invalid citations and claims with insufficient support', async ({
   page,
 }) => {
+  await stop()
   const sid = execFileSync(python, ['-B', '-m', 'tests.local_chat.citation_cases', root], {
     cwd: repo,
     env,
@@ -215,6 +232,7 @@ test('unbound numbers, invalid citations and claims with insufficient support', 
     encoding: 'utf8',
     timeout: 30000,
   }).trim()
+  await start()
   await page.goto(url + '?chat=' + sid)
   const turns = page.locator('.turn')
   await expect(turns).toHaveCount(3)
@@ -297,11 +315,13 @@ test('an old backend is reported as a version mismatch', async ({ page }) => {
   const button = page.getByRole('button', { name: '批次设置', exact: true })
   await button.click()
   const panel = page.getByRole('complementary', { name: '批次设置' })
+  await expect(panel).toBeVisible()
   await panel.getByRole('combobox').selectOption('LIVE')
   await expect(panel).toContainText('聊天页面和后台版本不一致')
   await expect(panel.getByText('应用数据目录', { exact: true })).toHaveCount(0)
   await expect(panel).not.toContainText('无法使用 Windows 账号加密')
   await expect(panel.getByRole('button', { name: '开启批次' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '发送', exact: true })).toHaveCount(0)
 })
 
 test('deleting a sidebar chat needs confirmation and survives restart', async ({ page, request }) => {
@@ -337,4 +357,142 @@ test('deleting a sidebar chat needs confirmation and survives restart', async ({
   await page.getByRole('button', { name: '打开会话导航' }).click()
   for (const title of titles)
     await expect(page.getByRole('button', { name: '删除会话：' + title })).toHaveCount(0)
+})
+
+test('late rename cannot change the selected chat or lose a draft after a plain HTTP error', async ({
+  page, request,
+}) => {
+  const titles = ['交错会话 A', '交错会话 B']
+  const [a, b] = await Promise.all(titles.map(async (title) => {
+    const response = await request.post(url + 'api/v1/chats', {
+      data: { mode: 'LIVE', title },
+      headers: { 'X-GC-Client': 'local-chat-v1' },
+    })
+    expect(response.ok()).toBe(true)
+    return (await response.json()).id as string
+  }))
+  let allowRename!: () => void
+  const held = new Promise<void>((resolve) => { allowRename = resolve })
+  let renameStored!: () => void
+  const written = new Promise<void>((resolve) => { renameStored = resolve })
+  await page.route(url + 'api/v1/chats/' + a, async (route) => {
+    const response = await route.fetch()
+    renameStored()
+    await held
+    await route.fulfill({ response })
+  })
+  try {
+    await page.goto(url + '?chat=' + a)
+    await page.getByRole('button', { name: '重命名', exact: true }).click()
+    await page.getByLabel('会话名称').fill('交错会话 A 已改名')
+    await page.getByRole('button', { name: '保存名称' }).click()
+    await written
+    await page.getByRole('button', { name: titles[1], exact: true }).click()
+    await page.getByRole('button', { name: '批次设置', exact: true }).click()
+  } finally {
+    allowRename()
+  }
+  await expect(page.getByRole('button', { name: '交错会话 A 已改名', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: titles[1], exact: true, level: 1 })).toBeVisible()
+  await expect(page).toHaveURL(url + '?chat=' + b)
+  await expect(page.getByRole('complementary', { name: '批次设置' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭详情' }).click()
+
+  let failSave = true
+  await page.route(url + 'api/v1/chats/' + b + '/draft', async (route) => {
+    if (route.request().method() === 'PUT' && failSave) {
+      await route.fulfill({ status: 503, contentType: 'text/plain', body: 'private backend detail' })
+    } else await route.continue()
+  })
+  const input = page.getByRole('textbox', { name: '提问', exact: true })
+  await input.fill('会话 B 的待保存草稿')
+  await expect(page.getByRole('alert')).toContainText('HTTP 503')
+  await expect(page.getByRole('alert')).not.toContainText('private backend detail')
+  failSave = false
+  await page.getByRole('button', { name: '重新载入' }).click()
+  await expect(input).toHaveValue('会话 B 的待保存草稿')
+  const readDraft = async (sid: string) => (await (await request.get(url + 'api/v1/chats/' + sid + '/draft')).json()).text
+  await expect.poll(() => readDraft(b)).toBe('会话 B 的待保存草稿')
+  expect(await readDraft(a)).toBe('')
+})
+
+test('a failed progress connection reads the durable answer without repeating a command', async ({
+  page, request,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto(url)
+  await createDemo(page)
+  const input = page.getByRole('textbox', { name: '提问', exact: true })
+  await expect(input).toBeVisible()
+  const writes: string[] = []
+  const successfulReads: string[] = []
+  page.on('request', (r) => {
+    if (r.method() === 'POST') writes.push(new URL(r.url()).pathname)
+  })
+  page.on('response', (r) => {
+    const path = new URL(r.url()).pathname
+    if (r.ok() && r.request().method() === 'GET' && /\/api\/v1\/turns\/[^/]+$/.test(path)) {
+      successfulReads.push(path)
+    }
+  })
+  await page.route('**/api/v1/turns/*/events?*', async (route) => {
+    const persisted = new URL(route.request().url())
+    persisted.pathname = persisted.pathname.slice(0, -'/events'.length)
+    persisted.search = ''
+    await expect.poll(async () => {
+      const response = await request.get(persisted.href)
+      return (await response.json()).has_answer
+    }, { timeout: 20000 }).toBe(true)
+    await route.fulfill({ status: 503, contentType: 'text/plain', body: 'test interruption' })
+  })
+  await input.fill('进度连接丢失时仍可查看原轮答案')
+  await input.press('Enter')
+  await expect(page.locator('.turn .answer')).toBeVisible({ timeout: 30000 })
+  expect(successfulReads).toHaveLength(1)
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toMatch(/\/api\/v1\/chats\/[^/]+\/turns$/)
+  expect(errors).toEqual([])
+})
+
+test('the next day resumes the same chat after the old grant expires and the service restarts', async ({
+  page, request,
+}) => {
+  await page.goto(url)
+  await createDemo(page)
+  const input = page.getByRole('textbox', { name: '提问', exact: true })
+  const turns = page.locator('.turn')
+  await input.fill('昨天的条件：按发生顺序列出依据。')
+  await input.press('Enter')
+  await expect(turns.first().locator('.answer')).toBeVisible({ timeout: 20000 })
+  const savedUrl = page.url()
+  const sid = new URL(savedUrl).searchParams.get('chat')
+  const readHistory = async () =>
+    (await (await request.get(url + 'api/v1/chats/' + sid + '/turns')).json()).turns
+  const [first] = await readHistory()
+  expect(first.has_answer).toBe(true)
+  await input.fill('第二天接着追问，原来的依据是什么？')
+  await expect.poll(async () =>
+    (await (await request.get(url + 'api/v1/chats/' + sid + '/draft')).json()).text,
+  ).toBe('第二天接着追问，原来的依据是什么？')
+
+  const day = 24 * 60 * 60
+  await stop()
+  await start(day)
+  await page.clock.setFixedTime(Date.now() + day * 1000)
+  await page.reload()
+  await expect(page).toHaveURL(savedUrl)
+  await expect(input).toHaveValue('第二天接着追问，原来的依据是什么？')
+  await expect(turns).toHaveCount(1)
+  const expired = (await (await request.get(url + 'api/v1/batches')).json()).items
+    .find((batch: { id: string }) => batch.id === first.batch_id)
+  expect(expired.state).toBe('expired')
+  await page.getByRole('button', { name: '开启问答批次' }).click()
+  await page.getByRole('button', { name: '开启批次', exact: true }).click()
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(turns.nth(1).locator('.answer')).toBeVisible({ timeout: 20000 })
+  const [prior, next] = await readHistory()
+  expect(prior).toMatchObject({ id: first.id, result_hash: first.result_hash, batch_id: first.batch_id })
+  expect(next.chat_id).toBe(sid)
+  expect(next.batch_id).not.toBe(first.batch_id)
 })

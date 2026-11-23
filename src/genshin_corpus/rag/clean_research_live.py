@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import time
+from uuid import uuid4
 
 from ..evidence_io import digest, read, require, seal, sha, verify
 from ..generation.clean_chat import ENDPOINT, MODEL, ROUTES, DEFAULT_ROUTE
@@ -210,10 +211,15 @@ class ResearchSessions(ChatSessions):
         return super().reserve(*args)
 
 
+class LocalQueryInterrupted(RuntimeError):
+    """Local work stopped before a ranking was committed."""
+
+
 class ResearchPipeline:
     """Reuse the verified CPU reader within a turn; GPUs still exit per query."""
-    def __init__(self, store, tid, repo):
+    def __init__(self, store, tid, repo, *, staged_local_queries=False, explicit_resume=False):
         self.store, self.tid, self.repo = store, tid, Path(repo)
+        self.staged_local_queries, self.explicit_resume = staged_local_queries, explicit_resume
         self.pipeline = None; self._reader = None; self.worker_timings = []
 
     @property
@@ -228,17 +234,34 @@ class ResearchPipeline:
         settings = self.store.chat(self.store.turn(self.tid)["session"])["settings"]
         require(query.combination == settings.get("retrieval_combination", "S0"), "RESEARCH_COMBINATION_CHANGED")
         config = "config/clean-generation-s2-v1.json" if query.combination == "S2" else "config/clean-retrieval-v1.json"
-        output = self.store.root / "local_queries" / self.tid / query.query_id
-        if output.exists():
-            verify(output); result = read(output / "ranked.json")
-            require(result["query"] == query.value(), "G5_LOCAL_QUERY_REPLAY_CHANGED")
+        committed = self.store.root / "local_queries" / self.tid / query.query_id
+        completion = committed / "complete.json"
+        if self.staged_local_queries:
+            require(not committed.is_symlink() and (not committed.exists() or committed.is_dir()),
+                    "G5_LOCAL_QUERY_DIRECTORY_CHANGED")
+        published = (self.store.published_artifact(self.tid, "g5-ranked-" + query.query_id)
+                     if self.staged_local_queries else None)
+        if committed.exists() and (not self.staged_local_queries or completion.exists() or completion.is_symlink()):
+            try:
+                verify(committed)
+            except TypeError as exc:
+                raise ValueError("G5_LOCAL_QUERY_SEAL_INVALID") from exc
+            result = read(committed / "ranked.json")
+            require(isinstance(result, dict) and result.get("query") == query.value(), "G5_LOCAL_QUERY_REPLAY_CHANGED")
+            require(published is None or self.store.load(published) == result, "G5_PUBLISHED_RANKING_CHANGED")
             return result
+        output = committed
+        if self.staged_local_queries:
+            require(published is None, "G5_PUBLISHED_RANKING_SEAL_MISSING")
+            output = self._attempt_directory(committed, query.query_id)
+
         start = time.perf_counter()
         self.worker_timings.clear()
         if self.pipeline is None:
             self.pipeline = LocalPipeline(self.repo, self.repo / config,
                 self.repo / "config/reranking-selected-v1.json", output,
-                worker_factory=lambda *a, **kw: TimedWorker(self.worker_timings, *a, **kw))
+                worker_factory=lambda *a, **kw: TimedWorker(self.worker_timings, *a,
+                    recover_eof=self.staged_local_queries, **kw))
         else:
             self.pipeline.reader.binding.check()
             output.mkdir(parents=True, exist_ok=False); self.pipeline.output = output
@@ -249,7 +272,27 @@ class ResearchPipeline:
             "total_seconds": time.perf_counter() - start, "cpu_reader_reused": len(parents) > 0,
             "workers": self.worker_timings,
             "gpu_policy": "unchanged_serial_job_owned_workers"})
-        seal(output); return result
+        seal(output)
+        if self.staged_local_queries:
+            # The conversation execution lock serializes publishing for this turn.
+            # A killed worker can leave a partial seal only inside its attempt.
+            verify(output)
+            require(read(output / "ranked.json") == result and result["query"] == query.value(),
+                    "G5_LOCAL_QUERY_COMMIT_CHANGED")
+            committed.parent.mkdir(parents=True, exist_ok=True)
+            require(not committed.exists() and not committed.is_symlink(), "G5_LOCAL_QUERY_ALREADY_COMMITTED")
+            output.rename(committed)
+        return result
+
+    def _attempt_directory(self, committed, query_id):
+        attempts = self.store.root / "local_attempts" / self.tid / query_id
+        if (committed.exists() or attempts.exists()) and not self.explicit_resume:
+            raise LocalQueryInterrupted("Local query requires explicit continuation")
+        attempts.mkdir(parents=True, exist_ok=True)
+        if committed.exists():
+            # Retain a pre-staging partial directory if one is present in this scope.
+            committed.rename(attempts / ("legacy-" + uuid4().hex))
+        return attempts / uuid4().hex
 
     def close(self):
         if self.pipeline: self.pipeline.close()
@@ -258,9 +301,10 @@ class ResearchPipeline:
 
 class TimedWorker(JsonWorker):
     """Measure unchanged worker startup, inference and confirmed shutdown."""
-    def __init__(self, records, *args, **kwargs):
+    def __init__(self, records, *args, recover_eof=False, **kwargs):
         self.measurement = {"module": args[2], "arguments": args[3]}
         self.measured_close = False
+        self.recover_eof = recover_eof
         records.append(self.measurement)
         tick = time.perf_counter()
         super().__init__(*args, **kwargs)
@@ -270,6 +314,14 @@ class TimedWorker(JsonWorker):
         tick = time.perf_counter()
         try: return super().request(value)
         finally: self.measurement["request_seconds"] = time.perf_counter() - tick
+
+    def receive(self):
+        try:
+            return super().receive()
+        except ValueError as exc:
+            if self.recover_eof and str(exc) == "Worker exited unexpectedly; inspect stderr":
+                raise LocalQueryInterrupted("Local query worker exited before completion") from exc
+            raise
 
     def close(self):
         tick = time.perf_counter()

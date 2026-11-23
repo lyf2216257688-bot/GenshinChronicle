@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from genshin_corpus.evidence_io import read, sha, write
+from genshin_corpus.evidence_io import read, sha, verify, write
 from genshin_corpus.generation.clean_chat import MODEL, encoded
 from genshin_corpus.generation.clean_chat_transport import ChatSessions
 from genshin_corpus.rag.clean_conversation import ConversationStore
@@ -16,7 +16,7 @@ from genshin_corpus.rag.clean_conversation_graph import citation_view
 from genshin_corpus.rag.clean_mock import FixturePipeline, MockOpener, MockResponse, fixture_inputs
 from genshin_corpus.rag import clean_research as r
 from genshin_corpus.rag import clean_research_live as live
-from genshin_corpus.retrieval.clean_based.query_v2 import validate_ancestry
+from genshin_corpus.retrieval.clean_based.query_v2 import ResearchQuery, validate_ancestry
 from genshin_corpus.retrieval.clean_based.source import InputReader
 from tests.scratch import scratch_root
 
@@ -635,6 +635,156 @@ class ResearchTests(unittest.TestCase):
         r.run_turn(self.store, tid, self.pipeline)
         self.assertEqual(sender.call_count, 1)
         self.assertEqual(self.bridge().batch.accounting()["unknown_usage_requests"], 1)
+
+    def staged_pipeline(self, tid, *, resume=False):
+        return live.ResearchPipeline(self.store, tid, REPO, staged_local_queries=True, explicit_resume=resume)
+
+    def local_fixture(self, *, fail_at=lambda _query, _phase: None):
+        reader = self.reader
+
+        class LocalFixture(Pipeline):
+            def __init__(self, repo, _config, _selector, output, *, worker_factory):
+                super().__init__(reader, repo)
+                self.output = output
+                self.output.mkdir(parents=True)
+
+            def run(self, query, **kwargs):
+                (self.output / "worker.log").write_bytes(b"local worker started")
+                fail_at(query, "started")
+                result = super().run(query, **kwargs)
+                write(self.output / "ranked.json", result)
+                fail_at(query, "ranked")
+                return result
+
+        return patch.object(live, "LocalPipeline", LocalFixture)
+
+    def test_staged_live_local_interruptions_continue_same_turn_without_extra_reservation(self):
+        self.live_fixture()
+        tid = self.turn()
+        failures = iter(["started", "ranked"])
+        interruption = next(failures)
+
+        def interrupt(_query, phase):
+            nonlocal interruption
+            if phase == interruption:
+                interruption = next(failures, None)
+                raise live.LocalQueryInterrupted(phase)
+
+        response = MockOpener("已恢复。[E01]")
+        with self.local_fixture(fail_at=interrupt), patch.dict(os.environ, {"TOKENMETRO_API_KEY": "fixture"}), patch(
+                "genshin_corpus.generation.clean_chat_transport.build_opener", return_value=response) as opener:
+            for resume, phase in [(False, "started"), (True, "ranked")]:
+                with self.assertRaisesRegex(live.LocalQueryInterrupted, phase):
+                    r.run_turn(self.store, tid, self.staged_pipeline(tid, resume=resume), continue_turn=resume)
+                self.assertFalse((self.store.root / "live/closed.json").exists())
+                self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 0)
+                opener.assert_not_called()
+            with self.assertRaisesRegex(ValueError, "requires explicit continue"):
+                r.run_turn(self.store, tid, self.staged_pipeline(tid))
+            result = r.run_turn(self.store, tid, self.staged_pipeline(tid, resume=True), continue_turn=True)
+            opener.assert_called_once()
+
+        self.assertEqual(result["turn_id"], tid)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 1)
+        attempts = self.store.root / "local_attempts" / tid / "original"
+        self.assertEqual(len(list(attempts.glob("*/worker.log"))), 2)
+        self.assertEqual(len(list(attempts.glob("*/ranked.json"))), 1)
+        self.assertEqual(list(attempts.glob("*/complete.json")), [])
+        committed = self.store.root / "local_queries" / tid / "original"
+        verify(committed)
+        published = self.store.published_artifact(tid, "g5-ranked-original")
+        self.assertEqual(published["sha256"], sha(committed / "ranked.json"))
+        query = ResearchQuery.parse(read(committed / "ranked.json")["query"])
+        with patch.object(live, "LocalPipeline", side_effect=AssertionError("sealed query must replay")):
+            self.assertEqual(self.staged_pipeline(tid, resume=True).run(query), self.store.load(published))
+            (committed / "ranked.json").write_bytes(b"{}")
+            with self.assertRaisesRegex(ValueError, "Artifact set/hash changed"):
+                self.staged_pipeline(tid, resume=True).run(query)
+            (committed / "complete.json").unlink()
+            with self.assertRaisesRegex(ValueError, "G5_PUBLISHED_RANKING_SEAL_MISSING"):
+                self.staged_pipeline(tid, resume=True).run(query)
+
+    def test_staged_legacy_partial_is_retained_and_requires_explicit_resume(self):
+        tid = self.turn()
+        text = self.store.turn(tid)["question"]
+        query = ResearchQuery(self.sid, tid, "original", text, text, text, text)
+        old = self.store.root / "local_queries" / tid / "original"
+        old.mkdir(parents=True)
+        (old / "worker.log").write_bytes(b"legacy partial")
+        with self.local_fixture():
+            with self.assertRaises(live.LocalQueryInterrupted):
+                self.staged_pipeline(tid).run(query)
+            self.assertEqual((old / "worker.log").read_bytes(), b"legacy partial")
+            self.staged_pipeline(tid, resume=True).run(query)
+        verify(old)
+        attempts = self.store.root / "local_attempts" / tid / "original"
+        self.assertEqual([p.read_bytes() for p in attempts.glob("legacy-*/worker.log")], [b"legacy partial"])
+
+    def test_cancel_parked_initial_local_query_does_not_restart_it(self):
+        self.live_fixture()
+        tid = self.turn()
+
+        def fail(_query, _phase):
+            raise live.LocalQueryInterrupted("worker stopped")
+
+        with self.local_fixture(fail_at=fail), self.assertRaises(live.LocalQueryInterrupted):
+            r.run_turn(self.store, tid, self.staged_pipeline(tid))
+        self.store.cancel(tid)
+        with patch.object(live, "LocalPipeline", side_effect=AssertionError("cancelled query started")):
+            result = r.run_turn(self.store, tid, self.staged_pipeline(tid, resume=True), continue_turn=True)
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 0)
+
+    def test_cancel_parked_followup_search_retains_prior_sealed_reservation(self):
+        self.live_fixture()
+        tid = self.turn()
+
+        def fail_followup(query, _phase):
+            if query.query_id != "original":
+                raise live.LocalQueryInterrupted("follow-up worker stopped")
+
+        with self.local_fixture(fail_at=fail_followup), patch.dict(os.environ, {"TOKENMETRO_API_KEY": "fixture"}), patch(
+                "genshin_corpus.generation.clean_chat_transport.build_opener", return_value=ToolOpener([search()])) as opener:
+            with self.assertRaises(live.LocalQueryInterrupted):
+                r.run_turn(self.store, tid, self.staged_pipeline(tid))
+            self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 1)
+            self.store.cancel(tid)
+            with patch.object(live, "LocalPipeline", side_effect=AssertionError("cancelled search started")):
+                result = r.run_turn(self.store, tid, self.staged_pipeline(tid, resume=True), continue_turn=True)
+            opener.assert_called_once()
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(self.bridge().batch.accounting()["request_reservations"], 1)
+
+    def test_cancel_after_unsealed_reservation_keeps_unknown_without_resending(self):
+        self.live_fixture()
+        tid = self.turn()
+
+        class InterruptedOpener:
+            def open(self, _request, *, timeout):
+                raise Crash()
+
+        with self.local_fixture(), patch.dict(os.environ, {"TOKENMETRO_API_KEY": "fixture"}), patch(
+                "genshin_corpus.generation.clean_chat_transport.build_opener", return_value=InterruptedOpener()) as opener:
+            with self.assertRaises(Crash):
+                r.run_turn(self.store, tid, self.staged_pipeline(tid))
+            totals = self.bridge().batch.accounting()
+            self.assertEqual((totals["request_reservations"], totals["unknown_usage_requests"]), (1, 1))
+            self.store.cancel(tid)
+            result = r.run_turn(self.store, tid, self.staged_pipeline(tid, resume=True), continue_turn=True)
+            self.assertEqual(result["status"], "cancelled")
+            opener.assert_called_once()
+            self.assertEqual(self.bridge().batch.accounting(), totals)
+
+    def test_staged_inner_worker_eof_is_recoverable_but_invalid_output_is_not(self):
+        worker = object.__new__(live.TimedWorker)
+        worker.recover_eof = True
+        with patch.object(live.JsonWorker, "receive", side_effect=ValueError("Worker exited unexpectedly; inspect stderr")):
+            with self.assertRaises(live.LocalQueryInterrupted):
+                worker.receive()
+        with patch.object(live.JsonWorker, "receive", side_effect=ValueError("Invalid worker result")):
+            with self.assertRaisesRegex(ValueError, "Invalid worker result"):
+                worker.receive()
 
 
 if __name__ == "__main__": unittest.main()

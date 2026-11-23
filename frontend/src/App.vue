@@ -42,7 +42,7 @@ const categories = {
   citation: '引用问题',
   other: '其他问题',
 }
-const liveBatch = computed(() => s.batch?.state === 'open' && s.batch.expires * 1000 > now.value)
+const liveBatch = computed(() => !!s.info && s.batch?.state === 'open' && s.batch.expires * 1000 > now.value)
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval>
 onMounted(() => {
@@ -82,13 +82,14 @@ async function panelAction(fn: () => Promise<unknown>) {
 async function revisit(f: Feedback) {
   await s.safe(async () => {
     const id = await s.revisit(f)
+    if (!id) return
     await nextTick()
-    document.getElementById('turn-' + id)?.scrollIntoView({ block: 'center' })
+    if (s.current?.id === f.chat_id)
+      document.getElementById('turn-' + id)?.scrollIntoView({ block: 'center' })
   })
 }
 function showBatches() {
-  s.closePanel()
-  s.panel = 'batch'
+  s.setPanel('batch')
   nav.value = false
   void s.safe(s.refreshBatchPanel)
 }
@@ -117,14 +118,14 @@ function showReports() {
 function editTitle() {
   if (!s.current) return
   title.value = s.current.title
-  s.panel = 'rename'
+  s.setPanel('rename')
 }
 function askDelete(chat: Chat) {
   deleteTarget.value = chat
   s.error = ''
   s.notice = ''
   nav.value = false
-  s.panel = 'delete'
+  s.setPanel('delete')
 }
 function confirmDelete() {
   const chat = deleteTarget.value
@@ -206,7 +207,7 @@ function confirmDelete() {
           v-if="s.draft"
           :draft="s.draft"
           :enabled="liveBatch"
-          :sending="s.sending"
+          :sending="s.sending || s.busy"
           @edit="s.edit"
           @send="s.safe(s.send)"
           @grants="showBatches"
@@ -318,7 +319,7 @@ function confirmDelete() {
           @submit.prevent="panelAction(() => s.rename(title.trim()))"
         >
           <label>会话名称<input v-model="title" maxlength="100" required /></label
-          ><button class="primary" :disabled="!title.trim()">保存名称</button>
+          ><button class="primary" :disabled="panelBusy || !title.trim()">保存名称</button>
         </form>
         <div v-if="s.panel === 'delete' && deleteTarget" class="form">
           <p>删除「{{ deleteTarget.title }}」？</p>

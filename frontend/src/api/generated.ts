@@ -452,7 +452,7 @@ export interface components {
              * Api Revision
              * @constant
              */
-            api_revision: 2;
+            api_revision: 3;
             /** Issues */
             issues: string[];
             /** Key Configured */
