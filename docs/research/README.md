@@ -32,6 +32,10 @@
 | G7 | [70Q 质量审计](clean-generation-g7-70q-quality-audit-20261117.md)。70 题分桶、逐题判断、问答案据、代表题损失定位与账目分开保存。 |
 | G5 第二批 | [证据利用复验](clean-generation-g5-evidence-evaluation-20261123.md)与[续轮传输、证据成本与全链路排序审计](clean-generation-g5-targeted-audit-20261123.md)。封存排名与回执回放、定位与引用对比、有限配对、故障复现、请求开销和排序干预。 |
 
+## 工程审计
+
+[2026-11-23 业务与架构审计](../audits/README.md)保留两份基线报告、后续提交和逐项处置范围。原实验回执及本机产物由各日期报告索引。
+
 ## Legacy Phase02–04
 
 - [Parsed](../phases/phase-02-parsed-schema.md) 与 [Canonical](../phases/phase-03-canonical-schema.md) 保留确定性抽取、血缘和版本合同。[Batch 5A 验收](phase-03/batch-5a-representative-acceptance.md)记录代表性结构检查。
