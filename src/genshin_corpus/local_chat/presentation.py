@@ -162,6 +162,21 @@ def distinct_positions(fragment):
     return list(positions.values())
 
 
+def structure_positions(fragment):
+    if "structure_text_positions" not in fragment:
+        return distinct_positions(fragment)
+    return [fragment["texts"][i] for i in dict.fromkeys(fragment["structure_text_positions"])]
+
+
+def source_locator(text):
+    lineage = text["raw_lineage"]
+    return {"clean": text["clean_ref"], "raw_run": lineage["raw_run_id"],
+            "raw_byte_revalidation": lineage["raw_byte_revalidation"],
+            "origins": lineage["origins"], "artifacts": [
+                {"id": a["artifact_id"], "path": a.get("path"), "sha256": a["sha256"]}
+                for a in lineage["artifacts"]]}
+
+
 def source(store, tid, packet, cid):
     item, result = publication(store, tid)
     addr = {"turn_id": tid, "packet_id": packet, "citation_id": cid}
@@ -170,39 +185,56 @@ def source(store, tid, packet, cid):
     view = citation_view(store, tid, cid, packet_id=packet)
     f = view["fragment"]
     parent = view["parent"]["fragments"][0] if view["parent"] else None
-    title = f["structure"].get("retrieval_text", "").splitlines()
+    body = f["structure"]
+    title = (body.get("retrieval_text", "") if isinstance(body, dict) else "").splitlines()
     document = f["parent_context"].get("label_evidence", {}).get("document_title") or {}
     title = title[0] if title else document.get("text") or "资料 " + str(f["source_item"].get("content_id", ""))
-    locators = []
     positions = distinct_positions(f)
-    verified = {digest(p["clean_ref"]): p["text"] for p in positions}
+    verified = {digest(p["clean_ref"]): (index, p["text"]) for index, p in enumerate(positions, 1)}
+    location_gap = False
+
     def original(part):
-        value = verified[digest(part["clean_ref"])]
-        require(value == part["text"], "Source passage differs from the read receipt")
-        return value
+        nonlocal location_gap
+        resolved = verified.get(digest(part["clean_ref"]))
+        if resolved is None and f["scope"] == "parent" and "structure_text_positions" not in f:
+            location_gap = True
+            return None
+        require(resolved is not None and resolved[1] == part["text"], "Source passage differs from the read receipt")
+        return resolved
+
     lines = []
-    for part in f["structure"].get("parts", []):
+    parts = body["parts"] if f["scope"] == "chunk" else []
+    if f["scope"] == "parent":
+        parts = [part for unit in body["units"] for part in unit["parts"]]
+    for part in parts:
+        verified_part = original(part)
+        if verified_part is None:
+            continue
+        index, text = verified_part
         speaker = part.get("speaker")
         if isinstance(speaker, dict):
             speaker = speaker.get("text")
-        lines.append({"text": original(part), "dialogue": "node_id" in part,
+        lines.append({"text": text, "dialogue": "node_id" in part,
                       "speaker": speaker if isinstance(speaker, str) else None,
-                      "conditions": [original(c) for c in part.get("condition_sources", [])],
-                      "condition_status": part.get("condition_status")})
-    for text in positions:
-        lineage = text["raw_lineage"]
-        locators.append({"clean": text["clean_ref"], "raw_run": lineage["raw_run_id"],
-                         "raw_byte_revalidation": lineage["raw_byte_revalidation"],
-                         "origins": lineage["origins"], "artifacts": [
-                             {"id": a["artifact_id"], "path": a.get("path"), "sha256": a["sha256"]}
-                             for a in lineage["artifacts"]]})
-    return {"citation": addr, "title": title, "lines": lines, "texts": [x["text"] for x in positions],
+                      "conditions": [condition[1] for c in part.get("condition_sources", [])
+                                     if (condition := original(c)) is not None],
+                      "condition_status": part.get("condition_status"), "locator": index})
+    passages = structure_positions(f) if f["scope"] in {"natural_parent", "graph"} else positions
+    parent_positions = structure_positions(parent) if parent else []
+    context = {"资料": f["source_item"], "条件": f["conditions"], "叙事语境": f["source_context"],
+               "来源与支持范围": {"source_status": f["authority"], "semantic_support": view["semantic_support"]},
+               "父级语境": f["parent_context"]}
+    if not location_gap:
+        context["引文结构"] = body
+    if parent and parent["fragment_id"] != f["fragment_id"]:
+        context["父级结构"] = parent["structure"]
+    return {"citation": addr, "title": title, "lines": lines, "texts": [x["text"] for x in passages],
             "support_note": "已核验本轮保存的引文及来源定位。请结合原文和上下文判断它能否支持回答中的结论。",
-            "has_parent": bool(parent), "parent_texts": [x["text"] for x in distinct_positions(parent)] if parent else [],
-            "context": {"资料": f["source_item"], "条件": f["conditions"], "叙事语境": f["source_context"],
-                        "来源与支持范围": {"source_status": f["authority"], "semantic_support": view["semantic_support"]},
-                        "父级语境": f["parent_context"], "原文结构": parent["structure"] if parent else f["structure"]},
-            "locators": locators}
+            "read_scope": f["scope"], "location_gap": location_gap, "has_parent": bool(parent),
+            "parent_status": view["parent_status"], "parent_stage": view["parent_stage"],
+            "parent_texts": [x["text"] for x in parent_positions],
+            "parent_locators": [source_locator(x) for x in parent_positions],
+            "context": context, "locators": [source_locator(x) for x in (positions if lines else passages)]}
 
 
 def trace(store, tid):

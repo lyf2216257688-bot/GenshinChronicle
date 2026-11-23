@@ -50,7 +50,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 const id = encodeURIComponent
-const apiRevision: Runtime['api_revision'] = 3
+const apiRevision: Runtime['api_revision'] = 4
 const eventKinds = new Set(['stage', 'draft', 'refresh', 'settled', 'error'])
 export const client = {
   async runtime() {

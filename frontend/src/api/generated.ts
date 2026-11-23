@@ -452,7 +452,7 @@ export interface components {
              * Api Revision
              * @constant
              */
-            api_revision: 3;
+            api_revision: 4;
             /** Issues */
             issues: string[];
             /** Key Configured */
@@ -484,10 +484,28 @@ export interface components {
             lines: components["schemas"]["SourceLine"][];
             /** Texts */
             texts: string[];
+            /**
+             * Read Scope
+             * @enum {string}
+             */
+            read_scope: "chunk" | "parent" | "natural_parent" | "graph";
+            /** Location Gap */
+            location_gap: boolean;
             /** Parent Texts */
             parent_texts: string[];
             /** Has Parent */
             has_parent: boolean;
+            /**
+             * Parent Status
+             * @enum {string}
+             */
+            parent_status: "available" | "not_read_or_failed" | "read_failed" | "integrity_error";
+            /** Parent Stage */
+            parent_stage: ("in_packet" | "saved_read" | "after_answer") | null;
+            /** Parent Locators */
+            parent_locators: {
+                [key: string]: unknown;
+            }[];
             /** Context */
             context: {
                 [key: string]: unknown;
@@ -509,6 +527,8 @@ export interface components {
             conditions: string[];
             /** Condition Status */
             condition_status: string | null;
+            /** Locator */
+            locator: number;
         };
         /** Trace */
         Trace: {

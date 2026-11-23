@@ -304,13 +304,18 @@ def iter_records(clean_manifest: Path, *, allow_partial: bool = False):
         yield record
 
 
-def resolve_clean_ref(clean_ref: CleanRef, *, record: dict[str, Any], raw_run_root: Path | None = None) -> dict[str, Any]:
+def resolve_clean_ref(clean_ref: CleanRef, *, record: dict[str, Any], raw_run_root: Path | None = None,
+                      blocks: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     if clean_ref.observation_id != record["observation_id"]:
         raise ValueError("CleanRef observation mismatch")
-    block = next((block for block in iter_blocks(record) if block["block_id"] == clean_ref.block_id), None)
+    if blocks is None:
+        block = next((block for block in iter_blocks(record) if block["block_id"] == clean_ref.block_id), None)
+    else:
+        block = blocks.get(clean_ref.block_id)
     if block is None:
         raise ValueError("CleanRef block does not exist")
-    block.pop("context", None)
+    if "context" in block:
+        block = {key: value for key, value in block.items() if key != "context"}
     try:
         value = pointer_get(block, clean_ref.value_pointer)
     except (KeyError, IndexError, TypeError) as error:

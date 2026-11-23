@@ -130,6 +130,68 @@ class EvidenceTests(unittest.TestCase):
                 found = True; break
         self.assertTrue(found)
 
+    def test_structured_parent_verifies_all_positions_including_repeated_text(self):
+        candidate = next(candidate for candidate in self.ranked["candidates"]
+                         if len(self.reader.read_parent(candidate["source"])["units"]) > 80)
+        legacy = EvidenceReader(self.reader)
+        verified = EvidenceReader(self.reader, verified_parent_ranges=True)
+        handle = legacy.register(self.ranked)[candidate["chunk_id"]]
+        verified.register(self.ranked)
+        old = legacy.read(handle, "parent")["fragments"][0]
+        current = verified.read(handle, "parent")["fragments"][0]
+        parts = [part for unit in current["structure"]["units"] for part in unit["parts"]]
+        located = [current["texts"][i] for i in current["structure_text_positions"]]
+        self.assertEqual(current["structure"], old["structure"])
+        self.assertGreater(len(parts), len(old["texts"]))
+        self.assertEqual([(p["clean_ref"], p["text"]) for p in parts],
+                         [(p["clean_ref"], p["text"]) for p in located])
+        repeated = [p["clean_ref"]["block_id"] for p in located if p["text"] == "完整长句。"]
+        self.assertEqual(len(repeated), 80)
+        self.assertEqual(len(set(repeated)), 80)
+
+        from genshin_corpus.local_chat import presentation
+        addr = {"turn_id": "turn", "packet_id": "packet", "citation_id": "E01"}
+        for fragment in (old, current):
+            view = {"fragment": fragment, "parent": None, "parent_status": "not_read_or_failed",
+                    "parent_stage": None, "semantic_support": "NOT_EVALUATED"}
+            with patch.object(presentation, "publication", return_value=(True, {"citations": [addr]})), \
+                    patch.object(presentation, "citation_view", return_value=view):
+                source = presentation.source(None, "turn", "packet", "E01")
+            self.assertEqual(source["read_scope"], "parent")
+            self.assertEqual(source["location_gap"], fragment is old)
+            if fragment is old:
+                self.assertLess(len(source["lines"]), len(parts))
+            else:
+                self.assertEqual([line["text"] for line in source["lines"]], [part["text"] for part in parts])
+                for line, part in zip(source["lines"], parts, strict=True):
+                    self.assertEqual(source["locators"][line["locator"] - 1]["clean"], part["clean_ref"])
+
+    def test_structured_parent_checks_conditions_and_blocks_unverified_body(self):
+        candidate = next(candidate for candidate in self.ranked["candidates"] if candidate["source"]["graph_locator"])
+        er = EvidenceReader(self.reader, verified_parent_ranges=True)
+        handle = er.register(self.ranked)[candidate["chunk_id"]]
+        actual = er.read(handle, "parent")["fragments"][0]
+        by_position = {digest(p["clean_ref"]): p for p in actual["texts"]}
+        parts = [part for unit in actual["structure"]["units"] for part in unit["parts"]]
+        conditions = [c for part in parts for c in part["condition_sources"]]
+        self.assertTrue(conditions)
+        for condition in conditions:
+            source = by_position[digest(condition["clean_ref"])]
+            self.assertEqual(source["text"], condition["text"])
+            self.assertTrue(source["raw_lineage"]["artifacts"])
+        for damage in ("wrong_text", "missing_locator"):
+            changed = deepcopy(actual["structure"])
+            part = changed["units"][-1]["parts"][-1]
+            if damage == "wrong_text":
+                part["text"] = "不存在的原句"
+                error = ValueError
+            else:
+                del part["clean_ref"]
+                error = KeyError
+            with self.subTest(damage=damage), patch.object(self.reader, "read_parent", return_value=changed):
+                with self.assertRaises(error):
+                    er.read(handle, "parent")
+
     def test_packet_determinism_complete_dispositions_and_cross_group_order(self):
         _, _, receipts = self.receipts()
         a = assemble([self.ranked], receipts, context=CONTEXT, budget=BUDGET)

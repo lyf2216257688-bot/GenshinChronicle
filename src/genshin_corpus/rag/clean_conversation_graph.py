@@ -87,6 +87,86 @@ def citation_view(store, tid, citation_id, *, packet_id=None):
     return citation_views(store, tid, [citation_id], packet_id=packet_id)[citation_id]
 
 
+def _verify_citation_parent(parent, receipt):
+    require(parent["handle"] == receipt["handle"] and parent["source_snapshot"] == receipt["source_snapshot"]
+            and parent["input_bundle_id"] == receipt["input_bundle_id"], "Parent source differs")
+    require(parent["scope"] == "natural_parent" and parent["source_validation"] == "PASS"
+            and len(parent["fragments"]) == 1 and parent["fragments"][0]["scope"] == "natural_parent"
+            and parent["receipt_id"] == digest({k: v for k, v in parent.items() if k != "receipt_id"}),
+            "Parent receipt is unverified")
+
+
+def _parent_context_binding(tid, sources_ref, packet_id, citation_ids):
+    return {"version": "gc-citation-parent-context-1", "turn_id": tid, "sources_ref": sources_ref,
+            "packet_id": packet_id, "citation_ids": list(dict.fromkeys(citation_ids))}
+
+
+def save_citation_parents(store, tid, sources_ref, sources, citation_ids, *, reader_factory):
+    """Seal optional local context for the citations of an already generated answer."""
+    if not citation_ids:
+        return None
+    packet = sources["packet"]
+    validate_citations(packet, citation_ids)
+    binding = _parent_context_binding(tid, sources_ref, packet["packet_id"], citation_ids)
+    key = "g5-citation-parents-" + packet["packet_id"]
+    existing = store.published_artifact(tid, key)
+    if existing:
+        sealed = store.load(existing)
+        require({k: v for k, v in sealed.items() if k != "parents"} == binding, "Citation context binding changed")
+        return existing
+
+    by_handle = {}
+    for cid in binding["citation_ids"]:
+        rid = packet["citations"][cid]["receipt_id"]
+        read_ref = sources["reads"][rid]
+        receipt = store.load(read_ref)
+        require(receipt["receipt_id"] == rid and receipt["source_validation"] == "PASS", "Unverified citation receipt")
+        handle = receipt["handle"]
+        parent_ref = read_ref if receipt["scope"] == "natural_parent" else sources["parents"].get(handle)
+        if handle not in by_handle or parent_ref:
+            by_handle[handle] = receipt, parent_ref
+
+    reader, context = None, {}
+    for handle, (receipt, parent_ref) in by_handle.items():
+        if parent_ref:
+            _verify_citation_parent(store.load(parent_ref), receipt)
+            context[handle] = {"ref": parent_ref, "status": "available", "stage": "saved_read"}
+            continue
+        parent_key = "g5-post-answer-parent-" + digest([packet["packet_id"], handle])
+        parent_ref = store.published_artifact(tid, parent_key)
+        try:
+            if parent_ref:
+                parent = store.load(parent_ref)
+            else:
+                if reader is None:
+                    reader = reader_factory()
+                parent = reader.read(handle, "natural_parent")
+            _verify_citation_parent(parent, receipt)
+        except (OSError, KeyError, ValueError) as exc:
+            context[handle] = {"status": "integrity_error" if parent_ref else "read_failed",
+                               "error_type": type(exc).__name__}
+            continue
+        if parent_ref is None:
+            parent_ref = store.artifact(tid, parent_key, parent, atomic=True)
+        context[handle] = {"ref": parent_ref, "status": "available", "stage": "after_answer"}
+    return store.artifact(tid, key, {**binding, "parents": context}, atomic=True)
+
+
+def _citation_parent_context(store, tid, result, packet):
+    ref = result.get("parent_context_ref")
+    if not ref:
+        return {}, False
+    binding = _parent_context_binding(tid, result["sources_ref"], packet["packet_id"],
+                                      [item["citation_id"] for item in result["citations"]])
+    try:
+        saved = store.load(ref)
+        require({k: v for k, v in saved.items() if k != "parents"} == binding
+                and isinstance(saved.get("parents"), dict), "Citation context binding changed")
+        return saved["parents"], False
+    except (OSError, KeyError, TypeError, ValueError):
+        return {}, True
+
+
 def citation_views(store, tid, citation_ids, *, packet_id=None):
     """One verified snapshot per render; no cache survives the caller's refresh."""
     result = saved_result(store, tid)
@@ -95,6 +175,8 @@ def citation_views(store, tid, citation_ids, *, packet_id=None):
     packet = sources["packet"]
     require(packet_id is None or packet_id == packet["packet_id"], "Citation Packet belongs to another turn")
     validate_citations(packet, citation_ids)
+    supplemental, context_corrupt = _citation_parent_context(store, tid, result, packet)
+    delivered_reads = {entry["receipt_id"] for entry in packet["citations"].values()}
     views, receipts, parents = {}, {}, {}
     for citation_id in dict.fromkeys(citation_ids):
         mapping = packet["citations"][citation_id]; rid = mapping["receipt_id"]
@@ -102,14 +184,34 @@ def citation_views(store, tid, citation_ids, *, packet_id=None):
         receipt = receipts[rid]
         require(receipt["receipt_id"] == rid and receipt["source_validation"] == "PASS", "Unverified citation receipt")
         fragment = next(f for f in receipt["fragments"] if f["fragment_id"] == mapping["fragment_id"])
-        handle = receipt["handle"]; parent_ref = sources["parents"].get(handle)
-        if handle not in parents: parents[handle] = store.load(parent_ref) if parent_ref else None
-        parent = parents[handle]
-        if parent:
-            require(parent["handle"] == handle and parent["source_snapshot"] == receipt["source_snapshot"], "Parent source differs")
+        handle = receipt["handle"]
+        if handle not in parents:
+            parent_ref = sources["parents"].get(handle)
+            if receipt["scope"] == "natural_parent":
+                parents[handle] = receipt, "available", "in_packet"
+            elif parent_ref:
+                parent = store.load(parent_ref)
+                _verify_citation_parent(parent, receipt)
+                stage = "in_packet" if parent["receipt_id"] in delivered_reads else "saved_read"
+                parents[handle] = parent, "available", stage
+            elif handle in supplemental:
+                try:
+                    entry = supplemental[handle]
+                    if entry["status"] == "available":
+                        parent = store.load(entry["ref"])
+                        _verify_citation_parent(parent, receipt)
+                        parents[handle] = parent, "available", entry["stage"]
+                    else:
+                        require(entry["status"] in {"integrity_error", "read_failed"}, "Invalid parent context status")
+                        parents[handle] = None, entry["status"], None
+                except (OSError, KeyError, TypeError, ValueError):
+                    parents[handle] = None, "integrity_error", None
+            else:
+                parents[handle] = None, "integrity_error" if context_corrupt else "not_read_or_failed", None
+        parent, parent_status, parent_stage = parents[handle]
         views[citation_id] = {"turn_id": tid, "packet_id": packet["packet_id"], "citation_id": citation_id,
                 "fragment": fragment, "receipt": receipt, "parent": parent,
-                "parent_status": "available" if parent else "not_read_or_failed",
+                "parent_status": parent_status, "parent_stage": parent_stage,
                 "semantic_support": "NOT_EVALUATED"}
     return views
 

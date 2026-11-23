@@ -286,6 +286,16 @@ receipts, preserving complete assistant/tool protocol units and original budgets
 UNKNOWN never creates a replacement operation. All calls, including final
 synthesis, consume the same finite campaign and turn budgets. No hidden retries.
 
+New G5 execution permits bind the Chat protocol and transport adapter identities.
+The adapter records request-open timing, response framing and archived byte
+counts, and enumerated exception types or numeric OS codes when available.
+An incomplete declared HTTP body preserves received bytes and is an uncertain
+execution unless the shared caller has a definitive rejection. A blocking socket
+read can delay the cooperative deadline check until it returns. Neither timing,
+the absence of headers, nor numeric error diagnostics prove unsent execution.
+The evidence quality policy reports a sealed UNKNOWN as `unknown` in the turn
+summary; archived publications retain their recorded status and bindings.
+
 The program enforces finite requests/tokens, searches, reads, tools, controller
 rounds and elapsed time. Two read/search actions without new verified receipt
 identities stop as `no_gain`; duplicate query text does not rerun retrieval.
@@ -418,6 +428,55 @@ profiles do not opt in and retain strict rejection. More than two error rounds
 stop without an extra summary request. UNKNOWN, source/identity/usage/ledger or
 transport failures never become argument feedback or automatic retries. Live
 integrity exceptions close the campaign and preserve the interrupted checkpoint.
+
+### Evidence quality profile
+
+`gc-g5-official-5` uses the same S0, BGE ordering, DeepSeek route, roles and finite
+limits as `gc-g5-official-4`. `clean_research_live prepare --profile` selects either
+policy for a new authorization. The selected settings, tool schema and code are
+bound to the permit and checked before dispatch. Adoption belongs to
+[Current Phase](../current-phase.md).
+
+The model receives an ordered catalog from the sealed query group. Its titles,
+conditions and short literal excerpts aid navigation. Shared source/locale fields
+are recorded once per page and combined with each row's source identity. The first
+catalog uses at most 16,000 UTF-8 bytes and fits around the actual request budget. A continuation
+uses `list_candidates(query_id, after_rank)` and returns at most 20 candidates
+within 8,000 bytes. Listing uses the existing tool allowance, with no new query,
+source read or no-gain increment. The catalog records body availability and
+preserves a chunk's position in each query where it appeared. Preview duplication
+is avoided when the same Chunk body was shown. If the entire verified body does
+not fit the read feedback, the receipt remains local and the feedback marks the
+omission. Only a verified fragment already shown in the active task can be
+explicitly selected. A sufficient initial Packet can be answered directly.
+
+For the first Packet, preserve the fragments that the uncompressed budget would
+have admitted before spending space on further verified Chunks. The compact
+model projection may share identical parent/source context and the exact values
+common to all parts or an inclusive 1-based range of a single source node. The
+scoped projection preserves the original model view upon expansion. Body text,
+speaker, branch membership and applicable conditions remain inline. Receipts
+and locations keep their original form. When the shared representation would
+cost more, the body uses the original view. The same projection is used for
+verified read feedback so exact already-delivered content can be referenced.
+
+Final Assembly considers explicit selections, foreground Chunk reads, then
+remaining verified Chunks in ranked order. Structured expansions are eligible
+when explicitly selected. Assembly checks each admission against the whole-message
+budget and records the tier, body exposure and disposition. An admitted Chunk can
+prove literal, qualifier-preserving coverage of another Chunk. Packet order and
+E-numbers follow the original query and rank order of admitted evidence. A
+structured parent read verifies each displayed source range before admission,
+with distinct Clean positions retained even when their wording is identical.
+
+The publication records binding as `PASS`, `MISSING` or `FAIL` for text that has
+been checked. Narrow citation-only bracket variants normalize to `[E01]` form.
+Unbound text is a partial answer and an undefined identifier blocks publication.
+The sealed model response stays available in its original operation. Binding
+validation is separate from review of whether a cited passage supports a specific
+claim. After validating the answer, a local sidecar seals natural-parent context
+for its referenced handles. The sidecar is bound to the published source Packet
+and independently verified on readback. It uses no model operation.
 
 ## G6 optional Sparse/S2 contract
 

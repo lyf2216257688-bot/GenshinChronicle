@@ -30,6 +30,7 @@
 | G5 | [原研究实现与受限运行](clean-generation-g5-20261114.md)、[官方 thinking 试验](clean-generation-official-thinking-20261114.md)、[官方路由与能力](clean-generation-official-g5-20261115.md)、[最终验收检查点](clean-generation-g5-final-acceptance-20261115.md)、[证据价值停止与有限结项](clean-generation-g5-stopping-acceptance-20261115.md) |
 | G6 | [暂停交接](clean-generation-g6-pause-20261116.md)、[S2 工程与有限 Live](clean-generation-g6-implementation-live-20261117.md)、[保持 S0 的 Sparse 补充离线研究](clean-generation-g6-s0-sparse-offline-study-20261117.md)。按各原根追溯 UNKNOWN、显式恢复及有限预算。 |
 | G7 | [70Q 质量审计](clean-generation-g7-70q-quality-audit-20261117.md)。70 题分桶、逐题判断、问答案据、代表题损失定位与账目分开保存。 |
+| G5 第二批 | [证据利用复验](clean-generation-g5-evidence-evaluation-20261123.md)与[续轮传输、证据成本与全链路排序审计](clean-generation-g5-targeted-audit-20261123.md)。封存排名与回执回放、定位与引用对比、有限配对、故障复现、请求开销和排序干预。 |
 
 ## Legacy Phase02–04
 

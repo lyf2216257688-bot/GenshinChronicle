@@ -1,10 +1,13 @@
 """Raw-first, retry-free Chat attempts through the existing session budget bridge."""
 from contextlib import nullcontext
+from http.client import BadStatusLine, HTTPException, IncompleteRead, RemoteDisconnected
 import math
 import os
 from pathlib import Path
+import socket
+import ssl
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from .. import model_calls as calls
@@ -23,6 +26,31 @@ def code_identity():
     return {"protocol": sha(protocol.__file__), "transport": sha(__file__)}
 
 
+_TRANSPORT_ERROR_TYPES = (
+    URLError, ssl.SSLCertVerificationError, ssl.SSLError, socket.gaierror, socket.herror,
+    RemoteDisconnected, BadStatusLine, IncompleteRead, TimeoutError, BrokenPipeError,
+    ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError, OSError, HTTPException,
+)
+
+
+def _transport_error_type(exc):
+    return next((cls.__name__ for cls in _TRANSPORT_ERROR_TYPES if isinstance(exc, cls)), None)
+
+
+def _failure_diagnostics(exc, phase):
+    """Record exception classes and OS codes without persisting exception text."""
+    failure = {"phase": phase, "exception_type": _transport_error_type(exc) or "other"}
+    reason = exc.reason if isinstance(exc, URLError) else exc
+    if reason is not exc:
+        failure["cause_type"] = _transport_error_type(reason) or "other"
+    if isinstance(reason, OSError):
+        for name in ("errno", "winerror", "verify_code"):
+            value = getattr(reason, name, None)
+            if type(value) is int and -(1 << 31) <= value < (1 << 32):
+                failure[name] = value
+    return failure
+
+
 def attempt(root, manifest, *, key, opener, cancelled, emit):
     """One HTTP exchange. Caller supplies approval, shared scheduling and budget."""
     body = protocol.encoded(manifest["wire"])
@@ -38,19 +66,33 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
               "http_status": None, "error_codes": [], "content_validation": {"status": "NOT_COMPLETED"},
               "protocol_validation": {"status": "NOT_COMPLETED"}, "answer_text": None,
               "semantic_acceptance": "NOT_REVIEWED"}
+    timeout = manifest["limits"]["timeout_seconds"]
+    diagnostics = {"request_body_bytes": len(body), "response_body_bytes": 0, "socket_timeout_seconds": timeout,
+                   "request_open_elapsed_seconds": None, "failure": None}
+    result["transport_diagnostics"] = diagnostics
     decoder = protocol.Decoder(manifest, emit)
     response = None; complete = False; started = time.monotonic()
+    deadline = started + timeout
+    phase = "before_send"
     try:
         if cancelled(): raise calls.Deferred("CANCELLED_BEFORE_SEND")
         req = Request(endpoint, data=body, method="POST", headers={"Authorization": "Bearer " + key,
                       "Content-Type": "application/json", "Accept-Encoding": "identity"})
         result.update(calls=1, request_count="UNKNOWN")
-        try: response = opener.open(req, timeout=manifest["limits"]["timeout_seconds"])
+        phase = "request_open"
+        open_started = time.monotonic()
+        try: response = opener.open(req, timeout=timeout)
         except HTTPError as exc: response = exc
+        finally: diagnostics["request_open_elapsed_seconds"] = time.monotonic() - open_started
+        phase = "response_headers"
         result["http_status"] = response.status if hasattr(response, "status") else response.code
         result["request_count"] = 1
         headers = {k: response.headers[k] for k in ("content-type", "content-encoding", "retry-after") if k in response.headers}
         write(root / "http.json", {"status": result["http_status"], "headers": headers})
+        length = response.headers.get("content-length", "").strip()
+        fixed_length = (result["http_status"] >= 200 and result["http_status"] not in {204, 304}
+                        and response.headers.get("transfer-encoding", "").lower() != "chunked"
+                        and length.isascii() and length.isdecimal())
         size = 0; parse_error = None
         valid_http = result["http_status"] == 200
         supported_encoding = headers.get("content-encoding", "identity") in {"", "identity"}
@@ -58,19 +100,41 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
         media = headers.get("content-type", "").split(";", 1)[0].strip().lower()
         valid_media = media == ("text/event-stream" if stream else "application/json")
         # Archive every chunk and fsync BEFORE passing it to the decoder/event sink.
+        phase = "response_archive"
         with (root / "response.body.raw").open("xb") as raw:
             while True:
+                phase = "response_body_read"
                 if cancelled(): raise calls.Deferred("CANCELLED_IN_FLIGHT")
-                if time.monotonic() - started > manifest["limits"]["timeout_seconds"]:
+                phase = "response_deadline"
+                if time.monotonic() >= deadline:
                     raise TimeoutError()
-                chunk = response.read1(4096) if hasattr(response, "read1") else response.read(4096)
+                phase = "response_body_read"
+                read_error = None
+                try:
+                    chunk = response.read1(4096) if hasattr(response, "read1") else response.read(4096)
+                except IncompleteRead as exc:
+                    chunk, read_error = exc.partial, exc
+                if chunk:
+                    phase = "response_archive"
+                    raw.write(chunk); raw.flush(); os.fsync(raw.fileno()); size += len(chunk)
+                    diagnostics["response_body_bytes"] = size
+                    require(size <= RESPONSE_BYTES, "RESPONSE_SIZE_LIMIT")
+                if read_error is not None:
+                    phase = "response_body_read"
+                    raise read_error
+                phase = "response_deadline"
+                if time.monotonic() >= deadline:
+                    raise TimeoutError()
                 if not chunk: break
-                raw.write(chunk); raw.flush(); os.fsync(raw.fileno()); size += len(chunk)
-                require(size <= RESPONSE_BYTES, "RESPONSE_SIZE_LIMIT")
                 if stream and valid_http and supported_encoding and valid_media and parse_error is None:
+                    phase = "response_decode"
                     try: decoder.feed(chunk)
                     except (ValueError, TypeError, KeyError) as exc: parse_error = exc
+            # HTTPResponse.read1 may give EOF without raising when a body ends early.
+            phase = "response_framing"
+            require(not fixed_length or (length.lstrip("0") or "0") == str(size), "INCOMPLETE_HTTP_BODY")
             complete = True
+        phase = "response_decode"
         require(valid_http, "HTTP_REJECTED")
         require(supported_encoding and valid_media, "UNSUPPORTED_RESPONSE_ENCODING_OR_MEDIA")
         if parse_error: raise parse_error
@@ -89,6 +153,7 @@ def attempt(root, manifest, *, key, opener, cancelled, emit):
         safe = code if code and all(c.isupper() or c in "_0123456789" for c in code) else type(exc).__name__
         result["error_codes"].append(safe)
         result["failure_type"] = type(exc).__name__
+        diagnostics["failure"] = _failure_diagnostics(exc, phase)
         if isinstance(exc, calls.Deferred): result["kind"] = "cancelled"
         if result["calls"] == 0: result["state"] = "CANCELLED_BEFORE_SEND"
         elif not complete:

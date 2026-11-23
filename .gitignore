@@ -56,6 +56,10 @@ Thumbs.db
 !/scripts/retrieval/run-python314-migration.ps1
 !/scripts/retrieval/run-rerank-handoff.ps1
 !/scripts/retrieval/study_s0_sparse.py
+!/scripts/retrieval/evaluate_g5_evidence.py
+!/scripts/retrieval/audit_g5_evidence_cost.py
+!/scripts/retrieval/audit_g5_upstream.py
+!/scripts/retrieval/g5_evidence_cases.json
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

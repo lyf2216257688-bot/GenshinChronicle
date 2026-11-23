@@ -55,4 +55,4 @@ $env:GC_CLEAN_CHAT_ROOT = (Join-Path (Get-Location) "data/generation/mock-ui-$st
 
 ## 研究入口与历史接口
 
-`clean_research_live` 的准备流程、许可校验、停止策略和恢复规则见 [Generation 合同](phases/clean-generation-v1.md)。本地工作台、目录留存和文档示例不启用远程请求。查询质量、工程验收和正式 Serving 采用分别记录。原 RU/Qwen3、Legacy Streamlit 和 Phase05 历史接口由[研究索引](research/README.md)查找。
+`clean_research_live` 使用显式有限许可。准备 G5 许可时可用 `prepare --profile gc-g5-official-5` 选择第二批证据利用试验策略，默认策略及采用状态见[当前阶段](current-phase.md)。许可校验、停止和恢复规则见 [Generation 合同](phases/clean-generation-v1.md)。查询质量、工程验收和正式 Serving 采用分别记录。原 RU/Qwen3、Legacy Streamlit 和 Phase05 历史接口由[研究索引](research/README.md)查找。

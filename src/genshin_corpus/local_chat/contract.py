@@ -10,7 +10,7 @@ Kind = Literal["question", "requirement", "correction_fact", "correction_intent"
 Category = Literal["answer", "missing_evidence", "citation", "other"]
 Title = Annotated[str, Field(min_length=1, max_length=100)]
 Message = Annotated[str, Field(max_length=12000)]
-RuntimeRevision = Literal[3]
+RuntimeRevision = Literal[4]
 API_REVISION, = get_args(RuntimeRevision)
 
 
@@ -133,6 +133,7 @@ class SourceLine(Model):
     speaker: str | None
     conditions: list[str]
     condition_status: str | None
+    locator: int
 
 
 class Source(Model):
@@ -141,8 +142,13 @@ class Source(Model):
     support_note: str
     lines: list[SourceLine]
     texts: list[str]
+    read_scope: Literal["chunk", "parent", "natural_parent", "graph"]
+    location_gap: bool
     parent_texts: list[str]
     has_parent: bool
+    parent_status: Literal["available", "not_read_or_failed", "read_failed", "integrity_error"]
+    parent_stage: Literal["in_packet", "saved_read", "after_answer"] | None
+    parent_locators: list[dict]
     context: dict
     locators: list[dict]
 

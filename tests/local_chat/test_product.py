@@ -67,6 +67,9 @@ class ChatProductTests(unittest.TestCase):
         self.assertTrue(source["texts"] and source["parent_texts"] and source["locators"])
         self.assertTrue(source["lines"])
         self.assertTrue(all(line["text"] in source["texts"] for line in source["lines"]))
+        self.assertEqual(source["read_scope"], "chunk")
+        self.assertEqual(source["parent_stage"], "saved_read")
+        self.assertEqual(len(source["parent_locators"]), len(source["parent_texts"]))
         feedback = self.api("POST", f"/turns/{tid}/feedback", {"note": "需要再读上下文", "category": "citation", "citation": c})
         self.assertTrue(self.api("GET", f"/turns/{tid}/trace")["dispositions"])
         self.api("POST", "/batches/" + first["id"] + "/close")
@@ -450,10 +453,11 @@ class ChatProductTests(unittest.TestCase):
     @unittest.skipUnless(os.getenv("GC_TEST_LOCAL_PROFILE") == "1", "requires local sealed G3 route evidence")
     def test_official_g5_entry_with_in_memory_transport_and_no_socket(self):
         """Exercise real permit validation, G5, shared budget and worker entry without a provider connection."""
+        from functools import partial
         import socket
         import sys
         from genshin_corpus.local_chat import worker
-        from genshin_corpus.rag import clean_mock
+        from genshin_corpus.rag import clean_mock, clean_research, clean_research_live
         from genshin_corpus.retrieval.clean_based.source import InputReader
         from tests.generation.test_clean_research import Pipeline
         store = self.svc.store
@@ -464,7 +468,9 @@ class ChatProductTests(unittest.TestCase):
             if os.name == "nt":
                 self.api("PUT", "/live-settings", {"endpoint": credentials.OFFICIAL_ENDPOINT, "api_key": key})
             grant = contract.Grant(mode="LIVE", requests=2, minutes=5, confirm_live=True)
-            b = self.svc.open_batch(grant)
+            prepare = partial(clean_research_live.prepare, profile=clean_research.EVIDENCE_QUALITY_PROFILE)
+            with patch.object(clean_research_live, "prepare", side_effect=prepare):
+                b = self.svc.open_batch(grant)
             if os.name == "nt":
                 self.api("DELETE", "/live-settings", expect=409)
             with patch.object(store, "claim", return_value=None):
@@ -489,7 +495,10 @@ class ChatProductTests(unittest.TestCase):
             self.assertTrue(request.get_header("Authorization") == "Bearer " + key)
             self.assertEqual(self.svc.turn(tid)["answer"], "离线协议夹具[E01]")
             citation = self.svc.turn(tid)["citations"][0]
-            self.assertTrue(self.svc.citation(tid, citation["packet_id"], citation["citation_id"])["texts"])
+            source = self.svc.citation(tid, citation["packet_id"], citation["citation_id"])
+            self.assertTrue(source["texts"] and source["parent_texts"])
+            self.assertEqual(source["parent_stage"], "after_answer")
+            self.assertEqual(len(source["parent_locators"]), len(source["parent_texts"]))
             self.assertTrue(self.svc.trace(tid)["queries"])
             self.assertEqual(self.svc.batches()["items"][0]["requests"], 1)
             self.svc.close_batch(b["id"])

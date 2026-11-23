@@ -1473,7 +1473,7 @@
             "type": "string"
           },
           "api_revision": {
-            "const": 3,
+            "const": 4,
             "title": "Api Revision",
             "type": "integer"
           },
@@ -1563,6 +1563,20 @@
             "title": "Texts",
             "type": "array"
           },
+          "read_scope": {
+            "enum": [
+              "chunk",
+              "parent",
+              "natural_parent",
+              "graph"
+            ],
+            "title": "Read Scope",
+            "type": "string"
+          },
+          "location_gap": {
+            "title": "Location Gap",
+            "type": "boolean"
+          },
           "parent_texts": {
             "items": {
               "type": "string"
@@ -1573,6 +1587,40 @@
           "has_parent": {
             "title": "Has Parent",
             "type": "boolean"
+          },
+          "parent_status": {
+            "enum": [
+              "available",
+              "not_read_or_failed",
+              "read_failed",
+              "integrity_error"
+            ],
+            "title": "Parent Status",
+            "type": "string"
+          },
+          "parent_stage": {
+            "anyOf": [
+              {
+                "enum": [
+                  "in_packet",
+                  "saved_read",
+                  "after_answer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Stage"
+          },
+          "parent_locators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Parent Locators",
+            "type": "array"
           },
           "context": {
             "additionalProperties": true,
@@ -1594,8 +1642,13 @@
           "support_note",
           "lines",
           "texts",
+          "read_scope",
+          "location_gap",
           "parent_texts",
           "has_parent",
+          "parent_status",
+          "parent_stage",
+          "parent_locators",
           "context",
           "locators"
         ],
@@ -1641,6 +1694,10 @@
               }
             ],
             "title": "Condition Status"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "integer"
           }
         },
         "required": [
@@ -1648,7 +1705,8 @@
           "dialogue",
           "speaker",
           "conditions",
-          "condition_status"
+          "condition_status",
+          "locator"
         ],
         "title": "SourceLine",
         "type": "object"

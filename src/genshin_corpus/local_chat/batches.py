@@ -9,7 +9,7 @@ from .. import model_calls
 from ..evidence_io import digest, read, require, sha
 from ..generation.clean_chat_transport import ChatSessions
 from ..rag import clean_research_live
-from ..rag.clean_conversation_graph import fixture_settings
+from ..rag.clean_conversation_graph import code_identity as fixed_chain_identity, fixture_settings
 from ..rag.clean_store import put
 from .credentials import read_credential
 from .store import Problem
@@ -17,7 +17,8 @@ from .store import Problem
 
 def adapter_identity():
     folder = Path(__file__).parent
-    return {name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py", "credentials.py", "context.py")}
+    return {**{name: sha(folder / name) for name in ("store.py", "batches.py", "worker.py", "credentials.py", "context.py")},
+            "fixed_chain": digest(fixed_chain_identity())}
 
 
 class ExecutionView:

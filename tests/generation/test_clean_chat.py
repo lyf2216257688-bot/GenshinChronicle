@@ -1,21 +1,25 @@
 """Offline Chat protocol/transport fixtures; no API key, model or corpus."""
 from copy import deepcopy
 from dataclasses import replace
+from http.client import IncompleteRead
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import BytesIO
 import json
 from pathlib import Path
 import socket
 from tempfile import TemporaryDirectory
+from threading import Thread
 import time
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
+from urllib.request import ProxyHandler, build_opener
 
 from genshin_corpus import model_calls as calls
 from genshin_corpus.evidence_io import read, sha, verify
 from genshin_corpus.generation.clean_chat import ChatRequest, Decoder, MODEL, schema_check
 from genshin_corpus.generation.clean_chat_transport import (
-    ChatSessions, VERSION, assistant_from_seal, code_identity, tool_reply,
+    ChatSessions, VERSION, assistant_from_seal, attempt, code_identity, tool_reply,
 )
 from genshin_corpus.generation import clean_probe
 from genshin_corpus.rag.clean_store import Store
@@ -259,6 +263,63 @@ class ChatTests(unittest.TestCase):
         self.assertEqual((self.bridge.root / "calls" / op / "response.body.raw").read_bytes(), raw)
         self.assertEqual(result["state"], "UNKNOWN")
 
+    def test_wrapped_transport_error_preserves_only_phase_type_and_numeric_codes(self):
+        cause = ConnectionResetError(104, "fixture-secret")
+        cause.winerror = 10054
+        opener = Opener(error=URLError(cause))
+        op, result = self.execute(opener=opener)
+        diagnostics = result["transport_diagnostics"]
+        self.assertEqual(diagnostics["failure"], {
+            "phase": "request_open", "exception_type": "URLError",
+            "cause_type": "ConnectionResetError", "errno": 104, "winerror": 10054,
+        })
+        self.assertEqual(diagnostics["request_body_bytes"], len(opener.calls[0][0].data))
+        self.assertEqual(diagnostics["socket_timeout_seconds"], 10)
+        self.assertIsNone(result["http_status"])
+        self.assertEqual(result["attempt_classifications"][0]["execution"], "UNKNOWN")
+        self.assertEqual(self.bridge.execute_chat(op, opener=Opener(error=AssertionError())), result)
+        self.assertEqual(self.bridge.batch.accounting()["request_reservations"], 1)
+        self.assertNotIn("fixture-secret", json.dumps(result))
+
+    def test_incomplete_stream_retains_partial_bytes_with_known_http_status(self):
+        raw = sse(stream_values(tools=True))[:200]
+        op, result = self.execute(request(stream=True), Opener(stream=True, pieces=[
+            raw[:100], IncompleteRead(raw[100:], 10),
+        ]))
+        self.assertEqual((self.bridge.root / "calls" / op / "response.body.raw").read_bytes(), raw)
+        self.assertEqual(result["http_status"], 200)
+        self.assertEqual(result["transport_diagnostics"]["response_body_bytes"], len(raw))
+        self.assertEqual(result["transport_diagnostics"]["failure"], {
+            "phase": "response_body_read", "exception_type": "IncompleteRead",
+        })
+        self.assertEqual(result["attempt_classifications"][0]["execution"], "UNKNOWN")
+
+    def test_cooperative_deadline_checks_after_final_read(self):
+        payload = json.dumps(response()).encode()
+        original = Response.read1
+        timestamp = 0
+
+        def read_past_deadline(fixture, size):
+            nonlocal timestamp
+            data = original(fixture, size)
+            if not data:
+                timestamp = 11
+            return data
+
+        folder = self.root / "late-response"
+        folder.mkdir()
+        with patch.object(Response, "read1", read_past_deadline), patch(
+            "genshin_corpus.generation.clean_chat_transport.time.monotonic", side_effect=lambda: timestamp,
+        ):
+            result = attempt(folder, request().manifest(), key="fixture-secret", opener=Opener(payload),
+                             cancelled=lambda: False, emit=lambda event: None)
+        self.assertEqual((folder / "response.body.raw").read_bytes(), payload)
+        self.assertEqual(result["state"], "UNKNOWN")
+        self.assertIsNone(result["answer_text"])
+        self.assertEqual(result["transport_diagnostics"]["failure"], {
+            "phase": "response_deadline", "exception_type": "TimeoutError",
+        })
+
     def test_crash_after_first_bytes_unknown_and_sealed_call_reconcile_zero_send(self):
         class Crash(BaseException): pass
         op = self.bridge.prepare_chat(self.tid, "crash", request(stream=True))
@@ -382,6 +443,67 @@ class ChatTests(unittest.TestCase):
         self.assertEqual([c["status"] for c in result["cases"]], ["PASS", "STOPPED"])
         self.assertEqual(result["accounting"]["request_reservations"], 2)
         self.assertFalse((root / "tool-receipts").exists())
+
+
+class LoopbackTests(unittest.TestCase):
+    def test_urllib_distinguishes_truncated_body_and_pre_header_disconnect(self):
+        """Exercise real urllib framing and observe Connection: close with no provider."""
+        payload = json.dumps(response()).encode()
+        observed = []
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def do_POST(self):
+                observed.append((self.headers.get("Connection"), self.rfile.read(int(self.headers["Content-Length"]))))
+                self.close_connection = True
+                if len(observed) == 3:
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload) + (11 if len(observed) == 2 else 0)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *_args):
+                pass
+
+        with TemporaryDirectory(dir=scratch_root()) as temp, HTTPServer(("127.0.0.1", 0), Handler) as server:
+            endpoint = f"http://127.0.0.1:{server.server_port}/test"
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                manifest = request().manifest()
+                manifest["profile"]["endpoint"] = endpoint
+                opener = build_opener(ProxyHandler({}))
+                results = []
+                with patch.dict("genshin_corpus.generation.clean_chat.ROUTES", {
+                    "loopback-fixture": {"endpoint": endpoint, "model": MODEL},
+                }, clear=True):
+                    for number in (1, 2, 3):
+                        folder = Path(temp) / str(number)
+                        folder.mkdir()
+                        results.append(attempt(folder, manifest, key="fixture-secret", opener=opener,
+                                               cancelled=lambda: False, emit=lambda event: None))
+                        if number <= 2:
+                            self.assertEqual((folder / "response.body.raw").read_bytes(), payload)
+                        else:
+                            self.assertFalse((folder / "response.body.raw").exists())
+            finally:
+                server.shutdown()
+                thread.join()
+
+        self.assertEqual(len(observed), 3)
+        self.assertEqual(observed, [("close", observed[0][1])] * 3)
+        self.assertEqual(results[0]["state"], "CONTENT_VERIFIED")
+        self.assertEqual(results[1]["state"], "UNKNOWN")
+        self.assertEqual(results[1]["error_codes"], ["INCOMPLETE_HTTP_BODY"])
+        self.assertEqual(results[1]["transport_diagnostics"]["failure"]["phase"], "response_framing")
+        self.assertEqual(results[2]["state"], "UNKNOWN")
+        self.assertIsNone(results[2]["http_status"])
+        self.assertEqual(results[2]["transport_diagnostics"]["failure"], {
+            "phase": "request_open", "exception_type": "RemoteDisconnected",
+        })
 
 
 if __name__ == "__main__": unittest.main()

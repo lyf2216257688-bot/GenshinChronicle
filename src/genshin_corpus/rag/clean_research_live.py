@@ -9,14 +9,16 @@ from ..generation.clean_chat import ENDPOINT, MODEL, ROUTES, DEFAULT_ROUTE
 from ..generation.clean_chat_transport import ChatSessions
 from ..retrieval.clean_based.runtime_v2 import LocalPipeline, JsonWorker
 from .clean_store import put
-from .clean_research import VERSION, TOOLS, code_identity, fixture_settings, verify_data
+from .clean_research import (BASELINE_PROFILE, EVIDENCE_QUALITY_PROFILE, VERSION, code_identity,
+                             fixture_settings, tools_for, verify_data)
 
 
 def validate_settings(s):
-    g6 = s.get("generation_profile") == "gc-g6-official-1"
+    profile = s.get("generation_profile")
+    g6 = profile == "gc-g6-official-1"
     require(s.get("retrieval_combination", "S0") in ({"S0", "S2"} if g6 else {"S0"}), "EXPLICIT_G6_REQUIRED_FOR_S2")
-    if s.get("generation_profile") in {"gc-g5-official-2", "gc-g5-official-3", "gc-g5-official-4", "gc-g6-official-1"}:
-        revised = s["generation_profile"] in {"gc-g5-official-3", "gc-g5-official-4", "gc-g6-official-1"}
+    if profile in {"gc-g5-official-2", "gc-g5-official-3", BASELINE_PROFILE, EVIDENCE_QUALITY_PROFILE, "gc-g6-official-1"}:
+        revised = profile != "gc-g5-official-2"
         require(s.get("engine") == VERSION and s.get("mode") == "LIVE"
             and s.get("route") == DEFAULT_ROUTE and s.get("thinking") == "dynamic", "G5_OFFICIAL_SCOPE_REQUIRED")
         l = s["limits"]
@@ -40,8 +42,10 @@ def validate_settings(s):
                 "OFFICIAL_LIST_PRICE_RISK_CEILING")
         if revised: require(type(s.get("tool_error_corrections")) is int and 0 <= s["tool_error_corrections"] <= 2,
                             "FINITE_TOOL_CORRECTIONS_REQUIRED")
-        if s["generation_profile"] in {"gc-g5-official-4", "gc-g6-official-1"}:
+        if profile in {BASELINE_PROFILE, EVIDENCE_QUALITY_PROFILE, "gc-g6-official-1"}:
             require(s.get("stop_policy") == "evidence-value-1", "G5_STOP_POLICY_CHANGED")
+        if profile == EVIDENCE_QUALITY_PROFILE:
+            require(s["tool_error_corrections"] == 2, "G5_EVIDENCE_QUALITY_TOOL_CORRECTIONS_REQUIRED")
         return
     require(s.get("engine") == VERSION and s.get("mode") == "LIVE" and s.get("thinking") == "disabled",
             "G5_LIVE_SCOPE_REQUIRED")
@@ -58,8 +62,10 @@ def validate_settings(s):
     require(all(type(s.get(k)) is int and 0 < s[k] <= v for k, v in bounds.items()), "G5_LIMIT_INCREASE_REJECTED")
 
 
-def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5", turn_requests=None):
+def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5", turn_requests=None, profile=None):
     require(stage in {"g5", "g6"}, "Unknown preparation stage")
+    require(profile is None or (stage == "g5" and profile in {BASELINE_PROFILE, EVIDENCE_QUALITY_PROFILE}),
+            "EXPLICIT_G5_PROFILE_REQUIRED")
     require(type(requests) is int and 0 < requests <= (20 if stage == "g6" else 10)
             and type(seconds) is int and 0 < seconds <= 7200
             and isinstance(authorization, str) and authorization.strip(), "FINITE_AUTHORIZATION_REQUIRED")
@@ -69,7 +75,7 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5",
     require(config["route"] == DEFAULT_ROUTE and config["endpoint"] == route["endpoint"]
         and config["model"] == route["model"] and config["api_key_env"] == route["key_env"], "OFFICIAL_CONFIG_ROUTE_CHANGED")
     settings = {**fixture_settings(), "mode": "LIVE", "campaign": "g5-official-" + digest(str(store.root))[:20],
-        "generation_profile": config["version"], "route": config["route"], "thinking": config["thinking"],
+        "generation_profile": profile or config["version"], "route": config["route"], "thinking": config["thinking"],
         "roles": config["roles"], "context_tokens": config["context_tokens"], "output_tokens": 32768,
         "timeout_seconds": config["timeout_seconds"], "history_bytes": 24000, "worker_timeout_seconds": 1800,
         "max_searches": 6, "max_tools": 16, "max_rounds": 5, "max_reads": 48, "research_seconds": 3600,
@@ -101,7 +107,7 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5",
     permit = {"version": VERSION, "live_enabled": True, "data_root": str(store.root), "repo": str(repo),
         "campaign": settings["campaign"], "settings": settings, "authorization": authorization,
         "expires_at": time.time() + seconds, "endpoint": route["endpoint"], "model": route["model"], "code": code_identity(),
-        "upstream_code": upstream(), "tool_schema": digest(TOOLS),
+        "upstream_code": upstream(), "tool_schema": digest(tools_for(settings)),
         "assets": {n: sha(repo / n) for n in ("config/clean-retrieval-v1.json", "config/index-selected-v1.json",
                                              "config/reranking-selected-v1.json", "config/clean-generation-v1.json")},
         "protocol_evidence": {"path": str(evidence), "complete_sha256": sha(evidence / "complete.json")},
@@ -160,7 +166,8 @@ class ResearchSessions(ChatSessions):
                 and p["upstream_code"] == upstream() and p["data_root"] == str(self.store.root)
                 and p["campaign"] == self.campaign and p["settings"]["limits"] == self.limits
                 and p["endpoint"] == route["endpoint"] and p["model"] == route["model"] and p["live_enabled"] is True
-                and p["tool_schema"] == digest(TOOLS) and time.time() < p["expires_at"], "G5_PERMIT_MISSING_OR_EXPIRED")
+                and p["tool_schema"] == digest(tools_for(p["settings"]))
+                and time.time() < p["expires_at"], "G5_PERMIT_MISSING_OR_EXPIRED")
         require(not (self.store.root / "live/closed.json").exists(), "G5_CAMPAIGN_CLOSED")
         require(p["max_attempts"] == 1 and p["unknown_retries"] == p["format_retries"] == 0, "G5_NO_RETRIES")
         for n, expected in p["assets"].items(): require(sha(Path(p["repo"]) / n) == expected, "G5_ASSET_CHANGED")
@@ -193,7 +200,7 @@ class ResearchSessions(ChatSessions):
         require(envelope is not None and manifest["wire"]["thinking"] == {"type": role["thinking"]}
                 and manifest["profile"]["endpoint"] == route["endpoint"]
                 and manifest["wire"]["model"] == route["model"] and manifest["wire"]["stream"] is True
-                and manifest["wire"].get("tools", []) == ([] if envelope["phase"] == "final" else TOOLS),
+                and manifest["wire"].get("tools", []) == ([] if envelope["phase"] == "final" else tools_for(settings)),
                 "G5_REQUEST_OUTSIDE_VERIFIED_PREVIEW")
         require((manifest.get("tool_argument_errors") == "feedback") ==
                 (bool(settings.get("tool_error_corrections")) and envelope["phase"] != "final"),
@@ -338,6 +345,7 @@ def main(argv=None):
     prep = sub.add_parser("prepare"); prep.add_argument("--authorization", required=True)
     prep.add_argument("--requests", type=int, default=8)
     prep.add_argument("--stage", choices=("g5", "g6"), default="g5")
+    prep.add_argument("--profile", choices=(BASELINE_PROFILE, EVIDENCE_QUALITY_PROFILE))
     prep.add_argument("--turn-requests", type=int)
     new = sub.add_parser("new"); new.add_argument("--title", default="原神主动研究")
     new.add_argument("--combination", choices=("S0", "S2"), default="S0")
@@ -350,7 +358,7 @@ def main(argv=None):
     from .clean_conversation import ConversationStore
     store = ConversationStore(a.root)
     if a.action == "prepare": value = prepare(store, a.repo, a.authorization, requests=a.requests, stage=a.stage,
-                                             turn_requests=a.turn_requests)
+                                             turn_requests=a.turn_requests, profile=a.profile)
     elif a.action == "new":
         settings = read(store.root / "live/permit.json")["settings"]
         if settings.get("generation_profile") == "gc-g6-official-1":
