@@ -1,359 +1,323 @@
-import json
-from datetime import datetime, timezone
+import math
+import os
 from pathlib import Path
-from typing import Any, Mapping
+import re
+from urllib.parse import urlsplit, urlunsplit
 
+from ..model_calls import locked
+from .access import AccessPaused, SourceAccess
 from .config import CollectorConfig
-from .storage import RunStore, write_json
-from .transport import HttpTransport, RequestError, Response
+from .contract import (
+    DETAIL_HEADERS, ENDPOINTS, REQUEST_CONTRACT, SCHEMA, SOURCE, RawIntegrityError,
+    channel_nodes, content_key, full_request, json_bytes, object_at,
+)
+from .run_store import RawRunStore, now
+from .storage import sha256
+from .transport import HttpTransport, MAX_RETRY_DELAY, RequestError, USER_AGENT, request_with_retries
 
 
-_PAGINATION_SIGNAL_KEYS = {
-    "page",
-    "page_size",
-    "page_num",
-    "total",
-    "total_count",
-    "has_more",
-    "next",
-    "next_cursor",
-    "cursor",
-    "offset",
-}
-
-_LISTING_CONTAINER_HINT_KEYS = {
-    "id",
-    "channel_id",
-    "parent_id",
-    "depth",
-    "children",
-    "layout",
-    "entry_limit",
-    "hidden",
-    "shortcut",
-    "name",
-}
+def _component(value, label):
+    reserved = {"CON", "PRN", "AUX", "NUL"} | {f"{name}{i}" for name in ("COM", "LPT") for i in range(1, 10)}
+    if (not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value)
+            or value.endswith(".") or value.split(".")[0].upper() in reserved):
+        raise ValueError(f"Invalid {label} path component")
+    return value
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _base_url(value):
+    try:
+        if not isinstance(value, str) or any(ord(c) <= 32 or c == "\\" for c in value) or "?" in value or "#" in value:
+            raise ValueError
+        split = urlsplit(value)
+        if split.scheme not in ("http", "https") or not split.hostname or split.username is not None:
+            raise ValueError
+        port = split.port
+    except (TypeError, ValueError):
+        raise ValueError("Invalid Raw base URL. Use an HTTP(S) address without credentials, query or fragment.") from None
+    hostname = split.hostname
+    host = f"[{hostname}]" if ":" in hostname else hostname
+    if port is not None and port != (443 if split.scheme == "https" else 80):
+        host = f"{host}:{port}"
+    return urlunsplit((split.scheme, host, split.path.rstrip("/"), "", ""))
 
 
 class Collector:
-    def __init__(self, config: CollectorConfig, transport=None):
+    def __init__(self, config: CollectorConfig, transport=None, *, access=None):
         self.config = config
-        self.transport = transport or HttpTransport(timeout=config.timeout, max_retries=config.max_retries,
-                                                    backoff_base=config.backoff_base)
-        self.run_id = config.resolved_run_id()
-        self.store = RunStore(config.output_root, "mihoyo_obc", config.locale, self.run_id)
-        self.inventory: dict[str, dict[str, Any]] = {}
-        self._listing_contract_blocked = False
-        self.manifest: dict[str, Any] = self._blank_manifest()
-        self._checkpoint()
+        self.run_id = _component(config.resolved_run_id(), "run ID")
+        locale = _component(config.locale, "locale")
+        output = Path(config.output_root).resolve()
+        root = output / SOURCE / locale / self.run_id
+        if root.resolve() != root:
+            raise RawIntegrityError("Raw run root uses a filesystem alias")
+        self.store = RawRunStore(root)
+        self.base_url = _base_url(config.base_url)
+        self.listing_params = dict(config.listing_params)
+        if not isinstance(config.app_sn, str) or not config.app_sn.strip():
+            raise ValueError("app_sn must be nonempty")
+        if any(not isinstance(k, str) or not k.strip() or not isinstance(v, str) for k, v in self.listing_params.items()):
+            raise ValueError("listing_params must map nonempty names to strings")
+        if any(key.lower() in {"app_sn", "channel_id"} for key in self.listing_params):
+            raise ValueError("listing_params may not override app_sn or channel_id")
+        if (type(config.max_retries) is not int or config.max_retries < 0
+                or type(config.timeout) not in (int, float) or not math.isfinite(config.timeout) or config.timeout <= 0
+                or type(config.backoff_base) not in (int, float) or not math.isfinite(config.backoff_base)
+                or config.backoff_base < 0):
+            raise ValueError("Invalid timeout or retry policy")
+        self.transport = transport if transport is not None else HttpTransport(timeout=config.timeout)
+        self.user_agent = self.transport.user_agent if isinstance(self.transport, HttpTransport) else USER_AGENT
+        self.access = access if access is not None else SourceAccess()
 
-    def _blank_manifest(self) -> dict[str, Any]:
+    def _scope(self, fetch_details, channel_ids, detail_limit):
+        if type(fetch_details) is not bool:
+            raise ValueError("fetch_details must be a boolean")
+        if detail_limit is not None and (not fetch_details or type(detail_limit) is not int or detail_limit < 0):
+            raise ValueError("A non-negative detail limit requires detail collection")
+        if channel_ids is not None:
+            if isinstance(channel_ids, (str, bytes)):
+                raise ValueError("channel_ids must be an iterable of channel identifiers")
+            channel_ids = list(channel_ids)
+            if not channel_ids or any(not content_key(key) for key in channel_ids):
+                raise ValueError("channel_ids must contain nonempty channel identifiers")
+            channel_ids = sorted({str(key) for key in channel_ids})
         return {
-            "source_system": "mihoyo_obc",
-            "locale": self.config.locale,
-            "run_id": self.run_id,
-            "status": "partial",
-            "started_at": _now(),
-            "ended_at": None,
-            "request_scope": {"app_sn": self.config.app_sn, "locale": self.config.locale},
-            "channels": [],
-            "recognized_channel_count": 0,
-            "details": [],
-            "detail_selection": {"limit": None, "strategy": "inventory_order", "selected_content_ids": []},
-            "failures": [],
-            "listing_responses_saved": 0,
-            "listing_records_discovered": 0,
-            "unique_detail_responses_expected": 0,
-            "successful_detail_fetches": 0,
-            "failed_detail_fetches": 0,
-            "cross_channel_duplicate_memberships": 0,
-            "unknown_unhandled_structures": [],
-            "retry_summary": {"attempts": 0, "retryable_failures": 0, "retry_after_seen": 0},
-            "paths": {},
+            "source_system": SOURCE, "locale": self.config.locale, "run_id": self.run_id,
+            "collection_root": os.path.normcase(str(self.store.root)),
+            "base_url": self.base_url, "app_sn": self.config.app_sn,
+            "user_agent": self.user_agent,
+            "request_contract": REQUEST_CONTRACT, "channel_ids": channel_ids,
+            "listing_param_names": sorted(self.listing_params),
+            "listing_params_sha256": sha256(json_bytes(self.listing_params)),
+            "fetch_details": fetch_details, "detail_limit": detail_limit,
         }
 
-    def _checkpoint(self) -> None:
-        write_json(self.store.manifest_path, self.manifest)
+    def _request(self, kind, key):
+        params, headers = {"app_sn": self.config.app_sn}, {}
+        if kind == "listings":
+            params.update({"channel_id": key, **dict(sorted(self.listing_params.items()))})
+        elif kind == "details":
+            params.update({"entry_page_id": key, "lang": self.config.locale})
+            headers = DETAIL_HEADERS.copy()
+        url = self.base_url + ENDPOINTS[kind]
+        request = {"method": "GET", "url": url, "params": params, "headers": {"User-Agent": self.user_agent, **headers}}
+        receipt = {"url": url, "request_sha256": sha256(json_bytes(request)),
+                   "run_identity_sha256": self.identity["sha256"]}
+        return {"url": url, "params": params, "headers": headers, "receipt": receipt}
 
-    @staticmethod
-    def _json(body: bytes) -> Any:
-        return json.loads(body.decode("utf-8"))
+    def _send(self, request, observe):
+        options = {"params": request["params"], "headers": request["headers"]}
+        if isinstance(self.transport, HttpTransport):
+            return self.transport.request_once(request["url"], observe=observe, **options)
+        return self.transport.get(request["url"], **options)
 
-    @staticmethod
-    def _sanity_json(body: bytes) -> bool:
-        try:
-            json.loads(body.decode("utf-8"))
-            return True
-        except Exception:
-            return False
+    def _begin(self, scope):
+        self.manifest = {
+            "schema_version": SCHEMA, "source_system": SOURCE, "locale": self.config.locale, "run_id": self.run_id,
+            "status": "partial", "full_coverage": False, "started_at": self.identity["started_at"], "ended_at": None,
+            "request_scope": scope, "run_identity_sha256": self.identity["sha256"],
+            "execution": {"timeout": self.config.timeout, "max_retries": self.config.max_retries,
+                          "backoff_base": self.config.backoff_base},
+            "coverage": {"recognized_channel_ids": [], "target_channel_ids": [], "missing_channel_ids": [],
+                         "discovery_complete": False},
+            "channels": [], "details": [], "detail_selection": {"limit": scope["detail_limit"],
+                                                               "strategy": "none", "selected_content_ids": []},
+            "paths": {}, "failures": [], "recovery_issues": [],
+            "recognized_channel_count": 0, "listing_responses_saved": 0, "listing_records_discovered": 0,
+            "cross_channel_duplicate_memberships": 0, "inventory_count": 0, "unique_detail_responses_expected": 0,
+            "successful_detail_fetches": 0, "failed_detail_fetches": 0, "http_responses_saved": 0,
+            "retry_summary": {"attempts": 0, "retryable_failures": 0, "retry_after_seen": 0},
+        }
+        self.inventory = {}
+        self.expected = {}
+        self.discovery_blocked = False
+        for path in (self.store.checkpoint_path, self.store.discovery_path):
+            if not path.exists():
+                continue
+            prior = object_at(path)
+            if prior.get("run_identity_sha256") != self.identity["sha256"] or not isinstance(prior.get("paths"), dict):
+                raise RawIntegrityError(f"Raw recovery record has an invalid identity at {path}")
+            if path == self.store.checkpoint_path and prior.get("status") != "partial":
+                raise RawIntegrityError(f"Raw progress checkpoint has an unexpected status at {path}")
+            for key, entry in prior["paths"].items():
+                kind, separator, identifier = key.partition(":")
+                if (not separator or not identifier or kind not in ENDPOINTS or not isinstance(entry, dict)
+                        or (key in self.expected and self.expected[key] != entry)):
+                    raise RawIntegrityError(f"Raw recovery records disagree for {key}")
+                self.expected[key] = entry
+        for key, entry in self.expected.items():
+            kind, identifier = key.split(":", 1)
+            self.store.accepted(kind, identifier, self._request(kind, identifier)["receipt"], expected=entry)
+        for kind, identifier in self.store.accepted_keys():
+            if kind not in ENDPOINTS:
+                raise RawIntegrityError(f"Unknown accepted Raw kind: {kind}")
+            key = f"{kind}:{identifier}"
+            if key not in self.expected:
+                entry, _ = self.store.accepted(kind, identifier, self._request(kind, identifier)["receipt"])
+                self.expected[key] = entry
 
-    def _record_failure(self, kind: str, key: str, url: str, status: int | None, error: str, *, context=None) -> None:
-        failure = {"kind": kind, "key": key, "url": url, "status": status, "error": error, "recorded_at": _now()}
-        if context is not None:
-            failure["context"] = context
-        self.store.failure(failure)
-        self.manifest["failures"].append(failure)
-        self.manifest["status"] = "partial"
-        self._checkpoint()
-
-    def _get(self, kind: str, key: str, endpoint: str, params: Mapping[str, str], *, headers=(), context=None) -> bytes | None:
-        record = self.store.valid_response(kind, key, self._sanity_json)
-        if record is not None:
-            self.manifest["paths"][f"{kind}:{key}"] = {"raw": record["raw_path"], "metadata": record["metadata_path"], "sha256": record["sha256"]}
-            return Path(record["raw_path"]).read_bytes()
-        url = self.config.base_url.rstrip("/") + endpoint
-        try:
-            response: Response = self.transport.get(url, params=params, headers=headers)
-            self.manifest["retry_summary"]["attempts"] += 1
-            if response.status != 200:
-                raise RequestError(f"HTTP {response.status}", status=response.status)
-            record = self.store.write_response(kind, key, response.body, {"url": response.url, "status": response.status, "context": context})
-            self.manifest["paths"][f"{kind}:{key}"] = {"raw": record["raw_path"], "metadata": record["metadata_path"], "sha256": record["sha256"]}
-            self._checkpoint()
-            return response.body
-        except RequestError as exc:
-            if exc.retryable:
-                self.manifest["retry_summary"]["retryable_failures"] += 1
-            if exc.status == 429:
-                self.manifest["retry_summary"]["retry_after_seen"] += 1
-            self._record_failure(kind, key, url, exc.status, str(exc), context=context)
+    def _get(self, kind, key, *, dispatch=True):
+        request = self._request(kind, key)
+        receipt = request["receipt"]
+        entry_key = f"{kind}:{key}"
+        accepted = self.store.accepted(kind, key, receipt, expected=self.expected.get(entry_key))
+        records, issues, attempts = self.store.attempts(kind, key, receipt)
+        if accepted is None:
+            accepted = self.store.recover_attempt(kind, key, receipt, records, issues)
+        if accepted is None and dispatch:
+            try:
+                request_with_retries(
+                    lambda observe: self._send(request, observe), access=self.access, request=receipt,
+                    on_attempt=lambda response, error, retry_after, access: self.store.record_attempt(
+                        kind, key, receipt, response, error, retry_after_seen=retry_after, restriction=access),
+                    max_retries=self.config.max_retries, backoff_base=self.config.backoff_base,
+                    wait_cap=MAX_RETRY_DELAY,
+                )
+            except AccessPaused as exc:
+                self.manifest["access_restriction"] = exc.restriction
+            except RequestError:
+                # The completed transport attempt already recorded the failure.
+                pass
+            records, latest_issues, attempts = self.store.attempts(kind, key, receipt)
+            issues = list(dict.fromkeys(issues + latest_issues))
+            accepted = self.store.recover_attempt(kind, key, receipt, records, issues)
+        retry = self.manifest["retry_summary"]
+        retry["attempts"] += attempts
+        retry["retryable_failures"] += sum(record.get("retryable") is True for record in records)
+        retry["retry_after_seen"] += sum(record.get("retry_after_seen") is True for record in records)
+        self.manifest["http_responses_saved"] += sum("raw_path" in record for record in records)
+        self.manifest["recovery_issues"].extend(issues)
+        if accepted is not None:
+            entry, data = accepted
+            self.manifest["paths"][entry_key] = entry
+            return data
+        if not dispatch:
             return None
-
-    def discover_map(self) -> Any | None:
-        body = self._get("map", "home-map", "/common/blackboard/ys_obc/v1/home/map", {"app_sn": self.config.app_sn})
-        return self._json(body) if body else None
-
-    @staticmethod
-    def _channel_identity(value: dict[str, Any]):
-        if "channel_id" in value:
-            return value["channel_id"]
-        if "id" in value and any(key in value for key in ("parent_id", "depth", "children", "list")):
-            return value["id"]
+        record = records[-1] if records else {}
+        restriction = self.manifest.get("access_restriction", {})
+        error = restriction.get("reason") or record.get("error", "no usable Raw response")
+        self.manifest["failures"].append({"kind": kind, "key": key, "url": request["url"],
+                                          "status": restriction.get("status", record.get("status")), "error": error})
+        if kind == "listings" and "pagination signals:" in error:
+            self.discovery_blocked = True
         return None
 
-    def _nodes(self, value: Any):
-        if isinstance(value, dict):
-            if self._channel_identity(value) is not None:
-                yield value
-            for child in value.values():
-                yield from self._nodes(child)
-        elif isinstance(value, list):
-            for child in value:
-                yield from self._nodes(child)
-
-    def _record_unknown(self, context: dict[str, Any], note: str) -> None:
-        self.store.failure({
-            "kind": "listing_item_anomaly",
-            "key": str(context.get("channel_id", "unknown")),
-            "url": "",
-            "status": None,
-            "error": note,
-            "context": context,
-            "recorded_at": _now(),
-        })
-        self.manifest["unknown_unhandled_structures"].append({"context": context, "note": note, "recorded_at": _now()})
-        self.manifest["failures"].append({
-            "kind": "listing_item_anomaly",
-            "key": str(context.get("channel_id", "unknown")),
-            "url": "",
-            "status": None,
-            "error": note,
-            "context": context,
-            "recorded_at": _now(),
-        })
-        self.manifest["status"] = "partial"
-        self._checkpoint()
-
-    @staticmethod
-    def _listing_pagination_signals(value: Any) -> list[str]:
-        """Inspect only the response envelope and recognized listing containers."""
-        signals = []
-
-        def inspect_dict(node: dict[str, Any], path: str, *, descend_list: bool = False) -> None:
-            for key, child in node.items():
-                child_path = f"{path}.{key}"
-                if key.lower() in _PAGINATION_SIGNAL_KEYS:
-                    signals.append(child_path)
-                if key == "list" and isinstance(child, list) and descend_list:
-                    for index, item in enumerate(child):
-                        if (
-                            isinstance(item, dict)
-                            and "content_id" not in item
-                            and isinstance(item.get("list"), list)
-                            and any(hint in item for hint in _LISTING_CONTAINER_HINT_KEYS)
-                        ):
-                            inspect_dict(item, f"{child_path}[{index}]", descend_list=True)
-
-        if not isinstance(value, dict):
-            return signals
-        inspect_dict(value, "root")
-        data = value.get("data")
-        if isinstance(data, dict):
-            inspect_dict(data, "root.data", descend_list=True)
-        return signals
-
-    def fetch_listings(self, map_payload: Any, *, channel_ids=None) -> int:
-        selected_channels = None if channel_ids is None else {str(channel_id) for channel_id in channel_ids}
-        seen = set()
-        recognized_channels = 0
-        for node in self._nodes(map_payload):
-            channel_id = str(self._channel_identity(node))
-            if channel_id in seen:
+    def _discover(self, scope):
+        payload = self._get("map", "home-map")
+        if payload is None:
+            return False
+        ids = [str(node["id"]) for node in channel_nodes(payload["list"], is_map=True)]
+        requested = scope["channel_ids"]
+        targets = ids if requested is None else [key for key in ids if key in requested]
+        missing = [] if requested is None else sorted(set(requested) - set(ids))
+        coverage = self.manifest["coverage"]
+        coverage.update({"recognized_channel_ids": ids, "target_channel_ids": targets, "missing_channel_ids": missing})
+        self.manifest["recognized_channel_count"] = len(ids)
+        if missing:
+            self.manifest["failures"].append({"kind": "channel_selection", "keys": missing,
+                                              "error": "requested channel IDs absent from map"})
+        for key in targets:
+            channel = {"channel_id": key, "status": "not_attempted", "pagination": "UNKNOWN",
+                       "listing_record_count": 0}
+            self.manifest["channels"].append(channel)
+            dispatch = not self.discovery_blocked and "access_restriction" not in self.manifest
+            listing = self._get("listings", key, dispatch=dispatch)
+            if listing is None:
+                if dispatch:
+                    channel["status"] = "failed"
+                    if self.discovery_blocked:
+                        channel["pagination"] = "pagination_signal_detected"
                 continue
-            seen.add(channel_id)
-            recognized_channels += 1
-            if selected_channels is not None and channel_id not in selected_channels:
-                continue
-            body = self._get("listings", channel_id, "/common/blackboard/ys_obc/v1/home/content/list",
-                             {"app_sn": self.config.app_sn, "channel_id": channel_id, **self.config.listing_params},
-                             context={"channel_id": channel_id})
-            channel_record = {"channel_id": channel_id, "status": "completed" if body else "failed",
-                              "pagination": "single_response_verified" if body else "UNKNOWN",
-                              "attempted": True, "completed": bool(body), "failed": not bool(body)}
-            self.manifest["channels"].append(channel_record)
-            self._checkpoint()
-            if not body:
-                continue
-            payload = self._json(body)
-            pagination_signals = self._listing_pagination_signals(payload)
-            if pagination_signals:
-                channel_record["pagination"] = "pagination_signal_detected"
-                self._listing_contract_blocked = True
-                self._record_failure(
-                    "listing_pagination_contract",
-                    channel_id,
-                    self.config.base_url.rstrip("/") + "/common/blackboard/ys_obc/v1/home/content/list",
-                    None,
-                    "listing response contains unhandled pagination signals",
-                    context={"channel_id": channel_id, "signals": pagination_signals},
-                )
-                break
             self.manifest["listing_responses_saved"] += 1
-            for item in self._items(payload, context={"channel_id": channel_id}):
-                content_id = item.get("content_id")
-                if content_id is None:
-                    self._record_unknown({"kind": "listing_item", "channel_id": channel_id, "item": item},
-                                         "listing item missing content_id")
-                    continue
-                self.manifest["listing_records_discovered"] += 1
-                entry = self.inventory.setdefault(str(content_id), {"content_id": str(content_id), "channels": []})
-                if channel_id not in entry["channels"]:
-                    if entry["channels"]:
-                        self.manifest["cross_channel_duplicate_memberships"] += 1
-                    entry["channels"].append(channel_id)
-            self._checkpoint()
-        return recognized_channels
+            rows = [row for node in channel_nodes(listing["list"]) for row in node["list"]]
+            channel.update({"status": "completed", "pagination": "single_response_verified",
+                            "listing_record_count": len(rows)})
+            self.manifest["listing_records_discovered"] += len(rows)
+            for row in rows:
+                content_id = str(row["content_id"])
+                memberships = self.inventory.setdefault(content_id, {"content_id": content_id, "channels": []})["channels"]
+                if key not in memberships:
+                    self.manifest["cross_channel_duplicate_memberships"] += bool(memberships)
+                    memberships.append(key)
+        coverage["discovery_complete"] = bool(targets) and not self.manifest["failures"]
+        return coverage["discovery_complete"]
 
-    def _items(self, value: Any, context: dict[str, Any] | None = None):
-        if isinstance(value, dict):
-            if isinstance(value.get("list"), list):
-                for x in value["list"]:
-                    if isinstance(x, dict) and "content_id" in x:
-                        yield x
-                    elif (
-                        isinstance(x, dict)
-                        and isinstance(x.get("list"), list)
-                        and any(key in x for key in ("id", "parent_id", "depth", "children"))
-                    ):
-                        # Channel/list containers are traversed below; they are not content records.
-                        continue
-                    elif isinstance(x, dict):
-                        yield x
-                    else:
-                        self._record_unknown({**(context or {}), "item": x}, "non-dict listing item")
-            for child in value.values():
-                yield from self._items(child, context=context)
-        elif isinstance(value, list):
-            for child in value:
-                yield from self._items(child, context=context)
-
-    def _select_details(self, detail_limit):
-        if detail_limit is None:
-            self.manifest["detail_selection"] = {
-                "limit": None,
-                "strategy": "inventory_order",
-                "selected_content_ids": list(self.inventory),
-            }
-            return list(self.inventory.items())
-        channel_order = [entry["channel_id"] for entry in self.manifest["channels"]]
-        if len(channel_order) <= 1:
-            selected = list(self.inventory.items())[:detail_limit]
-            strategy = "inventory_order"
-        else:
-            buckets = {
-                channel_id: [
-                    (content_id, membership)
-                    for content_id, membership in self.inventory.items()
-                    if channel_id in membership["channels"]
-                ]
-                for channel_id in channel_order
-            }
-            selected = []
-            selected_ids = set()
-            while len(selected) < detail_limit:
-                made_progress = False
-                for channel_id in channel_order:
-                    candidate = next((item for item in buckets[channel_id] if item[0] not in selected_ids), None)
-                    if candidate is None:
-                        continue
-                    selected.append(candidate)
-                    selected_ids.add(candidate[0])
-                    made_progress = True
-                    if len(selected) >= detail_limit:
+    def _select_details(self, scope):
+        limit = scope["detail_limit"]
+        if not scope["fetch_details"]:
+            return [], "none"
+        if limit is None:
+            return list(self.inventory), "inventory_order"
+        channels = self.manifest["coverage"]["target_channel_ids"]
+        if len(channels) <= 1:
+            return list(self.inventory)[:limit], "inventory_order"
+        buckets = {key: [] for key in channels}
+        for content_id, member in self.inventory.items():
+            for key in member["channels"]:
+                buckets[key].append(content_id)
+        iterators = [iter(bucket) for bucket in buckets.values()]
+        selected, seen = [], set()
+        while iterators and len(selected) < limit:
+            active = []
+            for bucket in iterators:
+                for content_id in bucket:
+                    if content_id not in seen:
+                        selected.append(content_id)
+                        seen.add(content_id)
+                        active.append(bucket)
                         break
-                if not made_progress:
+                if len(selected) == limit:
                     break
-            strategy = "channel_round_robin"
-        self.manifest["detail_selection"] = {
-            "limit": detail_limit,
-            "strategy": strategy,
-            "selected_content_ids": [content_id for content_id, _ in selected],
-        }
-        return selected
+            iterators = active
+        return selected, "channel_round_robin"
 
-    def fetch_details(self, *, detail_limit=None) -> None:
-        if detail_limit is not None and detail_limit < 0:
-            raise ValueError("detail_limit must be non-negative")
-        write_json(self.store.metadata / "inventory.json", list(self.inventory.values()))
-        self.manifest["unique_detail_responses_expected"] = len(self.inventory)
-        self._checkpoint()
-        details = self._select_details(detail_limit)
-        for content_id, membership in details:
-            body = self._get("details", content_id, "/hoyowiki/genshin/wapi/entry_page",
-                             {"app_sn": self.config.app_sn, "entry_page_id": content_id, "lang": self.config.locale},
-                             headers={"x-rpc-wiki_app": "genshin"}, context={"content_id": content_id})
-            self.manifest["details"].append({"content_id": content_id, "channels": membership["channels"],
-                                              "status": "completed" if body else "failed"})
-            if body:
+    def _details(self, selected):
+        for key in selected:
+            status = "not_attempted"
+            dispatch = "access_restriction" not in self.manifest
+            if self._get("details", key, dispatch=dispatch) is not None:
+                status = "completed"
                 self.manifest["successful_detail_fetches"] += 1
-            else:
+            elif dispatch:
+                status = "failed"
                 self.manifest["failed_detail_fetches"] += 1
-            self._checkpoint()
+            self.manifest["details"].append({**self.inventory[key], "status": status})
 
-    def _finalize(self) -> dict[str, Any]:
+    def _collect(self, scope):
+        self._begin(scope)
+        if not self.store.checkpoint_path.exists():
+            self.store.checkpoint(self.manifest)
+        complete_discovery = self._discover(scope)
         self.manifest["inventory_count"] = len(self.inventory)
-        self.manifest["ended_at"] = _now()
-        self.manifest["status"] = "complete" if self.manifest["failed_detail_fetches"] == 0 and not self.manifest["failures"] else "partial"
-        self._checkpoint()
-        return self.manifest
+        self.manifest["unique_detail_responses_expected"] = len(self.inventory)
+        if complete_discovery:
+            selected, strategy = self._select_details(scope)
+            selection = {"limit": scope["detail_limit"], "strategy": strategy, "selected_content_ids": selected}
+            self.manifest["detail_selection"] = selection
+            discovery = self.store.freeze_discovery(list(self.inventory.values()), {
+                "run_identity_sha256": self.identity["sha256"], "paths": dict(self.manifest["paths"]),
+                "coverage": self.manifest["coverage"], "detail_selection": selection,
+            })
+            self.manifest["inventory_sha256"] = discovery["inventory_sha256"]
+            self.store.checkpoint(self.manifest)
+            self._details(selected)
+            if full_request(scope) and not self.inventory:
+                self.manifest["failures"].append({"kind": "coverage", "error": "full OBC inventory is empty"})
+        self.manifest["ended_at"] = now()
+        if not complete_discovery or self.manifest["failures"]:
+            self.store.checkpoint(self.manifest)
+            return self.manifest
+        self.manifest["full_coverage"] = full_request(scope)
+        self.manifest["status"] = "complete" if self.manifest["full_coverage"] else "scoped_complete"
+        self.store.prepare(self.manifest)
+        return self.store.terminal(self.identity, request_for=self._request, publish=True)
 
-    def run(self, *, fetch_details: bool = True, channel_ids=None, detail_limit=None) -> dict:
-        payload = self.discover_map()
-        if payload is not None:
-            recognized_channels = self.fetch_listings(payload, channel_ids=channel_ids)
-            self.manifest["recognized_channel_count"] = recognized_channels
-            if recognized_channels == 0:
-                self._record_failure(
-                    "map_schema",
-                    "home-map",
-                    self.config.base_url.rstrip("/") + "/common/blackboard/ys_obc/v1/home/map",
-                    None,
-                    "map response contained no recognizable channel nodes",
-                )
-            if fetch_details and not self._listing_contract_blocked:
-                self.fetch_details(detail_limit=detail_limit)
-        return self._finalize()
+    def run(self, *, fetch_details=True, channel_ids=None, detail_limit=None):
+        scope = self._scope(fetch_details, channel_ids, detail_limit)
+        self.identity = self.store.identity(scope)
+        if self.identity is not None and self.store.manifest_path.exists():
+            return self.store.terminal(self.identity, request_for=self._request)
+        with locked(self.store.lock_path):
+            self.identity = self.store.identity(scope, initialize=True)
+            if self.store.manifest_path.exists() or self.store.prepared_path.exists():
+                return self.store.terminal(self.identity, request_for=self._request, publish=True)
+            return self._collect(scope)

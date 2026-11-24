@@ -10,6 +10,7 @@ import re
 import time
 from typing import Any
 
+from ..collector.contract import check_full_input, has_legacy_coverage_gap, is_versioned, relative_path
 from ..collector.storage import atomic_write
 from ..evidence_io import digest, inside, read, sha
 from ..build_runtime import atomic_json, checked_receipt, record_jobs
@@ -42,15 +43,27 @@ def _record_bytes(record) -> bytes:
 class RawRun:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
-        self.manifest = read(self.root / "metadata/manifest.json")
-        if self.manifest.get("status") != "complete" or self.manifest.get("source_system") != "mihoyo_obc":
+        manifest_path = self.root / "metadata/manifest.json"
+        if not manifest_path.is_file():
+            raise ValueError("Clean requires a published Raw manifest")
+        manifest_body = manifest_path.read_bytes()
+        self.manifest = json.loads(manifest_body)
+        if (not isinstance(self.manifest, dict) or self.manifest.get("status") != "complete"
+                or self.manifest.get("source_system") != "mihoyo_obc"):
             raise ValueError("Clean requires a complete mihoyo_obc Raw manifest")
         for key in ("run_id", "locale"):
             if not isinstance(self.manifest.get(key), str) or not self.manifest[key]:
                 raise ValueError("Raw manifest identity is incomplete")
-        self.manifest_sha256 = hashlib.sha256((self.root / "metadata/manifest.json").read_bytes()).hexdigest()
+        self.versioned = is_versioned(self.manifest)
+        self.manifest_sha256 = hashlib.sha256(manifest_body).hexdigest()
+        if self.versioned:
+            relative_path(self.root, "metadata/manifest.json", prefix="metadata")
+            relative_path(self.root, "metadata/inventory.json", prefix="metadata")
         self.inventory_artifact = self._local_artifact("metadata/inventory.json", "inventory")
-        self.inventory = read(self.root / "metadata/inventory.json")
+        inventory_body = self.inventory_artifact["body"]
+        if self.versioned:
+            check_full_input(self.root, self.manifest, inventory_body)
+        self.inventory = json.loads(inventory_body)
         self.items: dict[str, tuple[int, dict[str, Any]]] = {}
         for index, item in enumerate(self.inventory):
             content_id = str(item["content_id"])
@@ -67,6 +80,8 @@ class RawRun:
         self._load_discovery()
 
     def _path(self, value: str) -> Path:
+        if self.versioned:
+            return relative_path(self.root, value)
         # Existing manifests contain repository-relative Windows paths. Also
         # support relocated runs while keeping every artifact under this root.
         normalized = value.replace("\\", "/")
@@ -74,7 +89,11 @@ class RawRun:
         if candidate.is_relative_to(self.root):
             return candidate
         parts = normalized.split("/")
-        if self.root.name in parts:
+        run_id = self.manifest["run_id"]
+        if run_id in parts:
+            position = len(parts) - 1 - parts[::-1].index(run_id)
+            normalized = "/".join(parts[position + 1:])
+        elif self.root.name in parts:
             position = len(parts) - 1 - parts[::-1].index(self.root.name)
             normalized = "/".join(parts[position + 1:])
         elif not parts or parts[0] not in {"responses", "metadata"}:
@@ -280,10 +299,14 @@ def build_clean_run(*, raw_run_root: Path, clean_run_id: str,
     if root.resolve().is_relative_to(raw.root) or raw.root.is_relative_to(root.resolve()):
         raise ValueError("Clean output must be separate from its immutable Raw input")
     manifest_path = root / "metadata/manifest.json"
+    binding = {"raw_run_id": raw_run_id, "raw_manifest_sha256": raw.manifest_sha256,
+               "selection": selected, "dependencies": dependencies(),
+               "discovery_sha256": {key: artifact["sha256"] for key, artifact in raw.discovery_artifacts.items()}}
+    if not raw.versioned and has_legacy_coverage_gap(raw.manifest, raw.inventory):
+        archived = read(manifest_path) if manifest_path.is_file() else None
+        if archived is None or archived.get("status") != "complete" or archived.get("binding") != binding:
+            raise ValueError("Historical Raw coverage is insufficient for a new Clean build")
     with locked(root / "build.lock"):
-        binding = {"raw_run_id": raw_run_id, "raw_manifest_sha256": raw.manifest_sha256,
-                   "selection": selected, "dependencies": dependencies(),
-                   "discovery_sha256": {key: artifact["sha256"] for key, artifact in raw.discovery_artifacts.items()}}
         existing = read(manifest_path) if manifest_path.exists() else None
         if existing is not None and existing.get("binding") != binding:
             raise FileExistsError("Clean run ID already binds different inputs or versions")

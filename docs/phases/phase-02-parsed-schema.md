@@ -137,6 +137,12 @@ adapter, and schema/parser/pipeline/rule dependencies. A change to one of
 those inputs invalidates only the corresponding observation in a new Parsed
 run.
 
+For [versioned Raw inputs](phase-01-raw-collection.md#versioned-collector-contract),
+the runner checks full coverage against the archived discovery responses and
+inventory before creating a Parsed run. It resolves promoted paths from the
+supplied Raw run root. Unversioned archives keep their original bindings for
+readback. A provable historical scope gap blocks creation of a new Parsed run.
+
 Reuse is intentionally limited to the same source, locale, and Raw run ID:
 reused records retain their original `RawRef`, so Phase 02 does not claim that
 a record from another Raw snapshot represents the current observation.

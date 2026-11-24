@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+from ...collector.contract import check_full_input, has_legacy_coverage_gap, is_versioned, relative_path
 from ..classification import classification_dependencies
 from ..contracts import (
     PARSED_SCHEMA_VERSION,
@@ -118,8 +119,12 @@ class OBCParsedRunPipeline:
 
     def run(self) -> dict[str, Any]:
         raw_manifest_path = self.raw_run_root / "metadata" / "manifest.json"
+        if not raw_manifest_path.is_file():
+            raise ValueError("OBC Parsed runner requires a published Raw manifest")
         raw_manifest_body = raw_manifest_path.read_bytes()
         raw_manifest = json.loads(raw_manifest_body.decode("utf-8"))
+        if not isinstance(raw_manifest, dict):
+            raise ValueError("Raw manifest must be an object")
         source = raw_manifest.get("source_system")
         locale = raw_manifest.get("locale")
         raw_run_id = raw_manifest.get("run_id")
@@ -128,7 +133,15 @@ class OBCParsedRunPipeline:
         if raw_manifest.get("status") != "complete":
             raise ValueError("OBC Parsed runner requires a complete Raw manifest")
 
+        versioned = is_versioned(raw_manifest)
+        if versioned:
+            relative_path(self.raw_run_root, "metadata/manifest.json", prefix="metadata")
+            inventory_path = relative_path(self.raw_run_root, "metadata/inventory.json", prefix="metadata")
+            check_full_input(self.raw_run_root, raw_manifest, inventory_path.read_bytes())
         store = ParsedRunStore(self.output_root, source, locale, self.parsed_run_id)
+        raw_root, parsed_root = self.raw_run_root.resolve(), store.root.resolve()
+        if parsed_root.is_relative_to(raw_root) or raw_root.is_relative_to(parsed_root):
+            raise ValueError("Parsed output must be separate from its immutable Raw input")
         manifest = blank_manifest(
             source=source,
             locale=locale,
@@ -146,6 +159,11 @@ class OBCParsedRunPipeline:
         )
         if existing is not None:
             return existing
+        if not versioned:
+            inventory_path = self.raw_run_root / "metadata/inventory.json"
+            inventory = _read_json(inventory_path) if inventory_path.is_file() else None
+            if has_legacy_coverage_gap(raw_manifest, inventory):
+                raise ValueError("Historical Raw coverage is insufficient for a new Parsed build")
         manifest["input_detail_count"] = len(inputs)
         reusable = self._load_reusable_records(source=source, locale=locale, raw_run_id=raw_run_id)
         records: list[dict[str, Any]] = []
@@ -192,6 +210,7 @@ class OBCParsedRunPipeline:
             raise ValueError("Raw manifest missing details or paths")
         inputs: list[_RawInput] = []
         seen: set[str] = set()
+        versioned = is_versioned(raw_manifest)
         for detail in details:
             if not isinstance(detail, Mapping) or detail.get("content_id") is None:
                 raise ValueError("Raw manifest contains detail without content_id")
@@ -207,8 +226,12 @@ class OBCParsedRunPipeline:
             raw_value = path_entry.get("raw")
             metadata_value = path_entry.get("metadata")
             expected_sha = path_entry.get("sha256")
-            raw_path = self._resolve_path(raw_value) if isinstance(raw_value, str) else None
-            metadata_path = self._resolve_path(metadata_value) if isinstance(metadata_value, str) else None
+            if versioned:
+                raw_path = relative_path(self.raw_run_root, raw_value)
+                metadata_path = relative_path(self.raw_run_root, metadata_value)
+            else:
+                raw_path = self._resolve_path(raw_value, raw_manifest["run_id"]) if isinstance(raw_value, str) else None
+                metadata_path = self._resolve_path(metadata_value, raw_manifest["run_id"]) if isinstance(metadata_value, str) else None
             validation_error = None
             if raw_path is None or metadata_path is None or not isinstance(expected_sha, str):
                 validation_error = "RAW_PATH_RECORD_INVALID"
@@ -261,7 +284,11 @@ class OBCParsedRunPipeline:
                 return None
         return dict(existing)
 
-    def _resolve_path(self, value: str) -> Path:
+    def _resolve_path(self, value: str, run_id: str) -> Path:
+        parts = value.replace("\\", "/").split("/")
+        for index in range(len(parts) - 2, -1, -1):
+            if parts[index] == run_id and parts[index + 1] == "responses":
+                return relative_path(self.raw_run_root, "/".join(parts[index + 1:]))
         candidate = Path(value)
         if candidate.is_absolute():
             return candidate

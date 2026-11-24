@@ -18,6 +18,11 @@ Clean 进行确定性结构恢复、技术整理和有来源依据的标签提�
 现有已验证 `content_id` 合同。输入必须是完整 Raw run，所选 ID 必须存在于
 inventory。详情缺失、校验失败或关键 envelope 失配进入阻断记录。
 
+对于 [`gc-raw-2`](phase-01-raw-collection.md#versioned-collector-contract)，入口在创建输出前
+核对最终清单的全量资格、inventory 哈希、实际栏目树与列表覆盖、详情集合及 run 内定位。
+`--content-id` 在合格 Raw 输入中选择 Clean 记录。历史清单继续按原字节和绑定回读。
+能从历史清单或库存确认存在范围缺口时，入口拒绝新建派生 run，既有绑定仍可验证。
+
 ## 2. 持久化结构
 
 每条观测保存一个紧凑 UTF-8 JSON 文件，运行清单保存为

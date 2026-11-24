@@ -1,1 +1,1 @@
-{"data":{"id":509653,"title":"任务"}}
+{"retcode":0,"message":"OK","data":{"page":{"id":"509653","name":"任务","desc":"原始任务文本","modules":[{"id":"m1","name":"正文","components":[{"component_id":"collapse_panel","data":"{\"rich_text\":\"<p>任务正文</p>\"}"}]}]}}}

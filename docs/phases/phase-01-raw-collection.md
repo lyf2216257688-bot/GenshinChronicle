@@ -125,6 +125,41 @@ Required engineering behavior:
 
 Collector fixtures/tests and manifest support belong to 01D implementation and acceptance.
 
+### Versioned Collector contract
+
+New runs use `gc-raw-2`. Before any HTTP dispatch, the Collector records the canonical collection root, source, locale, run ID, base URL, app identifier, request contract, request headers, listing parameter names and digest, channel set, detail flag and detail limit. Reordering or repeating the same channel identifiers yields the same channel set. Operational timeout and retry settings may vary between invocations. A mismatched identity requires a new run. Each mutable run has a process lock outside its archive directory.
+
+Each HTTP attempt has its own receipt and, when a body is available, byte-for-byte response file. Keep the failures and unaccepted observations as audit evidence. Only a verified request binding, HTTP 200, integer `retcode=0` and the expected OBC container qualify an observation for acceptance. The verified discovery response has `data.list` channel nodes. Listing roots must match the requested channel. Details must have a matching `data.page.id`. Leave content component interpretation to downstream. An unhandled pagination signal or a missing requested channel blocks discovery completion. The Collector freezes inventory, memberships and the ordered detail selection after all targeted listings pass.
+
+Raw bodies, receipts and accepted references are created atomically at independent, non-replacing paths. An interruption before reference publication can recover the earliest fully verified attempt. A saved but unaccepted body with missing or invalid metadata stays at its original location. A later request uses a new attempt. An accepted reference remains fixed. Known reference loss or any accepted-path, receipt or body integrity failure blocks collection for the run.
+
+| Artifact | State and recovery |
+| --- | --- |
+| `metadata/checkpoint.json` | Replaceable `partial` report. Recovery uses durable identity, attempt receipts, accepted references and frozen discovery. |
+| `metadata/inventory.json`, `metadata/discovery.json` | Write-once discovery and selection. The inventory SHA-256 is carried into the final manifest. |
+| `metadata/finalizing.json` | Durable prepared manifest and SHA-256. Resume can finish publication from the same prepared bytes after verifying the evidence. |
+| `metadata/manifest.json` | Final `complete` or `scoped_complete` manifest. Valid reopen under the original collection identity uses zero HTTP requests and writes. Its `paths` entries point to accepted observations relative to the archive root. |
+
+The collection identity governs writes and resume. Archive readers use the final manifest, its digest, the inventory and response locators at the supplied archive root. A backup or moved copy can be read independently of the original collection path, process locks and local access state. Old unversioned runs remain available under their historical read contract. Collection against an old or unidentifiable directory requires a fresh run ID.
+
+#### Source access restrictions
+
+All outgoing requests for `mihoyo_obc` share the per-user source state and dispatch lock, including different request kinds, run IDs, locales, base URL settings and output roots. The state is under `%LOCALAPPDATA%/GenshinChronicle/raw-collector` on Windows and the user state directory under `genshinchronicle/raw-collector` on POSIX. Each HTTP attempt records its dispatch before sending and its response status when received. The Collector preserves unexpected redirect responses as failures under the reviewed request contract.
+
+- **403** freezes new source dispatches across process restarts. A dispatch interrupted before recording the HTTP outcome also blocks new dispatches for review. After independently confirming access is permitted, use the standalone `--acknowledge-access EVENT_ID --reason "verified restoration reason"` operation. It saves a receipt and performs zero HTTP requests.
+- **429** writes the source's earliest next dispatch time as UTC epoch seconds, honoring `Retry-After` and bounded backoff with a minimum delay of one second. A wait longer than the available retry budget ends the invocation as `partial`. Restarts and other runs respect the saved deadline. The acknowledgment operation leaves the cooldown in force. Transport and 5xx retries stay bounded.
+
+#### Completion and exit codes
+
+| Status | Meaning | Exit code |
+| --- | --- | --- |
+| `complete` | All enumerable channels and unique details for this run and locale were collected under the verified OBC request contract. The run requested unfiltered discovery and uncapped details, has nonempty inventory and has no unresolved gaps. Coverage applies to the observed API JSON within this run. | `0` |
+| `scoped_complete` | The requested discovery, filtered or sampled scope succeeded. A finite limit remains scoped even when it covers all discovered details. | `0` |
+| `partial` | A requested operation has an unresolved failure, coverage gap or access restriction. The resumable report is the checkpoint. | `1` |
+| Rejected | Invalid arguments, identity conflict, integrity fault, unavailable run/source lock or local storage failure. | `2` |
+
+The CLI defaults to discovery. Supply `--details` to fetch details and optionally use `--channel-id` and `--detail-limit`. Its JSON summary includes the requested scope, full-coverage eligibility, unresolved failures, counts and the final manifest or checkpoint path. The response receipts preserve historical failures after recovery. A complete run attests to the reviewed source and the enumerable API scope of that observation, with media and upstream material outside the observed scope remaining outside the completeness claim.
+
 ### 01E — Staged validation before full crawl
 
 Live staged validation runs in this order:
@@ -140,7 +175,7 @@ Live staged validation runs in this order:
 
 Do not treat the map's embedded `list` as the complete inventory. Do not proceed past a failed review gate.
 
-P01-EA evidence (2026-08-24): browser inspection of channels 25 and 130 showed exactly one `content/list` request per channel, no pagination query parameters, and no appended request after scrolling to the bottom. A controlled run completed 200/200 detail fetches with 0 failures. Re-running the same run ID completed in about 1.7 seconds with zero retry attempts, demonstrating listing/detail resume skips for already valid saved responses. This is current frontend evidence, not a permanent API guarantee. The collector records `single_response_verified` for this observed contract and stops with an explicit partial manifest if a future response exposes a recognized pagination control field in the response envelope or listing container. Live 429/5xx behavior remains UNKNOWN; bounded offline retry behavior is covered by tests.
+P01-EA evidence (2026-08-24): browser inspection of channels 25 and 130 showed exactly one `content/list` request per channel, no pagination query parameters, and no appended request after scrolling to the bottom. A controlled run completed 200/200 detail fetches with 0 failures. The historical same-run probe took about 1.7 seconds with zero new requests. That probe established cache reuse at the time. The versioned contract above defines the current publication and resume behavior. The Collector records `single_response_verified` under the reviewed listing contract and reports `partial` if it encounters a recognized pagination signal. The response to live 429/5xx remains unknown. Retry and access restriction handling have offline coverage.
 
 ### 01F — Profile Raw before designing Parsed (complete)
 

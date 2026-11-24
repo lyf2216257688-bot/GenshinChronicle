@@ -5,11 +5,13 @@
     "list": [
       {
         "id": 194,
+        "name": "图鉴",
         "parent_id": 0,
         "depth": 1,
         "children": [
           {
             "id": 43,
+            "name": "目录",
             "parent_id": 194,
             "depth": 2,
             "children": [],
