@@ -60,6 +60,10 @@ Thumbs.db
 !/scripts/retrieval/audit_g5_evidence_cost.py
 !/scripts/retrieval/audit_g5_upstream.py
 !/scripts/retrieval/g5_evidence_cases.json
+!/scripts/retrieval/capture_rerank_disagreement.py
+!/scripts/retrieval/replay_rerank_disagreement.py
+!/scripts/retrieval/rerank_disagreement_cases.json
+!/scripts/retrieval/rerank_disagreement_policy.py
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

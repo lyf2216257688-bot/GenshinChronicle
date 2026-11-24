@@ -18,6 +18,7 @@
 | --- | --- |
 | Retrieval | [P0–P2 实现](clean-retrieval-p0p2-20261111.md)、[P3 Sparse 准备](sparse-build-preparation-20261112.md)、[P4 运行准备](recall-experiment-preparation-20261112.md)、[S0/S1/S2 70Q 评审](recall-p4-70q-quality-review-20261113.md) |
 | Reranking | [准备](clean-reranking-preparation-20261113.md)、[P0–P1 运行与最长配对](clean-reranking-p0p1-readiness-20261113.md)、[P2 BGE/GTE](clean-reranking-p2-comparison-20261113.md)、[P3 结构与 MMR](clean-reranking-p3-comparison-20261113.md)、[P4 采用与完整交接](clean-reranking-p4-handoff-20261113.md) |
+| 首读排序保护研究 | [召回与重排分歧的历史回放和独立验证](clean-rerank-disagreement-20261124.md)。比较原身份规则、双路分歧和带证据门槛的单席位干预。 |
 
 ## Generation
 
