@@ -28,8 +28,8 @@
 | `collector/` | 来源发现、采集、Raw 存储、恢复与运行清单。 |
 | `clean/` | 直接 Raw-to-Clean 提取、持久化、版本化 locator 和回读接口。 |
 | `chunking/` | Clean 准入、微/宏投影、图与条件字段、自然父级回读。 |
-| `indexing/` | 统一输入、analyzer、表示绑定及独立离线构建与验证。 |
-| `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff；V2 运行时由工作台接入。 |
+| `indexing/` | 统一输入、analyzer、表示绑定及独立离线构建与验证。版本化索引在此维护 Dense／Sparse 数值块、BM25F 桶及独立构建对照。 |
+| `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff。V2 运行时由工作台接入，版本化试验入口显式接收 release 并绑定证据回读。 |
 | `generation/` | Evidence Packet 组装、provider-neutral 生成合同、协议检查、结果及引用绑定。 |
 | `rag/`、`ui/` | 工作台与保留的 Legacy 编排、持久化和本地 Streamlit 页面。UI 通过后端进入工作流程。 |
 | `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、本机凭据、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |

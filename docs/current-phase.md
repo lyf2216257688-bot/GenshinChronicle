@@ -4,6 +4,8 @@
 
 ## 当前工作与下一步
 
+2026-11-25 已独立核验新版 Raw `p01eb_full_20261124` 及其跨日恢复。新版完整覆盖 96 个栏目、17,329 条详情，正式差分为新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。新版 Dense/Sparse 固定长度双条编码、BM25F 每路 64 桶及显式 release 查询入口已实现。双臂启动器、执行封存、故障恢复、24 条新版 Raw 独立派生及机器预检已验证，本次正式整版运行由操作者手动发起。发布切换仍需独立授权。现用发布链见下表。[新版差分、离线验收与预算](research/incremental-raw-and-indexes-20261125.md) · [启动命令与封条](research/incremental-launcher-readiness-20261125.md)
+
 2026-11-23 第二批实现了 G5 证据利用策略 `gc-g5-official-5` 和 Windows 本地聊天接口修订号 4。新版 G5 可从已排序候选按页选读，按可核验位置保存父级正文，优先入包已选和主动回读的关键片段，并区分引用绑定、缺失和失败。查证面板可以分别核对引用和父级上下文。离线复验覆盖 G6/G7 固定排名、选读和组包。新版保留为显式试验，工作台和本地聊天的新真实批次默认仍用 `gc-g5-official-4`。[Generation 合同](phases/clean-generation-v1.md#evidence-quality-profile) · [产品合同](phases/local-chat-v1.md) · [第二批复验记录](research/clean-generation-g5-evidence-evaluation-20261123.md)
 
 四题真实配对的八侧均有运行记录，首轮候选顺序逐题一致，五侧交付正式回答。Q068 是唯一两侧均交付的题，试验侧支持的必要结论由 0/2 增至 1/2。试验侧另外三题的第二个请求均为远端结果未知。新登记批次占用 25 次，加上先前凭据被拒绝的 1 次，共 26/48 次。四题均可配对复核的采用门槛未达。历史 G6/G7 保持原记录。[配对结果与限制](research/clean-generation-g5-evidence-evaluation-20261123.md#配对实测与独立样本)
@@ -14,7 +16,7 @@
 
 第一批可靠性修复覆盖提交、调度、中断恢复、会话状态、接口错误、定向纠正和长会话上下文。历史工程验收复现了跨日续聊、220 轮历史后的追问和旧版数据根回读。仍兼容且有效的批次可以显式继续，不兼容的旧批次按原绑定只读，同一会话可开启新批次。[产品测试](../tests/local_chat/test_product.py) · [浏览器场景](../frontend/tests/chat.browser.spec.ts)
 
-2026-11-24 第三批修复了 Raw 采集的 F01、F02、D01、D02。新 run 使用 `gc-raw-2`，绑定请求身份，以写入一次的观测和最终清单支持恢复，并区分请求范围完成、全量覆盖和部分失败。403 停止来源派发，429 冷却跨进程生效。离线夹具与故障注入通过，正式 Raw 清单、既有 Clean 和 Parsed 绑定及代表记录定位已只读复核。现用快照仍为 `p01eb_full_20260824`。本批验收限于离线工程验证和历史档案回读。[Raw 合同](phases/phase-01-raw-collection.md#versioned-collector-contract) · [第三批验收](audits/README.md#2026-11-24-第三批-raw-采集可靠性)
+第三批修复了 Raw 采集的 F01、F02、D01、D02，已通过离线故障注入及正式跨日恢复复核。现用快照为 `p01eb_full_20260824`。Collector 下批安排实时进度、安全暂停、脱敏网络诊断和连续传输失败熔断。[Raw 合同](phases/phase-01-raw-collection.md#versioned-collector-contract) · [第三批验收](audits/README.md#2026-11-24-第三批-raw-采集可靠性) · [真实恢复](audits/README.md#2026-11-25-正式-raw-跨日恢复)
 
 2026-11-23 的业务和架构审计保留修复前基线。收尾复核记录了本地聊天及 G5 试验策略的修复范围。旧 G4 LIVE 的恢复与许可身份覆盖、G7 历史导出差异仍见原审计及后续处置。[审计与后续处置](audits/README.md)
 
@@ -60,6 +62,7 @@ G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNO
 
 ### 阶段合同
 
+- [语料版本与增量构建](phases/versioned-corpus-incremental.md)
 - [Raw 采集](phases/phase-01-raw-collection.md) · [Clean V1](phases/clean-v1.md) · [Chunking V2/V2.1](phases/chunking-v2.md)
 - [统一索引输入](phases/indexing-input-v1.md) · [物理索引构建与独立查询](phases/index-benchmark-v1.md) · [Sparse 构建](phases/sparse-build-v1.md)
 - [Clean Retrieval](phases/clean-retrieval-v1.md) · [冻结召回比较](phases/recall-experiment-v1.md) · [Clean Reranking](phases/clean-reranking-v1.md) · [Clean Generation](phases/clean-generation-v1.md)

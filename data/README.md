@@ -6,12 +6,13 @@
 
 | 数据根（相对本目录） | 负责的内容 |
 | --- | --- |
-| `raw/mihoyo_obc/zh-cn/` | 官方 API 原始观测、发现响应、失败记录及运行清单。完整快照为 `p01eb_full_20260824/`，source/locale 由配置选择。 |
+| `raw/mihoyo_obc/zh-cn/` | 官方 API 原始观测、发现响应、失败记录及运行清单。完整观测包括 `p01eb_full_20260824/` 和 `p01eb_full_20261124/`。source/locale 由配置选择，采用状态见[当前阶段](../docs/current-phase.md)。 |
 | `clean/mihoyo_obc/zh-cn/clean-v1-full-20261106/` | Clean V1 结构记录和 Raw 定位，`metadata/manifest.json` 为正式下游绑定。 |
 | `parsed/mihoyo_obc/`、`canonical/mihoyo_obc/` | 历史 Phase02/03 证据及血缘，保留独立合同和可回读基线。 |
 | `retrieval/clean-chunking-full-v2-1-20261108/` | V2.1 manifest 及 flat exports，包含实际候选、自然父级、对白图和准入记录。 |
 | `retrieval/index-benchmark-v1-20261109/` | 其中的 `dense/bge-m3/`、`bm25f/` 和两者共同绑定的 `input-attempts/` 是在用资产。以[选择器](../config/index-selected-v1.json)为准。 |
 | `retrieval/bge-m3-sparse-v1-20261112-ready/`、`retrieval/python314-compatibility-20261113-r3/` | 分别为显式 S2 配套索引和用于校验运行时与既有索引兼容性的证明。 |
+| `retrieval/incremental-raw-*-20261125.json`、`retrieval/incremental-impact-sample-20261125/` | 版本化 Raw 核验、正式差分、旧分片复用量和真实变更样本的投影及编码实测。逐版本独立数据根与发布描述符的结构见[增量合同](../docs/phases/versioned-corpus-incremental.md)。 |
 | `retrieval/rerank-v1-handoff-20261113/` | P4 完整有序候选交接。排序选择器同时绑定冻结的 70Q 输入、分析和评审，定位见[选择器](../config/reranking-selected-v1.json)与 [P4 报告](../docs/research/clean-reranking-p4-handoff-20261113.md)。 |
 | `generation/clean-v1-local/` | 可配置的本地会话默认根。显式查询、Mock 测试以及有限研究使用各自的新根。 |
 | `generation/personal-chat-v1/` | 独立个人聊天软件的默认数据根。中央 `sessions.sqlite` 保存长期会话、草稿及不可变结果与反馈的引用。`live-settings.json` 保存官方地址与 Windows 当前账号加密的凭据。`batches/<id>/` 独立保存许可、批次关闭记录、预算、请求账本与执行检查点。 |

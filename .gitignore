@@ -64,6 +64,13 @@ Thumbs.db
 !/scripts/retrieval/replay_rerank_disagreement.py
 !/scripts/retrieval/rerank_disagreement_cases.json
 !/scripts/retrieval/rerank_disagreement_policy.py
+!/scripts/retrieval/study_incremental_dense.py
+!/scripts/retrieval/study_incremental_bm25f.py
+!/scripts/retrieval/run-incremental-corpus.ps1
+!/scripts/retrieval/snapshot_full_run.py
+!/scripts/retrieval/snapshot_acceptance.py
+!/scripts/retrieval/verify_snapshot_observations.py
+!/scripts/retrieval/smoke_snapshot_launcher.py
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

@@ -36,6 +36,7 @@ The [local chat client](phases/local-chat-v1.md) consumes published turn, source
 ## Cross-layer contracts
 
 - Use versioned manifests, stable identities, source locators, hashes and create-only outputs. Unknown critical structures, missing records or failed bindings stop the affected operation. Explicit omissions retain the reason.
+- A [versioned corpus snapshot](phases/versioned-corpus-incremental.md) binds the current Raw observation and the effective Raw observation used for evidence. It records the source-value equivalence needed to reuse earlier evidence. Computation reuse binds the relevant inputs and execution contract independently of source and release row identities.
 - `model_calls` owns attempts, retry decisions, budgets, cooldown and interrupted-call recovery. Task adapters keep raw evidence and validate protocol, usage and content. The caller owns semantic policy and live authorization. Frozen legacy exceptions are recorded in the [model interfaces catalog](model-interfaces.md).
 - Parameters such as candidate depth, Top-K, fusion weights, model revisions and context budgets are operating points. They are evaluated with bounded comparisons. Provenance, immutability, explainable disposition and independent source readback govern every operating point.
 - Establish a runnable chain, measure failures against source evidence, and scope changes to the diagnosed layer. Engineering integrity, semantic quality and adoption have separate acceptance gates. Evaluators serve specific decisions and stay proportional to the system under test.
