@@ -1,0 +1,18 @@
+{
+  "version": "gc-mcp-live-1",
+  "retrieval": {"path": "config/clean-retrieval-v1.json", "sha256": "15ede449cf198b31bcda117393ca4ef30204ea05ac34180d1311f569d8ae4912"},
+  "reranking": {"path": "config/reranking-selected-v1.json", "sha256": "9c52e5c4222bb5185a4ddb78a501cdcb45279c4f41f3daaa5a1d3145c1c30fe7"},
+  "releases": {
+    "20260824": {
+      "kind": "flat",
+      "raw_run": "p01eb_full_20260824",
+      "artifact": {"path": "config/index-selected-v1.json", "sha256": "008a1522442dd29ab3f86d03efed0a8fbfff944c54e68f88ffb1e7a26fb6d9bd"},
+      "input_sha256": "f30eb4b0e0721c624701b4815d76b17a4c10518df203fbd1faadae11adb648da"
+    },
+    "20261124": {
+      "kind": "release",
+      "raw_run": "p01eb_full_20261124",
+      "artifact": {"path": "data/retrieval/vcr-1126/incremental/indexes/release.json", "sha256": "74c69f98b73267bde9a9d7819a67a9689cfaebef96aa247b2ba432be3ba5e938"}
+    }
+  }
+}

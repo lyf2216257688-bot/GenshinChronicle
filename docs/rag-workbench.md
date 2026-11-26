@@ -4,7 +4,7 @@
 
 日常连续对话使用[个人聊天软件](local-chat.md)。下文列出研究工作台、命令行与原 Streamlit 入口。
 
-用宿主 Agent 回放指定研究问题、回查原文和核对引用时，使用[专业证据 MCP 的 stdio 入口](phases/mcp-offline-v1.md#启动验证和停止)。
+用宿主 Agent 实时查证时启用[专业证据 MCP 实时入口](phases/mcp-live-v1.md)。历史冻结题用[离线回放入口](phases/mcp-offline-v1.md#启动验证和停止)。
 
 ## 六阶段交付
 

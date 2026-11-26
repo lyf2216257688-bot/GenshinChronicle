@@ -4,11 +4,11 @@
 
 ## 当前工作与下一步
 
-GC 长期采用路线 B，优先把专业证据能力通过通用 MCP 提供给 Agent。2026-11-25 已完成授权的 P0 和 P1 离线试点。两道 G7 冻结题的首包与正式 Generation 逐字段一致，DSH 与 Codex 均已通过安装版本的本机工具直调。试点按显式 stdio 入口启用，使用独立审计根。正式问答仍采用 `gc-g5-official-4`；语料更新按下段独立推进。MCP 后续有限真查询需安排资源窗口，宿主真实问答配对、模型常驻试验及发布切换分别待审议。[架构决定](decisions/adr-0002-host-neutral-evidence-engine.md) · [离线合同](phases/mcp-offline-v1.md) · [验收与适用范围](research/mcp-offline-acceptance-20261125.md)
+GC 长期采用路线 B，优先把专业证据能力通过通用 MCP 提供给 Agent。2026-11-25 的 P0 和 P1 离线试点保留冻结排名、首包对照和两种宿主验收。2026-11-26 的 P1 实时查询与 P2 新版接入通过本机工程验收。实时 stdio 入口显式选择 `20260824` 或候选 Release `20261124`，支持自由补查、原文和引用回读及研究恢复。DSH 与 Codex 的安装版本完成真实本地工具调用。独立审计根完成两版隔离与回滚回读。P3 完成三题的离线证据对照，并封存四道未运行的真实评测题。下一项可审议工作是登记有限的宿主真实问答配对。付费模型请求和正式发布切换分别授权。正式问答仍采用 `gc-g5-official-4`。[架构决定](decisions/adr-0002-host-neutral-evidence-engine.md) · [实时合同](phases/mcp-live-v1.md) · [实机验收](research/mcp-live-acceptance-20261126.md) · [Agentic 对照](research/mcp-agentic-rag-evaluation-20261126.md)
 
 新版 Raw `p01eb_full_20261124` 已核验，覆盖 96 个栏目、17,329 条详情，差分新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。2026-11-26，`data/retrieval/vcr-1126` 的恢复版 Quick 双臂对照通过，36 份阶段回执、120 项输出及资产依赖清单经独立核验。两臂各自复用原构建物理索引，文档重新编码、新建词法桶和跨臂借用均为零。原执行根、恢复根及其跨根依赖一并保留。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾)
 
-**本轮 Extended 已取消。** 保留已完成的 Q001–Q003、Q004 中断记录、G7 题库和既有研究资产。历史题全量回归和人工语义复核转为按需研究。先梳理新版语料正式绑定、历史引用回读和回滚的最小工程验收，以及存储清理方案。随后推进 MCP 的真实检索、自由补查和证据交付。现用语料仍为 `p01eb_full_20260824`，本轮只做存储与依赖审计及方案设计，正式切换与付费请求仍分别授权。[恢复记录及本轮停止点](research/incremental-recovery-20261126.md)
+**本轮 Extended 已取消。** 保留已完成的 Q001–Q003、Q004 中断记录、G7 题库和既有研究资产。历史题全量回归和人工语义复核按研究需要开展。新版 `vcr-1126` 已通过独立目录的显式绑定、证据回读及回滚演练。A1 缓存、GTE 与中断 Quick 的验证副本、可离线恢复的前端依赖和 G0 试验环境已按清单处理。现用语料仍为 `p01eb_full_20260824`。[工程验收与清理记录](research/storage-and-release-readiness-20261126.md) · [恢复记录](research/incremental-recovery-20261126.md)
 
 2026-11-23 第二批实现了 G5 证据利用策略 `gc-g5-official-5` 和 Windows 本地聊天接口修订号 4。新版 G5 可从已排序候选按页选读，按可核验位置保存父级正文，优先入包已选和主动回读的关键片段，并区分引用绑定、缺失和失败。查证面板可以分别核对引用和父级上下文。离线复验覆盖 G6/G7 固定排名、选读和组包。新版保留为显式试验，工作台和本地聊天的新真实批次默认仍用 `gc-g5-official-4`。[Generation 合同](phases/clean-generation-v1.md#evidence-quality-profile) · [产品合同](phases/local-chat-v1.md) · [第二批复验记录](research/clean-generation-g5-evidence-evaluation-20261123.md)
 
@@ -67,6 +67,7 @@ G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNO
 ### 阶段合同
 
 - [专业证据 MCP 离线合同](phases/mcp-offline-v1.md)
+- [专业证据 MCP 实时合同](phases/mcp-live-v1.md)
 - [语料版本与增量构建](phases/versioned-corpus-incremental.md)
 - [Raw 采集](phases/phase-01-raw-collection.md) · [Clean V1](phases/clean-v1.md) · [Chunking V2/V2.1](phases/chunking-v2.md)
 - [统一索引输入](phases/indexing-input-v1.md) · [物理索引构建与独立查询](phases/index-benchmark-v1.md) · [Sparse 构建](phases/sparse-build-v1.md)

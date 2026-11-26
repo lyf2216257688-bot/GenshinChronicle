@@ -7,12 +7,13 @@ const { createRequire } = require("node:module");
 const { createHash } = require("node:crypto");
 
 async function main() {
-  const [python, auditName] = process.argv.slice(2);
+  const [python, auditName, release] = process.argv.slice(2);
   assert(path.isAbsolute(python) && fs.existsSync(python), "Supply the Generation Python executable");
   assert(/^[A-Za-z0-9_-]{1,48}$/.test(auditName), "Supply a fresh audit name");
   assert(process.versions.electron, "Use the installed DeepSeek Harness executable");
   const repo = process.cwd();
-  const parent = path.join(repo, "data/generation/mcp-offline-v1");
+  assert(!release || /^20[0-9]{6}$/.test(release), "Supply a registered release key");
+  const parent = path.join(repo, release ? "data/generation/mcp-live-v1" : "data/generation/mcp-offline-v1");
   fs.mkdirSync(parent, { recursive: true });
   const output = path.join(parent, auditName);
   fs.mkdirSync(output);
@@ -21,11 +22,15 @@ async function main() {
   const systemPrompt = fromDSH("@deepseek-ai/dsh-system-prompt").default;
   const tools = fromDSH("@deepseek-ai/dsh-tools").default;
   const bridge = fromDSH("@deepseek-ai/dsh-mcp-client");
+  const timeout = release ? 600000 : 60000;
+  const args = ["-X", "utf8", "-B", "-m", release ? "genshin_corpus.mcp_live" : "genshin_corpus.mcp_offline",
+    "--repo", repo, "--audit-name", auditName];
+  if (release) args.push("--release", release);
   const hostConfig = {
     transport: "stdio", serverName: "gc", cwd: repo, command: python,
-    args: ["-X", "utf8", "-B", "-m", "genshin_corpus.mcp_offline", "--repo", repo, "--audit-name", auditName],
+    args,
     env: { PYTHONPATH: path.join(repo, "src") }, startupTimeoutMs: 20000,
-    toolCallTimeoutMs: 60000, failOnStartupError: true, reconnect: { enabled: false },
+    toolCallTimeoutMs: timeout, failOnStartupError: true, reconnect: { enabled: false },
   };
   async function connected(run) {
     const ctx = new Context();
@@ -36,7 +41,7 @@ async function main() {
         fibers.push(fiber);
         await fiber.await();
       }
-      async function call(name, args, signal = AbortSignal.timeout(60000)) {
+      async function call(name, args, signal = AbortSignal.timeout(timeout)) {
         const tool = ctx.tools.get("mcp__gc__" + name);
         assert(tool, name);
         const exec = { signal };
@@ -53,6 +58,17 @@ async function main() {
     } finally {
       for (const fiber of fibers.reverse()) await fiber.dispose();
     }
+  }
+  if (release) {
+    const report = await verifyLive(connected, release);
+    report.host_bridge_version = fromDSH("@deepseek-ai/dsh-mcp-client/package.json").version;
+    report.bridge_sha256 = createHash("sha256").update(fs.readFileSync(fromDSH.resolve("@deepseek-ai/dsh-mcp-client"))).digest("hex");
+    report.node = process.versions.node;
+    report.electron = process.versions.electron;
+    const target = path.join(output, "dsh-client.json");
+    fs.writeFileSync(target, JSON.stringify(report, null, 2) + "\n", { flag: "wx" });
+    console.log(target);
+    return;
   }
   const start = { study: "dsh-study", case: "Q068", request_id: "start" };
   const interrupted = { study: "cancel-probe", case: "Q001", request_id: "open" };
@@ -117,6 +133,88 @@ async function main() {
   const target = path.join(output, "dsh-client.json");
   fs.writeFileSync(target, JSON.stringify(report, null, 2) + "\n", { flag: "wx" });
   console.log(target);
+}
+
+async function collect(first, nextPage) {
+  let page = first.projection;
+  if (page.body !== undefined) return { body: page.body, pages: 1 };
+  const digest = page.projection_sha256;
+  const total = page.total_chars;
+  const parts = [page.partial_json_text];
+  while (page.next_offset !== null) {
+    const offset = page.next_offset;
+    page = (await nextPage(offset)).projection;
+    assert.equal(page.offset, offset);
+    assert.equal(page.projection_sha256, digest);
+    parts.push(page.partial_json_text);
+  }
+  const text = parts.join("");
+  assert.equal([...text].length, total);
+  return { body: JSON.parse(text), pages: parts.length };
+}
+
+async function verifyLive(connected, release) {
+  const study = { study: "dsh-live" };
+  const start = { ...study, request_id: "open", question: "伊涅芙在成为现在的伊涅芙之前，源自哪条古龙，她分出的意志曾用什么称号？" };
+  const interrupted = { ...study, request_id: "cancel", parent_query: "original", gap: "检查另一个原文出处",
+    search_text: "伊涅芙 角色语音 纳塔 最初的记忆" };
+  let final;
+  const report = await connected(async (call, tools) => {
+    assert.equal((await call("get_scope", {})).new_studies.release, release);
+    const tick = performance.now();
+    const first = await call("open_study", start);
+    const openSeconds = (performance.now() - tick) / 1000;
+    const pageArgs = { ...study, packet_ref: first.packet_ref };
+    const initial = await collect(first, offset => call("get_packet", { ...pageArgs, offset }));
+    assert(initial.body.length > 0);
+    const candidates = await call("browse_candidates", { ...study, query: "original" });
+    const candidate = candidates.rows[0];
+    assert(candidate);
+    const followTime = performance.now();
+    const follow = await call("follow_query", { ...study, request_id: "origin", parent_query: "original",
+      gap: "补齐明晨之镜与悖谬的关系，优先查伊涅芙来历语音和人物故事",
+      search_text: "伊涅芙 想要了解伊涅芙 其五 明晨之镜 一个念头 人物故事 悖谬",
+      evidence_handles: [candidate.handle],
+    });
+    const followSeconds = (performance.now() - followTime) / 1000;
+    assert.deepEqual(follow.query_ids, ["original", "origin"]);
+    const more = await call("browse_candidates", { ...study, query: "origin" });
+    const source = await call("read_source", { ...study, request_id: "read", handle: more.rows[0].handle, scope: "parent" });
+    const expanded = await collect(source, offset => call("get_read", { ...study, read_ref: source.read_ref, offset }));
+    assert(expanded.body);
+    final = await call("assemble_packet", { ...study, request_id: "assemble" });
+    const packet = { ...study, packet_ref: final.packet_ref };
+    const output = await collect(final, offset => call("get_packet", { ...packet, offset }));
+    assert(output.body.length > 0);
+    const bound = await call("check_answer", { ...packet, answer: "[E01]" });
+    assert.equal(bound.status, "PASS");
+    await assert.rejects(call("check_answer", { ...pageArgs, answer: "[E01]" }), /Foreign or superseded Packet/);
+    await assert.rejects(call("check_answer", { ...packet, answer: "[E999]" }));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    try {
+      await assert.rejects(call("follow_query", interrupted, controller.signal));
+      assert(controller.signal.aborted);
+    } finally {
+      clearTimeout(timer);
+    }
+    return { tools, release, binding: final.binding, generation_calls: 0, open_seconds: openSeconds,
+      follow_seconds: followSeconds, first_packet: first.packet_id, final_packet: final.packet_id,
+      first_packet_pages: initial.pages, final_packet_pages: output.pages,
+      first_packet_chars: first.projection.total_chars, final_packet_chars: final.projection.total_chars,
+      parent_pages: expanded.pages, parent_chars: source.projection.total_chars, parent_receipt: source.receipt_id,
+      valid_citation: bound.sources.E01, stale_and_unknown_citations_rejected: true };
+  });
+  await connected(async call => {
+    const committed = await call("request_status", { ...study, request_id: "assemble" });
+    assert.deepEqual(committed, { status: "committed", result: final });
+    const stopped = await call("request_status", { ...study, request_id: interrupted.request_id });
+    assert.equal(stopped.status, "no_committed_result");
+    assert.deepEqual((await call("get_study", study)).queries.map(item => item.query.query_id), ["original", "origin"]);
+    report.cancellation = stopped;
+    report.exact_recovery = true;
+  });
+  return report;
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -14,11 +14,13 @@
 | `retrieval/bge-m3-sparse-v1-20261112-ready/`、`retrieval/python314-compatibility-20261113-r3/` | 分别为显式 S2 配套索引和用于校验运行时与既有索引兼容性的证明。 |
 | `retrieval/incremental-raw-*-20261125.json`、`retrieval/incremental-impact-sample-20261125/` | 版本化 Raw 核验、正式差分、旧分片复用量和真实变更样本的投影及编码实测。逐版本独立数据根与发布描述符的结构见[增量合同](../docs/phases/versioned-corpus-incremental.md)。 |
 | `retrieval/vc-20261124/`、`retrieval/vcr-1126/` | 原双臂构建及失败审计、独立兼容恢复输出。恢复 release 继续引用原臂数值块、词法桶以及原有 Clean 与 Chunk 载荷。Quick 完成回执、`asset_dependencies` 和已执行的历史题回执保存在恢复根。原根、恢复根及所有有效跨根引用按原路径保留。[恢复记录及保留范围](../docs/research/incremental-recovery-20261126.md#恢复版-quick-收尾) |
+| `retrieval/release-binding-20261126-r1/`、`retrieval/release-binding-20261126-r2/`、`retrieval/storage-cleanup-20261126/` | 隔离绑定与回滚、前置清单和清理回执。原研究工件路径和摘要可继续回读。[验收记录](../docs/research/storage-and-release-readiness-20261126.md) |
 | `retrieval/rerank-v1-handoff-20261113/` | P4 完整有序候选交接。排序选择器同时绑定冻结的 70Q 输入、分析和评审，定位见[选择器](../config/reranking-selected-v1.json)与 [P4 报告](../docs/research/clean-reranking-p4-handoff-20261113.md)。 |
 | `generation/clean-v1-local/` | 可配置的本地会话默认根。显式查询、Mock 测试以及有限研究使用各自的新根。 |
 | `generation/personal-chat-v1/` | 独立个人聊天软件的默认数据根。中央 `sessions.sqlite` 保存长期会话、草稿及不可变结果与反馈的引用。`live-settings.json` 保存官方地址与 Windows 当前账号加密的凭据。`batches/<id>/` 独立保存许可、批次关闭记录、预算、请求账本与执行检查点。 |
 | `generation/g7-70q-baseline-20261117/` | 完整 G7 基线及审计。保留 `questions/` 原始轨迹、`records/` 逐题结果、`audit/` 独立判断、账目和 UNKNOWN 尝试。 |
 | `generation/mcp-offline-v1/<audit-name>/` | 每个本机试点的独立审计根。SQLite 按研究保存操作、完整回执、Packet、失败尝试和可重放结果。验收脚本另存 `acceptance.json`。 |
+| `generation/mcp-live-v1/<audit-name>/` | 实时研究的独立审计根。SQLite 按原绑定保存已提交的查询、收条和 Packet，真实检索的运行证据与失败保存在 `queries/`。清理时沿保留研究的语料绑定保留索引及上游资产。 |
 
 在用 Dense/BM25F 的 manifest 共同指向同一输入包，输入包再绑定 Chunk 与 Clean 的绝对路径。移动这些路径会使工作台的验证或源文回读失败。模型、解释器、wheel 和迁移凭据在 `.local/`，入口见[工作台运行前提](../docs/rag-workbench.md#运行前提)。
 

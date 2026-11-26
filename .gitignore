@@ -73,7 +73,13 @@ Thumbs.db
 !/scripts/retrieval/verify_mcp_offline.py
 !/scripts/retrieval/verify_mcp_dsh.cjs
 !/scripts/retrieval/verify_mcp_codex.py
+!/scripts/retrieval/verify_mcp_live_codex.py
+!/scripts/retrieval/compare_mcp_evidence.py
+!/scripts/retrieval/probe_mcp_resources.py
+!/scripts/retrieval/prepare_mcp_eval.py
 !/scripts/retrieval/smoke_snapshot_launcher.py
+!/scripts/retrieval/storage_cleanup.py
+!/scripts/retrieval/verify_release_binding.py
 /.agents/
 /PROJECT.md
 /TEST_INFRA.md

@@ -27,7 +27,7 @@ Official source → Raw → Clean → Chunking → Indexing
 
 The [local chat client](phases/local-chat-v1.md) consumes published turn, source and progress views through a versioned product API. The product adapter owns chat identities, drafts, local credential storage, per-turn grant selection, the durable job queue, conversation admission and feedback. The existing Generation engine owns research decisions, model calls, publication and evidence binding.
 
-On the [MCP path](decisions/adr-0002-host-neutral-evidence-engine.md), the host owns research strategy, model execution and answer wording. GC owns candidate discovery, ordering, source readback, bounded Packet assembly and citation checks. A study pins its source and implementation. A citation names a Packet and its entry. GC records the body it returned and distinguishes that observation from model visibility and semantic support. The [offline pilot](phases/mcp-offline-v1.md) exercises this boundary using previously ranked queries.
+On the [MCP path](decisions/adr-0002-host-neutral-evidence-engine.md), the host owns research strategy, model execution and answer wording. GC owns candidate discovery, ordering, source readback, bounded Packet assembly and citation checks. A study pins its source and implementation. A citation names a Packet and its entry. GC records the body it returned and distinguishes that observation from model visibility and semantic support. The [live entry point](phases/mcp-live-v1.md) can target the flat index or a named corpus release. The [offline entry point](phases/mcp-offline-v1.md) replays previously ranked queries.
 
 ## Preserved interfaces
 

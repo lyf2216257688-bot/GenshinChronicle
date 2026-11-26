@@ -32,6 +32,7 @@ Plan、索引/统一输入/Clean/Chunk清单、迁移seal和P4 handoff seal。
 
 正式新环境：`.local/runtime-py314/generation/`，与Dense、词法和Reranker隔离。
 先在`.local/generation-framework-check/`安装并运行兼容夹具，再将同一wheel集合安装到正式环境。
+2026-11-26 存储治理由原锁和留存 wheel 复建临时环境，验证通过后清理原临时环境并封存其安装元数据。正式环境及原 G0 审计继续保留。[复建与清理记录](storage-and-release-readiness-20261126.md#实际清理)
 [requirements-py314-generation.lock](../../requirements/requirements-py314-generation.lock)固定41项依赖及SHA256：
 LangGraph 1.2.22、checkpoint 4.3.2、SQLite checkpoint 3.1.3；`pip check`通过。
 LangSmith为框架传递依赖；没有使用云服务、Store或遥测，tracing显式关闭。

@@ -32,6 +32,7 @@
 | `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff。V2 运行时由工作台接入，版本化试验入口显式接收 release 并绑定证据回读。 |
 | `generation/` | Evidence Packet 组装、provider-neutral 生成合同、协议检查、结果及引用绑定。 |
 | `mcp_offline/` | 冻结排名试点的 stdio 工具、原文回读适配与独立研究审计。协议发现按需加载证据资产。 |
+| `mcp_live/` | 实时 stdio 入口、研究状态、版本化查询接线及逐路释放 Reader 的新版词法 worker。 |
 | `rag/`、`ui/` | 工作台与保留的 Legacy 编排、持久化和本地 Streamlit 页面。UI 通过后端进入工作流程。 |
 | `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、本机凭据、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |
 | `model_calls.py`、`model_call_sessions.py`、`evidence_io.py` | 共享请求计数与恢复、会话侧操作桥接、create-only JSON/哈希/封存。 |

@@ -19,7 +19,7 @@ def require(condition, detail):
 
 
 @contextmanager
-def connect(command, home, env, log):
+def connect(command, home, env, log, *, timeout=60):
     with subprocess.Popen([command, "app-server", "--stdio"], cwd=home, env=env, stdin=subprocess.PIPE,
                           stdout=subprocess.PIPE, stderr=log,
                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)) as process:
@@ -44,7 +44,7 @@ def connect(command, home, env, log):
             process.stdin.flush()
             if not notification:
                 while True:
-                    line = incoming.get(timeout=60)
+                    line = incoming.get(timeout=timeout)
                     require(line, "Codex app-server closed before replying")
                     reply = json.loads(line)
                     if reply.get("id") == serial:
