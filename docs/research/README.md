@@ -11,7 +11,7 @@
 | Chunk V2.1 | [有限修复与全量结果](clean-chunking-v2-1-20261108.md)、[构建性能与恢复](build-performance-20261107.md) |
 | 早期 Chunk | [结构调查](clean-chunking-full-survey-20261106.md)、[初次试点](clean-chunking-pilot-20261107.md)、[三规则修订](clean-chunking-refinement-20261107.md)、[V2 对照](clean-chunking-v2-20261107.md)、[全量构建恢复](chunking-v2-recovery-20261107.md) |
 | 索引 | [统一输入导出](indexing-input-v1-20261109.md)、[独立构建及搜索](index-benchmark-launcher-20261109.md)、[Python 3.14 兼容性与迁移](python314-migration-20261113.md) |
-| 跨版本增量 | [首次离线工作点](incremental-build-pilot-20261124.md) · [新版 Raw 正式差分、索引验收与预算](incremental-raw-and-indexes-20261125.md) · [首次启动器与封条](incremental-launcher-readiness-20261125.md) · [对照运行手册](incremental-first-build-runbook-20261125.md) · [Quick 兼容恢复与新封条](incremental-recovery-20261126.md) |
+| 跨版本增量 | [首次离线工作点](incremental-build-pilot-20261124.md) · [新版 Raw 正式差分、索引验收与预算](incremental-raw-and-indexes-20261125.md) · [首次启动器与封条](incremental-launcher-readiness-20261125.md) · [对照运行手册](incremental-first-build-runbook-20261125.md) · [Quick 恢复、收尾与 Extended 计划](incremental-recovery-20261126.md) |
 
 ## 召回与重排
 

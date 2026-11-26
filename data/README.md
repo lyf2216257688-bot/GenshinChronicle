@@ -13,7 +13,7 @@
 | `retrieval/index-benchmark-v1-20261109/` | 其中的 `dense/bge-m3/`、`bm25f/` 和两者共同绑定的 `input-attempts/` 是在用资产。以[选择器](../config/index-selected-v1.json)为准。 |
 | `retrieval/bge-m3-sparse-v1-20261112-ready/`、`retrieval/python314-compatibility-20261113-r3/` | 分别为显式 S2 配套索引和用于校验运行时与既有索引兼容性的证明。 |
 | `retrieval/incremental-raw-*-20261125.json`、`retrieval/incremental-impact-sample-20261125/` | 版本化 Raw 核验、正式差分、旧分片复用量和真实变更样本的投影及编码实测。逐版本独立数据根与发布描述符的结构见[增量合同](../docs/phases/versioned-corpus-incremental.md)。 |
-| `retrieval/vc-20261124/`、`retrieval/vcr-1126/` | 原双臂构建及失败审计、独立兼容恢复输出。恢复 release 继续引用原臂数值块、词法桶以及原有 Clean 与 Chunk 载荷。清理和回滚按 release 血缘及完成回执中的 `asset_dependencies` 检查。原根保留完整。[恢复记录](../docs/research/incremental-recovery-20261126.md) |
+| `retrieval/vc-20261124/`、`retrieval/vcr-1126/` | 原双臂构建及失败审计、独立兼容恢复输出。恢复 release 继续引用原臂数值块、词法桶以及原有 Clean 与 Chunk 载荷。Quick 完成回执、`asset_dependencies` 和已执行的历史题回执保存在恢复根。原根、恢复根及所有有效跨根引用按原路径保留。[恢复记录及保留范围](../docs/research/incremental-recovery-20261126.md#恢复版-quick-收尾) |
 | `retrieval/rerank-v1-handoff-20261113/` | P4 完整有序候选交接。排序选择器同时绑定冻结的 70Q 输入、分析和评审，定位见[选择器](../config/reranking-selected-v1.json)与 [P4 报告](../docs/research/clean-reranking-p4-handoff-20261113.md)。 |
 | `generation/clean-v1-local/` | 可配置的本地会话默认根。显式查询、Mock 测试以及有限研究使用各自的新根。 |
 | `generation/personal-chat-v1/` | 独立个人聊天软件的默认数据根。中央 `sessions.sqlite` 保存长期会话、草稿及不可变结果与反馈的引用。`live-settings.json` 保存官方地址与 Windows 当前账号加密的凭据。`batches/<id>/` 独立保存许可、批次关闭记录、预算、请求账本与执行检查点。 |

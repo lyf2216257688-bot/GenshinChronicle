@@ -8,13 +8,13 @@
 pwsh -NoProfile -File .\scripts\retrieval\run-incremental-corpus.ps1 -Mode Run -Suite Quick -SealSha256 34089f8d3ab8f64ebeb00b777a07fd244baa5c9bc60bddf03a3ea9b11f74cb67
 ```
 
-在同一条命令上替换 `-Mode` 即可执行预检 `Preflight`、续跑 `Resume` 或完成后复验 `Validate`。继续做历史题、真实变化和 Packet 时指定 `-Mode Validate -Suite Extended`。若夜间一并执行，初次命令直接用 `-Suite Extended`，中断后续跑也使用 Extended。
+原执行支持预检 `Preflight`、续跑 `Resume` 和完成后复验 `Validate`。在新根一次完成双臂构建和 Extended 的原方案使用 `-Suite Extended`。正式恢复后的 Extended 使用[恢复版封条、输出及续跑参数](incremental-recovery-20261126.md#extended-启动与断点恢复)。
 
 ## 执行封存
 
 - [执行封条](../../data/retrieval/incremental-execution-20261125-v2/complete.json) 固定已审核源码、全部项目配置、启动器、输入清单、分词器、CUDA 设备与驱动及三套解释器身份。包记录包含安装版本和 `RECORD` 哈希，解释器与基础 Python 库有文件哈希。模型权重由对应运行器按原选择清单验签。
 - 构建、查询及重排从封存源码导入。封存文件与运行时读取的本机配置持有 Windows 只读共享句柄。封条哈希须与启动命令匹配，续跑核验原运行身份。错误封条和过长的 Windows Clean 输出路径在派发前拒绝。
-- [题集注册](../../data/retrieval/incremental-execution-20261125-v2/questions.json) 保留六道快速题并注册 G7 历史 70 题、11 个变化见证。已校验 70 份历史原始召回、排序和原始首包可按封存回执读取。新版 Extended 结果等待整版候选建立。
+- [题集注册](../../data/retrieval/incremental-execution-20261125-v2/questions.json) 保留六道快速题并注册 G7 历史 70 题、11 个变化见证。运行准备时已校验 70 份历史原始召回、排序和原始首包可按封存回执读取。恢复版沿用该题集。
 
 ## 新版 Raw 独立派生
 

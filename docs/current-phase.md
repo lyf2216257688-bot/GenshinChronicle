@@ -6,9 +6,9 @@
 
 GC 长期采用路线 B，优先把专业证据能力通过通用 MCP 提供给 Agent。2026-11-25 已完成授权的 P0 和 P1 离线试点。两道 G7 冻结题的首包与正式 Generation 逐字段一致，DSH 与 Codex 均已通过安装版本的本机工具直调。试点按显式 stdio 入口启用，使用独立审计根。正式问答仍采用 `gc-g5-official-4`；语料更新按下段独立推进。MCP 后续有限真查询需安排资源窗口，宿主真实问答配对、模型常驻试验及发布切换分别待审议。[架构决定](decisions/adr-0002-host-neutral-evidence-engine.md) · [离线合同](phases/mcp-offline-v1.md) · [验收与适用范围](research/mcp-offline-acceptance-20261125.md)
 
-新版 Raw `p01eb_full_20261124` 已核验，覆盖 96 个栏目、17,329 条详情，差分新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。原 Quick 两臂已生成独立索引，2026-11-26 在 `compare-vectors` 前置身份检查停止。219 份历史 Clean 的孤立节点诊断顺序使证据绑定分歧，实际统一输入和各臂物理资产支持兼容恢复。已完成授权的 Clean 确定性修复、索引前双臂检查、独立恢复入口、离线测试和新执行封存。原封条、原输出和审计继续保留。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [故障、复核与修复](research/incremental-recovery-20261126.md)
+新版 Raw `p01eb_full_20261124` 已核验，覆盖 96 个栏目、17,329 条详情，差分新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。2026-11-26，`data/retrieval/vcr-1126` 的恢复版 Quick 双臂对照通过，36 份阶段回执、120 项输出及资产依赖清单经独立核验。两臂各自复用原构建物理索引，文档重新编码、新建词法桶和跨臂借用均为零。原执行根、恢复根及其跨根依赖一并保留。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾)
 
-**下一步由操作者安排正式 Quick 恢复。** 新封条 `incremental-execution-20261126-recovery-v1`，新输出 `data/retrieval/vcr-1126`。只读预检已核对运行身份和输入，实测内存低于 6 GiB 启动门槛时按既有保护暂停。待资源达标用封条下的 `Run -Suite Quick` 启动，完成后核验新回执及资产依赖清单。Extended（历史 70 题与 11 个变化案例）、人工语义复核、聊天版本绑定与回滚按既有次序安排，正式发布切换须独立授权。[恢复启动、资源预算与续跑](research/incremental-recovery-20261126.md#正式恢复入口)
+**本轮 Extended 已取消。** 保留已完成的 Q001–Q003、Q004 中断记录、G7 题库和既有研究资产。历史题全量回归和人工语义复核转为按需研究。先梳理新版语料正式绑定、历史引用回读和回滚的最小工程验收，以及存储清理方案。随后推进 MCP 的真实检索、自由补查和证据交付。现用语料仍为 `p01eb_full_20260824`，本轮只做存储与依赖审计及方案设计，正式切换与付费请求仍分别授权。[恢复记录及本轮停止点](research/incremental-recovery-20261126.md)
 
 2026-11-23 第二批实现了 G5 证据利用策略 `gc-g5-official-5` 和 Windows 本地聊天接口修订号 4。新版 G5 可从已排序候选按页选读，按可核验位置保存父级正文，优先入包已选和主动回读的关键片段，并区分引用绑定、缺失和失败。查证面板可以分别核对引用和父级上下文。离线复验覆盖 G6/G7 固定排名、选读和组包。新版保留为显式试验，工作台和本地聊天的新真实批次默认仍用 `gc-g5-official-4`。[Generation 合同](phases/clean-generation-v1.md#evidence-quality-profile) · [产品合同](phases/local-chat-v1.md) · [第二批复验记录](research/clean-generation-g5-evidence-evaluation-20261123.md)
 
