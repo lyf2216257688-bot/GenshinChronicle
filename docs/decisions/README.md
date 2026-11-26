@@ -47,4 +47,5 @@ the decision is costly or hard to reverse.
 | ADR | Title | Status | Date | Scope |
 | :--- | :--- | :--- | :--- | :--- |
 | [ADR-0001](adr-0001-obc-content-id-contract.md) | MiHoYo OBC `content_id` Stable Content Key Contract | accepted | 2026-09-15 | Phase 01 / Raw Acquisition |
+| [ADR-0002](adr-0002-host-neutral-evidence-engine.md) | Host-neutral professional evidence engine | accepted | 2026-11-25 | Clean RAG, Generation and MCP |
 

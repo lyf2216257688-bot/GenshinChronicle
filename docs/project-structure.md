@@ -11,7 +11,7 @@
 | `Start-GC-Chat.cmd`、`frontend/` | Windows 聊天启动器，Vue 3 / TypeScript 页面、产品契约快照、前端操作与浏览器测试。编译页面随产品包交付。 |
 | `config/` | 版本化运行选择器、显式实验配置和安全样例。实验计划的绑定以其报告和 manifest 为准。 |
 | [`requirements/`](../requirements/) | Python 各隔离运行时的依赖清单和锁。安装命令使用 `-r requirements/<文件名>`。 |
-| `scripts/retrieval/` | 版本化的构建、迁移、对照及交接 PowerShell 入口，以及有限研究 helper。 |
+| `scripts/retrieval/` | 版本化的构建、迁移、对照及交接 PowerShell 入口，以及有限研究 helper。增量启动器由 `snapshot_full_run.py` 调度，`snapshot_recovery.py` 负责跨臂前置核验、封存资产兼容恢复和保留依赖登记。 |
 | `tests/` | 夹具测试、离线回放和本地 UI 测试。小型净化数据位于 `tests/fixtures/` 和各子套件。 |
 | `data/` | Raw 证据、派生产物、运行历史及封存回执。 |
 | `docs/` | 层架构、阶段合同、技术决策、运营指南和日期研究。依据[文档导航](current-phase.md#文档导航)选择事实主文档。 |
@@ -31,6 +31,7 @@
 | `indexing/` | 统一输入、analyzer、表示绑定及独立离线构建与验证。版本化索引在此维护 Dense／Sparse 数值块、BM25F 桶及独立构建对照。 |
 | `retrieval/clean_based/` | Clean 候选检索与融合、用独立 worker 打分、排序与完整 handoff。V2 运行时由工作台接入，版本化试验入口显式接收 release 并绑定证据回读。 |
 | `generation/` | Evidence Packet 组装、provider-neutral 生成合同、协议检查、结果及引用绑定。 |
+| `mcp_offline/` | 冻结排名试点的 stdio 工具、原文回读适配与独立研究审计。协议发现按需加载证据资产。 |
 | `rag/`、`ui/` | 工作台与保留的 Legacy 编排、持久化和本地 Streamlit 页面。UI 通过后端进入工作流程。 |
 | `local_chat/` | 个人聊天软件的 Starlette 接口、会话与批次存储适配、本机凭据、后台执行入口和 `static/` 页面。使用原有 RAG、证据校验和模型调用账本。 |
 | `model_calls.py`、`model_call_sessions.py`、`evidence_io.py` | 共享请求计数与恢复、会话侧操作桥接、create-only JSON/哈希/封存。 |

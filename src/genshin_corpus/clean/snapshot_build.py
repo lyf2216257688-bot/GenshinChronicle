@@ -2,20 +2,22 @@
 
 import argparse
 from collections import Counter, defaultdict
+import hashlib
 from pathlib import Path
 
 from ..collector.run_store import create_json
-from ..evidence_io import digest, inside, read, require, sha
+from ..evidence_io import digest, inside, read, require, sha, strict_json
 from ..model_calls import locked
 from .models import SCHEMA_VERSION, dependencies, observation_id
 from .obc import record_fingerprint
-from .pipeline import build_clean_run
+from .pipeline import _bytes, _record_bytes, build_clean_run
 from .reader import validate_record
 from .snapshot_diff import Snapshot, compare_snapshots
 
 
 VERSION = "gc-clean-snapshot-1"
 REVIEWED_LEGACY_CLEAN_SHA = "f31b5d5252999046e611474f24a1504fbe3d00ef030846484c5c1b455b955faf"
+SERIALIZATION = "compact-json-orphan-diagnostics-by-origin-v1"
 
 
 def _rules():
@@ -23,7 +25,19 @@ def _rules():
     names = ("clean/models.py", "clean/obc.py", "clean/pipeline.py", "clean/reader.py", "clean/context.py",
              "clean/field_rules.py", "clean/markup.py", "parser/contracts.py", "parser/dialogue.py", "parser/obc/adapter.py",
              "evidence_io.py", "build_runtime.py")
-    return {"versions": dependencies(), "code": {name: sha(package / name) for name in names}}
+    return {"versions": dependencies(), "code": {name: sha(package / name) for name in names},
+            "serialization": SERIALIZATION}
+
+
+def legacy_rules(rules):
+    return {key: value for key, value in rules.items() if key != "serialization"}
+
+
+def serialization_target(body, record):
+    canonical = _record_bytes(record)
+    if canonical != body:
+        require(_bytes(record, pretty=False) == body, "Unsupported historical Clean serialization")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def _raw_ref(snapshot):
@@ -36,22 +50,24 @@ def _record_ref(manifest, entry):
             "sha256": entry["record_sha256"], "clean_observation_id": entry["observation_id"]}
 
 
-def _read_record(entry, raw, *, verify_origins=False):
+def _read_record(entry, raw, *, verify_origins=False, check_serialization=False):
     ref = entry["record"]
     path = Path(ref["path"])
-    require(path.is_absolute() and path == path.resolve() and sha(path) == ref["sha256"], "Clean snapshot record changed")
+    require(path.is_absolute() and path == path.resolve(), "Invalid Clean snapshot path")
+    body = path.read_bytes()
+    require(hashlib.sha256(body).hexdigest() == ref["sha256"], "Clean snapshot record changed")
     item = entry["source_item"]
     cid = item["content_id"]
     detail = entry["effective_observation"]["locators"]["detail"]
     descriptor = {"kind": "details", "path": detail["path"], "sha256": detail["sha256"]}
     fingerprint = record_fingerprint(descriptor, raw.raw.discovery(cid))
     expected = observation_id(item, raw.binding["run_id"], fingerprint)
-    record = read(path)
+    record = strict_json(body.decode("utf-8"))
     require(record["observation_id"] == ref["clean_observation_id"] == expected
             and record["source_item"] == item and record["input"]["raw_run_id"] == raw.binding["run_id"]
             and record["input"]["dependency_fingerprint"] == fingerprint, "Clean record has foreign Raw provenance")
     validate_record(record, raw.raw.root if verify_origins else None)
-    return record
+    return serialization_target(body, record) if check_serialization else ref["sha256"]
 
 
 def _previous_entries(path, previous, rules):
@@ -62,7 +78,7 @@ def _previous_entries(path, previous, rules):
         require(value["logical_id"] == _logical_id(value), "Previous Clean logical identity mismatch")
         entries = {row["source_item"]["content_id"]: row for row in value["records"]}
         require(len(entries) == len(value["records"]) and entries.keys() == previous.raw.items.keys(), "Previous Clean coverage differs")
-        return entries if value["rules"] == rules else {}
+        return entries if value["rules"] in (rules, legacy_rules(rules)) else {}
 
     require(value["schema_version"] == SCHEMA_VERSION and value["status"] == "complete"
             and value["binding"]["raw_manifest_sha256"] == previous.binding["manifest_sha256"]
@@ -95,6 +111,28 @@ def _paths_separate(output, sources):
             "Clean snapshot output must be separate from bound input roots")
 
 
+def derive_records(entries, archives, output, *, workers=1, expected=None):
+    groups = defaultdict(list)
+    for entry in entries:
+        groups[Path(entry["effective_raw"]["root"])].append(entry)
+    for root, group in groups.items():
+        source = archives[root]
+        stage = output / "build"
+        run = source.binding["manifest_sha256"]
+        ids = [entry["source_item"]["content_id"] for entry in group]
+        derived = build_clean_run(raw_run_root=root, output_root=stage, clean_run_id=run, content_ids=ids, workers=workers)
+        if derived["status"] != "complete":
+            failure = next((entry for entry in derived["records"] if "error" in entry), None)
+            raise ValueError("Clean record generation did not complete: " + str(failure))
+        manifest = stage / source.coverage["source"] / source.coverage["locale"] / run / "metadata/manifest.json"
+        refs = {entry["content_id"]: _record_ref(manifest, entry) for entry in derived["records"]}
+        for entry in group:
+            cid = entry["source_item"]["content_id"]
+            entry["record"] = refs[cid]
+            if expected is not None and cid in expected:
+                require(refs[cid]["sha256"] == expected[cid], "Historical Clean replay differs: " + cid)
+
+
 def build_snapshot(current_raw, previous_raw, previous_clean, output, *, mode, workers=1):
     require(mode in {"full", "incremental"}, "Select a Clean snapshot build mode")
     previous_clean = Path(previous_clean).resolve()
@@ -114,7 +152,7 @@ def build_snapshot(current_raw, previous_raw, previous_clean, output, *, mode, w
     require(diff["status"] == "complete" and diff["current"] == current.binding and diff["previous"] == previous.binding,
             "Raw change coverage is unresolved")
     archive_cache = {old.raw.root: old for old in (previous, current)}
-    rows, to_build = [], defaultdict(list)
+    rows, to_build, expected, historical = [], [], {}, {}
     for row in diff["records"]:
         observed = row["current_observation"]
         if observed is None:
@@ -131,13 +169,19 @@ def build_snapshot(current_raw, previous_raw, previous_clean, output, *, mode, w
                    "effective_raw": _raw_ref(source), "disposition": "reused" if old and mode == "incremental" else "built"}
         if old and mode == "incremental":
             binding["record"] = old["record"]
-            _read_record(binding, source)
+            target = _read_record(binding, source, check_serialization=True)
+            if target != old["record"]["sha256"]:
+                expected[cid] = target
+                historical[cid] = {"record": old["record"], "target_sha256": target}
+                binding["disposition"] = "built"
+                to_build.append(binding)
         else:
-            to_build[source.raw.root].append(binding)
+            to_build.append(binding)
         rows.append(binding)
 
     plan = {"version": VERSION, "mode": mode, "current": _raw_ref(current), "previous": _raw_ref(previous),
-            "previous_clean_sha256": previous_clean_sha, "diff_id": digest(diff), "rules": rules}
+            "previous_clean_sha256": previous_clean_sha, "diff_id": digest(diff), "rules": rules,
+            "serialization_replays": historical}
     with locked(output / "build.lock"):
         if plan_path.exists():
             require(read(plan_path) == plan, "Clean snapshot resume binding changed")
@@ -146,17 +190,7 @@ def build_snapshot(current_raw, previous_raw, previous_clean, output, *, mode, w
         manifest_path = output / "manifest.json"
         if manifest_path.exists():
             return validate_snapshot(manifest_path, verify_origins=False)
-        for root, group in to_build.items():
-            source = archive_cache[root]
-            stage = output / "build"
-            run = source.binding["manifest_sha256"]
-            ids = [entry["source_item"]["content_id"] for entry in group]
-            derived = build_clean_run(raw_run_root=root, output_root=stage, clean_run_id=run, content_ids=ids, workers=workers)
-            require(derived["status"] == "complete", "Clean record generation did not complete")
-            manifest = stage / current.coverage["source"] / current.coverage["locale"] / run / "metadata/manifest.json"
-            refs = {entry["content_id"]: _record_ref(manifest, entry) for entry in derived["records"]}
-            for entry in group:
-                entry["record"] = refs[entry["source_item"]["content_id"]]
+        derive_records(to_build, archive_cache, output, workers=workers, expected=expected)
         for snapshot in archive_cache.values():
             snapshot.verify_binding()
         require(sha(previous_clean) == previous_clean_sha and _rules() == rules, "Bound Clean input or rules changed")
@@ -190,7 +224,8 @@ def validate_snapshot(path, *, verify_origins=True):
         require(current.observation(cid) == row["current_observation"] and source.observation(cid) == row["effective_observation"]
                 and row["current_observation"]["consumed_source_sha256"] == row["effective_observation"]["consumed_source_sha256"],
                 "Clean snapshot observations are not equivalent")
-        _read_record(row, source, verify_origins=verify_origins)
+        target = _read_record(row, source, verify_origins=verify_origins, check_serialization=True)
+        require(target == row["record"]["sha256"], "Noncanonical Clean snapshot record: " + cid)
     for raw in archives.values():
         raw.verify_binding()
     return value

@@ -70,6 +70,9 @@ Thumbs.db
 !/scripts/retrieval/snapshot_full_run.py
 !/scripts/retrieval/snapshot_acceptance.py
 !/scripts/retrieval/verify_snapshot_observations.py
+!/scripts/retrieval/verify_mcp_offline.py
+!/scripts/retrieval/verify_mcp_dsh.cjs
+!/scripts/retrieval/verify_mcp_codex.py
 !/scripts/retrieval/smoke_snapshot_launcher.py
 /.agents/
 /PROJECT.md

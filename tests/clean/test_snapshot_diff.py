@@ -20,12 +20,13 @@ from tests.collector.test_collector import channel, discovery
 
 
 class FixtureTransport:
-    def __init__(self, listings, *, name="角色", include_third=True, changed_detail=None):
+    def __init__(self, listings, *, name="角色", include_third=True, changed_detail=None, dialogue=False):
         self.listings = listings
         self.map = [channel(10, name="任务"), channel(20, name=name, parent_id=10)]
         if include_third:
             self.map.append(channel(30, name="武器"))
         self.changed_detail = changed_detail
+        self.dialogue = dialogue
 
     def get(self, url, *, params=(), headers=()):
         if "channel_id" in params:
@@ -36,6 +37,10 @@ class FixtureTransport:
             key = int(params["entry_page_id"])
             prose = {"rich_text": "<p>旧国工匠的故事。</p>"}
             modules = [{"name": "正文", "components": [{"component_id": "collapse_panel", "data": json.dumps(prose)}]}] if key != 5 else []
+            if self.dialogue and key == 1:
+                dialogue = {"root_id": "root", "contents": {node: {"dialogue": node} for node in ("root", "b", "a")},
+                            "child_ids": {"root": []}}
+                modules[0]["components"].append({"component_id": "interactive_dialogue", "data": json.dumps(dialogue)})
             body = json.dumps({"retcode": 0, "data": {"page": {"id": key, "name": "同文", "modules": modules,
                               "menus": ["别的结构"] if key == self.changed_detail else []}}}).encode("utf-8")
         else:

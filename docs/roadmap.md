@@ -2,6 +2,8 @@
 
 This roadmap describes project direction. The [current stage](current-phase.md) owns the immediate action, adopted choices and authorization.
 
+GC prioritizes a professional knowledge engine accessible through general MCP hosts, including DSH and Codex. Hosts own conversation and research decisions. GC provides version-bound, source-backed evidence. Preserve the standalone application and formal Generation baseline for use and comparison. General chat UI development has lower priority. Decide adoption by answer correctness, key evidence coverage, retrieval efficiency and response time, then operating cost. [Architectural decision](decisions/adr-0002-host-neutral-evidence-engine.md)
+
 ## Build on the evidence foundation
 
 The original sequence established [Raw Collection](phases/phase-01-raw-collection.md), [Parsed](phases/phase-02-parsed-schema.md) and [Canonical](phases/phase-03-canonical-schema.md) over official OBC text. The [Legacy Phase04](phases/phase-04-retrieval-evidence-assembly.md#basic-rag-v1-delivery-contract) baseline established source-backed Retrieval Units, isolated lexical and Dense search, deterministic Assembly, provider-neutral Generation and local presentation. Historical milestones and operating points are in the [Phase04 register](research/phase-04/p04-rag-historical-checkpoint-register.md).

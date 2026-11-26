@@ -22,6 +22,7 @@ from genshin_corpus.model_calls import locked
 from genshin_corpus.retrieval.clean_based.query_v2 import ResearchQuery
 
 from snapshot_acceptance import register_cases
+import snapshot_recovery as recovery
 
 
 VERSION = "gc-versioned-corpus-execution-1"
@@ -46,7 +47,8 @@ PINS = {
     RANGES: "bfdab210f0d1fed0f920847d69bff08760fbca1017615362751f32c48fea6d40",
     DIFF: "48833b87601d76b9f0a27cf8335729a6adb2cce332f49c781beaa158b89b127b",
 }
-SCRIPTS = ("run-incremental-corpus.ps1", "snapshot_full_run.py", "snapshot_acceptance.py", "verify_snapshot_observations.py")
+SCRIPTS = ("run-incremental-corpus.ps1", "snapshot_full_run.py", "snapshot_acceptance.py",
+           "snapshot_recovery.py", "verify_snapshot_observations.py")
 
 
 def now():
@@ -82,12 +84,37 @@ def freeze(repo, execution):
     publish_execution(repo, execution, dataset, checks, metadata["tokenizers"], list(QUESTIONS), register_cases(repo, repo / DIFF))
 
 
-def publish_execution(repo, execution, dataset, checks, tokenizers, quick, acceptance, *, smoke=False):
+def freeze_recovery(repo, execution, original_execution, original_run, original_sha):
+    seal_path = original_execution / "complete.json"
+    require(sha(seal_path) == original_sha, "Original seal differs")
+    original = verify(original_execution)
+    require(original["scope"] == "official-comparison" and original["repo"] == str(repo)
+            and original["version"] == VERSION, "Unsupported source execution for recovery")
+    questions = read(original_execution / "questions.json")
+    source, checks = recovery.capture_sources(repo, original_run, original_sha)
+    source["execution"] = recovery.pin(seal_path)
+    checks = {**original["inputs"], **checks, seal_path.relative_to(repo).as_posix(): original_sha}
+    tokenizers = [{"path": value, "sha256": original["inputs"][Path(value).relative_to(repo).as_posix()]}
+                  for value in original["tokenizers"]]
+    original_files = {name: checksum for name, checksum in read(seal_path)["files"].items()
+                      if name.startswith(("src/", "config/"))}
+    for name, checksum in original_files.items():
+        if name != "src/genshin_corpus/clean/snapshot_build.py":
+            require(sha(inside(repo, name)) == checksum, "Recovery runtime contract changed: " + name)
+    publish_execution(repo, execution, original["dataset"], checks, tokenizers, questions["quick"],
+                      questions["extended"], recovery_source=source, original=original, source_inventory=original_files)
+
+
+def publish_execution(repo, execution, dataset, checks, tokenizers, quick, acceptance, *, smoke=False,
+                      recovery_source=None, original=None, source_inventory=None):
     retrieval = read(repo / "config/clean-retrieval-v1.json")
     reranking = read(repo / "config/reranking-selected-v1.json")
     paths = {"dense": retrieval["dense_python"], "lexical": retrieval["lexical_python"], "reranker": reranking["python"]}
-    config = sorted(path for path in (repo / "config").glob("*.json"))
-    source = sorted(path for path in (repo / "src").rglob("*") if path.is_file() and "__pycache__" not in path.parts)
+    if source_inventory is None:
+        files = sorted((repo / "config").glob("*.json"))
+        files += sorted(path for path in (repo / "src").rglob("*") if path.is_file() and "__pycache__" not in path.parts)
+    else:
+        files = [inside(repo, name) for name in source_inventory]
     scripts = [repo / "scripts/retrieval" / name for name in SCRIPTS]
     require(smoke or [item["sha256"] for item in tokenizers] == [
         "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
@@ -101,19 +128,25 @@ def publish_execution(repo, execution, dataset, checks, tokenizers, quick, accep
         checks[item["manifest"]] = item["manifest_sha256"]
     pinned(repo, checks)
     runtime_ids = {name: runtime(repo, interpreter) for name, interpreter in paths.items()}
+    gpu = gpu_identity()
+    if original is not None:
+        require(runtime_ids == original["runtimes"] and gpu == original["gpu_identity"],
+                "Recovery requires the original sealed interpreter and GPU identities")
     execution.mkdir(parents=True, exist_ok=False)
-    for path in source + config + scripts:
+    for path in files + scripts:
         copy(path, execution / path.relative_to(repo))
-    require(all(sha(path) == sha(execution / path.relative_to(repo)) for path in source + config + scripts),
+    require(all(sha(path) == sha(execution / path.relative_to(repo)) for path in files + scripts),
             "Implementation changed while freezing")
     create_json(execution / "questions.json", {"quick": quick, "extended": acceptance})
     create_json(execution / "quick-questions.json", quick)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True, timeout=15).strip()
     seal(execution, {"version": VERSION, "created_at": now(), "repo": str(repo), "git_parent": head,
                      "inputs": checks, "runtime_paths": paths, "runtimes": runtime_ids, "dataset": dataset,
-                     "scope": "smoke" if smoke else "official-comparison", "gpu_identity": gpu_identity(),
+                     "scope": "binding-recovery" if recovery_source else "smoke" if smoke else "official-comparison",
+                     "gpu_identity": gpu, "recovery": recovery_source,
                      "tokenizers": [item["path"] for item in tokenizers],
-                     "limits": {"start_disk_gib": 1 if smoke else 40, "running_disk_gib": .25 if smoke else 6,
+                     "limits": {"start_disk_gib": 10 if recovery_source else 1 if smoke else 40,
+                                "running_disk_gib": .25 if smoke else 6,
                                 "start_ram_gib": 1.5 if smoke else 6,
                                 "running_ram_gib": .75, "start_gpu_mib": 2048, "heartbeat_seconds": 10}})
     print(sha(execution / "complete.json"), flush=True)
@@ -163,6 +196,7 @@ class Stage:
     stable_dir: Path | None = None
     gpu: bool = False
     recover: tuple | None = None
+    optional: dict | None = None
 
 
 class Run:
@@ -225,7 +259,8 @@ class Run:
             return None
         value = read(path)
         require(value["execution_sha256"] == self.sha and value["stage"] == stage.name
-                and set(value["outputs"]) == set(stage.outputs), "Foreign stage receipt")
+                and stage.outputs.keys() <= value["outputs"].keys() <= (stage.outputs | (stage.optional or {})).keys(),
+                "Foreign stage receipt")
         files = {}
         for key, ref in value["outputs"].items():
             artifact = inside(self.root, ref["path"])
@@ -300,6 +335,11 @@ class Run:
             for name, path in targets.items():
                 require(path.is_file(), "Expected stage artifact missing: " + str(path))
                 files[name] = {"path": path.relative_to(self.root).as_posix(), "sha256": sha(path)}
+            for name, filename in (stage.optional or {}).items():
+                path = stage_dir / filename
+                if path.is_file():
+                    targets[name] = path
+                    files[name] = {"path": path.relative_to(self.root).as_posix(), "sha256": sha(path)}
             create_json(self.artifacts / (stage.name + ".json"), {"stage": stage.name, "outputs": files,
                         "execution_sha256": self.sha, "attempt": attempt.relative_to(self.root).as_posix(), **metrics})
             self.emit("completed", stage=stage.name, **metrics)
@@ -309,34 +349,78 @@ class Run:
             raise
 
     def pair(self, *, build):
-        releases = []
-        source = self.settings["dataset"]
-        for mode in ("incremental", "full"):
+        source, clean_inputs, inputs, releases = self.settings["dataset"], [], [], []
+        step = self.stage if build else self.receipt
+
+        def item(mode, part, module, args, directory, *, gpu=False, recover=None, python="dense", finish="manifest.json"):
+            files = step(Stage(f"{mode}-{part}", python, ("-m", module, *args), {"main": finish}, directory, gpu, recover))
+            require(files is not None, f"{mode}-{part} has no validated stage receipt. Complete Run or Resume first.")
+            return files["main"]
+
+        for mode in recovery.ARMS:
             arm = self.root / mode
-            clean, chunk = (arm / part / "manifest.json" for part in ("clean", "chunk"))
-            step = self.stage if build else self.receipt
+            clean = arm / "clean/manifest.json"
+            clean_inputs.append(item(mode, "clean", CLEAN, ("build", "--mode", mode, "--current-raw", self.repo / source["new"],
+                                     "--previous-raw", self.repo / source["old"], "--previous-clean", self.repo / source["old_clean"],
+                                     "--output", clean.parent), clean.parent, recover=("-m", CLEAN, "validate", clean)))
+        self.check_parity("compare-clean", clean_inputs, build=build)
+        for mode, clean in zip(recovery.ARMS, clean_inputs, strict=True):
+            arm = self.root / mode
+            chunk = arm / "chunk/manifest.json"
             previous = ("--previous", self.repo / source["ranges"]) if mode == "incremental" else ()
-
-            def item(part, module, args, directory, *, gpu=False, recovery=None, python="dense", finish="manifest.json"):
-                files = step(Stage(f"{mode}-{part}", python, ("-m", module, *args), {"main": finish}, directory, gpu, recovery))
-                require(files is not None, f"{mode}-{part} has no validated stage receipt. Complete Run or Resume first.")
-                return files["main"]
-
-            item("clean", CLEAN, ("build", "--mode", mode, "--current-raw", self.repo / source["new"], "--previous-raw",
-                                 self.repo / source["old"], "--previous-clean", self.repo / source["old_clean"], "--output", clean.parent),
-                 clean.parent, recovery=("-m", CLEAN, "validate", clean))
-            item("chunk", CHUNK, ("build", "--mode", mode, "--clean", clean, "--selection",
+            item(mode, "chunk", CHUNK, ("build", "--mode", mode, "--clean", clean, "--selection",
                                  self.path_config(source["rules"]), "--qwen-tokenizer", self.settings["tokenizers"][0],
                                  "--bge-tokenizer", self.settings["tokenizers"][1], "--output", chunk.parent, *previous),
-                 chunk.parent, recovery=("-m", CHUNK, "validate", chunk))
-            inputs = item("inputs", "genshin_corpus.indexing.snapshot_inputs", (chunk, "{output}"), None)
-            vectors = item("vectors", MODULE, ("build-vectors", "--input", inputs, "--output", arm / "vectors", "--sparse"),
+                 chunk.parent, recover=("-m", CHUNK, "validate", chunk))
+            inputs.append(item(mode, "inputs", "genshin_corpus.indexing.snapshot_inputs", (chunk, "{output}"), None))
+        self.check_parity("compare-upstream", inputs, build=build)
+        for mode, manifest in zip(recovery.ARMS, inputs, strict=True):
+            arm = self.root / mode
+            vectors = item(mode, "vectors", MODULE, ("build-vectors", "--input", manifest, "--output", arm / "vectors", "--sparse"),
                            arm / "vectors", gpu=True)
-            bm25f = item("bm25f", MODULE, ("build-bm25f", "--input", inputs, "--output", arm / "bm25f"),
+            bm25f = item(mode, "bm25f", MODULE, ("build-bm25f", "--input", manifest, "--output", arm / "bm25f"),
                          arm / "bm25f", python="lexical")
-            releases.append(item("release", MODULE, ("package", "--input", inputs, "--vectors", vectors,
+            releases.append(item(mode, "release", MODULE, ("package", "--input", manifest, "--vectors", vectors,
                                 "--bm25f", bm25f, "--output", "{output}/release.json"), None, finish="release.json"))
         return releases
+
+    def check_parity(self, stage, inputs, *, build):
+        step = self.stage if build else self.receipt
+        runner = self.execution / "scripts/retrieval/snapshot_full_run.py"
+        result = step(Stage(stage, "dense", (runner, stage, *inputs,
+                           "{output}/parity.json"), {"main": "parity.json"}))
+        require(result is not None and read(result["main"])["inputs"] == [recovery.pin(path) for path in inputs],
+                "Current upstream parity receipt is missing or foreign")
+
+    def recover_pair(self, *, build):
+        step = self.stage if build else self.receipt
+        runner = self.execution / "scripts/retrieval/snapshot_full_run.py"
+        inputs, releases = [], []
+        for arm in recovery.ARMS:
+            result = step(Stage(f"{arm}-recover-upstream", "dense",
+                                (runner, "recover-upstream", arm, "{output}"),
+                                {"clean": "clean/manifest.json", "normalization": "clean/normalization.json",
+                                 "chunk": "chunk/manifest.json", "main": "inputs/manifest.json",
+                                 "rows": "inputs/rows.jsonl"}, self.root / arm))
+            require(result is not None, "Complete recovery Run or Resume first: " + arm)
+            inputs.append(result["main"])
+        self.check_parity("compare-upstream", inputs, build=build)
+        for arm, source in zip(recovery.ARMS, inputs, strict=True):
+            result = step(Stage(f"{arm}-recover-indexes", "dense",
+                                (runner, "recover-indexes", arm, source, "{output}"),
+                                {"main": "release.json", "vectors": "vectors/manifest.json", "bm25f": "bm25f/manifest.json"},
+                                self.root / arm / "indexes"))
+            require(result is not None, "Complete index recovery Run or Resume first: " + arm)
+            releases.append(result["main"])
+        return releases
+
+    def verify_recovery_assets(self, releases):
+        runner = self.execution / "scripts/retrieval/snapshot_full_run.py"
+        result = self.stage(Stage("asset-dependencies-" + uuid4().hex[:8], "dense",
+                            (runner, "asset-dependencies", *releases, "{output}/dependencies.json"),
+                            {"main": "dependencies.json"}))
+        path = result["main"]
+        return {"path": path.relative_to(self.root).as_posix(), "sha256": sha(path)}
 
     def quick(self, releases, *, recheck=False):
         left, right = releases
@@ -364,15 +448,16 @@ class Run:
                 for side, release in zip(("left", "right"), releases, strict=True):
                     result = self.stage(Stage(f"{case}-{side}", "dense", ("-m", MODULE, "query", "--release", release,
                                         "--query-json", query, "--rerank", "--output", "{output}"),
-                                        {"main": "run.json", "candidates": "candidates.json", "ranked": "ranked.json"}, gpu=True))
+                                        {"main": "run.json", "candidates": "candidates.json", "ranked": "ranked.json"},
+                                        gpu=True, optional={"evidence": "first-evidence.json"}))
                     pair.append(result)
                 a, b = pair
                 require(sha(a["candidates"]) == sha(b["candidates"]), "Quick candidate difference: " + case)
                 order = lambda path: [item["chunk_id"] for item in read(path)["candidates"]]
                 require(order(a["ranked"]) == order(b["ranked"]), "Quick reranking difference: " + case)
-                evidence = [arm["main"].with_name("first-evidence.json") for arm in pair]
-                require(evidence[0].is_file() == evidence[1].is_file()
-                        and (not evidence[0].is_file() or sha(evidence[0]) == sha(evidence[1])), "Quick evidence difference: " + case)
+                evidence = [arm.get("evidence") for arm in pair]
+                require(all(bool(order(arm["ranked"])) == bool(arm.get("evidence")) for arm in pair)
+                        and (evidence[0] is None or sha(evidence[0]) == sha(evidence[1])), "Quick evidence difference: " + case)
 
     def extended(self, release):
         from snapshot_acceptance import summarize
@@ -404,20 +489,51 @@ def main():
     if sys.argv[1:2] == ["validate-layer"]:
         _validate_layer()
         return 0
+    action = sys.argv[1:2]
+    if action in (["compare-clean"], ["compare-upstream"]):
+        left, right, output = map(Path, sys.argv[2:])
+        compare = recovery.clean_parity if action == ["compare-clean"] else recovery.upstream_parity
+        compare(left, right, output)
+        return 0
+    if action and action[0] in {"recover-upstream", "recover-indexes", "asset-dependencies"}:
+        execution = Path(__file__).resolve().parents[2]
+        settings = read(execution / "complete.json")["metadata"]
+        origin = settings["recovery"]
+        if action[0] == "recover-upstream":
+            arm, output = sys.argv[2:]
+            selection = execution / "config" / settings["dataset"]["rules"]
+            recovery.recover_upstream(origin["arms"][arm], selection, settings["tokenizers"], Path(output))
+        elif action[0] == "recover-indexes":
+            arm, source, output = sys.argv[2:]
+            recovery.recover_indexes(origin["arms"][arm], Path(origin["root"]) / arm, Path(source), Path(output))
+        else:
+            left, right, output = map(Path, sys.argv[2:])
+            recovery.retain_assets(origin, (left, right), output)
+        return 0
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("mode", choices=("freeze", "Preflight", "Run", "Resume", "Validate"))
+    p.add_argument("mode", choices=("freeze", "freeze-recovery", "Preflight", "Run", "Resume", "Validate"))
     p.add_argument("--suite", choices=("Quick", "Extended"), default="Quick")
     p.add_argument("--repo", type=Path, default=Path.cwd())
     p.add_argument("--execution", type=Path, required=True)
     p.add_argument("--output", type=Path)
     p.add_argument("--seal")
     p.add_argument("--owner", type=int)
+    p.add_argument("--source-execution", type=Path)
+    p.add_argument("--source-run", type=Path)
+    p.add_argument("--source-seal")
     args = p.parse_args()
     repo, execution = args.repo.resolve(), args.execution.resolve()
     permitted = repo / "data/retrieval"
     require(execution.is_relative_to(permitted) and execution != permitted, "Use a dedicated execution root under data/retrieval")
     if args.mode == "freeze":
         freeze(repo, execution)
+        return 0
+    if args.mode == "freeze-recovery":
+        require(all((args.source_execution, args.source_run, args.source_seal)), "Recovery requires an explicit original run and seal")
+        sources = [inside(permitted, path.absolute()) for path in (args.source_execution, args.source_run)]
+        require(all(path != permitted and not execution.is_relative_to(path) and not path.is_relative_to(execution)
+                    for path in sources), "Recovery seal must be separate from its sources")
+        freeze_recovery(repo, execution, *sources, args.source_seal)
         return 0
     root = args.output.resolve()
     require(root.is_relative_to(permitted) and root != permitted
@@ -429,8 +545,15 @@ def main():
     require(checksum == args.seal, "Execution seal mismatch")
     declared = read(execution / "complete.json")
     config = {key: value for key, value in declared["files"].items() if key.startswith("config/")}
+    original = declared["metadata"].get("recovery")
+    protected = []
+    if original:
+        original_roots = [Path(original["root"]), Path(original["execution"]["path"]).parent]
+        require(all(not root.is_relative_to(path) and not path.is_relative_to(root) for path in original_roots),
+                "Use an output root separate from the original run and seal")
+        protected = [inside(repo, key) for key in declared["metadata"]["inputs"]]
     paths = [execution / "complete.json", *[inside(execution, key) for key in declared["files"]],
-             *[inside(repo, key) for key in config]]
+             *[inside(repo, key) for key in config], *protected]
     with readonly_files(paths):
         metadata = verify(execution)
         require(metadata["version"] == VERSION and metadata["repo"] == str(repo), "Foreign execution plan")
@@ -454,10 +577,12 @@ def main():
             if not run.preflight(fresh=False):
                 return 2
         with locked(root / "run.lock"), prevent_idle_sleep():
-            releases = run.pair(build=args.mode in {"Run", "Resume"})
+            pair = run.recover_pair if original else run.pair
+            releases = pair(build=args.mode in {"Run", "Resume"})
             run.quick(releases, recheck=args.mode == "Validate")
             if args.suite == "Extended":
                 run.extended(releases[0])
+            dependencies = run.verify_recovery_assets(releases) if original else None
             pinned(repo, metadata["inputs"])
             report = {"status": "PASS", "suite": args.suite, "execution_sha256": checksum,
                       "releases": [str(path) for path in releases],
@@ -466,7 +591,14 @@ def main():
                       "elapsed_session_seconds": round(time.monotonic() - run.start, 3),
                       "elapsed_wall_seconds": (datetime.now(timezone.utc) -
                           datetime.fromisoformat(read(root / "run.json")["started_at"])).total_seconds()}
-            atomic_json(root / (args.suite.lower() + "-complete.json"), report)
+            complete = root / (args.suite.lower() + "-complete.json")
+            if original:
+                report["asset_dependencies"] = dependencies
+                if complete.exists():
+                    complete = root / (args.suite.lower() + "-revalidation-" + uuid4().hex[:8] + ".json")
+                create_json(complete, report)
+            else:
+                atomic_json(complete, report)
             run.emit("run-completed", suite=args.suite)
     return 0
 

@@ -1,0 +1,84 @@
+{
+  "version": "gc-mcp-frozen-catalog-1",
+  "source": "historical-g7",
+  "raw_run": "p01eb_full_20260824",
+  "input": {
+    "path": "data/retrieval/index-benchmark-v1-20261109/input-attempts/export-1794216082672799100-b96c140c/bundle/manifest.json",
+    "sha256": "f30eb4b0e0721c624701b4815d76b17a4c10518df203fbd1faadae11adb648da"
+  },
+  "assets": {
+    "index": {
+      "path": "config/index-selected-v1.json",
+      "sha256": "008a1522442dd29ab3f86d03efed0a8fbfff944c54e68f88ffb1e7a26fb6d9bd"
+    },
+    "retrieval": {
+      "path": "config/clean-retrieval-v1.json",
+      "sha256": "15ede449cf198b31bcda117393ca4ef30204ea05ac34180d1311f569d8ae4912"
+    },
+    "reranking": {
+      "path": "config/reranking-selected-v1.json",
+      "sha256": "9c52e5c4222bb5185a4ddb78a501cdcb45279c4f41f3daaa5a1d3145c1c30fe7"
+    },
+    "generation": {
+      "path": "config/clean-generation-v1.json",
+      "sha256": "c4231f47ac9b12c1a698804d472a46c6a00fbafc0438bc0fd6e89a15448b98f6"
+    }
+  },
+  "cases": [
+    {
+      "id": "Q001",
+      "question": "如果一个须弥教令院学者主要研究历史、社会与知识来源等问题，他最适合归属六大学派中的哪一派？",
+      "initial_sources": {
+        "path": "data/generation/g7-70q-baseline-20261117/questions/Q001-recovery-r01/chat_artifacts/fff3367364daf61cfd1aa79149da37063547002631d81988936d3103df893c01/52234de7e6211970cfce87cb7163580e0dd9dd9210b0cbf26e2c7ef756490756.json",
+        "sha256": "36dd9843d118788c726e0a9b127a786abd4a9853ef8db5cfa70f5f1449a970d4"
+      },
+      "groups": {
+        "original": {
+          "path": "data/generation/g7-70q-baseline-20261117/questions/Q001-recovery-r01/local_queries/fff3367364daf61cfd1aa79149da37063547002631d81988936d3103df893c01/original/ranked.json",
+          "sha256": "9d0e44558cf371c33c9e00f5cefd289ad6da3c7cb0355f070b5a0a6504730d7e"
+        }
+      },
+      "follow_ups": {}
+    },
+    {
+      "id": "Q068",
+      "question": "伊涅芙的前身在纳塔古龙体系中的称号是什么？",
+      "initial_sources": {
+        "path": "data/generation/g7-70q-baseline-20261117/questions/Q068/chat_artifacts/5d64756edfda6a7f93415b755c4a78c98723be8d47458119e5a13b6374848144/52234de7e6211970cfce87cb7163580e0dd9dd9210b0cbf26e2c7ef756490756.json",
+        "sha256": "78883247aa58bb9bbace604fc8a4482a91575a4597311dc4c87b7f35cc5c1f5c"
+      },
+      "groups": {
+        "original": {
+          "path": "data/generation/g7-70q-baseline-20261117/questions/Q068/local_queries/5d64756edfda6a7f93415b755c4a78c98723be8d47458119e5a13b6374848144/original/ranked.json",
+          "sha256": "f2b150c60d7b081f6d2307bd3a368a44e25f5f398cf562525bf1885b768fa605"
+        },
+        "query-1": {
+          "path": "data/generation/g7-70q-baseline-20261117/questions/Q068/local_queries/5d64756edfda6a7f93415b755c4a78c98723be8d47458119e5a13b6374848144/query-1/ranked.json",
+          "sha256": "fca230121f820fcdd6728fd1635fb71185859e4ff26741761ced08371adb6ed5"
+        }
+      },
+      "follow_ups": {
+        "query-1": {
+          "session_id": "g7-70q-q068",
+          "turn_id": "5d64756edfda6a7f93415b755c4a78c98723be8d47458119e5a13b6374848144",
+          "query_id": "query-1",
+          "original_question": "伊涅芙的前身在纳塔古龙体系中的称号是什么？",
+          "subquestion": "伊涅芙的前身「悖谬」是纳塔古龙体系中的称号吗，具体称号是什么？",
+          "search_text": "伊涅芙 悖谬 明晨之镜 至高领主 纳塔 称号",
+          "rerank_text": "伊涅芙前身 悖谬 纳塔 古龙 至高领主 称号 明晨之镜",
+          "kind": "follow_up",
+          "round": 1,
+          "parent_query_ids": [
+            "original"
+          ],
+          "parent_evidence_refs": [
+            "b0b1f89662f1915b22bbb5766ab9c6895c7b9c8ad97c6dfa5866ac7e17a4807d"
+          ],
+          "trigger_gap": "现有E01提到伊涅芙前身被称作「悖谬」，但「悖谬」是否为纳塔古龙体系（至高领主/秘源技术）中的正式称号仍缺原文。需查伊涅芙角色故事前几段或龙族设定的“称号”原文，确认「悖谬」的性质与所属体系。",
+          "combination": "S0",
+          "version": "gc-research-query-2"
+        }
+      }
+    }
+  ]
+}

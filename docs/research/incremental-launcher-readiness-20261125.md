@@ -1,5 +1,7 @@
 # 2026-11-25 整版运行准备与验收
 
+本文记录首次执行前的封存和准备。该次 Quick 于 2026-11-26 在向量对照前置身份检查停止。之后的执行入口见[兼容恢复记录](incremental-recovery-20261126.md)，采用状态见[当前阶段](../current-phase.md)。
+
 运行前先复核 [机器资源与 Quick／Extended 边界](incremental-first-build-runbook-20261125.md)。以下命令从仓库根运行，正式输出为 `data/retrieval/vc-20261124/`。
 
 ```powershell
@@ -26,6 +28,6 @@ pwsh -NoProfile -File .\scripts\retrieval\run-incremental-corpus.ps1 -Mode Run -
 
 前序冒烟发现 Windows 深层文件名和 Whoosh 短时目录共享锁问题。正式根使用短路径，预检核对最深 Clean 写入路径。词法桶发布在同一构建锁内对 Windows 短时文件冲突做有界重试，已发布目标仍拒绝覆盖。
 
-正式封条包含 320 个文件、12 个外部输入哈希和 3 套解释器身份。实机只读预检通过，D 盘余量约 48.6 GiB、可用内存约 6.56 GiB、GPU 空闲 2,576 MiB。正式输出目录尚未创建。[正式预检日志](../../data/retrieval/incremental-execution-preflight-20261125.log)
+正式封条包含 320 个文件、12 个外部输入哈希和 3 套解释器身份。2026-11-25 实机只读预检通过，当时 D 盘余量约 48.6 GiB、可用内存约 6.56 GiB、GPU 空闲 2,576 MiB，正式输出目录尚未创建。[正式预检日志](../../data/retrieval/incremental-execution-preflight-20261125.log)
 
 用正式封存的 Extended 子程序单独试跑一题。历史侧取 Q001 的封存结果，新侧使用冒烟小语料，成功生成新旧召回、重排、Packet 及新引用校验制品。该试跑用于验证报告链，真实 81 案例的机械和语义结果仍在整版后验收。[单题 Extended 冒烟](../../data/retrieval/incremental-smoke-extended-q001-20261125/case.json)

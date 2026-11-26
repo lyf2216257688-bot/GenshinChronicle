@@ -29,6 +29,7 @@ inventory。详情缺失、校验失败或关键 envelope 失配进入阻断记�
 `data/clean/<source>/<locale>/<clean_run_id>/metadata/manifest.json`。
 记录位于同一 run 的 `records/<observation_id>.json`。
 数组及成员列表保留来源顺序，JSON 对象的序列化键排序承担确定性写入。
+孤立节点诊断由提取规则生成，序列化按其来源位置稳定顺序，保留诊断出现次数。历史记录进入新版快照时按[增量合同](versioned-corpus-incremental.md#raw-差分与证据身份)核对兼容性，原记录可依原清单回读。
 
 顶层 `CleanRecord` 包含以下字段。
 

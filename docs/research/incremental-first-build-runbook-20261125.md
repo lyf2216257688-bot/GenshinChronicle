@@ -1,5 +1,7 @@
 # 首次整版对照运行方案
 
+本手册记录首次整版的运行和原 Quick 验收范围。该次运行的故障及后续正式恢复入口见[兼容恢复记录](incremental-recovery-20261126.md)。
+
 在 Windows PowerShell 7 的独立终端中从仓库根启动。已核验新观测 `p01eb_full_20261124`，此次运行从已有 Raw 开始。两个构建臂、验收及日志使用独立的 `data/retrieval/vc-20261124/`。短路径为 Windows Clean 逐条回执保留文件名长度。发布和切换仍需独立审查与授权。[依据与预算](incremental-raw-and-indexes-20261125.md)
 
 ## 夜间运行
