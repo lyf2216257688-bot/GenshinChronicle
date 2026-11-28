@@ -12,7 +12,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 
-from genshin_corpus.evidence_io import digest
+from genshin_corpus.evidence_io import digest, read
 
 from verify_mcp_codex import connect, require
 
@@ -96,11 +96,15 @@ def main():
     args = parser.parse_args()
     require(re.fullmatch(r"[a-zA-Z0-9_-]{1,48}", args.audit_name), "Invalid audit name")
     repo = Path.cwd()
+    catalog = read(repo / "config/mcp-live-v1.json")
+    active = catalog["active"]
+    old = {"study": args.old_study or "codex-flat-study"} if args.old_study or args.seed_flat else None
+    require(old is None or "20260824" in catalog["releases"], "Flat study execution has been archived")
+    reconnect_release = "20260824" if old else active
     root = repo / "data/generation/mcp-live-v1" / args.audit_name
     root.mkdir(parents=True, exist_ok=bool(args.old_study))
     study = {"study": "codex-release-study"}
     open_args = {**study, "request_id": "open", "question": "《幽潭心》中住在清泉镇的纯水精灵叫什么？她和迪奥娜的调酒祝福有何关系？"}
-    old = {"study": args.old_study or "codex-flat-study"} if args.old_study or args.seed_flat else None
     flat_seconds = None
     if args.seed_flat:
         with client(repo, root, "20260824") as (call, _, _):
@@ -112,9 +116,9 @@ def main():
             body, _ = collect(flat_first, lambda offset: call("get_packet", {**flat_packet, "offset": offset}))
             require(bool(body) and call("check_answer", {**flat_packet, "answer": "[E01]"})["status"] == "PASS",
                     "Flat study evidence not recoverable in Codex")
-    with client(repo, root, "20261124") as (call, version, tools):
+    with client(repo, root, active) as (call, version, tools):
         scope = call("get_scope", {})
-        require(scope["new_studies"]["release"] == "20261124", "Wrong release")
+        require(scope["new_studies"]["release"] == active, "Wrong release")
         previous = call("get_study", old) if old else None
         start = time.perf_counter()
         first = call("open_study", open_args)
@@ -134,12 +138,12 @@ def main():
         if old:
             call("get_packet", {**study, "packet_ref": previous["current_packet_ref"]}, expect_error=True)
             call("read_source", {**old, "request_id": "foreign", "handle": handle, "scope": "chunk"}, expect_error=True)
-    with client(repo, root, "20260824") as (call, _, _):
-        require(call("get_scope", {})["new_studies"]["release"] == "20260824", "Rollback release differs")
-        require(call("get_study", study)["release"] == "20261124", "Study was rebound after rollback")
+    with client(repo, root, reconnect_release) as (call, _, _):
+        require(call("get_scope", {})["new_studies"]["release"] == reconnect_release, "Reconnect release differs")
+        require(call("get_study", study)["release"] == active, "Study was rebound after reconnect")
         recovered = call("request_status", {**study, "request_id": "open"})
         require(recovered == {"status": "committed", "result": first}
-                and call("open_study", open_args) == first, "Committed readback after rollback changed")
+                and call("open_study", open_args) == first, "Committed readback after reconnect changed")
         packet_view = call("get_packet", packet)
         require(packet_view["projection"] == first["projection"], "Historical Packet changed")
         reread = call("read_source", {**study, "request_id": "reread-parent", "handle": handle, "scope": "parent"})
@@ -158,7 +162,7 @@ def main():
               "packet_chars": first["projection"]["total_chars"], "parent_pages": source_pages,
               "parent_chars": expanded["projection"]["total_chars"], "parent_receipt": expanded["receipt_id"],
               "citations": checked["sources"], "unknown_citation_rejected": True,
-              "new_studies_rolled_back": True, "exact_recovery_after_rollback": True,
+              "reconnect_release": reconnect_release, "exact_recovery": True,
               "both_releases_reread": bool(old), "cross_release_rejected": bool(old)}
     with (root / "codex-client.json").open("x", encoding="utf8") as out:
         json.dump(report, out, ensure_ascii=False, indent=2)

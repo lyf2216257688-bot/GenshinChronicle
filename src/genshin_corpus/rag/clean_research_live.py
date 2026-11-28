@@ -70,11 +70,15 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5",
             and type(seconds) is int and 0 < seconds <= 7200
             and isinstance(authorization, str) and authorization.strip(), "FINITE_AUTHORIZATION_REQUIRED")
     repo = Path(repo).resolve()
+    from ..mcp_live.runtime import CATALOG, production_release
+    release = production_release(repo)
+    release.settings
     config = read(repo / "config/clean-generation-v1.json")
     route = ROUTES[config["route"]]
     require(config["route"] == DEFAULT_ROUTE and config["endpoint"] == route["endpoint"]
         and config["model"] == route["model"] and config["api_key_env"] == route["key_env"], "OFFICIAL_CONFIG_ROUTE_CHANGED")
     settings = {**fixture_settings(), "mode": "LIVE", "campaign": "g5-official-" + digest(str(store.root))[:20],
+        "corpus_release": release.summary(),
         "generation_profile": profile or config["version"], "route": config["route"], "thinking": config["thinking"],
         "roles": config["roles"], "context_tokens": config["context_tokens"], "output_tokens": 32768,
         "timeout_seconds": config["timeout_seconds"], "history_bytes": 24000, "worker_timeout_seconds": 1800,
@@ -108,8 +112,9 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5",
         "campaign": settings["campaign"], "settings": settings, "authorization": authorization,
         "expires_at": time.time() + seconds, "endpoint": route["endpoint"], "model": route["model"], "code": code_identity(),
         "upstream_code": upstream(), "tool_schema": digest(tools_for(settings)),
-        "assets": {n: sha(repo / n) for n in ("config/clean-retrieval-v1.json", "config/index-selected-v1.json",
-                                             "config/reranking-selected-v1.json", "config/clean-generation-v1.json")},
+        "assets": {n: sha(repo / n) for n in (CATALOG, "config/clean-retrieval-v1.json",
+                                             "config/reranking-selected-v1.json", "config/clean-generation-v1.json",
+                                             release.settings["selection"], release.spec["artifact"]["path"])},
         "protocol_evidence": {"path": str(evidence), "complete_sha256": sha(evidence / "complete.json")},
         "thinking_evidence": {"path": str(thinking / "audit"), "complete_sha256": sha(thinking / "audit/complete.json"),
             "capabilities_path": str(thinking / "capabilities.json"), "capabilities_sha256": sha(thinking / "capabilities.json")},
@@ -119,8 +124,6 @@ def prepare(store, repo, authorization, *, requests=8, seconds=7200, stage="g5",
     if stage == "g6":
         permit["retrieval_combinations"] = ["S0", "S2"]
         permit["profile_status"] = "G6_PAIRED_S0_S2_FINITE_VALIDATION_AUTHORIZED"
-        for name in ("config/clean-generation-s2-v1.json", "config/recall-experiment-v1.json"):
-            permit["assets"][name] = sha(repo / name)
     put(store.root / "live/permit.json", permit)
     ResearchSessions(store, settings["campaign"], settings["limits"], permit=permit)
     return settings
@@ -228,9 +231,26 @@ class ResearchPipeline:
         self.store, self.tid, self.repo = store, tid, Path(repo)
         self.staged_local_queries, self.explicit_resume = staged_local_queries, explicit_resume
         self.pipeline = None; self._reader = None; self.worker_timings = []
+        self.release = None
+
+    def _bound_release(self, settings):
+        registered = settings.get("corpus_release")
+        if registered is None:
+            return None
+        if self.release is None:
+            from ..mcp_live.runtime import production_release
+            release = production_release(self.repo)
+            require(release.summary() == registered, "G5_CORPUS_RELEASE_CHANGED")
+            self.release = release
+        require(self.release.summary() == registered, "G5_CORPUS_RELEASE_CHANGED")
+        return self.release
 
     @property
     def reader(self):
+        settings = self.store.chat(self.store.turn(self.tid)["session"])["settings"]
+        release = self._bound_release(settings)
+        if release is not None:
+            return release.reader
         if self.pipeline: return self.pipeline.reader
         if self._reader is None:
             from .clean_live import LivePipeline
@@ -239,6 +259,7 @@ class ResearchPipeline:
 
     def run(self, query, *, parents=(), evidence_refs=()):
         settings = self.store.chat(self.store.turn(self.tid)["session"])["settings"]
+        release = self._bound_release(settings)
         require(query.combination == settings.get("retrieval_combination", "S0"), "RESEARCH_COMBINATION_CHANGED")
         config = "config/clean-generation-s2-v1.json" if query.combination == "S2" else "config/clean-retrieval-v1.json"
         committed = self.store.root / "local_queries" / self.tid / query.query_id
@@ -264,7 +285,15 @@ class ResearchPipeline:
 
         start = time.perf_counter()
         self.worker_timings.clear()
-        if self.pipeline is None:
+        if release is not None:
+            def check():
+                if self.store.cancelled(self.tid):
+                    raise LocalQueryInterrupted("Local query cancelled before commit")
+
+            result = release.run(query, output, parents=parents, evidence_refs=evidence_refs, check=check)
+            check()
+            self.worker_timings.extend(read(output / "run.json")["usage"].items())
+        elif self.pipeline is None:
             self.pipeline = LocalPipeline(self.repo, self.repo / config,
                 self.repo / "config/reranking-selected-v1.json", output,
                 worker_factory=lambda *a, **kw: TimedWorker(self.worker_timings, *a,
@@ -274,7 +303,10 @@ class ResearchPipeline:
             output.mkdir(parents=True, exist_ok=False); self.pipeline.output = output
             self.pipeline.resources = []
         init_seconds = time.perf_counter() - start
-        result = self.pipeline.run(query, parents=parents, evidence_refs=evidence_refs)
+        if release is None:
+            result = self.pipeline.run(query, parents=parents, evidence_refs=evidence_refs)
+        else:
+            init_seconds = read(output / "run.json")["reader_prepare_seconds"]
         put(output / "g5-timing.json", {"reader_pipeline_init_seconds": init_seconds,
             "total_seconds": time.perf_counter() - start, "cpu_reader_reused": len(parents) > 0,
             "workers": self.worker_timings,
@@ -302,6 +334,7 @@ class ResearchPipeline:
         return attempts / uuid4().hex
 
     def close(self):
+        if self.release: self.release.close()
         if self.pipeline: self.pipeline.close()
         if self._reader: self._reader.close()
 

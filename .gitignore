@@ -67,6 +67,7 @@ Thumbs.db
 !/scripts/retrieval/study_incremental_dense.py
 !/scripts/retrieval/study_incremental_bm25f.py
 !/scripts/retrieval/run-incremental-corpus.ps1
+!/scripts/retrieval/update_corpus.py
 !/scripts/retrieval/snapshot_full_run.py
 !/scripts/retrieval/snapshot_acceptance.py
 !/scripts/retrieval/verify_snapshot_observations.py

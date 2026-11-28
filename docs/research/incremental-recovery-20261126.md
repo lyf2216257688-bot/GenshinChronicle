@@ -1,5 +1,7 @@
 # 2026-11-26 整版 Quick 兼容恢复
 
+本页记录双臂试验完成时的目录和运行合同。随后全建臂被采用，重复臂和旧版派生资产退役。原验证及历史证据的查找入口见[语料采用与专项清理](storage-adoption-20261126.md)。
+
 收尾后的路线调整取消了本轮 Extended。恢复根已保存 Q001–Q003 和 Q004 中断记录，后文命令和预算为当时的方案档案。当前验收范围及派发授权见[当前阶段](../current-phase.md)。
 
 原执行为 `incremental-execution-20261125-v2`，输出在 `data/retrieval/vc-20261124`。2026-11-26 07:41 JST，两个构建臂及 Clean、Chunk 验证均已结束，`compare-vectors` 在打开数值载荷前因 `input_bundle_id` 不一致停止。原执行封条、各臂产物、回执和失败日志保留在原位置。[原进度](../../data/retrieval/vc-20261124/progress.jsonl) · [错误日志](../../data/retrieval/vc-20261124/attempts/compare-vectors/67bde8c18d/stderr.log)

@@ -4,7 +4,7 @@
 
 ## 版本与工具
 
-服务启动时须选择 `--release 20260824` 或 `--release 20261124`。前者用现用扁平索引，后者读 Quick 封存的增量构建 Release。两版都复用 S0、`f1_max` 和 `bge_structural`，查询范围为登记语料。新研究固定 Release、选择器、输入和实现身份。关闭后以同一审计根、实现及可回读的原资产重启，可以继续原研究。回滚时把新研究的启动参数拨回 `20260824`，同根原有研究继续各用各的绑定。
+服务默认选择发布目录的活动语料，也可用 `--release` 显式指定已登记版本。新研究固定 Release、选择器、输入和实现身份，使用 S0、`f1_max` 和 `bge_structural`。以同一审计根、实现及 Release 重启可以继续研究。已归档的绑定拒绝继续查询，已保存的 Packet、原文和请求结果按原身份查阅。[发布目录](../../config/mcp-live-v1.json)
 
 | 操作 | 用法 |
 | --- | --- |
@@ -17,7 +17,7 @@
 | 核对引文 | `get_packet` 用 `packet_ref` 可打开该研究已交付的当前或历史包，也可指定单个 `citation`。`check_answer` 用当前包与答案内 `[E01]` 等标记做绑定检查，返回实际阅读收条和来源身份。 |
 | 恢复 | `get_study` 返回问题、查询、读回和包地址。`request_status` 使用原操作 ID 取回已提交的原结果。未提交的失败可在同一版本用原参数重试。全量正文、排序、收条及失败记录写入独立审计根。 |
 
-按字符分页的 `projection` 包含总长度、投影摘要及 `next_offset`。从第零页取到末页才得到完整 JSON。引用以 `packet_ref` 和包内编号共同定位。源码回读复验当前所用的 Chunk、Clean 和来源定位。旧扁平链核对原文与 Raw 血缘，新版另外校验当前和有效 Raw 字节，复用记录可显示两个不同的 Raw 版本。语义支持留给逐项原文评审。
+按字符分页的 `projection` 包含总长度、投影摘要及 `next_offset`。从第零页取到末页才得到完整 JSON。引用以 `packet_ref` 和包内编号共同定位。源码回读复验 Chunk、Clean、来源定位以及当前和有效 Raw 字节。复用记录可显示两个不同的 Raw 版本。语义支持留给逐项原文评审。
 
 每研究最多五次查询、32 份不同阅读收条、96 次已提交操作。首查及补查的服务端时限为 540 秒，建议把宿主工具时限配置为 600 秒。取消或断线在校验、worker 等待和提交边界生效。长文件解析完成后才到达下一检查点。提交后断线由原请求 ID 恢复。查询使用现有 GPU 锁，操作竞争会报告忙。每进程可复用当前语料的来源 Reader。Dense 和重排分进程依次加载并退出。新版词法 worker 逐路关闭 Reader。从 `queries/<attempt>/run.json` 可核对分段耗时、复用状态及进程退出。
 
@@ -29,17 +29,17 @@
 $repo = (Resolve-Path .).Path
 $python = (Resolve-Path ./.local/runtime-py314/generation/Scripts/python.exe).Path
 $env:PYTHONPATH = Join-Path $repo 'src'
-& $python -X utf8 -B -m genshin_corpus.mcp_live --repo $repo --audit-name standalone --release 20260824
+& $python -X utf8 -B -m genshin_corpus.mcp_live --repo $repo --audit-name standalone --release 20261124
 ```
 
-服务由宿主以 stdio 启动。以上直接命令用于检查启动参数，运行后等待 MCP 消息。两个宿主可用不同的 `--audit-name`。为历史研究保留原名称。退出时停止对应宿主进程或撤下配置，之后仍可用原绑定复查审计。
+服务由宿主以 stdio 启动。以上直接命令用于检查启动参数，运行后等待 MCP 消息。两个宿主使用各自的 `--audit-name`。历史结果以原名称定位至封存记录。同一活动 Release 内以原审计名称恢复已提交研究。
 
 **Codex** 可在目标配置中加入以下段落，使用实际的 `<repo>`、`<python>`，Windows TOML 路径可用单引号或正斜杠。[Codex MCP 配置说明](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 
 ```toml
 [mcp_servers.gc_live]
 command = '<python>'
-args = ['-X', 'utf8', '-B', '-m', 'genshin_corpus.mcp_live', '--repo', '<repo>', '--audit-name', 'codex', '--release', '20260824']
+args = ['-X', 'utf8', '-B', '-m', 'genshin_corpus.mcp_live', '--repo', '<repo>', '--audit-name', 'codex', '--release', '20261124']
 cwd = '<repo>'
 startup_timeout_sec = 20
 tool_timeout_sec = 600
@@ -59,7 +59,7 @@ PYTHONPATH = '<repo>/src'
     serverName: gc_live
     command: '<python>'
     cwd: '<repo>'
-    args: ['-X', 'utf8', '-B', '-m', 'genshin_corpus.mcp_live', '--repo', '<repo>', '--audit-name', 'dsh', '--release', '20260824']
+    args: ['-X', 'utf8', '-B', '-m', 'genshin_corpus.mcp_live', '--repo', '<repo>', '--audit-name', 'dsh', '--release', '20261124']
     env:
       PYTHONPATH: '<repo>/src'
     startupTimeoutMs: 20000

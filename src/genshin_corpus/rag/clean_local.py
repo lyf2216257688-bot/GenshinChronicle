@@ -10,7 +10,6 @@ from ..model_calls import locked
 from ..retrieval.clean_based.indexes import selected
 from ..retrieval.clean_based.query_v2 import ResearchQuery
 from ..retrieval.clean_based.rerank_handoff import validate_selection
-from ..retrieval.clean_based.runtime_v2 import LocalPipeline
 from ..retrieval.clean_based.source import InputReader
 
 
@@ -104,10 +103,14 @@ def main(argv=None):
             output.mkdir(parents=True, exist_ok=False)
             query = ResearchQuery("g2-local-workbench", output.name, "original", args.question, args.question, args.question, args.question,
                                   combination=args.combination)
-            config = "config/clean-generation-s2-v1.json" if args.combination == "S2" else "config/clean-retrieval-v1.json"
-            with LocalPipeline(repo, repo / config, repo / "config/reranking-selected-v1.json", output / "upstream") as pipeline:
-                ranked = pipeline.run(query, verify_reference=args.verify_reference)
+            require(not args.verify_reference, "Flat-index reference replay is archived")
+            from ..mcp_live.runtime import production_release
+            pipeline = production_release(repo)
+            try:
+                ranked = pipeline.run(query, output / "upstream")
                 result = packet_for(ranked, pipeline.reader, output / "assembly", budget)
+            finally:
+                pipeline.close()
             write(output / "report.json", result); seal(output)
     import json
     print(json.dumps(result, ensure_ascii=False))

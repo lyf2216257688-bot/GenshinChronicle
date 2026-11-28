@@ -2,7 +2,7 @@
 
 本项目构建可追溯的《原神》官方文本研究语料和本地 RAG 工作台。六阶段主线从不可变的 Raw 证据开始，经 Clean、Chunking、Indexing、Retrieval、Reranking 到 Generation。
 
-长期方向是可由不同 Agent 调用的专业知识引擎。独立应用与正式问答基线继续提供服务。MCP 提供显式启用的实时检索和冻结回放入口。[架构决定](docs/decisions/adr-0002-host-neutral-evidence-engine.md) · [当前验收状态](docs/current-phase.md)
+长期方向是可由不同 Agent 调用的专业知识引擎。独立应用与实时 MCP 共享正式语料发布。冻结回放试点按历史绑定归档。[架构决定](docs/decisions/adr-0002-host-neutral-evidence-engine.md) · [当前验收状态](docs/current-phase.md)
 
 [当前状态](docs/current-phase.md)记录当前采用项、授权和下一步。[RAG 工作台](docs/rag-workbench.md)列出六阶段实现、配置、数据绑定、离线入口及运行环境。
 

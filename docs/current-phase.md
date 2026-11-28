@@ -4,11 +4,11 @@
 
 ## 当前工作与下一步
 
-GC 长期采用路线 B，优先把专业证据能力通过通用 MCP 提供给 Agent。2026-11-25 的 P0 和 P1 离线试点保留冻结排名、首包对照和两种宿主验收。2026-11-26 的 P1 实时查询与 P2 新版接入通过本机工程验收。实时 stdio 入口显式选择 `20260824` 或候选 Release `20261124`，支持自由补查、原文和引用回读及研究恢复。DSH 与 Codex 的安装版本完成真实本地工具调用。独立审计根完成两版隔离与回滚回读。P3 完成三题的离线证据对照，并封存四道未运行的真实评测题。下一项可审议工作是登记有限的宿主真实问答配对。付费模型请求和正式发布切换分别授权。正式问答仍采用 `gc-g5-official-4`。[架构决定](decisions/adr-0002-host-neutral-evidence-engine.md) · [实时合同](phases/mcp-live-v1.md) · [实机验收](research/mcp-live-acceptance-20261126.md) · [Agentic 对照](research/mcp-agentic-rag-evaluation-20261126.md)
+GC 正式采用 `p01eb_full_20261124` 的版本化全建臂。个人聊天、Clean 工作台和实时 MCP 共享活动 Release，默认 S0、`f1_max`、`bge_structural` 和 `gc-g5-official-4`。显式 S2 由同一 Release 提供。Codex 与 DSH 使用新版实时入口。旧版派生语料、重复增量臂及旧 MCP 绑定已退役，已有回答、原文收条、Packet、账本和 Raw 按原身份留存。[活动发布目录](../config/mcp-live-v1.json) · [专项验收与清理](research/storage-adoption-20261126.md) · [实时合同](phases/mcp-live-v1.md)
 
-新版 Raw `p01eb_full_20261124` 已核验，覆盖 96 个栏目、17,329 条详情，差分新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。2026-11-26，`data/retrieval/vcr-1126` 的恢复版 Quick 双臂对照通过，36 份阶段回执、120 项输出及资产依赖清单经独立核验。两臂各自复用原构建物理索引，文档重新编码、新建词法桶和跨臂借用均为零。原执行根、恢复根及其跨根依赖一并保留。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾)
+新版 Raw 覆盖 96 个栏目、17,329 条详情。相对上版新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。全建臂复用整版 Quick 已验收的物理载荷。当前和有效 Raw 可以指向不同观测，历史 Raw 全部保留。下一次语料更新以当前 Release 为增量基线，旧派生物仅在被新 Release 传递引用时继续保留。当前没有获准的付费模型派发或正式 Raw 采集。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [增量合同](phases/versioned-corpus-incremental.md)
 
-**本轮 Extended 已取消。** 保留已完成的 Q001–Q003、Q004 中断记录、G7 题库和既有研究资产。历史题全量回归和人工语义复核按研究需要开展。新版 `vcr-1126` 已通过独立目录的显式绑定、证据回读及回滚演练。A1 缓存、GTE 与中断 Quick 的验证副本、可离线恢复的前端依赖和 G0 试验环境已按清单处理。现用语料仍为 `p01eb_full_20260824`。[工程验收与清理记录](research/storage-and-release-readiness-20261126.md) · [恢复记录](research/incremental-recovery-20261126.md)
+本轮 Extended 已取消，保留 Q001–Q003 结果、Q004 中断记录及 G7 的题库、回答和审计。P3 的三题离线对照与四道未运行的真实评测题按原研究绑定留档。真实问答配对按需单独登记。[Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾) · [Agentic 对照](research/mcp-agentic-rag-evaluation-20261126.md)
 
 2026-11-23 第二批实现了 G5 证据利用策略 `gc-g5-official-5` 和 Windows 本地聊天接口修订号 4。新版 G5 可从已排序候选按页选读，按可核验位置保存父级正文，优先入包已选和主动回读的关键片段，并区分引用绑定、缺失和失败。查证面板可以分别核对引用和父级上下文。离线复验覆盖 G6/G7 固定排名、选读和组包。新版保留为显式试验，工作台和本地聊天的新真实批次默认仍用 `gc-g5-official-4`。[Generation 合同](phases/clean-generation-v1.md#evidence-quality-profile) · [产品合同](phases/local-chat-v1.md) · [第二批复验记录](research/clean-generation-g5-evidence-evaluation-20261123.md)
 
@@ -16,11 +16,11 @@ GC 长期采用路线 B，优先把专业证据能力通过通用 MCP 提供给 
 
 续轮专项审计已按封存请求定位到连接建立或请求发送阶段，底层网络原因仍待诊断。已补充传输诊断、修复截断正文判定、改进候选预览和证据压缩，并保护首包原已准入片段。当前 `gc-g5-official-5` 已通过离线工程验证。此前试验许可、记录及 UNKNOWN 占额保留原绑定。[续轮和成本审计](research/clean-generation-g5-targeted-audit-20261123.md)
 
-2026-11-24 完成排序分歧的 70 题封存回放和 20 道独立题验证。来历窄规则只在历史 Q068 改变首包，新增语音同时换出有独立价值的角色故事。双路分歧直接换位会纳入已核实的范围错配，带原文范围及换出检查的试验版 90 题均弃权，独立首包增益未达门槛。继续采用 S0、`bge_structural` 和现行索引。排序分歧留作离线诊断，本试验止于离线。若另行开展 Generation 证据策略真实配对，仍需单独登记有限批次并固定正式上游顺序。[排序分歧验证](research/clean-rerank-disagreement-20261124.md)
+2026-11-24 完成排序分歧的 70 题封存回放和 20 道独立题验证。来历窄规则只在历史 Q068 改变首包，新增语音同时换出有独立价值的角色故事。双路分歧直接换位会纳入已核实的范围错配，带原文范围及换出检查的试验版 90 题均弃权，独立首包增益未达门槛。该历史试验的裁决是维持 S0 和 `bge_structural`。排序分歧留作离线诊断，本试验止于离线。若另行开展 Generation 证据策略真实配对，仍需单独登记有限批次并固定正式上游顺序。[排序分歧验证](research/clean-rerank-disagreement-20261124.md)
 
 第一批可靠性修复覆盖提交、调度、中断恢复、会话状态、接口错误、定向纠正和长会话上下文。历史工程验收复现了跨日续聊、220 轮历史后的追问和旧版数据根回读。仍兼容且有效的批次可以显式继续，不兼容的旧批次按原绑定只读，同一会话可开启新批次。[产品测试](../tests/local_chat/test_product.py) · [浏览器场景](../frontend/tests/chat.browser.spec.ts)
 
-第三批修复了 Raw 采集的 F01、F02、D01、D02，已通过离线故障注入及正式跨日恢复复核。现用快照为 `p01eb_full_20260824`。Collector 下批安排实时进度、安全暂停、脱敏网络诊断和连续传输失败熔断。[Raw 合同](phases/phase-01-raw-collection.md#versioned-collector-contract) · [第三批验收](audits/README.md#2026-11-24-第三批-raw-采集可靠性) · [真实恢复](audits/README.md#2026-11-25-正式-raw-跨日恢复)
+第三批修复了 Raw 采集的 F01、F02、D01、D02，已通过离线故障注入及正式跨日恢复复核。Collector 下批安排实时进度、安全暂停、脱敏网络诊断和连续传输失败熔断。[Raw 合同](phases/phase-01-raw-collection.md#versioned-collector-contract) · [第三批验收](audits/README.md#2026-11-24-第三批-raw-采集可靠性) · [真实恢复](audits/README.md#2026-11-25-正式-raw-跨日恢复)
 
 2026-11-23 的业务和架构审计保留修复前基线。收尾复核记录了本地聊天及 G5 试验策略的修复范围。旧 G4 LIVE 的恢复与许可身份覆盖、G7 历史导出差异仍见原审计及后续处置。[审计与后续处置](audits/README.md)
 
@@ -36,9 +36,9 @@ G7 运行分桶为 41 完成、14 有答案的部分完成、1 失败、14 UNKNO
 
 | 阶段 | 已完成基线与当前采用状态 |
 | --- | --- |
-| Clean | 16,437 份 `mihoyo_obc` `zh-cn` 记录由 Raw 直接构建，保留原文、结构、未知项和 Raw 定位。 |
-| Chunking | V2.1 balanced 微/宏双粒度，119,557 个唯一候选、214,870 个自然父级、5,087 组图；在用索引用已验证的扁平导出。 |
-| Indexing | 固定输入包上的 BGE-M3 1024d Dense 和 BM25F 为选定索引。完整的 BGE-M3 Sparse 供显式 S2 使用。 |
+| Clean | 17,329 份 `mihoyo_obc` `zh-cn` 记录由 Raw 直接构建，保留原文、结构、未知项和 Raw 定位。 |
+| Chunking | V2.1 balanced 微/宏双粒度，127,880 个唯一候选，正式输入绑定版本化分片范围。 |
+| Indexing | 正式 Release 绑定 BGE-M3 1024d Dense/Sparse 和 128 个 BM25F 桶。Sparse 供显式 S2 使用。 |
 | Retrieval | S0（BM25F + Dense，`f1_max`）是 Clean 本地链默认。S2 是冻结的显式研究选项，S1 和补充式 Sparse 结果保留为实验。 |
 | Reranking | BGE reranker v2 m3 + 保守结构处理（`bge_structural`），MMR 关闭。`bge_relevance` 可显式使用同一评分，自动回退关闭。 |
 | Generation | 独立工作台支持本地证据组装、持久化对话，原 Streamlit 工作台默认 Mock。个人聊天软件另有 Windows 入口，提供离线演示及显式开启有限批次的真实问答。G5/G6 研究配置选用 DeepSeek 官方 `deepseek-flash`。 |

@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--audit-name", required=True)
-    parser.add_argument("--release", required=True, help="Release key for new studies")
+    parser.add_argument("--release", help="Release key for new studies, defaults to the adopted corpus")
     args = parser.parse_args()
     require(re.fullmatch(r"[A-Za-z0-9_-]{1,48}", args.audit_name), "Invalid audit name")
     repo = args.repo.resolve()
@@ -23,7 +23,8 @@ def main():
         from .study import LiveStudies
 
         root = inside(repo, "data/generation/mcp-live-v1")
-        return LiveStudies(Releases(repo), inside(root, args.audit_name), args.release)
+        releases = Releases(repo)
+        return LiveStudies(releases, inside(root, args.audit_name), args.release or releases.active)
 
     serve(open_studies, sys.stdin.buffer, sys.stdout.buffer)
 

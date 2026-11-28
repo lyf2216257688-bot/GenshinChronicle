@@ -2,6 +2,8 @@
 
 采用方向见 [ADR-0002](../decisions/adr-0002-host-neutral-evidence-engine.md)，当前工作和后续授权见[当前阶段](../current-phase.md)。本合同的运行入口重放已登记的排序结果，用原语料重新核读和组包。支持范围由 `config/mcp-offline-v1.json` 中的题目及补查目录确定。
 
+该试点按原绑定归档。历史运行、已保存阅读收条和 Packet 可查阅。生产宿主使用[实时 MCP](mcp-live-v1.md)。
+
 ## P0 对照与绑定
 
 - 普通问题取 G7 Q001 的首次原始查询，复杂问题取 Q068 首查和已有的 `query-1`。两题使用历史 `gc-g5-official-4`、S0、`bge_structural` 和当时的首包上下文与预算。金标准是封存的排名和首包传递结果。问答语义质量另评。

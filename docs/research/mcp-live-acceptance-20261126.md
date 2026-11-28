@@ -1,5 +1,7 @@
 # GC 实时 MCP 验收
 
+本页记录切换前的旧扁平语料和候选增量臂验收。正式的全建臂及两宿主切换记录见[语料采用与专项清理](storage-adoption-20261126.md)。
+
 2026-11-26。使用现机的旧扁平语料与封存的增量 Release，固定 S0 和 `bge_structural`。实测通过本地进程落盘，复用已安装的 Dense、词法、重排和 Generation 环境。[实时合同与配置](../phases/mcp-live-v1.md)
 
 ## 工程验收

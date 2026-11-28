@@ -4,6 +4,8 @@
 
 ## Clean 到索引
 
+[2026-11-26 正式语料采用与专项清理](storage-adoption-20261126.md)记录全建臂采用、宿主切换、退役派生数据的取证路径和实测回收量。
+
 | 工作 | 证据与复现 |
 | --- | --- |
 | 源 API 与 Raw | [OBC API 发现](phase-01/mihoyo-obc-api-discovery.md)、[频道树](phase-01/channel-tree-notes.md)、[Raw 结构清查](raw-data-structure-inventory-20261106.md) |

@@ -11,7 +11,7 @@ from ..indexing import snapshot_lexical, snapshot_vectors
 from ..indexing.benchmark_io import attempt, disk_guard, ram_guard, resources
 from ..model_calls import locked
 from ..retrieval.clean_based.indexes import selected
-from ..retrieval.clean_based.query_v2 import fuse_v2, validate_ancestry, validate_profile_v2
+from ..retrieval.clean_based.query_v2 import WEIGHTS, fuse_v2, validate_ancestry, validate_profile_v2
 from ..retrieval.clean_based.rerank_handoff import validate_selection
 from ..retrieval.clean_based.rerank_v2 import rank_v2, scoring_input
 from ..retrieval.clean_based.runtime_v2 import JsonWorker, code_identity
@@ -44,12 +44,22 @@ class CancellableWorker(JsonWorker):
         return value
 
 
+CATALOG = "config/mcp-live-v1.json"
+
+
+def production_release(repo):
+    releases = Releases(Path(repo).resolve())
+    return releases.selected(releases.active)
+
+
 class Releases:
     def __init__(self, repo):
         self.repo = repo
-        config = read(repo / "config/mcp-live-v1.json")
+        config = read(repo / CATALOG)
         require(config["version"] == "gc-mcp-live-1", "Unknown MCP release catalog")
+        self.active = config["active"]
         self.points = {key: Release(repo, key, spec, config, self.use) for key, spec in config["releases"].items()}
+        require(self.active in self.points and not self.points[self.active].flat, "Invalid production release")
 
     def use(self, key):
         for name, release in self.points.items():
@@ -57,12 +67,12 @@ class Releases:
                 release.close()
 
     def selected(self, key):
-        require(key in self.points, "Unknown release")
+        require(key in self.points, "Unknown or archived corpus release")
         return self.points[key]
 
     def resolve(self, key, binding):
         release = self.selected(key)
-        require(release.binding == binding, "Study bound to a different release or implementation")
+        require(release.binding == binding, "Study is archived or bound to a different implementation")
         return release
 
     def catalog(self):
@@ -125,10 +135,12 @@ class Release:
             self.bundle_id = official_selection["input_bundle_id"]
             require(self.bundle_id == index["source"]["input_bundle_id"], "Foreign flat index bundle")
         else:
+            self._pin({"path": config["selection"], "sha256": config["selection_sha256"]})
             self.descriptor = read(self.artifact)
             require(self.descriptor["version"] == RELEASE_VERSION and self.descriptor["status"] == "complete",
                     "Unsupported release descriptor")
             self.bundle_id = self.descriptor["input_bundle_id"]
+            require(self.bundle_id == self.spec["input_bundle_id"], "Unexpected release input identity")
             self.stores = {}
             for key in ("input", "vectors", "bm25f"):
                 ref = self.descriptor[key]
@@ -248,14 +260,19 @@ class Release:
         return resources()["available_ram_bytes"] >= self.settings["minimum_available_ram_gib"] * 1024 ** 3
 
     def search(self, query, parents, evidence_refs, root, check):
+        return self.run(query, attempt(root, "query"), parents=parents, evidence_refs=evidence_refs, check=check)
+
+    def run(self, query, output, *, parents=(), evidence_refs=(), check=lambda: None):
         validate_ancestry(query, parents, evidence_refs)
         started = time.perf_counter()
         warm = "prepared" in self.__dict__
-        output = attempt(root, "query")
+        output = Path(output)
+        output.mkdir(parents=True, exist_ok=True)
         usage, hits = {}, []
         try:
             self.use(self.key)
-            config = self.settings
+            config = {**self.settings, "combination": query.combination, "channel_weights": WEIGHTS[query.combination]}
+            require(not self.flat or query.combination == "S0", "Archived flat release only supports S0")
             if warm and not self._reader_fits():
                 self.close()
                 warm = False
@@ -267,7 +284,7 @@ class Release:
                     stack.enter_context(locked(self.repo / ".local/clean-generation-gpu.lock"))
                 except OSError as exc:
                     raise ValueError("GC local compute is busy") from exc
-                for channel in ("bm25f", "dense"):
+                for channel in WEIGHTS[query.combination]:
                     check()
                     if warm and not self._reader_fits():
                         self.close()

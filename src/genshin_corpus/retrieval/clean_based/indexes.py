@@ -1,7 +1,7 @@
 """Read-only selected-index sessions. No build/resume or index-root writes."""
 from pathlib import Path
 
-from ...evidence_io import digest, inside, read, require
+from ...evidence_io import digest, inside, read, require, sha
 from ...indexing.benchmark_io import lines, verify_receipt
 from ...indexing.schema import representation_id
 from .source import FileBinding
@@ -9,6 +9,10 @@ from .source import FileBinding
 
 def selected(repo, config):
     selection = read(Path(repo) / config["selection"])
+    if selection["schema"] == "gc-snapshot-dense-model-1":
+        require(sha(Path(repo) / config["selection"]) == config["selection_sha256"],
+                "Versioned Dense model selection changed")
+        return selection, {"dense": (None, {"configuration": selection["configuration"]})}
     manifests = {}
     for channel, key in (("dense", "dense"), ("bm25f", "lexical")):
         item = selection[key]
