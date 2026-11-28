@@ -21,10 +21,15 @@ FIRST_READS = 6
 BUDGET = {"context_tokens": 60000, "output_tokens": 8192, "thinking_tokens": 0}
 
 
-def assemble_live(groups, receipts, context, selection=None):
+def assemble_live(groups, receipts, context, selection=None, *, preserve=()):
     options = {"context": context, "budget": BUDGET, "selection_ids": selection}
     if selection is not None:
-        return assemble(groups, receipts, **options, compact_content=True)
+        require(len(selection) == len(set(selection)), "Repeated selection ID")
+        options["selection_ids"] = list(dict.fromkeys([*preserve, *selection]))
+        packet = assemble(groups, receipts, **options, compact_content=True)
+        require(set(preserve) <= {entry["fragment_id"] for entry in packet["evidence"]},
+                "Selection would replace preserved evidence")
+        return packet
     original = assemble(groups, receipts, **options)
     preserved = [entry["fragment_id"] for entry in original["evidence"]]
     compact = assemble(groups, receipts, **{**options, "selection_ids": preserved},
@@ -177,7 +182,8 @@ class Research:
         groups[query.query_id] = ranked
         result = self.publish(groups, {})
         result.update(query=query.value(), search_seconds=ranked_at - started,
-                      read_and_packet_seconds=time.perf_counter() - ranked_at)
+                      read_and_packet_seconds=time.perf_counter() - ranked_at,
+                      search_coverage="ranked_candidates_only", candidate_count=len(handles))
         return result
 
     def publish(self, groups, args):
@@ -186,7 +192,15 @@ class Research:
                    "tools": [], "protocol_history": []}
         receipts = [load(self.db, ref) for ref in self.state["reads"].values()]
         selected = args.get("fragment_ids")
-        packet = assemble_live(list(groups.values()), receipts, context, selected)
+        preserve = ()
+        if "preserve" in args:
+            require(selected, "Preserving current evidence requires explicit fragments")
+            request = args["preserve"]
+            previous = self.packet(request["packet_ref"])
+            citations = request["citation_ids"]
+            require(set(citations) <= previous["citations"].keys(), "Unknown preserved citation")
+            preserve = [previous["citations"][cid]["fragment_id"] for cid in citations]
+        packet = assemble_live(list(groups.values()), receipts, context, selected, preserve=preserve)
         pref = self.address("packet", packet["packet_id"])
         self.state["current"] = pref
         self.state["packets"][pref] = put(self.db, packet)
@@ -194,6 +208,9 @@ class Research:
         if selected is not None:
             result["selected_dispositions"] = [part for row in packet["dispositions"] for part in row["fragments"]
                                                if part["fragment_id"] in selected]
+        if preserve:
+            admitted = {e["fragment_id"]: e["citation_id"] for e in packet["evidence"]}
+            result["preserved_citations"] = dict(zip(citations, (admitted[fid] for fid in preserve), strict=True))
         return result
 
     def packet(self, pref):
@@ -234,7 +251,7 @@ class Research:
             packet = self.packet(args["packet_ref"])
             _, ids, status = bind_answer(packet, args["answer"])
             bindings = {i: packet["citations"][i] for i in ids}
-            return {**status, "citations": bindings, "sources": {
+            return {**status, "packet_ref": args["packet_ref"], "citations": bindings, "sources": {
                 i: self.source_identity(load(self.db, self.state["reads"][b["receipt_id"]])) for i, b in bindings.items()}}
         if name == "get_read":
             key = next((ref for rid, ref in self.state["reads"].items() if self.address("read", rid) == args["read_ref"]), None)
@@ -265,6 +282,12 @@ class Research:
         ranked = groups[key]
         handles = self.candidate_handles(ranked)
         items = ranked["candidates"]
+        query_total = len(items)
+        match_text = args.get("match_text")
+        if match_text is not None:
+            phrase = match_text.strip().casefold()
+            require(phrase, "Empty navigation phrase")
+            items = [item for item in items if matches_candidate(item, phrase)]
         packet = self.packet(self.state["current"])
         index = list(groups).index(key)
         dispositions = {d["chunk_id"]: d["disposition"] for d in packet["dispositions"] if d["group"] == index}
@@ -281,5 +304,16 @@ class Research:
                               matcher, status, {}, included)
             rows.append({**row, "read_scopes": scopes, "packet_disposition": disposition})
         end = start + len(rows)
-        return {"query": key, "total": len(items), "rows": rows, "navigation_only": True,
-                "next_offset": end if end < len(items) else None}
+        result = {"query": key, "total": len(items), "rows": rows, "navigation_only": True,
+                  "next_offset": end if end < len(items) else None}
+        if match_text is not None:
+            result.update(match_text=match_text, query_total=query_total)
+        return result
+
+
+def matches_candidate(item, phrase):
+    context = item["source"]["source_context"]
+    labels = context["label_evidence"]
+    headings = (labels.get("document_title"), labels.get("section_title"), context.get("group_title"))
+    return phrase in item["chunk"]["retrieval_text"].casefold() or any(
+        phrase in heading["text"].casefold() for heading in headings if heading and heading.get("text"))

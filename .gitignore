@@ -76,6 +76,10 @@ Thumbs.db
 !/scripts/retrieval/verify_mcp_codex.py
 !/scripts/retrieval/verify_mcp_live_codex.py
 !/scripts/retrieval/compare_mcp_evidence.py
+!/scripts/retrieval/compare_mcp_dsh_timings.py
+!/scripts/retrieval/dsh_model_dispatch.py
+!/scripts/retrieval/replay_mcp_live_evidence.py
+!/scripts/retrieval/run_mcp_dsh_pair.py
 !/scripts/retrieval/probe_mcp_resources.py
 !/scripts/retrieval/prepare_mcp_eval.py
 !/scripts/retrieval/smoke_snapshot_launcher.py

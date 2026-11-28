@@ -7,7 +7,7 @@ const { createRequire } = require("node:module");
 const { createHash } = require("node:crypto");
 
 async function main() {
-  const [python, auditName, release] = process.argv.slice(2);
+  const [python, auditName, release, benchmarkPath, sourceRoot] = process.argv.slice(2);
   assert(path.isAbsolute(python) && fs.existsSync(python), "Supply the Generation Python executable");
   assert(/^[A-Za-z0-9_-]{1,48}$/.test(auditName), "Supply a fresh audit name");
   assert(process.versions.electron, "Use the installed DeepSeek Harness executable");
@@ -29,7 +29,7 @@ async function main() {
   const hostConfig = {
     transport: "stdio", serverName: "gc", cwd: repo, command: python,
     args,
-    env: { PYTHONPATH: path.join(repo, "src") }, startupTimeoutMs: 20000,
+    env: { PYTHONPATH: sourceRoot ?? path.join(repo, "src") }, startupTimeoutMs: 20000,
     toolCallTimeoutMs: timeout, failOnStartupError: true, reconnect: { enabled: false },
   };
   async function connected(run) {
@@ -60,7 +60,9 @@ async function main() {
     }
   }
   if (release) {
-    const report = await verifyLive(connected, release);
+    const report = benchmarkPath
+      ? await benchmarkLive(connected, release, JSON.parse(fs.readFileSync(benchmarkPath, "utf8")), output)
+      : await verifyLive(connected, release);
     report.host_bridge_version = fromDSH("@deepseek-ai/dsh-mcp-client/package.json").version;
     report.bridge_sha256 = createHash("sha256").update(fs.readFileSync(fromDSH.resolve("@deepseek-ai/dsh-mcp-client"))).digest("hex");
     report.node = process.versions.node;
@@ -151,6 +153,36 @@ async function collect(first, nextPage) {
   const text = parts.join("");
   assert.equal([...text].length, total);
   return { body: JSON.parse(text), pages: parts.length };
+}
+
+async function benchmarkLive(connected, release, { question, gap, search_text }, output) {
+  return connected(async (call, tools) => {
+    const scope = await call("get_scope", {});
+    assert.equal(scope.new_studies.release, release);
+    assert.equal(scope.remote_calls, 0);
+    const steps = [
+      ["cold_open", "open_study", { study: "cold", request_id: "open", question }],
+      ["warm_open", "open_study", { study: "warm", request_id: "open", question }],
+      ["warm_follow", "follow_query", { study: "warm", request_id: "follow", parent_query: "original", gap, search_text }],
+    ];
+    const samples = [];
+    for (const [stage, tool, args] of steps) {
+      const tick = performance.now();
+      const result = await call(tool, args);
+      const seconds = (performance.now() - tick) / 1000;
+      assert.equal(result.binding, scope.new_studies.binding);
+      const packet = { study: args.study, packet_ref: result.packet_ref };
+      const projection = await collect(result, offset => call("get_packet", { ...packet, offset }));
+      const citations = await call("check_answer", {
+        ...packet, answer: result.citation_ids.map(id => `[${id}]`).join(" ") || "无查证结果",
+      });
+      assert.equal(citations.status, result.citation_ids.length ? "PASS" : "MISSING");
+      const row = { stage, tool, args, seconds, result, projection, citations };
+      fs.writeFileSync(path.join(output, stage + ".json"), JSON.stringify(row, null, 2), { flag: "wx" });
+      samples.push({ stage, seconds, pages: projection.pages, packet: result.packet_id });
+    }
+    return { release, scope, tools, samples, generation_calls: 0 };
+  });
 }
 
 async function verifyLive(connected, release) {

@@ -74,10 +74,50 @@ class LiveResearch(EvidenceFixture):
         self.assertEqual(result["query"]["search_text"], "出现 条件")
         self.assertEqual(result["query"]["rerank_text"], "人物在何种条件下说话？")
         self.assertEqual(result["query"]["round"], 1)
+        self.assertEqual(result["search_coverage"], "ranked_candidates_only")
+        self.assertGreater(result["candidate_count"], 0)
         self.assertNotEqual(first["packet_ref"], result["packet_ref"])
         self.assertEqual(self.call("get_packet", packet_ref=first["packet_ref"])["projection"], first["projection"])
         with self.assertRaisesRegex(ValueError, "superseded"):
             self.call("check_answer", packet_ref=first["packet_ref"], answer="[E01]")
+
+    def test_navigation_phrase_preserves_original_ranks(self):
+        self.call("open_study", request_id="start", question="问题")
+        original = self.call("browse_candidates", query="original")
+        match = original["rows"][0]
+        filtered = self.call("browse_candidates", query="original", match_text=match["title"])
+        self.assertEqual(filtered["query_total"], original["total"])
+        self.assertEqual(filtered["rows"][0], match)
+        self.assertTrue(filtered["navigation_only"])
+        empty = self.call("browse_candidates", query="original", match_text="语料中没有此导航词")
+        self.assertEqual(empty["rows"], [])
+        self.assertIsNone(empty["next_offset"])
+
+    def test_expanding_packet_preserves_cited_fragments(self):
+        first = self.call("open_study", request_id="start", question="问题")
+        candidate = self.call("browse_candidates", query="original")["rows"][0]
+        source = self.call("read_source", request_id="source", handle=candidate["handle"], scope="parent")
+        original = self.call("check_answer", packet_ref=first["packet_ref"],
+                             answer=" ".join(f"[{cid}]" for cid in first["citation_ids"]))
+        preserve = {"packet_ref": first["packet_ref"], "citation_ids": first["citation_ids"]}
+        expanded = self.call("assemble_packet", request_id="expanded",
+                             fragment_ids=[source["fragment_id"]], preserve=preserve)
+        current = self.call("check_answer", packet_ref=expanded["packet_ref"],
+                            answer=" ".join(f"[{cid}]" for cid in expanded["citation_ids"]))
+        self.assertEqual(current["packet_ref"], expanded["packet_ref"])
+        self.assertEqual(current["semantic_support"], "NOT_EVALUATED")
+        self.assertEqual(expanded["preserved_citations"].keys(), original["citations"].keys())
+        for previous, new in expanded["preserved_citations"].items():
+            self.assertEqual(original["citations"][previous]["fragment_id"], current["citations"][new]["fragment_id"])
+        self.assertLessEqual({item["fragment_id"] for item in original["citations"].values()},
+                             {item["fragment_id"] for item in current["citations"].values()})
+        self.assertEqual(expanded["selected_dispositions"][0]["disposition"], "context_expansion")
+        with self.assertRaisesRegex(ValueError, "explicit fragments"):
+            self.call("assemble_packet", request_id="invalid", preserve=preserve)
+        with self.assertRaisesRegex(ValueError, "Unknown preserved citation"):
+            self.call("assemble_packet", request_id="unknown", fragment_ids=[source["fragment_id"]],
+                      preserve={**preserve, "citation_ids": ["E999"]})
+        self.assertEqual(self.call("get_study")["current_packet_ref"], expanded["packet_ref"])
 
     def test_release_switch_rollback_and_source_isolation(self):
         first = self.call("open_study", request_id="start", question="任意标题")

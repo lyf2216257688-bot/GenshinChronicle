@@ -295,19 +295,27 @@ class Release:
                 reader = self.reader
                 check()
                 tick = time.perf_counter()
-                documents = {}
-                for hit in hits:
-                    check()
-                    if not self.flat:
+                if not self.flat:
+                    # Unified input rows are grouped by source. Use that order for
+                    # readback so the bounded source cache can serve adjacent hits.
+                    for hit in hits:
                         number = hit["input_row"]
                         require(type(number) is int and 0 <= number < len(reader.source.rows), "Invalid versioned hit row")
                         hit["chunk_id"] = reader.source.rows[number]["chunk_id"]
+                    read_order = sorted(hits, key=lambda hit: hit["input_row"])
+                else:
+                    read_order = hits
+                documents = {}
+                for hit in read_order:
+                    check()
                     cid = hit["chunk_id"]
                     if cid not in documents:
                         documents[cid] = reader.document(hit["input_row"], cid)
                     document = documents[cid]
                     require(document["input_row"] == hit["input_row"] and all(
                         document["row"][k] == v for k, v in hit.get("index_mapping", {}).items()), "Index source mismatch")
+                usage["document_read_seconds"] = time.perf_counter() - tick
+                tick = time.perf_counter()
                 candidates = fuse_v2(query, hits, documents, config, input_bundle_id=reader.bundle_id, code=self.code)
                 if self.flat:
                     candidates["raw_hits"] = hits

@@ -29,7 +29,7 @@
 | --- | --- |
 | MCP 离线试点 | [冻结排名与 Packet 对照、DSH 及 Codex 实机工具验收](mcp-offline-acceptance-20261125.md) |
 | MCP 实时入口 | [真实查询、Release、实机与资源验收](mcp-live-acceptance-20261126.md) |
-| Agentic RAG | [历史压力题离线对照和四题真实配对预注册](mcp-agentic-rag-evaluation-20261126.md) |
+| Agentic RAG | [历史压力题离线对照和四题真实配对预注册](mcp-agentic-rag-evaluation-20261126.md) · [正式语料上的四题真实配对](mcp-agentic-rag-live-pair-20261128.md) |
 | 技术决定 | [初始实施方案](clean-generation-implementation-plan-20261114.md)保存当时的 24 项决定、约束和验收策略。[Generation 合同](../phases/clean-generation-v1.md#decisions-and-boundaries)记录采用版本及 D16 后续更新。 |
 | G0–G2 | [本地状态机、回读和 Packet](clean-generation-g0g2-20261114.md) |
 | G3 | [协议与能力限度](clean-generation-g3-20261114.md)、[参数核对](clean-generation-g3-parameter-check-20261114.md)、[tools-first 原计划](clean-generation-g3-tools-live-plan-20261114.md)、[tools/SSE 实测](clean-generation-g3-tools-live-20261114.md) |

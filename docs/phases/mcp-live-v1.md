@@ -10,14 +10,14 @@
 | --- | --- |
 | 检查版本 | `get_scope` 返回语料键、新研究使用的版本与研究上限。 |
 | 首查 | `open_study` 接受新 `study`、新 `request_id` 和原问题 `question`。保留完整原问题，以六个已排序候选的 Chunk 尝试组首包。空结果保留空证据。 |
-| 浏览 | `browse_candidates` 指定 `study` 和查询 ID。首轮 ID 为 `original`。续页用 `next_offset`。行内预览、条件提示和标题用于定位。 |
+| 浏览 | `browse_candidates` 指定 `study` 和查询 ID。首轮 ID 为 `original`。续页用 `next_offset`。行内预览、条件提示和标题用于定位。`match_text` 可在该查询已排序候选的标题和检索正文中筛选字面短语，保留原名次，同时返回筛选前后的数量。 |
 | 阅读 | `read_source` 指定已发放的候选 `handle`、`request_id` 与 `chunk`、`parent`、`natural_parent` 或 `graph`。用 `get_read` 和 `read_ref` 继续取回完整正文。 |
-| 补查 | `follow_query` 指定已执行的 `parent_query`、具体缺口 `gap` 和自由查询 `search_text`。可提供父查询的 `evidence_handles`、子问题、重排文本与补查类型。补查查询 ID 使用该操作的 `request_id`。各轮保留完整顺序。 |
-| 重新组包 | `assemble_packet` 可给出已读 `fragment_ids` 并查看这些片段的实际准入处置。默认组包先保留原规则准入的片段，再用结构化压缩释放的空间纳入更多已核读的 Chunk。候选顺序由 Reranking 确定。过长范围整段记为预算排除。 |
+| 补查 | `follow_query` 指定已执行的 `parent_query`、具体缺口 `gap` 和自由查询 `search_text`。可提供父查询的 `evidence_handles`、子问题、重排文本与补查类型。补查查询 ID 使用该操作的 `request_id`。各轮保留完整顺序。首查和补查响应登记本次已排序候选数，未检得的结论限定于本次检索。 |
+| 重新组包 | `assemble_packet` 可给出已读 `fragment_ids` 并查看这些片段的实际准入处置。显式选段时可用 `preserve` 指定同一研究的 `packet_ref` 和需要保留的 `citation_ids`，响应列出这些引文在新包中的编号。无法保住所指定片段时拒绝提交。默认组包先保留原规则准入的片段，再用结构化压缩释放的空间纳入更多已核读的 Chunk。候选顺序由 Reranking 确定。过长范围整段记为预算排除。 |
 | 核对引文 | `get_packet` 用 `packet_ref` 可打开该研究已交付的当前或历史包，也可指定单个 `citation`。`check_answer` 用当前包与答案内 `[E01]` 等标记做绑定检查，返回实际阅读收条和来源身份。 |
 | 恢复 | `get_study` 返回问题、查询、读回和包地址。`request_status` 使用原操作 ID 取回已提交的原结果。未提交的失败可在同一版本用原参数重试。全量正文、排序、收条及失败记录写入独立审计根。 |
 
-按字符分页的 `projection` 包含总长度、投影摘要及 `next_offset`。从第零页取到末页才得到完整 JSON。引用以 `packet_ref` 和包内编号共同定位。源码回读复验 Chunk、Clean、来源定位以及当前和有效 Raw 字节。复用记录可显示两个不同的 Raw 版本。语义支持留给逐项原文评审。
+按字符分页的 `projection` 包含总长度、投影摘要及 `next_offset`。从第零页取到末页才得到完整 JSON。涉及书信落款、发言归属和相邻条件时，优先检查支持完整自然容器的回读，核对返回的范围。引用以 `packet_ref` 和包内编号共同定位。源码回读复验 Chunk、Clean、来源定位以及当前和有效 Raw 字节。复用记录可显示两个不同的 Raw 版本。语义支持留给逐项原文评审。
 
 每研究最多五次查询、32 份不同阅读收条、96 次已提交操作。首查及补查的服务端时限为 540 秒，建议把宿主工具时限配置为 600 秒。取消或断线在校验、worker 等待和提交边界生效。长文件解析完成后才到达下一检查点。提交后断线由原请求 ID 恢复。查询使用现有 GPU 锁，操作竞争会报告忙。每进程可复用当前语料的来源 Reader。Dense 和重排分进程依次加载并退出。新版词法 worker 逐路关闭 Reader。从 `queries/<attempt>/run.json` 可核对分段耗时、复用状态及进程退出。
 

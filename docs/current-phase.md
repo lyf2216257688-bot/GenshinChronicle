@@ -8,7 +8,9 @@ GC 正式采用 `p01eb_full_20261124` 的版本化全建臂。个人聊天、Cle
 
 新版 Raw 覆盖 96 个栏目、17,329 条详情。相对上版新增 898、修改 4,390、移除 6、未变化 12,041、未决 0。全建臂复用整版 Quick 已验收的物理载荷。当前和有效 Raw 可以指向不同观测，历史 Raw 全部保留。下一次语料更新以当前 Release 为增量基线，旧派生物仅在被新 Release 传递引用时继续保留。当前没有获准的付费模型派发或正式 Raw 采集。[新版差分](research/incremental-raw-and-indexes-20261125.md) · [增量合同](phases/versioned-corpus-incremental.md)
 
-本轮 Extended 已取消，保留 Q001–Q003 结果、Q004 中断记录及 G7 的题库、回答和审计。P3 的三题离线对照与四道未运行的真实评测题按原研究绑定留档。真实问答配对按需单独登记。[Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾) · [Agentic 对照](research/mcp-agentic-rag-evaluation-20261126.md)
+GC 新功能以 MCP 为唯一对外入口，Windows 本地聊天进入维护模式，作为备用和质量对照。综合改进先固定 `20261124`。引用、原文选读和证据保留的局部回归及封存回放已完成。用户手动提交的六题均已从 DSH 会话和 MCP 审计回读，实际路由为 `metro / deepseek-v4.1-flash-1017`。六份最终答案的引用编号均可绑定。H01 正确引用研发指标并限定实测结论的检索范围。H02 已读到完整书信，仍将署名解释为可能属于收信人。Q068 引用了「明晨之镜」自述席次与分离关系的剧情，并保留原先的角色故事；预设的身份语音未读到。固定路径 H01 试跑的候选、包正文和引用来源一致，耗时未达到通过线。自动批次按停止条件关闭，2 次占额中 1 次获得有效回执、1 次为 UNKNOWN，无可评分答案。候选发布演练排在本版问答和性能验收之后。[离线回放](../data/generation/mcp-live-v1/comprehensive-20261128/evidence-replay.json) · [DSH 手动六题回读](../data/generation/mcp-live-v1/comprehensive-20261128/dsh-manual-session-readback.json) · [固定路径试跑](../data/generation/mcp-live-v1/comprehensive-20261128/fixed-path-pilot.json) · [自动批次占额](../data/generation/mcp-live-v1/comprehensive-dsh-pair-20261128/complete.json)
+
+本轮 Extended 已取消，保留 Q001–Q003 结果、Q004 中断记录及 G7 的题库、回答和审计。P3 的三题离线对照按原研究绑定留档。2026-11-28 使用 `20261124` 对四道预注册题做真实配对，八侧首次运行交付六份答案。H03、H04 两侧首查同序且均交付，H01、H02 的 MCP 首查被宿主工具审批拦截，补跑待确认。两组有效配对中，证据锚点覆盖相同，MCP 侧的关键结论均有引用支持。[Quick 收尾](research/incremental-recovery-20261126.md#恢复版-quick-收尾) · [四题真实配对](research/mcp-agentic-rag-live-pair-20261128.md)
 
 2026-11-23 第二批实现了 G5 证据利用策略 `gc-g5-official-5` 和 Windows 本地聊天接口修订号 4。新版 G5 可从已排序候选按页选读，按可核验位置保存父级正文，优先入包已选和主动回读的关键片段，并区分引用绑定、缺失和失败。查证面板可以分别核对引用和父级上下文。离线复验覆盖 G6/G7 固定排名、选读和组包。新版保留为显式试验，工作台和本地聊天的新真实批次默认仍用 `gc-g5-official-4`。[Generation 合同](phases/clean-generation-v1.md#evidence-quality-profile) · [产品合同](phases/local-chat-v1.md) · [第二批复验记录](research/clean-generation-g5-evidence-evaluation-20261123.md)
 
